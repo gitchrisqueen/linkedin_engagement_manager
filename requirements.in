@@ -1,0 +1,21 @@
+# Core libraries
+selenium           # For browser automation
+chromedriver-autoinstaller  # For installing ChromeDriver
+pyvirtualdisplay   # For running a virtual display
+mysql-connector-python  # For MySQL database interaction
+python-dotenv      # For loading environment variables from .env files
+
+
+# AI/ML and text processing
+openai             # For AI-based content generation
+
+# Optional (if you want to use Flask/FastAPI for the web dashboard)
+flask              # For creating a simple web interface
+
+# Task scheduling
+celery             # For scheduling tasks like posting at specific times
+redis              # Celery requires Redis as a message broker
+
+# Linting and Formatting (optional, useful for development)
+flake8             # For linting
+black              # For code formatting
