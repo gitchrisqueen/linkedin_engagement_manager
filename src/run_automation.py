@@ -490,7 +490,7 @@ Only respond with your final comment once you are satisfied with its quality and
     return comment
 
 
-def post_comment(driver, wait, post, comment_text):
+def post_comment(driver, wait, comment_text):
     """Post a comment to the currently opened post in the driver window"""
 
     # Find the comment input area
@@ -709,7 +709,7 @@ def automate_commenting(driver, wait):
         #    time.sleep(random.uniform(0.05, 0.15))  # Simulate human typing speed
 
         # Comment out the actual posting of the comment for now
-        post_comment(driver, wait, post, comment_text)
+        post_comment(driver, wait, comment_text)
 
         # Close tab when done
         close_tab(driver)
@@ -776,6 +776,26 @@ def start_process():
 
     # Close the browser
     driver.quit()
+
+def automate_profile_viewer_dms(driver, wait):
+    #Navigate to profile view page
+    driver.get("https://www.linkedin.com/analytics/profile-views/")
+
+
+    # Get Each Viewer within the last day (or time of dm run via database log)
+
+    # For each viewer# TODO: Use AI and memory to get insightful comments to send viewers
+
+        # If not connected send them a connection request
+            # Mention something specific about their profile or company to show genuine interest and that you've done your research
+
+
+        # If they are connected
+            # engage with their content
+
+            # Send DM - offer something of value—whether it's insights, resources, or potential collaboration opportunities.
+
+
 
 
 if __name__ == "__main__":
