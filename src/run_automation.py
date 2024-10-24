@@ -1,5 +1,8 @@
+import atexit
+import json
 import os
 import random
+import signal
 import sys
 import threading
 import time
@@ -20,6 +23,10 @@ from selenium.webdriver.remote.webdriver import WebDriver
 from selenium.webdriver.remote.webelement import WebElement
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.support.wait import WebDriverWait
+
+from linked_in_profile import LinkedInProfile
+from utilities.date import get_datetime
+from utilities.linked_in_scrapper import returnProfileInfo
 
 # Load .env file
 load_dotenv()
@@ -115,6 +122,14 @@ def are_you_satisfied():
         return are_you_satisfied() == default_value
 
 
+def create_folder_if_not_exists(folder_path):
+    if not os.path.exists(folder_path):
+        os.makedirs(folder_path)
+        # myprint(f"Folder '{folder_path}' created.")
+    # else:
+    # myprint(f"Folder '{folder_path}' already exists.")
+
+
 def create_driver():
     # Setup Selenium options (headless for Docker use)
     options = Options()
@@ -129,8 +144,18 @@ def create_driver():
     options.add_argument("window-size=1280,800")
     options.add_argument(
         "user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/74.0.3729.169 Safari/537.36")
+
+    # Create a sub_folder for the current user to use as the profile folder
+    # Get the directory of the current file
+    current_dir = os.path.dirname(os.path.abspath(__file__))
+
+    # Define the local path relative to the current file
+    profile_folder_path = os.path.join(current_dir, 'selenium_profiles', LI_USER)
+
+    create_folder_if_not_exists(profile_folder_path)
+
     options.add_argument(
-        "user-data-dir=/Users/christopherqueen/workspace/linkedin_engagement_manager/src/selenium_profile")  # This is to keep the browser logged in between runs
+        "user-data-dir=" + profile_folder_path)  # This is to keep the browser logged in between runs
 
     # Set up the Chrome driver
     driver = webdriver.Chrome(options=options)
@@ -550,12 +575,14 @@ def post_comment(driver, wait, comment_text):
             if like_button:
                 choices.append(like_button)
             celebrate_button = get_element_wait_retry(driver, wait, '//button[contains(@aria-label, "Celebrate")]',
-                                                      "Finding Celebrate Button", element_always_expected=False, max_try=1)
+                                                      "Finding Celebrate Button", element_always_expected=False,
+                                                      max_try=1)
             if celebrate_button:
                 choices.append(celebrate_button)
             insightful_button = get_element_wait_retry(driver, wait,
                                                        '//button[contains(@aria-label, "Insightful")]',
-                                                       "Finding Insightful Button", element_always_expected=False, max_try=1)
+                                                       "Finding Insightful Button", element_always_expected=False,
+                                                       max_try=1)
             if insightful_button:
                 choices.append(insightful_button)
             button_to_click = random.choice(choices)
@@ -714,7 +741,6 @@ def automate_commenting(driver, wait):
         # Close tab when done
         close_tab(driver)
 
-
     # Switch back to tab
     driver.switch_to.window(current_tab)
 
@@ -752,6 +778,211 @@ def test_ai_responses():
         myprint(f"AI Generated Comment: {comment_text}")
 
 
+def convert_viewed_on_to_date(viewed_on):
+    viewed_on = re.sub(r'(?i)viewed', '', viewed_on)
+    # Change 'w' to 'week'
+    viewed_on = re.sub(r'(?i)w', 'week', viewed_on)
+    return get_datetime(viewed_on)
+
+
+def automate_profile_viewer_dms(driver, wait):
+    # Navigate to profile view page
+    driver.get("https://www.linkedin.com/analytics/profile-views/")
+
+    viewed_on_xpath = './/div[contains(@class,"artdeco-entity-lockup__caption ember-view")]'
+
+    while True:  # Keep looping until we find a viewed on date out of range
+        # Get Each Viewer within the last day (or time of dm run via database log)
+        viewer_elements = get_elements_as_list_wait_stale(wait,
+                                                          '//ul[@aria-label="List of Entities"]//a[contains(@href,"linkedin.com/in") and not(contains(@aria-label,"Update"))]',
+                                                          "Finding Profile Viewers")
+
+        # myprint(f"Viewers count: {len(viewer_elements)}")
+
+        if len(viewer_elements) > 0:
+            # myprint("Here 1")
+            # Get the last viewer
+            last_viewer = viewer_elements[-1]
+            # myprint("Here 2")
+            # Extract the viewer's name
+            name_element = last_viewer.find_element(By.XPATH,
+                                                    './/div[contains(@class,"artdeco-entity-lockup__title")]/span/span[1]')
+            # myprint("Here 3")
+            if name_element:
+                last_viewer_name = getText(name_element)
+                # myprint(f"Last Viewer Name: {last_viewer_name}")
+            else:
+                last_viewer_name = random.choice(["John", "Jane"]) + " Doe"
+                myprint("Could not find name of last viewer")
+
+            last_viewed_on_element = last_viewer.find_element(By.XPATH, viewed_on_xpath)
+            if last_viewed_on_element:
+                last_viewed_on = getText(last_viewed_on_element).strip()
+                # myprint(f"Last Viewed on: {last_viewed_on}")
+
+                # Convert viewed on to date
+                last_viewed_date = convert_viewed_on_to_date(last_viewed_on)
+                # myprint(f"Last Viewed on Date: {last_viewed_date}")
+
+                # if the last viewed on date is Greater than 24 hours break the while loop
+                if (datetime.now() - last_viewed_date).days > 1:  # TODO: Change this to 1
+                    # myprint("Last viewed on date is more than 24 hours ago")
+                    break  # Break the while loop
+            else:
+                myprint(f"Could not find viewed on element for {last_viewer_name}")
+
+            # Scroll down to get more elements
+            driver.execute_script("window.scrollTo(0, document.body.scrollHeight);")
+            time.sleep(2)
+
+        else:
+            break  # Break the while loop
+
+    # myprint(f"Viewers: {str(viewer_elements)}")
+    myprint(f"Final Viewers count: {len(viewer_elements)}")
+
+    try:
+        # Filter the viewers by date within the last day
+        viewer_elements = [e for e in viewer_elements if (datetime.now() - convert_viewed_on_to_date(
+            getText(e.find_element(By.XPATH, viewed_on_xpath)))).days <= 1]
+    except Exception as e:
+        myprint(f"Error filtering viewers by date: {e}")
+
+    myprint(f"Filtered Viewers count: {len(viewer_elements)}")
+
+    current_tab = driver.current_window_handle
+    handles = driver.window_handles
+
+    # Get all the viewer names and urls into list so that elements dont go stale
+    viewer_names = [
+        getText(e.find_element(By.XPATH, './/div[contains(@class,"artdeco-entity-lockup__title")]/span/span[1]')) for e
+        in viewer_elements]
+    viewer_urls = [e.get_attribute('href') for e in viewer_elements]
+    # Merge them into a dictionary to iterate over
+    viewer_data = dict(zip(viewer_names, viewer_urls))
+
+    # Get the viewed data from each element and filter by a day ago or specific date
+    for viewer_name, viewer_url in viewer_data.items():
+        # Switch back to tab
+        driver.switch_to.window(current_tab)
+
+        myprint(f"Viewer Name: {viewer_name}")
+        myprint(f"Viewer URL: {viewer_url}")
+
+        # Wait for the new window or tab
+        driver.switch_to.new_window('tab')
+        wait.until(EC.new_window_is_opened(handles))
+
+        # Switch to viewer_url
+        driver.get(viewer_url)
+
+        # Send a DM to the viewer
+        send_dm(driver, wait, viewer_url, viewer_name)
+
+        # Close tab when done
+        close_tab(driver)
+
+
+def get_linkedin_profile_from_url(driver, wait, profile_url):
+    if profile_url not in driver.current_url:
+        # Open the profile URL
+        driver.get(profile_url)
+
+    # Get the profile data
+    profile_data = {}
+
+    # Get the company name
+    company_element = get_element_wait_retry(driver, wait, '//button[contains(@aria-label,"Current company")]',
+                                             "Finding Company Name", element_always_expected=False)
+
+    companyName = None
+    if company_element:
+        companyName = getText(company_element)
+
+    profile_data = returnProfileInfo(driver, profile_url, companyName)
+
+    # Use json to output to string
+    # myprint(json.dumps(profile_data, indent=4))
+
+    return profile_data
+
+
+def get_ai_description_of_profile(linked_in_profile: LinkedInProfile):
+    # Use json to output to string
+    linked_in_profile_json = linked_in_profile.model_dump_json()
+    prompt = f"""Please tell me what appears to be this person's personal interest based on their current job, skills, and recent activities.
+             A short summary of your analysis of around 500 characters is all that is needed.
+             Person: {linked_in_profile_json}"""
+
+    myprint(f"Prompt: {prompt}")
+
+    content = [{"type": "text", "text": prompt}]
+
+    # System prompt to be included in every request
+    system_prompt = {
+        "role": "system",
+        "content": f"""Act like a professional career coach and personality analyst with over 20 years of experience in understanding human behavior through social media profiles, particularly LinkedIn. Your expertise is in evaluating profiles to determine personal and professional character traits based on the content of their work experience, endorsements, skills, recommendations, posts, and interactions.
+
+Your objective is to thoroughly analyze LinkedIn profile data to extract insights about the individual’s character traits, such as leadership, teamwork, creativity, reliability, adaptability, communication skills, and more. Use subtle cues from the person's descriptions of job roles, their endorsements from others, the language used in their recommendations, and their professional interactions to form a comprehensive assessment. Ensure to identify both overt and nuanced traits, and support each finding with examples from the profile content. Pay special attention to the consistency between the skills endorsed by others and the responsibilities listed by the individual.
+
+Follow these steps:
+
+Start by identifying the general tone and language used in the profile, which may indicate personality traits like enthusiasm, confidence, or humility.
+Examine the person’s job titles and descriptions to identify traits such as leadership, initiative, and problem-solving abilities.
+Analyze the endorsements and recommendations, looking for patterns in how others describe the individual. Highlight any common traits mentioned (e.g., dependability, collaboration).
+Evaluate posts or comments for signs of professional engagement, thought leadership, or community involvement.
+Conclude with a comprehensive summary that combines these insights into a clear picture of the individual’s character traits, citing specific parts of the profile to support your findings.
+Take a deep breath and work on this problem step-by-step."""
+    }
+
+    # User prompt to be sent with each API call
+    user_message = {
+        "role": "user",
+        "content": content
+    }
+
+    # Call the API with the system and user prompt only (no memory of past prompts)
+    response = client.chat.completions.create(
+        model="gpt-4o-mini",  # Specify the model you want to use
+        messages=[system_prompt, user_message],  # System prompt + current user prompt
+        # temperature=0.3,  # Adjust this parameter as per your needs
+        # max_tokens=150  # Set token limit as required
+    )
+
+    # Extract and return the model's response
+    comment = response.choices[0].message.content.strip()
+    return comment
+
+
+def send_dm(driver, wait, viewer_url, viewer_name):
+    myprint(f"Sending DM to Viewer: {viewer_name}")
+
+    profile_data = get_linkedin_profile_from_url(driver, wait, viewer_url)
+    if profile_data:
+        profile = LinkedInProfile(**profile_data)
+        message = profile.generate_personalized_message()
+        myprint(message)
+
+        # Send the message
+
+        # TODO: Use AI and memory to get insightful comments to send viewers
+
+        if profile.is_1st_connection:
+            myprint("We Are 1st Connections")
+            # engage with their content (Ask AI which of their recent activities is most relevant to my profile
+
+            # Send DM - offer something of value—whether it's insights, resources, or potential collaboration opportunities.
+        else:
+            myprint(f"We Are {profile.connection} Connections")
+            # If not connected send them a connection request
+            # Mention something specific about their profile or company to show genuine interest and that you've done your research
+
+
+
+    else:
+        myprint(f"Failed to get profile data for {viewer_name}")
+
+
 def start_process():
     # Set Timer for 3 minutes
     time_in_secs = 60 * 15
@@ -763,6 +994,15 @@ def start_process():
     driver = create_driver()
     wait = get_driver_wait(driver)
 
+    def signal_handler(sig, frame):
+        final_method(driver)
+
+    # Register the signal handler for SIGINT
+    signal.signal(signal.SIGINT, signal_handler)
+
+    # Register the final_method to be called on exit
+    atexit.register(final_method, driver)
+
     login_to_linkedin(driver, wait)
     # test_already_commented(driver, wait)
     # automate_commenting(driver, wait)
@@ -770,33 +1010,118 @@ def start_process():
     # Create the countdown timer in a separate thread
     with ThreadPoolExecutor(max_workers=5) as executor:
         executor.submit(countdown_timer, time_in_secs)
-        executor.submit(automate_commenting, driver, wait)
+        # executor.submit(automate_commenting, driver, wait) # TODO: Uncomment this line
+        executor.submit(automate_profile_viewer_dms, driver,
+                        wait)  # TODO: Make this wait till there 10 min or less left on timer
 
     myprint("Time is up. Closing the browser")
 
+    final_method(driver)
+
+
+def final_method(driver):
+    global stop_post_commenting_thread
+    stop_post_commenting_thread.set()  # Set the flag to stop other threads
     # Close the browser
     driver.quit()
-
-def automate_profile_viewer_dms(driver, wait):
-    #Navigate to profile view page
-    driver.get("https://www.linkedin.com/analytics/profile-views/")
+    myprint("Program has exited.")
+    sys.exit(0)
 
 
-    # Get Each Viewer within the last day (or time of dm run via database log)
-
-    # For each viewer# TODO: Use AI and memory to get insightful comments to send viewers
-
-        # If not connected send them a connection request
-            # Mention something specific about their profile or company to show genuine interest and that you've done your research
-
-
-        # If they are connected
-            # engage with their content
-
-            # Send DM - offer something of value—whether it's insights, resources, or potential collaboration opportunities.
+def test_dates():
+    myprint(f"Testing dates | 1d ago: {convert_viewed_on_to_date('Viewed 1d ago')}")
+    myprint(f"Testing dates | 5d ago: {convert_viewed_on_to_date('viewed 5d ago')}")
+    myprint(f"Testing dates | 1w ago: {convert_viewed_on_to_date('Viewed 1w ago')}")
+    myprint(f"Testing dates | 1mo ago: {convert_viewed_on_to_date('Viewed 1mo ago')}")
 
 
+def test_linked_in_profile():
+    # Example usage with mutual connections being a mix of strings and LinkedInProfile objects
+    profile_data = {
+        "full_name": "Jane Doe",
+        "company_name": "Tech Innovators",
+        "industry": "Technology",
+        "profile_url": "https://www.linkedin.com/in/janedoe",
+        "recent_activity": ["AI in marketing"],
+        "mutual_connections": [
+            "John Smith",
+            LinkedInProfile(full_name="Emily Davis", company_name="DataCorp")
+        ],
+        "endorsements": ["Marketing Strategy", "Digital Advertising"],
+        "education": "Harvard Business School",
+        "certifications": ["Google Analytics Certified"],
+        "awards": ["Top 50 Women in Tech 2022"],
+        "groups": ["Women in Tech", "AI Enthusiasts"],
+        "interests": ["Marketing Analytics", "AI Innovations"]
+    }
 
+    profile = LinkedInProfile(**profile_data)
+
+    # Generate a personalized message
+    message = profile.generate_personalized_message()
+    myprint(message)
+
+    # Print a summary of the profile
+    myprint(profile.profile_summary)
+
+
+def test_get_linkedin_profile_from_url():
+    driver = create_driver()
+    wait = get_driver_wait(driver)
+
+    login_to_linkedin(driver, wait)
+
+    # profile_url = "https://www.linkedin.com/in/christopherqueen"
+    profile_url = "https://www.linkedin.com/in/eric-partaker-5560b92"
+    profile_data = get_linkedin_profile_from_url(driver, wait, profile_url)
+
+    if profile_data:
+        myprint("Profile data:")
+        myprint(json.dumps(profile_data, indent=4))
+        profile = LinkedInProfile(**profile_data)
+        myprint(profile.profile_summary)
+    else:
+        myprint("Failed to get profile data")
+
+    driver.quit()
+
+
+def test_send_dm():
+    driver = create_driver()
+    wait = get_driver_wait(driver)
+
+    login_to_linkedin(driver, wait)
+
+    # profile_url = "https://www.linkedin.com/in/christopherqueen"
+    profile_url = "https://www.linkedin.com/in/eric-partaker-5560b92"
+    send_dm(driver, wait, profile_url, "Eric Partaker")
+
+    driver.quit()
+
+
+def test_describe_profile():
+    driver = create_driver()
+    wait = get_driver_wait(driver)
+
+    login_to_linkedin(driver, wait)
+
+    profile_url = "https://www.linkedin.com/in/christopherqueen"
+
+    profile_data = get_linkedin_profile_from_url(driver, wait, profile_url)
+
+    if profile_data:
+        profile = LinkedInProfile(**profile_data)
+        description = get_ai_description_of_profile(profile)
+        myprint(description)
+
+    else:
+        myprint("Failed to get profile data")
+
+    driver.quit()
+
+
+from datetime import datetime
+import re
 
 if __name__ == "__main__":
     # Create the driver
@@ -805,6 +1130,12 @@ if __name__ == "__main__":
     # test_already_commented(driver, wait)
 
     # test_ai_responses()
+    # test_dates()
+    # test_linked_in_profile()
+    # test_get_linkedin_profile_from_url()
+    test_describe_profile()
+    # test_send_dm()
+    exit(0)
 
     start_process()
     myprint("Process finished")

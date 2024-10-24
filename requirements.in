@@ -19,3 +19,7 @@ redis              # Celery requires Redis as a message broker
 # Linting and Formatting (optional, useful for development)
 flake8             # For linting
 black              # For code formatting
+
+# Utilities
+dateparser         # For parsing dates from text
+bs4                # For web scraping
