@@ -158,3 +158,12 @@ def convert_datetime_to_start_of_day(dt: DT.datetime) -> DT.datetime:
 
 def convert_date_to_datetime(date: DT.date) -> DT.datetime:
     return DT.datetime.combine(date, DT.datetime.min.time())
+
+
+def convert_viewed_on_to_date(viewed_on):
+    viewed_on = re.sub(r'(?i)viewed', '', viewed_on)
+    viewed_on = re.sub(r'(?i)edited', '', viewed_on)
+    viewed_on = re.sub(r'(?i)•', '', viewed_on)
+    # Change 'w' to 'week'
+    viewed_on = re.sub(r'(?i)w', 'week', viewed_on)
+    return get_datetime(viewed_on.strip())

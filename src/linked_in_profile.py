@@ -1,5 +1,6 @@
 import re
-from typing import List, Optional, Union, Dict
+from datetime import datetime
+from typing import List, Optional, Union
 
 from pydantic import BaseModel, HttpUrl, Field, field_validator
 
@@ -7,6 +8,16 @@ from pydantic import BaseModel, HttpUrl, Field, field_validator
 class LinkedInSkill(BaseModel):
     name: str = None
     endorsements: Optional[int] = None
+
+
+class LinkedInActivity(BaseModel):
+    text: str = None
+    link: Optional[HttpUrl] = None
+    posted: Optional[datetime] = None
+
+    @property
+    def posted_on(self):
+        return self.posted.strftime("%b %d %Y")
 
 
 class LinkedInPosition(BaseModel):
@@ -40,7 +51,7 @@ class LinkedInProfile(BaseModel):
     connection: Optional[str] = None
 
     # Activity and Engagement
-    recent_activities: Optional[List[Dict]] = Field(default_factory=list)
+    recent_activities: Optional[List[LinkedInActivity]] = Field(default_factory=list)
 
     # Mutual connections can now be a list of either string names or LinkedInProfile objects
     mutual_connections: Optional[List[Union[str, 'LinkedInProfile']]] = Field(default_factory=list)
@@ -71,6 +82,14 @@ class LinkedInProfile(BaseModel):
         return value
 
     @property
+    def first_name(self):
+        return self.full_name.split()[0]
+
+    @property
+    def last_name(self):
+        return self.full_name.split()[-1]
+
+    @property
     def is_1st_connection(self):
         return '1' in self.connection
 
@@ -87,15 +106,17 @@ class LinkedInProfile(BaseModel):
             summary += "."
         return summary
 
-    def generate_personalized_message(self):
+    def generate_personalized_message(self, recent_activity_message: str = None, from_name: str = None):
         # Generate a personalized message based on the available profile information
         message = f"Hi {self.full_name},\n\n"
         if self.job_title:
             message += f"I noticed you are working as {self.job_title}."
         if self.company_name:
             message += f" Your work at {self.company_name} caught my attention."
-        if self.recent_activities:
-            message += f" I also saw your recent post about {self.recent_activities[0]}, and found it insightful."
+        if recent_activity_message:
+            message += f" Also, {recent_activity_message}"
+        else:
+            message += f" I also saw your recent post/comment and found it insightful."
 
         # Handle mutual connections, if they exist
         if self.mutual_connections:
@@ -108,5 +129,8 @@ class LinkedInProfile(BaseModel):
             message += f" We share a few mutual connections like {', '.join(connections[:2])}."
 
         message += "\n\nLet's connect and explore potential collaboration opportunities!"
+
+        if from_name:
+            message += f"\n\nBest regards,\n{from_name}"
 
         return message

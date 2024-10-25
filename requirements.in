@@ -1,6 +1,7 @@
 # Core libraries
 selenium           # For browser automation
 chromedriver-autoinstaller  # For installing ChromeDriver
+webdriver_manager  # For managing web drivers
 pyvirtualdisplay   # For running a virtual display
 mysql-connector-python  # For MySQL database interaction
 python-dotenv      # For loading environment variables from .env files

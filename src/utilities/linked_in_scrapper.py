@@ -1,11 +1,14 @@
 import copy
 import re
 import time
+import random
 from typing import List
 
 from bs4 import BeautifulSoup, PageElement
 from selenium import webdriver
 from utilities.date import get_linkedin_datetime_from_text
+from utilities.date import convert_viewed_on_to_date
+from utilities.date import convert_datetime_to_start_of_day
 
 start_identifier_map = {
     "education": 19,
@@ -138,7 +141,7 @@ def deep_compare(dict1, dict2):
 
 
 def get_page_source(driver, url, scroll_times=0):
-    if url not in driver.current_url:
+    if url != driver.current_url:
         # Open the profile URL
         driver.get(url)
         time.sleep(2)
@@ -152,8 +155,8 @@ def get_page_source(driver, url, scroll_times=0):
 
 
 # returns LinkedIn profile information
-def returnProfileInfo(driver: webdriver, employeeLink, companyName=None):
-    url = employeeLink
+def returnProfileInfo(driver: webdriver, profile_url, companyName=None):
+    url = profile_url
     source = get_page_source(driver, url, 0)
     profile = {}
     info = source.find('div', class_='mt2 relative')
@@ -166,7 +169,10 @@ def returnProfileInfo(driver: webdriver, employeeLink, companyName=None):
     profile['job_title'] = title
     if connection:
         profile['connection'] = connection.get_text().strip()
-    profile_li = source.find_all('li', class_='artdeco-list__item')
+    profile['profile_url'] = profile_url
+
+
+    #profile_li = source.find_all('li', class_='artdeco-list__item')
 
     # print_header("Profile Li(s)")
     # print(profile_li)
@@ -178,29 +184,29 @@ def returnProfileInfo(driver: webdriver, employeeLink, companyName=None):
     # print("Start Index: " + str(si), " | ", alltext[si][:20]) # TODO: For Debugging
     # print("Start Index: " + str(si), " | ", str(alltext))  # TODO: For Debugging
 
-    # Education
-    profile['education'] = get_profile_education(driver, employeeLink)
+    functions = [
+    ('education', lambda: get_profile_education(driver, profile_url)),
+    ('experiences', lambda: get_profile_experiences(driver, profile_url)),
+    ('certifications', lambda: get_profile_certifications(driver, profile_url)),
+    ('skills', lambda: get_profile_skills(driver, profile_url)),
+    ('recent_activities', lambda: get_profile_recent_activity(driver, profile_url))
+    ]
 
-    # Experiences
-    profile['experiences'] = get_profile_experiences(driver, employeeLink)
+    # Randomizing the function calls to appear natural and avoid detection
+    random.shuffle(functions)
 
-    # Certifications
-    profile['certifications'] = get_profile_certifications(driver, employeeLink)
-
-    # Skills
-    profile['skills'] = get_profile_skills(driver, employeeLink)
-
-    # Recent Activity
-    profile['recent_activity'] = get_profile_recent_activity(driver, employeeLink)
+    for key, func in functions:
+        #print("Calling function to get: ", key)
+        profile[key] = func()
 
     # Get the industry - TODO: This may not be publicly visible
     # TODO: Get the mutual connections
     # TODO: Get the endorsements
     # TODO: Get the awards
 
-    print_header("Profile")
-    print(profile)
-    print_header("")
+    #print_header("Profile")
+    #print(profile)
+    #print_header("")
 
     return profile
 
@@ -230,31 +236,50 @@ def get_profile_education(driver, employeeLink):
 
 def get_profile_recent_activity(driver, employeeLink):
     url = employeeLink + '/recent-activity/all/'
-    source = get_page_source(driver, url, 1)
-    profile_activity = []
-    activities = source.find_all('li')
+    source = get_page_source(driver, url, 2)
+    #activities = source.find_all('li')
     # Find all the links that have 'activity' in the url
     links = source.find_all('div',attrs={'data-urn': re.compile('activity')})
     found_links = ['https://www.linkedin.com/feed/update/' + link.get('data-urn') for link in links]
+    texts = source.find_all('div', class_='update-components-text')
+    found_text = [text.getText().strip() for text in texts]
+    posted_dates = source.select('div[class*="fie-impression-container"] div.relative span[class*="update-components-actor__sub-description"] span[aria-hidden="true"]')
+    found_dates = [date.getText().strip() for date in posted_dates]
 
     #print_header("Recent Activity")
     #print("Found Links", found_links)
+    #print("Found Test", found_text)
 
-    for a in activities:
+    # combine the profile activity and the found links into a mapped dict list
+    profile_activity = [{'text': text, 'link': link, 'posted': convert_datetime_to_start_of_day(convert_viewed_on_to_date(date+" ago"))} for text, link, date in zip(found_text, found_links, found_dates)]
+
+    #print("Recent Activity Links", profile_activity)
+
+    return profile_activity
+
+    """for a in activities:
         row = source_as_row(a)
         si = get_start_identifier(row)
         # Print the start identifier and the first 20 characters of the row from the start identifier
         # print("Start Index: " + str(si), " | ", row[si][:40])
-        #print("Start Index: " + str(si), " | ", str(row))
+        print("Start Index: " + str(si), " | ", str(row))
         rai = start_identifier_map['recent_activity_text']
         if si == start_identifier_map['recent_activity_number'] and rai < len(row) and row[rai]:
             activity = row[rai]
             profile_activity.append(activity)
 
+    print("Profile Activity", profile_activity)
+
+
+
     # combine the profile activity and the found links into a mapped dict list
     profile_activity = [{'text': activity, 'link': link} for activity, link in zip(profile_activity, found_links)]
 
-    return profile_activity
+    print("Recent Activity Links", profile_activity)
+
+    exit(0)
+
+    return profile_activity"""
 
 
 def get_profile_experiences(driver, employeeLink):
@@ -412,24 +437,37 @@ def get_profile_certifications(driver, employeeLink):
         row = source_as_row(c)
         # print(row)
         si = get_start_identifier(row)
-
         if si == start_identifier_map['cert_name']:
+            # Reset vars
+            company = None
+            issued_on = None
+            cert_skills = None
+            credential_id=None
+
             name = row[si][:len(row[si]) // 2]
+
             cbi = start_identifier_map['cert_by']
-            company = row[cbi][:len(row[cbi]) // 2]
+            if cbi < len(row) and row[cbi]:
+                company = row[cbi][:len(row[cbi]) // 2]
+
             ioi = start_identifier_map['cert_on']
-            issued_on = row[ioi][:len(row[ioi]) // 2]
-            # Remove Issued from prefix
-            issued_on = issued_on.replace("Issued ", "").strip()
+            if ioi < len(row) and row[ioi]:
+                issued_on = row[ioi][:len(row[ioi]) // 2]
+                # Remove Issued from prefix
+                issued_on = issued_on.replace("Issued ", "").strip()
+
             ski = start_identifier_map['cert_skills']
-            cert_skills = row[ski][:len(row[ski]) // 2]
-            # remove Skills: from prefix
-            cert_skills = cert_skills.replace("Skills: ", "").strip()
-            cert_skills = cert_skills.split(' · ')
+            if ski < len(row) and row[ski]:
+                cert_skills = row[ski][:len(row[ski]) // 2]
+                # remove Skills: from prefix
+                cert_skills = cert_skills.replace("Skills: ", "").strip()
+                cert_skills = cert_skills.split(' · ')
+
             cci = start_identifier_map['cert_credential']
-            credential_id = row[cci][:len(row[cci]) // 2]
-            # Remove "Credential ID " from prefix
-            credential_id = credential_id.replace("Credential ID ", "").strip()
+            if cci < len(row) and row[cci]:
+                credential_id = row[cci][:len(row[cci]) // 2]
+                # Remove "Credential ID " from prefix
+                credential_id = credential_id.replace("Credential ID ", "").strip()
 
             # Create a new certification dictionary and add it to the profile's certifications list.    '
             certification = {"name": name}
@@ -468,7 +506,7 @@ def get_profile_skills(driver, employeeLink):
         elif si == start_identifier_map['endorsements']:
             # Find endorsements
             endorsements = row[si][:len(row[si]) // 2]
-            print("Endorsements: ", endorsements)
+            #print("Endorsements: ", endorsements)
             # extract only the number from the endorsements text
             endorsement_numbers = re.findall(r'\d+', endorsements)
             if endorsement_numbers:
@@ -514,7 +552,10 @@ def get_start_end_dates(line):
         # print("StartEnd List: ", startendlist)
         start_date = startendlist[0]
         # print("Start Date: ", start_date)
-        end_date = startendlist[1]
+        if len(startendlist)>1:
+            end_date = startendlist[1]
+        else:
+            end_date = "Present"
         # print("End Date: ", end_date)
     else:
         # The currently work here
