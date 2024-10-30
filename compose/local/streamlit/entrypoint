@@ -1,0 +1,26 @@
+#!/bin/bash
+
+# if any of the commands in your code fails for any reason, the entire script fails
+set -o errexit
+# fail exit if one of your pipe command fails
+set -o pipefail
+# exits if any of your variables is not set
+set -o nounset
+
+# Retry mechanism
+RETRIES=3
+until /wait-for-it ${MYSQL_HOST}:${MYSQL_PORT} --timeout=10 --strict -- echo "MySQL is up and running"; do
+  echo "MySQL is unavailable - retrying in 10 seconds..."
+  sleep 10
+  ((RETRIES--))
+  if [ $RETRIES -le 0 ]; then
+    echo "MySQL is still unavailable after multiple attempts - exiting."
+    exit 1
+  fi
+done
+
+# Activate the virtual environment
+# source /.venv/bin/activate
+# poetry shell
+
+exec "$@"

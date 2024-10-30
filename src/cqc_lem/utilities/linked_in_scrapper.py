@@ -6,9 +6,9 @@ from typing import List
 
 from bs4 import BeautifulSoup, PageElement
 from selenium import webdriver
-from utilities.date import get_linkedin_datetime_from_text
-from utilities.date import convert_viewed_on_to_date
-from utilities.date import convert_datetime_to_start_of_day
+from cqc_lem.utilities.date import get_linkedin_datetime_from_text
+from cqc_lem.utilities.date import convert_viewed_on_to_date
+from cqc_lem.utilities.date import convert_datetime_to_start_of_day
 
 start_identifier_map = {
     "education": 19,
@@ -203,6 +203,8 @@ def returnProfileInfo(driver: webdriver, profile_url, companyName=None):
     # TODO: Get the mutual connections
     # TODO: Get the endorsements
     # TODO: Get the awards
+    # TODO: Get Interest
+    # TODO: Get Groups
 
     #print_header("Profile")
     #print(profile)

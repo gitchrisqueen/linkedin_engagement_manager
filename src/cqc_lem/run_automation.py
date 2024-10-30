@@ -12,9 +12,9 @@ from datetime import datetime
 from enum import Enum
 from typing import List
 
-import mysql.connector
 from dotenv import load_dotenv
 from openai import OpenAI
+from pyvirtualdisplay import Display
 from selenium import webdriver
 from selenium.common import NoSuchElementException, WebDriverException, TimeoutException, \
     StaleElementReferenceException, ElementClickInterceptedException, ElementNotInteractableException, \
@@ -30,21 +30,19 @@ from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.support.wait import WebDriverWait
 from webdriver_manager.chrome import ChromeDriverManager
 
-from linked_in_profile import LinkedInProfile
-from utilities.date import convert_viewed_on_to_date
-from utilities.linked_in_scrapper import returnProfileInfo
+from cqc_lem.linked_in_profile import LinkedInProfile
+# from celery import shared_task
+from cqc_lem.my_celery import app as shared_task
+from cqc_lem.utilities.date import convert_viewed_on_to_date
+from cqc_lem.utilities.env_constants import HEADLESS_BROWSER, USE_DOCKER_BROWSER
+from cqc_lem.utilities.linked_in_scrapper import returnProfileInfo
+from cqc_lem.utilities.utils import debug_function, myprint
 
 # Load .env file
 load_dotenv()
 
 MAX_WAIT_RETRY = 3
 WAIT_TIMEOUT = 3
-
-# Retrieve MySQL connection details from environment variables
-MYSQL_HOST = os.getenv('MYSQL_HOST')
-MYSQL_USER = os.getenv('MYSQL_USER')
-MYSQL_PASSWORD = os.getenv('MYSQL_PASSWORD')
-MYSQL_DATABASE = os.getenv('MYSQL_DATABASE')
 
 # Retrieve LinkedIn credentials from environment variables
 LI_USER = os.getenv('LI_USER')
@@ -60,12 +58,6 @@ client = OpenAI(
 # Global flag to indicate when to stop the thread
 stop_all_thread = threading.Event()
 time_remaining_seconds = 0
-
-
-def myprint(message):
-    sys.stdout.flush()
-    sys.stdout.write('\r' + message + '\n')
-    sys.stdout.flush()
 
 
 def countdown_timer(seconds):
@@ -92,26 +84,6 @@ def get_time_remaining_seconds():
 
 def get_time_remaining_minutes():
     return get_time_remaining_seconds() // 60
-
-
-def create_database():
-    conn = mysql.connector.connect(
-        host=MYSQL_HOST,
-        user=MYSQL_USER,
-        password=MYSQL_PASSWORD,
-        database=MYSQL_DATABASE
-    )
-
-    cursor = conn.cursor()
-    with open('schema.sql', 'r') as schema_file:
-        schema = schema_file.read()
-        cursor.execute(schema, multi=True)
-
-    conn.commit()
-    cursor.close()
-    conn.close()
-
-    myprint("Database creation finished!")
 
 
 class Satisfactory(Enum):
@@ -149,13 +121,89 @@ def create_folder_if_not_exists(folder_path):
     # myprint(f"Folder '{folder_path}' already exists.")
 
 
-def create_driver(headless: bool = True, create_copy: bool = False, port: int = 9515):
-    service = Service(ChromeDriverManager().install(), port=port)
+def get_docker_driver(headless=True):
+    options = getBaseOptions()
+    # options.headless = headless
+    if headless:
+        options = add_headless_options(options)
 
+    options.add_argument('--ignore-ssl-errors=yes')
+    options.add_argument('--ignore-certificate-errors')
+    driver = webdriver.Remote(
+        command_executor='http://chrome:4444/wd/hub',
+        options=options
+    )
+    if not headless:
+        driver.maximize_window()
+
+    return driver
+
+
+def add_headless_options(options: Options) -> Options:
+    # options.add_argument("--headless=new") # <--- DOES NOT WORK
+    # options.add_argument("--headless=chrome")  # <--- WORKING
+    options.add_argument("--headless")  # <--- ???
+
+    # Additional options while headless
+    options.add_argument('--start-maximized')  # Working
+    options.add_argument("--window-size=1920x1080")  # Working
+    options.add_argument('--disable-popup-blocking')  # Working
+    options.add_argument('--incognito')  # Working
+    options.add_argument('--no-sandbox')  # Working
+    options.add_argument('--enable-automation')  # Working
+    options.add_argument('--disable-gpu')  # Working
+    options.add_argument('--disable-extensions')  # Working
+    options.add_argument('--disable-infobars')  # Working
+    options.add_argument('--disable-browser-side-navigation')  # Working
+    options.add_argument('--disable-dev-shm-usage')  # Working
+    options.add_argument('--disable-features=VizDisplayCompositor')  # Working
+    options.add_argument('--dns-prefetch-disable')  # Working
+    options.add_argument("--force-device-scale-factor=1")  # Working
+
+    options.set_capability('goog:loggingPrefs', {'performance': 'ALL'})
+
+    return options
+
+
+def getBaseOptions(base_download_directory: str = None):
+    options = Options()
+    # options.add_argument("--incognito") # TODO: May cause issues with tabs
+    if base_download_directory is None:
+        base_download_directory = os.getcwd()
+    prefs = {"download.default_directory": base_download_directory + '/downloads',
+             "download.prompt_for_download": False,
+             "download.directory_upgrade": True,
+             "plugins.always_open_pdf_externally": True}
+    options.add_experimental_option("prefs", prefs)
+
+    options.add_argument('--disable-gpu')
+    options.add_argument('--no-sandbox')
+    options.add_argument('--disable-dev-shm-usage')
+
+    # Options to make us undetectable (Review https://amiunique.org/fingerprint from the browser to verify)
+    options.add_argument("window-size=1920x1080")
+    options.add_argument(
+        "user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/74.0.3729.169 Safari/537.36")
+
+    # options.page_load_strategy = 'eager'  # interactive
+    # options.page_load_strategy = "normal"  # complete
+
+    return options
+
+
+def create_driver(headless: bool = HEADLESS_BROWSER, create_copy: bool = False, port: int = 9515):
     # Setup Selenium options (headless for Docker use)
     options = Options()
     if headless:
         options.add_argument('--headless')  # Run in headless mode for Docker
+        display = Display(visible=False, size=(800, 800))
+        display.start()
+
+    driver_path = ChromeDriverManager().install()
+    print(f"Chrome Driver Path: {driver_path}")
+
+    service = Service(driver_path, port=port)
+
     options.add_argument('--disable-gpu')
     options.add_argument('--no-sandbox')
     options.add_argument('--disable-dev-shm-usage')
@@ -179,7 +227,7 @@ def create_driver(headless: bool = True, create_copy: bool = False, port: int = 
         current_dir = os.path.dirname(os.path.abspath(__file__))
 
         # Define the local path relative to the current file
-        profile_folder_path = os.path.join(current_dir, 'selenium_profiles', LI_USER)
+        profile_folder_path = os.path.join(current_dir, 'selenium_profiles')
 
         create_folder_if_not_exists(profile_folder_path)
 
@@ -205,9 +253,9 @@ def create_driver(headless: bool = True, create_copy: bool = False, port: int = 
         # Set up the Chrome driver options
         # Note: This will create a new profile for each run (not shared between runs)
         # options.add_argument("--user-data-dir=" + profile_folder_path)  # This is to keep the browser logged in between runs
-        options.add_argument("--profile-directory=" + profile_folder_path)
         options.add_argument(
-            "user-data-dir=" + profile_folder_path)  # This is to keep the browser logged in between runs
+            "user-data-dir=" + str(profile_folder_path))  # This is to keep the browser logged in between runs
+        options.add_argument("--profile-directory=" + LI_USER)
 
     # Set up the Chrome driver
     driver = webdriver.Chrome(service=service, options=options)
@@ -596,8 +644,13 @@ def generate_ai_response(post_content, profile: LinkedInProfile, post_img_url=No
     return comment
 
 
-def post_comment(driver, wait, comment_text):
+@debug_function
+def post_comment(driver, wait, post_link, comment_text):
     """Post a comment to the currently opened post in the driver window"""
+
+    if post_link != driver.current_url:
+        # Switch to post url
+        driver.get(post_link)
 
     # Find the comment input area
     comment_box = click_element_wait_retry(driver, wait,
@@ -733,7 +786,9 @@ def get_driver_wait(driver):
                          ])
 
 
-def automate_commenting(driver, wait):
+@debug_function
+@shared_task.task
+def automate_commenting(driver, wait, loop_for_duration=None):
     global stop_all_thread
 
     myprint("Starting Automate Commenting Thread...")
@@ -744,6 +799,8 @@ def automate_commenting(driver, wait):
 
     navigate_to_feed(driver, wait)
 
+    start_time = datetime.now()
+
     # Get 10 posts from the feed
     posts = get_feed_posts(driver, wait, num_posts=10)
 
@@ -751,7 +808,14 @@ def automate_commenting(driver, wait):
     handles = driver.window_handles
 
     for post in posts:
-        if stop_all_thread.is_set():
+        # break if it has been loop_for_duration seconds since the start time
+        if loop_for_duration:
+            elapsed_time = datetime.now() - start_time
+            if elapsed_time.total_seconds() >= loop_for_duration:
+                myprint("Loop duration reached. Stopping Automate Commenting thread...")
+                break
+        # Else do this (loop_for_duration overrides this break)
+        elif stop_all_thread.is_set():
             myprint("Stopping Automate Commenting thread...")
             break
 
@@ -775,20 +839,39 @@ def automate_commenting(driver, wait):
     driver.switch_to.window(current_tab)
 
 
-def automate_reply_commenting(driver, wait):
+@debug_function
+@shared_task.task
+def automate_reply_commenting(driver, wait, loop_for_duration=None):
     """"Reply to recent comments"""
     # TODO: Implement this function
 
     login_to_linkedin(driver, wait)
 
+    start_time = datetime.now()
+
+    while True:
+
+        myprint("Responding to Comments here...")
+
+        if loop_for_duration:
+            elapsed_time = datetime.now() - start_time
+            if elapsed_time.total_seconds() >= loop_for_duration:
+                myprint("Loop duration reached. Stopping Automate Reply Commenting thread...")
+                break
+        else:
+            break
+
+        time.sleep(10)  # Sleep for 10 seconds
+
     pass
 
 
-def automate_appreciation_dms(driver, wait):
+@debug_function
+@shared_task.task
+def automate_appreciation_dms(driver, wait, loop_for_duration=None):
     # TODO: Implement this function
 
     # After Accepting a Connection Request:
-
 
     # After Receiving a Recommendation:
 
@@ -796,10 +879,28 @@ def automate_appreciation_dms(driver, wait):
 
     # For a Successful Collaboration:
 
-    #General Appreciation:
+    # General Appreciation:
     # "Hi [Name], I really appreciate your insights on [topic]. Your perspective helped me see things differently, and I'm grateful for the opportunity to learn from you."
 
     login_to_linkedin(driver, wait)
+
+    start_time = datetime.now()
+
+    while True:
+
+        myprint("Sending Appreciations here...")
+
+        if loop_for_duration:
+            elapsed_time = datetime.now() - start_time
+            if elapsed_time.total_seconds() >= loop_for_duration:
+                myprint("Loop duration reached. Stopping Automate Appreciations thread...")
+                break
+        else:
+            break
+
+        time.sleep(10)  # Sleep for 10 seconds
+
+    pass
 
     pass
 
@@ -863,7 +964,7 @@ def generate_and_post_comment(driver, wait, post_link, my_profile: LinkedInProfi
     #    time.sleep(random.uniform(0.05, 0.15))  # Simulate human typing speed
 
     # Comment out the actual posting of the comment for now
-    post_comment(driver, wait, comment_text)
+    post_comment.delay(driver, wait, post_link, comment_text)
 
     myprint("Comment Posted")
 
@@ -909,12 +1010,19 @@ def test_ai_responses():
         myprint(f"AI Generated Comment: {comment_text}")
 
 
-def automate_profile_viewer_dms(driver, wait):
+@debug_function
+@shared_task.task
+def automate_profile_viewer_dms(driver, wait, loop_for_duration=None):
     global stop_all_thread
 
     # Wait until there are 10 minutes or less on the timer
     while True:
+        if loop_for_duration:
+            break  # This overrides the remaining time and threading setup
+
         remaining_minutes = get_time_remaining_minutes()
+
+        # Else do this (loop_for_duration overrides this break)
         if remaining_minutes <= 10:
             break
         # Sleep for the remaining time needed to be less than 10 minutes
@@ -931,6 +1039,8 @@ def automate_profile_viewer_dms(driver, wait):
 
     # Navigate to profile view page
     driver.get("https://www.linkedin.com/analytics/profile-views/")
+
+    start_time = datetime.now()
 
     viewed_on_xpath = './/div[contains(@class,"artdeco-entity-lockup__caption ember-view")]'
 
@@ -1007,7 +1117,12 @@ def automate_profile_viewer_dms(driver, wait):
     # Get the viewed data from each element and filter by a day ago or specific date
     for viewer_name, viewer_url in viewer_data.items():
 
-        if stop_all_thread.is_set():
+        if loop_for_duration:
+            elapsed_time = datetime.now() - start_time
+            if elapsed_time.total_seconds() >= loop_for_duration:
+                myprint("Loop duration reached. Stopping Automate Commenting thread...")
+                break
+        elif stop_all_thread.is_set():
             myprint("Stopping Automate Profile Viewers DMs thread...")
             break
 
@@ -1229,6 +1344,10 @@ def get_ai_message_refinement(original_message: str, character_limit: int = 300)
 def send_dm(driver, wait, my_profile: LinkedInProfile, viewer_url, viewer_name):
     myprint(f"Sending DM from: {my_profile.full_name} to: {viewer_name}")
 
+    if viewer_url != driver.current_url:
+        # Switch to viewer_url
+        driver.get(viewer_url)
+
     profile_data = get_linkedin_profile_from_url(driver, wait, viewer_url)
     if profile_data:
         profile = LinkedInProfile(**profile_data)
@@ -1267,9 +1386,12 @@ def send_dm(driver, wait, my_profile: LinkedInProfile, viewer_url, viewer_name):
             if not able_to_comment:
                 myprint("No activities, unable to or already left comment")
 
-            # TODO: Send DM - offer something of value—whether it's insights, resources, or potential collaboration opportunities.
-            # Generate something of value to offer
-            # Send actual DM
+                # TODO: Send DM - offer something of value—whether it's insights, resources, or potential collaboration opportunities.
+                # TODO: Generate something of value to offer
+                message = "Hi, I noticed we're connected on LinkedIn and wanted to reach out. I'm currently working on a project that I think you might find interesting. Would you be open to a quick chat to discuss it further?"
+
+                # Send actual DM
+                send_private_dm.delay(driver, wait, profile.profile_url, message)
         else:
             # myprint(f"We Are {profile.connection} Connections")
             # If not connected send them a connection request
@@ -1282,11 +1404,29 @@ def send_dm(driver, wait, my_profile: LinkedInProfile, viewer_url, viewer_name):
             myprint(f"Refined Response: {refined_response}")
 
             # Send connection request with this message
-            invite_to_connect(driver, wait, str(profile.profile_url), refined_response)
+            invite_to_connect.delay(driver, wait, str(profile.profile_url), refined_response)
     else:
         myprint(f"Failed to get profile data for {viewer_name}")
 
 
+@debug_function
+@shared_task.task
+def send_private_dm(driver, wait, profile_url, message):
+    """ Send dm message to a prole. Must be a 1st connection"""
+    login_to_linkedin(driver, wait)
+
+    # Open the profile URL
+    driver.get(profile_url)
+
+    # TODO: Add code to post the dm message
+    myprint("Sending DM: " + message)
+
+    dm_sent = False
+
+    return dm_sent
+
+
+@debug_function
 def invite_to_connect(driver: WebDriver, wait: WebDriverWait, connection_url, connection_message: str = None):
     if connection_url != driver.current_url:
         # Open the profile URL
@@ -1386,7 +1526,10 @@ def invite_to_connect(driver: WebDriver, wait: WebDriverWait, connection_url, co
 
 def get_driver_wait_pair():
     # Create the driver
-    driver = create_driver()
+    if USE_DOCKER_BROWSER:
+        driver = get_docker_driver()
+    else:
+        driver = create_driver()
     wait = get_driver_wait(driver)
     # Give some time for multiple calls
     time.sleep(2)
@@ -1399,9 +1542,6 @@ def start_process():
 
     # Set Timer for 3 minutes
     time_remaining_seconds = 60 * 15
-
-    # Make sure the database is created
-    # create_database() # TODO: Uncomment this line
 
     drivers_needed = 3
 
@@ -1433,7 +1573,7 @@ def start_process():
 
     myprint("Time is up. Closing the browser")
 
-    final_method([all_drivers])
+    final_method(all_drivers)
 
 
 def final_method(drivers: List[WebDriver]):

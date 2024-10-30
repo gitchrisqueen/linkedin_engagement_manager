@@ -3,17 +3,17 @@ from enum import Enum
 
 import chromedriver_autoinstaller
 from pyvirtualdisplay import Display
-from selenium_profile import webdriver
-from selenium_profile.common import NoSuchElementException, StaleElementReferenceException, ElementNotInteractableException, \
+from selenium import webdriver
+from selenium.common import NoSuchElementException, StaleElementReferenceException, ElementNotInteractableException, \
     TimeoutException, WebDriverException
-from selenium_profile.webdriver import ActionChains
-from selenium_profile.webdriver.chrome.options import Options
-from selenium_profile.webdriver.chrome.service import Service
-from selenium_profile.webdriver.common.by import By
-from selenium_profile.webdriver.remote.webdriver import WebDriver
-from selenium_profile.webdriver.remote.webelement import WebElement
-from selenium_profile.webdriver.support import expected_conditions as EC
-from selenium_profile.webdriver.support.wait import WebDriverWait
+from selenium.webdriver import ActionChains
+from selenium.webdriver.chrome.options import Options
+from selenium.webdriver.chrome.service import Service
+from selenium.webdriver.common.by import By
+from selenium.webdriver.remote.webdriver import WebDriver
+from selenium.webdriver.remote.webelement import WebElement
+from selenium.webdriver.support import expected_conditions as EC
+from selenium.webdriver.support.wait import WebDriverWait
 
 
 

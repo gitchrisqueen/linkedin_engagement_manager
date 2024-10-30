@@ -1,20 +1,39 @@
 
 services:
-  selenium-app:
-    build: .
-    container_name: selenium-app
+  web-app:
+    build:
+      context: .
+      dockerfile: ./compose/local/streamlit/Dockerfile
+    image: ${DOCKER_IMAGE_NAME}
+    container_name: web-app
+    command: /start
     depends_on:
       - mysql
+      - redis
     volumes:
-      - ./src:/app
+      - ./src:/app/src
+      # mount to the poetry distribution directory
+      #- .src:/app/dist
+
+      # Below used to override the start
+      - ./compose/local/streamlit/start:/start
     environment:
       - DISPLAY=:99
-      - MYSQL_HOST=${MYSQL_HOST}
-      - MYSQL_DATABASE=${MYSQL_DATABASE}
-      - MYSQL_USER=${MYSQL_USER}
-      - MYSQL_PASSWORD=${MYSQL_PASSWORD}
-    #ports:
-    #  - "5000:5000"  # For the web interface
+    env_file:
+      - .env
+    ports:
+      #  - "5000:5000"  # For the web interface
+      - "8000:8000"  # For API endpoints
+      - "${STREAMLIT_PORT}:${STREAMLIT_PORT}"  # For the streamlit app
+
+
+  redis:
+      image: redis:alpine
+      container_name: redis
+      volumes:
+        - redis_data:/data
+      ports:
+      - "6379:6379"
 
   mysql:
     image: mysql:8.0
@@ -25,9 +44,69 @@ services:
       MYSQL_USER: ${MYSQL_USER}
       MYSQL_PASSWORD: ${MYSQL_PASSWORD}
     ports:
-      - "3306:3306"
+      - "${MYSQL_PORT}:${MYSQL_PORT}"
     volumes:
       - db_data:/var/lib/mysql
+      - ./src/database/setup.sql:/docker-entrypoint-initdb.d/setup.sql
+
+  celery_worker:
+    image:  ${DOCKER_IMAGE_NAME}
+    container_name: celery_worker
+    command: /start-celeryworker
+    restart: always
+    #volumes:
+    #  - ./src:/app/src
+    volumes_from:
+      - web-app
+    env_file:
+      - .env
+    depends_on:
+      - redis
+      - mysql
+      - chrome
+
+  celery_beat:
+    image:  ${DOCKER_IMAGE_NAME}
+    container_name: celery_beat
+    command: /start-celerybeat
+    restart: always
+    #volumes:
+    # - ./src:/app/src
+    volumes_from:
+     - web-app
+    env_file:
+      - .env
+    depends_on:
+      - redis
+      - mysql
+
+  flower:
+    image:  ${DOCKER_IMAGE_NAME}
+    container_name: celery_flower
+    command: /start-flower
+    restart: always
+    #volumes:
+    #  - ./src:/app/src
+    volumes_from:
+      - web-app
+    env_file:
+      - .env
+    ports:
+      - 5557:5555
+    depends_on:
+      - redis
+      - mysql
+      - celery_worker
+  chrome:
+    image: selenium/standalone-chrome:latest
+    container_name: chrome
+    hostname: chrome
+    privileged: true
+    shm_size: 2g
+    ports:
+      - "4444:4444"
+      - "7900:7900"
 
 volumes:
   db_data:
+  redis_data:

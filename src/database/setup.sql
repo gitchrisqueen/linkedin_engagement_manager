@@ -9,7 +9,8 @@ CREATE TABLE IF NOT EXISTS posts (
     content TEXT NOT NULL,
     status ENUM('pending', 'approved', 'rejected', 'scheduled', 'posted') DEFAULT 'pending',
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    scheduled_at TIMESTAMP NULL
+    scheduled_time TIMESTAMP NULL
+    user_id INT NOT NULL
 );
 
 -- Table to log actions (comments, DMs, replies)
@@ -17,6 +18,7 @@ CREATE TABLE IF NOT EXISTS logs (
     id INT AUTO_INCREMENT PRIMARY KEY,
     action_type ENUM('comment', 'dm', 'reply', 'post') NOT NULL,
     post_id INT NULL,
+    post_url TEXT NOT NULL,
     message TEXT NOT NULL,
     result ENUM('success', 'failure') NOT NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,

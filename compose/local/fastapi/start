@@ -1,0 +1,6 @@
+#!/bin/bash
+
+set -o errexit
+set -o nounset
+
+uvicorn src.cqc_lem.api.main:app --reload

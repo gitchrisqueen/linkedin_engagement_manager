@@ -1,0 +1,130 @@
+[tool.poetry]
+name = "linkedin-engagement-manager"
+version = "0.1.0"
+description = ""
+authors = ["gitchrisqueen <christopher.queen@gmail.com>"]
+readme = "README.md"
+packages = [
+    { include = "cqc_lem", from = "src" },
+    { include = "cqc_lem_streamlit", from = "src" }
+
+]
+
+[tool.poetry.dependencies]
+#python = ">=3.9,<3.9.7 || >3.9.7,<4.0"
+python = ">=3.12,<4.0"
+# Core libraries
+selenium = "^4.25"
+chromedriver-autoinstaller = "^0.6"
+chromium = "^0.0"
+webdriver-manager = "^4.0"
+pyvirtualdisplay = "^3.0"
+mysql-connector-python = "^9.1"
+python-dotenv = "^1.0"
+
+# OpenAI
+openai = "^1.52.2"
+
+
+# Stream lit and compnents
+streamlit = "^1.32"
+streamlit-ext = "^0.1"
+streamlit-elements = "^0.1"
+extra-streamlit-components = "^0.1"
+
+# Aditional dependencies
+os-env = "^0.3"
+typing-extensions = "^4.12.2"
+bs4 = "^0.0.2"
+pandas = "^2.2.3"
+datetime = "^5.5"
+dateparser = "^1.2.0"
+celery = "^5.4.0"
+fastapi = "^0.115.4"
+uvicorn = "^0.32.0"
+markdownify = "^0.13.1"
+flower = "^2.0.1"
+redis = "^5.2.0"
+watchdog = "^5.0.3"
+streamlit-aggrid = "^1.0.5"
+requests = "^2.32.3"
+
+
+
+
+[tool.poetry.group.lint]
+optional = true
+
+[tool.poetry.group.lint.dependencies]
+ruff = "^0.1.5"
+
+[tool.poetry.group.dev]
+optional = true
+
+[tool.poetry.group.dev.dependencies]
+jupyter = "^1.0.0"
+setuptools = "^67.6.1"
+grandalf = "^0.8"
+
+
+[tool.poetry.group.test]
+optional = true
+
+[tool.poetry.group.test.dependencies]
+# The only dependencies that should be added are
+# dependencies used for running tests (e.g., pytest, freezegun, response).
+# Any dependencies that do not meet that criteria will be removed.
+pytest = "^7.3.0"
+freezegun = "^1.2.2"
+pytest-mock = "^3.10.0"
+syrupy = "^4.0.2"
+pytest-watcher = "^0.3.4"
+pytest-asyncio = "^0.21.1"
+grandalf = "^0.8"
+pytest-profiling = "^1.7.0"
+
+
+[tool.poetry.group.test_integration]
+optional = true
+dependencies = { }
+
+[tool.coverage.run]
+omit = [
+    "tests/*",
+]
+
+[tool.ruff.lint]
+select = [
+    "E", # pycodestyle
+    "F", # pyflakes
+    "I", # isort
+    "T201", # print
+]
+
+
+[build-system]
+requires = ["poetry-core>=1.0.0"]
+build-backend = "poetry.core.masonry.api"
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+# --strict-markers will raise errors on unknown marks.
+# https://docs.pytest.org/en/7.1.x/how-to/mark.html#raising-errors-on-unknown-marks
+#
+# https://docs.pytest.org/en/7.1.x/reference/reference.html
+# --strict-config       any warnings encountered while parsing the `pytest`
+#                       section of the configuration file raise errors.
+#
+# https://github.com/tophat/syrupy
+# --snapshot-warn-unused    Prints a warning on unused snapshots rather than fail the test suite.
+addopts = "--snapshot-warn-unused --strict-markers --strict-config --durations=5"
+# Registering custom markers.
+# https://docs.pytest.org/en/7.1.x/example/markers.html#registering-markers
+markers = [
+    "requires: mark tests as requiring a specific library",
+    "asyncio: mark tests as requiring asyncio",
+    "compile: mark placeholder test used to compile integration tests without running them",
+    "unit: mark a test as a unit test",
+    "integration: mark a test as an integration test",
+]
+asyncio_mode = "auto"

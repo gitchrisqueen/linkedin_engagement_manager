@@ -1,0 +1,20 @@
+#!/bin/bash
+
+set -o errexit
+set -o nounset
+
+worker_ready() {
+    # TODO: Check on the -A param here
+    celery -A cqc_lem.my_celery inspect ping
+}
+
+until worker_ready; do
+  >&2 echo 'Celery workers not available'
+  sleep 1
+done
+>&2 echo 'Celery workers is available'
+
+# TODO: Check on the -A param here
+celery -A cqc_lem.my_celery  \
+    --broker="${CELERY_BROKER_URL}" \
+    flower

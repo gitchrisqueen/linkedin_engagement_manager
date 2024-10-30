@@ -41,7 +41,7 @@ This roadmap outlines the steps to take LinkedIn Engagement Manager (LEM) from s
 | ✅      | Extend the Selenium script to: Comment on posts,                                                                       
 | 🟡 | Extend Selenium to: Send direct messages to profile viewers.                                                           |
 | ✅      | Integrate AI content generation modules: Generate simple text for comments and DMs using an AI service (e.g., OpenAI). |
-| 🔴     | Store AI-generated content in MySQL for scheduling purposes.                                                           |
+| 🟡     | Store AI-generated content in MySQL for scheduling purposes.                                                           |
 
 - **Testing**:
   - Automate commenting and DM-sending functionality on LinkedIn.
@@ -54,11 +54,12 @@ This roadmap outlines the steps to take LinkedIn Engagement Manager (LEM) from s
 - **Goal**: Add post scheduling and sentiment analysis for content validation.
 - **Tasks**:
 
-| Status | Task Description |
-|--------|------------------|
-| 🔴 | Set up a post scheduler using **Celery** and **Redis** for task queuing. |
+| Status | Task Description                                                                                            |
+|--------|-------------------------------------------------------------------------------------------------------------|
+| 🟡 | Set up a post scheduler using **Celery** and **Redis** for task queuing.                                    |
+| 🔴 | Add **[Flower](https://flower.readthedocs.io/en/latest/)** for monitoring of **Celery** tasks queue.                                                |
 | 🔴 | Implement sentiment analysis on AI-generated content using `VADER` or `TextBlob` to ensure appropriateness. |
-| 🔴 | Allow posts to be scheduled at specific times, store scheduling info in MySQL. |
+| 🟡 | Allow posts to be scheduled at specific times, store scheduling info in MySQL.                              |
 
 - **Testing**:
   - Verify scheduled posts appear at correct times.
@@ -71,10 +72,10 @@ This roadmap outlines the steps to take LinkedIn Engagement Manager (LEM) from s
 - **Goal**: Enable a manual preview and approval workflow for all generated content.
 - **Tasks**:
 
-| Status | Task Description |
-|--------|------------------|
-| 🔴 | Build a basic **web dashboard** (using Flask or FastAPI) to: Display AI-generated content, Allow users to manually approve or reject content. |
-| 🔴 | Add an option for **auto-approval**, so posts can be published without manual intervention. |
+| Status | Task Description                                                                                                                                  |
+|--------|---------------------------------------------------------------------------------------------------------------------------------------------------|
+| 🔴 | Build a basic **web dashboard** (using Streamlit or FastAPI) to: Display AI-generated content, Allow users to manually approve or reject content. |
+| 🔴 | Add an option for **auto-approval**, so posts can be published without manual intervention.                                                       |
 
 - **Testing**:
   - Verify that content can be previewed and approved via the web interface.

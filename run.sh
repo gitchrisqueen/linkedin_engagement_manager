@@ -3,19 +3,28 @@
 # Load the .env file (optional, Docker Compose will load this automatically if the .env is in the root)
 export $(grep -v '^#' .env | xargs)
 
-# Step 1: Build and run the Docker containers
-echo "Building and starting Docker containers..."
-docker-compose up --build -d
+# Prompt the user if they want to build the latest docker image
+read -p "Do you want to build the latest Docker image? (y/n): " build_image
+if [ "$build_image" == "y" ]; then
+    echo "Building Docker images (${DOCKER_IMAGE_NAME}:latest)..."
+    docker-compose build
+fi
 
-# Step 2: Wait for MySQL container to be ready (optional, useful for slow startups)
-echo "Waiting for MySQL to be ready..."
-sleep 10  # Adjust the sleep time if needed
 
-# Step 3: Run the Selenium automation script inside the container
-echo "Executing the Selenium automation script..."
-docker exec -it selenium-app python run_automation.py
+# Step 1: Run the Docker containers
+echo "Starting Docker containers..."
+docker-compose up -d
 
-# Step 4: (Optional) Add cleanup commands, if needed
+# Step 3: (Optional) Add cleanup commands, if needed
 # docker-compose down
+
+# Print pertinent information
+echo "=============================="
+echo "Streamlit Web App: http://localhost:8501/"
+echo "API Docs: http://localhost:8000/docs"
+echo "Flower Celery Monitoring: http://localhost:5555"
+echo "Docker Chrome VNC: http://localhost:7900/?autoconnect=1&resize=scale&password=secret"
+echo "=============================="
+
 
 echo "Execution completed!"
