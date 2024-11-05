@@ -23,7 +23,7 @@ echo "=============================="
 echo "Streamlit Web App: http://localhost:8501/"
 echo "API Docs: http://localhost:8000/docs"
 echo "Flower Celery Monitoring: http://localhost:5555"
-echo "Docker Chrome VNC: http://localhost:7900/?autoconnect=1&resize=scale&password=secret"
+echo "Docker Chrome VNC: http://localhost:4444"
 echo "=============================="
 
 

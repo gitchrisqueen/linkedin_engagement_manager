@@ -49,6 +49,8 @@ class LinkedInProfile(BaseModel):
     industry: Optional[str] = None
     profile_url: Optional[HttpUrl] = None
     connection: Optional[str] = None
+    password: Optional[str] = None
+    email: Optional[str] = None
 
     # Activity and Engagement
     recent_activities: Optional[List[LinkedInActivity]] = Field(default_factory=list)

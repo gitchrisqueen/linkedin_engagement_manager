@@ -94,4 +94,7 @@ COPY ./compose/local/streamlit/celery/flower/start /start-flower
 RUN sed -i 's/\r$//g' /start-flower
 RUN chmod +x /start-flower
 
+# Create a logs folder
+RUN mkdir -p /app/logs
+
 ENTRYPOINT ["/entrypoint"]

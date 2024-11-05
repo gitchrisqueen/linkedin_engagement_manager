@@ -10,7 +10,6 @@ CREATE TABLE IF NOT EXISTS posts (
     status ENUM('pending', 'approved', 'rejected', 'scheduled', 'posted') DEFAULT 'pending',
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     scheduled_time TIMESTAMP NULL
-    user_id INT NOT NULL
 );
 
 -- Table to log actions (comments, DMs, replies)

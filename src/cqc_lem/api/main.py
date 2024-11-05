@@ -1,15 +1,29 @@
 import time
 from datetime import datetime
 from enum import Enum
-from typing import Optional
+from typing import Optional, Any
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Query
 from fastapi import HTTPException
 from pydantic import BaseModel, computed_field
 
-from cqc_lem.utilities.db import get_db_connection
+from cqc_lem.utilities.db import insert_post, get_post_by_email, get_user_id, update_db_post
 
 app = FastAPI()
+
+error_responses = {
+    400: {"description": "Bad Request"},
+    401: {"description": "Unauthorized"},
+    403: {"description": "Forbidden"},
+    404: {"description": "Not Found"},
+    405: {"description": "Method Not Allowed"},
+    422: {"description": "Unprocessable Entity"}
+}
+
+
+class ResponseModel(BaseModel):
+    status_code: int
+    detail: Any
 
 
 class PostType(str, Enum):
@@ -18,10 +32,20 @@ class PostType(str, Enum):
     video = "video"
 
 
+class PostStatus(str, Enum):
+    pending = "pending"
+    approved = "approved"
+    rejected = "rejected"
+    scheduled = "scheduled"
+    posted = "posted"
+
+
 class PostRequest(BaseModel):
     content: str
     post_type: Optional[PostType] = PostType.text
     scheduled_datetime: datetime
+    email: str
+    status: Optional[PostStatus] = PostStatus.pending
 
     @property
     def post_json(self):
@@ -37,60 +61,53 @@ class PostRequest(BaseModel):
         return self.scheduled_datetime.isoformat()
 
 
-@app.post("/schedule_post/")
-def schedule_post(post: PostRequest):
+@app.post("/schedule_post/", responses={
+    200: {"description": "Post scheduled successfully"},
+    **{k: v for k, v in error_responses.items() if k in [403, 404]}
+})
+def schedule_post(post: PostRequest) -> ResponseModel:
     """Endpoint to schedule a post."""
 
-    conn = get_db_connection()
-    cursor = conn.cursor()
-    cursor.execute(
-        "INSERT INTO posts (content, scheduled_time, post_type) VALUES (%s, %s, %s)",
-        (post.content, post.scheduled_time, post.post_type)
-    )
-    conn.commit()
-    cursor.close()
-    conn.close()
-    return {"status": "Post scheduled successfully"}
+    user_id = get_user_id(post.email)
+
+    if not user_id:
+        raise HTTPException(status_code=403, detail="User not found")
+
+    if insert_post(post.email, post.content, post.scheduled_time, post.post_type):
+        return ResponseModel(status_code=200, detail="Post scheduled successfully")
+    else:
+        raise HTTPException(status_code=404, detail="Could not schedule post")
 
 
-@app.get("/posts/")
-def get_posts(
-        #user_id: None
-):
-    """Endpoint to get all posts."""
-    conn = get_db_connection()
-    cursor = conn.cursor()
-    user_id =  None
-    where_clause = ""
-    if user_id is not None:
-        where_clause = "WHERE user_id = " + user_id
-    cursor.execute(
-        f"SELECT id, content, scheduled_time, post_type FROM posts {where_clause} ORDER BY scheduled_time asc"
-    )
+@app.get("/posts/", responses={
+    200: {"description": "Post scheduled successfully"},
+    **{k: v for k, v in error_responses.items() if k in [400, 404]}
+})
+def get_posts(email: Optional[str] = Query(None)) -> ResponseModel:
+    """Endpoint to get posts by email."""
+    if not email:
+        raise HTTPException(status_code=400, detail="Email is required")
 
-    posts = cursor.fetchall()
-    cursor.close()
-    conn.close()
+    posts = get_post_by_email(email)
+    if not posts:
+        raise HTTPException(status_code=404, detail="No posts found for the given email")
 
     # Convert posts to a list of dictionaries
-    posts_list = [{"post_id": post[0], "content": post[1], "scheduled_time": post[2], "post_type": post[3]} for post in posts]
+    posts_list = [{"post_id": post["id"], "content": post["content"], "scheduled_time": post["scheduled_time"],
+                   "post_type": post["post_type"], "status": post['status']} for post in posts]
 
-    return {"status": "Success", 'data': posts_list}
+    return ResponseModel(status_code=200, detail=posts_list)
 
 
-@app.post("/update_post/")
-def update_post(post_id: int, post: PostRequest):
+@app.post("/update_post/", responses={
+    200: {"description": "Post updated successfully"},
+    **{k: v for k, v in error_responses.items() if k in [405]}
+
+})
+def update_post(post_id: int, post: PostRequest) -> ResponseModel:
     """Endpoint to update a post."""
-    conn = get_db_connection()
-    cursor = conn.cursor()
-    cursor.execute(
-        "UPDATE posts SET content = %s, scheduled_time = %s, post_type = %s WHERE id = %s",
-        (post.content, post.scheduled_time, post.post_type, post_id)
-    )
-    if cursor.rowcount == 0:
-        #raise HTTPException(status_code=404, detail="Post not found")
-        return {"status": f"Post ID: {post_id} Not Foud"}
-    conn.commit()
-    cursor.close()
-    conn.close()
-    return {"status": "Post updated successfully"}
+
+    if update_db_post(post.content, post.scheduled_time, post.post_type, post_id, post.status):
+        return ResponseModel(status_code=200, detail="Post updated successfull")
+    else:
+        raise HTTPException(status_code=405, detail="Post could not be updated")

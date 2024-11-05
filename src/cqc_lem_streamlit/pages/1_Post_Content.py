@@ -41,12 +41,15 @@ selected_time = st.time_input("Select Time", value=best_time)
 # Combine the selected date and time into a single datetime object
 scheduled_datetime = datetime.combine(selected_date, selected_time)
 
+# Add input for email address
+email = st.text_input("Email Address")
+
 
 # Button to submit the form
 if st.button("Schedule Post"):
-    if content and scheduled_datetime:
+    if content and scheduled_datetime and email:
         try:
-            post_request = PostRequest(content=content, post_type="text", scheduled_datetime=scheduled_datetime)
+            post_request = PostRequest(content=content, post_type="text", scheduled_datetime=scheduled_datetime, email=email)
 
             #st.write(str(post_request.post_json))
 
@@ -59,11 +62,9 @@ if st.button("Schedule Post"):
                 st.success("Post scheduled successfully!")
                 # Clear the content field
                 st.session_state.content = ''
-            elif response.status_code == 422:
-                st.error(f"Error: Invalid input data. Detail:  {response.json()["detail"]}")
             else:
-                st.error("Error scheduling post.")
+                st.error(f"Error ({response.status_code}): {response.json()["detail"]}")
         except ValueError as ve:
             st.error(f"Error: {ve}")
     else:
-        st.error("Please provide content and a scheduled time.")
+        st.error("Please provide content,scheduled time and email address.")

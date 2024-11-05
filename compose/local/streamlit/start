@@ -9,7 +9,6 @@ STREAMLIT_EMAIL=${STREAMLIT_EMAIL}
 
 # Get the streamlit port
 STREAMLIT_PORT=${STREAMLIT_PORT:-8501}
-#STREAMLIT_EMAIL=christopher.queen@gmail.com
 
 # Activate Streamlit with email
 {
@@ -18,13 +17,11 @@ STREAMLIT_PORT=${STREAMLIT_PORT:-8501}
   echo "Streamlit already activated"
 }
 
+# Start Streamlit app
 streamlit run --server.port $STREAMLIT_PORT ./src/cqc_lem_streamlit/Home.py &
-
-# TODO: Do I need to run celery scheduler
-# python src/cqc_lem/run_scheduler.py
 
 # Start FASTAPI / Uvicorn
 uvicorn src.cqc_lem.api.main:app --reload --host 0.0.0.0
 
-# Keep the container running
-tail -f /dev/null
+# Keep the container running ???
+# tail -f /dev/null

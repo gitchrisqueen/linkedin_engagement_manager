@@ -1,14 +1,15 @@
 import copy
+import random
 import re
 import time
-import random
 from typing import List
 
 from bs4 import BeautifulSoup, PageElement
 from selenium import webdriver
-from cqc_lem.utilities.date import get_linkedin_datetime_from_text
-from cqc_lem.utilities.date import convert_viewed_on_to_date
+
 from cqc_lem.utilities.date import convert_datetime_to_start_of_day
+from cqc_lem.utilities.date import convert_viewed_on_to_date
+from cqc_lem.utilities.date import get_linkedin_datetime_from_text
 
 start_identifier_map = {
     "education": 19,
@@ -155,24 +156,23 @@ def get_page_source(driver, url, scroll_times=0):
 
 
 # returns LinkedIn profile information
-def returnProfileInfo(driver: webdriver, profile_url, companyName=None):
+def returnProfileInfo(driver: webdriver, profile_url, company_name=None):
     url = profile_url
     source = get_page_source(driver, url, 0)
     profile = {}
     info = source.find('div', class_='mt2 relative')
-    name = info.find('h1', class_='text-heading-xlarge').get_text().strip()
+    name = info.find('h1', class_='break-words').get_text().strip()
     title = info.find('div', class_='text-body-medium break-words').get_text().lstrip().strip()
     connection = info.find('span', class_='dist-value')
     profile['full_name'] = name
-    if companyName:
-        profile['company_name'] = companyName
+    if company_name:
+        profile['company_name'] = company_name
     profile['job_title'] = title
     if connection:
         profile['connection'] = connection.get_text().strip()
     profile['profile_url'] = profile_url
 
-
-    #profile_li = source.find_all('li', class_='artdeco-list__item')
+    # profile_li = source.find_all('li', class_='artdeco-list__item')
 
     # print_header("Profile Li(s)")
     # print(profile_li)
@@ -185,18 +185,18 @@ def returnProfileInfo(driver: webdriver, profile_url, companyName=None):
     # print("Start Index: " + str(si), " | ", str(alltext))  # TODO: For Debugging
 
     functions = [
-    ('education', lambda: get_profile_education(driver, profile_url)),
-    ('experiences', lambda: get_profile_experiences(driver, profile_url)),
-    ('certifications', lambda: get_profile_certifications(driver, profile_url)),
-    ('skills', lambda: get_profile_skills(driver, profile_url)),
-    ('recent_activities', lambda: get_profile_recent_activity(driver, profile_url))
+        ('education', lambda: get_profile_education(driver, profile_url)),
+        ('experiences', lambda: get_profile_experiences(driver, profile_url)),
+        ('certifications', lambda: get_profile_certifications(driver, profile_url)),
+        ('skills', lambda: get_profile_skills(driver, profile_url)),
+        ('recent_activities', lambda: get_profile_recent_activity(driver, profile_url))
     ]
 
     # Randomizing the function calls to appear natural and avoid detection
     random.shuffle(functions)
 
     for key, func in functions:
-        #print("Calling function to get: ", key)
+        # print("Calling function to get: ", key)
         profile[key] = func()
 
     # Get the industry - TODO: This may not be publicly visible
@@ -206,9 +206,9 @@ def returnProfileInfo(driver: webdriver, profile_url, companyName=None):
     # TODO: Get Interest
     # TODO: Get Groups
 
-    #print_header("Profile")
-    #print(profile)
-    #print_header("")
+    # print_header("Profile")
+    # print(profile)
+    # print_header("")
 
     return profile
 
@@ -239,23 +239,26 @@ def get_profile_education(driver, employeeLink):
 def get_profile_recent_activity(driver, employeeLink):
     url = employeeLink + '/recent-activity/all/'
     source = get_page_source(driver, url, 2)
-    #activities = source.find_all('li')
+    # activities = source.find_all('li')
     # Find all the links that have 'activity' in the url
-    links = source.find_all('div',attrs={'data-urn': re.compile('activity')})
+    links = source.find_all('div', attrs={'data-urn': re.compile('activity')})
     found_links = ['https://www.linkedin.com/feed/update/' + link.get('data-urn') for link in links]
     texts = source.find_all('div', class_='update-components-text')
     found_text = [text.getText().strip() for text in texts]
-    posted_dates = source.select('div[class*="fie-impression-container"] div.relative span[class*="update-components-actor__sub-description"] span[aria-hidden="true"]')
-    found_dates = [date.getText().strip() for date in posted_dates]
+    posted_dates = source.select(
+        'div[class*="fie-impression-container"] div.relative span[class*="update-components-actor__sub-description"] span[aria-hidden="true"]')
+    found_dates = [date.getText(date).strip() for date in posted_dates]
 
-    #print_header("Recent Activity")
-    #print("Found Links", found_links)
-    #print("Found Test", found_text)
+    # print_header("Recent Activity")
+    # print("Found Links", found_links)
+    # print("Found Test", found_text)
 
     # combine the profile activity and the found links into a mapped dict list
-    profile_activity = [{'text': text, 'link': link, 'posted': convert_datetime_to_start_of_day(convert_viewed_on_to_date(date+" ago"))} for text, link, date in zip(found_text, found_links, found_dates)]
+    profile_activity = [{'text': text, 'link': link,
+                         'posted': convert_datetime_to_start_of_day(convert_viewed_on_to_date(date + " ago"))} for
+                        text, link, date in zip(found_text, found_links, found_dates)]
 
-    #print("Recent Activity Links", profile_activity)
+    # print("Recent Activity Links", profile_activity)
 
     return profile_activity
 
@@ -444,7 +447,7 @@ def get_profile_certifications(driver, employeeLink):
             company = None
             issued_on = None
             cert_skills = None
-            credential_id=None
+            credential_id = None
 
             name = row[si][:len(row[si]) // 2]
 
@@ -493,14 +496,14 @@ def get_profile_skills(driver, employeeLink):
     profile_skills = []
     skills = source.find_all('li')
     # print_header("Skills")
-    #skills_search_word_frequency = {}
+    # skills_search_word_frequency = {}
     for s in skills:
         row = source_as_row(s)
         si = get_start_identifier(row)
-        #print("Start Index: " + str(si), " | ", str(row))
+        # print("Start Index: " + str(si), " | ", str(row))
 
         # TODO: Below is for debugging
-        #skills_search_word_frequency = record_search_word_frequency(row, si, ['endorsements'], skills_search_word_frequency)
+        # skills_search_word_frequency = record_search_word_frequency(row, si, ['endorsements'], skills_search_word_frequency)
 
         if si == start_identifier_map['skills']:
             skill = row[si][:len(row[si]) // 2]
@@ -508,7 +511,7 @@ def get_profile_skills(driver, employeeLink):
         elif si == start_identifier_map['endorsements']:
             # Find endorsements
             endorsements = row[si][:len(row[si]) // 2]
-            #print("Endorsements: ", endorsements)
+            # print("Endorsements: ", endorsements)
             # extract only the number from the endorsements text
             endorsement_numbers = re.findall(r'\d+', endorsements)
             if endorsement_numbers:
@@ -518,8 +521,8 @@ def get_profile_skills(driver, employeeLink):
                     profile_skills[-1]['endorsements'] = endorsements
 
     # TODO: Below is for debugging
-    #print_header("Search Word Frequency")
-    #print(skills_search_word_frequency)
+    # print_header("Search Word Frequency")
+    # print(skills_search_word_frequency)
     # TODO: Above is for debugging
 
     return profile_skills
@@ -554,7 +557,7 @@ def get_start_end_dates(line):
         # print("StartEnd List: ", startendlist)
         start_date = startendlist[0]
         # print("Start Date: ", start_date)
-        if len(startendlist)>1:
+        if len(startendlist) > 1:
             end_date = startendlist[1]
         else:
             end_date = "Present"

@@ -12,11 +12,12 @@ services:
       - redis
     volumes:
       - ./src:/app/src
-      # mount to the poetry distribution directory
-      #- .src:/app/dist
-
+      # mount test folder
+      - ./tests:/app/tests
       # Below used to override the start
       - ./compose/local/streamlit/start:/start
+      # Mount the logs folder
+      - ./logs:/app/logs
     environment:
       - DISPLAY=:99
     env_file:
@@ -30,6 +31,7 @@ services:
   redis:
       image: redis:alpine
       container_name: redis
+      restart: always
       volumes:
         - redis_data:/data
       ports:
@@ -38,6 +40,7 @@ services:
   mysql:
     image: mysql:8.0
     container_name: mysql-db
+    restart: always
     environment:
       MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
       MYSQL_DATABASE: ${MYSQL_DATABASE}
@@ -48,6 +51,18 @@ services:
     volumes:
       - db_data:/var/lib/mysql
       - ./src/database/setup.sql:/docker-entrypoint-initdb.d/setup.sql
+
+  flyway:
+    image: redgate/flyway
+    container_name: flyway
+    entrypoint: /flyway-entrypoint.sh
+    env_file:
+      - .env
+    volumes:
+      - ./src/database/migrations:/flyway/sql
+      - ./src/database/flyway-entrypoint.sh:/flyway-entrypoint.sh
+    depends_on:
+      - mysql
 
   celery_worker:
     image:  ${DOCKER_IMAGE_NAME}
@@ -63,7 +78,7 @@ services:
     depends_on:
       - redis
       - mysql
-      - chrome
+      - selenium-hub
 
   celery_beat:
     image:  ${DOCKER_IMAGE_NAME}
@@ -91,22 +106,58 @@ services:
       - web-app
     env_file:
       - .env
+    environment:
+      - FLOWER_UNAUTHENTICATED_API=True
     ports:
-      - 5557:5555
+      - "5555:5555"
     depends_on:
       - redis
       - mysql
       - celery_worker
   chrome:
-    image: selenium/standalone-chrome:latest
+    image: selenium/node-chrome:latest
     container_name: chrome
-    hostname: chrome
-    privileged: true
-    shm_size: 2g
+    shm_size: 2gb
+    volumes:
+      - chrome_profile:/tmp # to persist the chrome user Data dir
+    depends_on:
+      - selenium-hub
+    environment:
+      - SE_EVENT_BUS_HOST=selenium-hub
+      - SE_EVENT_BUS_PUBLISH_PORT=4442
+      - SE_EVENT_BUS_SUBSCRIBE_PORT=4443
+      - SE_ENABLE_TRACING=false
+      - SE_VNC_NO_PASSWORD=1
+      - SE_NODE_MAX_SESSIONS=4 # This should not be more than the available CPUS
+      - SE_NODE_OVERRIDE_MAX_SESSIONS=true # To allow the override of the max sessions
+
+  selenium-hub:
+    image: selenium/hub:latest
+    container_name: selenium-hub
+    hostname: selenium-hub
+    environment:
+      - SE_ENABLE_TRACING=false
+      - SE_VNC_NO_PASSWORD=1
+      - SE_ENABLE_BROWSER_LEFTOVERS_CLEANUP=true # Cleanup browser leftovers
+      - SE_BROWSER_LEFTOVERS_INTERVAL_SECS=1800 # 30 Minutes
+      - SE_BROWSER_LEFTOVERS_TEMPFILES_DAYS=14 # 14 Days
     ports:
+      #- "4442:4442"
+      #- "4443:4443"
       - "4444:4444"
-      - "7900:7900"
+  #chrome:
+  #  image: selenium/standalone-chrome:latest
+  #  container_name: chrome
+  #  hostname: chrome
+  #  privileged: true
+  #  shm_size: 2g
+  #  ports:
+  #    - "4444:4444"
+  #    - "7900:7900"
+  #  environment:
+  #    - SE_ENABLE_TRACING=false
 
 volumes:
   db_data:
   redis_data:
+  chrome_profile:
