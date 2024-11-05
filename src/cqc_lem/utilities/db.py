@@ -134,6 +134,20 @@ def insert_post(email, content, scheduled_time, post_type) -> bool:
     connection.close()
     return success
 
+def insert_planned_post(user_id: int, scheduled_time, post_type: str, buyer_stage: str) -> bool:
+    connection = get_db_connection()
+    cursor = connection.cursor()
+
+    cursor.execute("""
+        INSERT INTO posts (scheduled_time, post_type, user_id, buyer_stage, status, content)
+        VALUES (%s, %s, %s, %s, %s, %s)
+    """, (scheduled_time, post_type, user_id, buyer_stage, 'planning', 'TBD'))
+
+    connection.commit()
+    success = cursor.rowcount == 1
+    cursor.close()
+    connection.close()
+    return success
 
 def update_db_post(content: str, scheduled_time: str, post_type: str, post_id: int, status: str) -> bool:
     connection = get_db_connection()
@@ -151,6 +165,21 @@ def update_db_post(content: str, scheduled_time: str, post_type: str, post_id: i
 
     return success
 
+def update_db_post_content(post_id: int, content: str) -> bool:
+    connection = get_db_connection()
+    cursor = connection.cursor()
+
+    cursor.execute(
+        "UPDATE posts SET content = %s, status = 'pending' WHERE id = %s",
+        (content, post_id)
+    )
+
+    connection.commit()
+    success = cursor.rowcount == 1
+    cursor.close()
+    connection.close()
+
+    return success
 
 def update_db_post_status(post_id: int, status: str) -> bool:
     connection = get_db_connection()
@@ -329,3 +358,45 @@ def remove_linked_in_profile_by_email(profile_email: str):
 
     cursor.close()
     connection.close()
+
+
+def get_post_type_counts(user_id: int):
+    """Query the database to get the count of each post_type in the 'posts' table for the given user id."""
+    connection = get_db_connection()
+    cursor = connection.cursor(dictionary=True)
+
+    cursor.execute("SELECT post_type, COUNT(*) AS count FROM posts WHERE user_id = %s GROUP BY post_type", (user_id,))
+    post_counts = {row['post_type']: row['count'] for row in cursor.fetchall()}
+
+    cursor.close()
+    connection.close()
+
+    return post_counts
+
+
+def get_planned_posts_for_current_week():
+    """Query the database to get the planned content for the current week."""
+    connection = get_db_connection()
+    cursor = connection.cursor(dictionary=True)
+
+    cursor.execute(
+        "SELECT id, post_type, buyer_stage FROM posts WHERE status = 'planning' AND WEEK(scheduled_time) = WEEK(NOW())")
+    planned_content = cursor.fetchall()
+
+    cursor.close()
+    connection.close()
+
+    return planned_content
+
+def get_last_planned_post_date_for_user(user_id: int):
+    """Query the database to get the last planned post date for the given user."""
+    connection = get_db_connection()
+    cursor = connection.cursor()
+
+    cursor.execute("SELECT MAX(scheduled_time) AS last_planned_date FROM posts WHERE user_id = %s AND status = 'planning'", (user_id,))
+    last_planned_date = cursor.fetchone()
+
+    cursor.close()
+    connection.close()
+
+    return last_planned_date[0] if last_planned_date else None

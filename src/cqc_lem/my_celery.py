@@ -35,6 +35,16 @@ app.conf.update(
             'task': 'cqc_lem.run_scheduler.start_appreciate_dms',
             'schedule': crontab(hour='8', minute='0'),  # Run every day at 8:00 AM
         },
+        # Generate Content Plan on the 1st of the month at 1:00 AM
+        'generate-content-plan': {
+            'task': 'cqc_lem.run_content_plan.generate_content',
+            'schedule': crontab(hour='1', minute='0', day_of_month='1'),
+        },
+        # Create weekly content from plan on Saturdays at 1:00 AM
+        'create-content-from-plan': {
+            'task': 'cqc_lem.run_content_plan.create_weekly_content',
+            'schedule': crontab(hour='1', minute='0', day_of_week='sat'),
+        }
 
     }
 )

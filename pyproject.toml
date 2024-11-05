@@ -49,6 +49,9 @@ watchdog = "^5.0.3"
 streamlit-aggrid = "^1.0.5"
 requests = "^2.32.3"
 tldextract = "^5.1.2"
+imessage-reader = "^0.6.1"
+nltk = "^3.9.1"
+fpdf = "^1.7.2"
 
 
 

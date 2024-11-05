@@ -75,6 +75,5 @@ def post_to_linkedin(user_id: int, post_id, **kwargs):
     update_db_post_status(post_id, 'posted')
 
 
-
 if __name__ == "__main__":
     print("Process finished")

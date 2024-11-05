@@ -1,6 +1,7 @@
 import functools
 import os
 from enum import Enum
+from datetime import datetime, time, date
 
 import tldextract
 
@@ -62,3 +63,31 @@ class Satisfactory(Enum):
 def get_top_level_domain(url: str) -> str:
     extracted = tldextract.extract(url)
     return f"{extracted.domain}.{extracted.suffix}"
+
+def get_best_posting_times():
+    # Determine the best time for posting based on the selected date
+    best_times = {
+        0: time(14, 0),  # Monday
+        1: time(9, 0),  # Tuesday
+        2: time(12, 0),  # Wednesday
+        3: time(17, 0),  # Thursday
+        4: time(23, 0),  # Friday
+        5: time(7, 0),  # Saturday
+        6: time(9, 0)  # Sunday
+    }
+
+    return best_times
+
+
+def get_best_posting_time(selected_date: date):
+    best_times = get_best_posting_times()
+
+    # Get the best time for the selected date
+    best_time = best_times[selected_date.weekday()]
+
+    return best_time
+
+def get_12h_format_best_time(best_time: time):
+    # Format the best time to 12-hour format
+    best_time_12hr = best_time.strftime("%I:%M %p")
+    return best_time_12hr

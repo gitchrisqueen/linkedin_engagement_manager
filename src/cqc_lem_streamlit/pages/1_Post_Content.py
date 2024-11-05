@@ -3,6 +3,7 @@ import requests
 from datetime import datetime, time
 
 from cqc_lem.api.main import PostRequest
+from cqc_lem.utilities.utils import get_best_posting_time, get_12h_format_best_time
 
 st.title("Schedule Your Post")
 
@@ -12,25 +13,15 @@ if "content" not in st.session_state:
 
 # Input fields for content and time
 content = st.text_area("Post Content", value=st.session_state.content)
+
 # Date input for selecting the date
 selected_date = st.date_input("Select Date", min_value=datetime.today().date())
 
-# Determine the best time for posting based on the selected date
-best_times = {
-    0: time(14, 0),  # Monday
-    1: time(9, 0),   # Tuesday
-    2: time(12, 0),  # Wednesday
-    3: time(17, 0),  # Thursday
-    4: time(23, 0),  # Friday
-    5: time(7, 0),   # Saturday
-    6: time(9, 0)    # Sunday
-}
-
 # Get the best time for the selected date
-best_time = best_times[selected_date.weekday()]
+best_time = get_best_posting_time(selected_date)
 
 #Format the best time to 12-hour format
-best_time_12hr = best_time.strftime("%I:%M %p")
+best_time_12hr = get_12h_format_best_time(best_time)
 
 # Alert the user the ideal posting time has been selected based on their post day
 st.info(f"The best time to post on {selected_date.strftime('%A')} is {best_time_12hr}")

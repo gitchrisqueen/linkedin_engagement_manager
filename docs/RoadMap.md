@@ -18,11 +18,11 @@ This roadmap outlines the steps to take LinkedIn Engagement Manager (LEM) from s
 
 | Status | Task Description |
 |-------|------------------|
-| 🟡 | Set up the **Docker environment** with separate containers for: Python (Selenium and app logic), MySQL (Database) |
-| 🟡 | Configure **Docker Compose** to ensure all services run together. |
+| ✅ | Set up the **Docker environment** with separate containers for: Python (Selenium and app logic), MySQL (Database) |
+| ✅ | Configure **Docker Compose** to ensure all services run together. |
 | ✅ | Set up initial MySQL schema for storing posts, logs, and approval data. |
 | ✅ | Initialize **Selenium** with a basic browser automation script (e.g., open LinkedIn and log in). |
-| 🟡 | Ensure basic connectivity between Python, Selenium, and MySQL. |
+| ✅ | Ensure basic connectivity between Python, Selenium, and MySQL. |
 
 - **Testing**:
   - Verify that Docker containers can communicate with each other.
@@ -56,10 +56,10 @@ This roadmap outlines the steps to take LinkedIn Engagement Manager (LEM) from s
 
 | Status | Task Description                                                                                            |
 |--------|-------------------------------------------------------------------------------------------------------------|
-| 🟡 | Set up a post scheduler using **Celery** and **Redis** for task queuing.                                    |
-| 🔴 | Add **[Flower](https://flower.readthedocs.io/en/latest/)** for monitoring of **Celery** tasks queue.                                                |
+| ✅ | Set up a post scheduler using **Celery** and **Redis** for task queuing.                                    |
+| ✅ | Add **[Flower](https://flower.readthedocs.io/en/latest/)** for monitoring of **Celery** tasks queue.                                                |
 | 🔴 | Implement sentiment analysis on AI-generated content using `VADER` or `TextBlob` to ensure appropriateness. |
-| 🟡 | Allow posts to be scheduled at specific times, store scheduling info in MySQL.                              |
+| ✅ | Allow posts to be scheduled at specific times, store scheduling info in MySQL.                              |
 
 - **Testing**:
   - Verify scheduled posts appear at correct times.
@@ -74,7 +74,7 @@ This roadmap outlines the steps to take LinkedIn Engagement Manager (LEM) from s
 
 | Status | Task Description                                                                                                                                  |
 |--------|---------------------------------------------------------------------------------------------------------------------------------------------------|
-| 🔴 | Build a basic **web dashboard** (using Streamlit or FastAPI) to: Display AI-generated content, Allow users to manually approve or reject content. |
+| ✅ | Build a basic **web dashboard** (using Streamlit or FastAPI) to: Display AI-generated content, Allow users to manually approve or reject content. |
 | 🔴 | Add an option for **auto-approval**, so posts can be published without manual intervention.                                                       |
 
 - **Testing**:
