@@ -61,9 +61,10 @@ file_handler.setFormatter(fmt)
 logger.addHandler(file_handler)
 
 
-def myprint(message, debug=True):
+def myprint(message, debug=False):
     if debug:
         logger.info(message)
-    sys.stdout.flush()
-    sys.stdout.write('\r' + message + '\n')
-    sys.stdout.flush()
+    else:
+        sys.stdout.flush()
+        sys.stdout.write('\r' + message + '\n')
+        sys.stdout.flush()

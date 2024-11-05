@@ -1,15 +1,16 @@
 import time
 
 from selenium.webdriver.common.by import By
-
-from cqc_lem.utilities.db import get_cookies, store_cookies
-from cqc_lem.utilities.env_constants import LI_USER, LI_PASSWORD
-from cqc_lem.utilities.logger import myprint
-from cqc_lem.utilities.selenium_util import load_cookies, click_element_wait_retry, get_element_wait_retry
-from cqc_lem.utilities.utils import are_you_satisfied
-from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.remote.webdriver import WebDriver
+from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.support.wait import WebDriverWait
+
+from cqc_lem.linked_in_profile import LinkedInProfile
+from cqc_lem.utilities.db import get_cookies, store_cookies, get_linked_in_profile_by_email, add_linkedin_profile, \
+    get_linked_in_profile_by_url
+from cqc_lem.utilities.linked_in_scrapper import returnProfileInfo
+from cqc_lem.utilities.logger import myprint
+from cqc_lem.utilities.selenium_util import load_cookies, click_element_wait_retry, get_element_wait_retry, getText
 
 
 def login_to_linkedin(driver: WebDriver, wait: WebDriverWait, user_email: str, user_password: str):
@@ -73,4 +74,86 @@ def login_to_linkedin(driver: WebDriver, wait: WebDriverWait, user_email: str, u
             myprint("Cookies stored to DB!")
         else:
             myprint("Login failed. Check your credentials.")
-            #are_you_satisfied()
+            # are_you_satisfied()
+
+
+def get_my_profile(driver, wait, user_email: str, user_password: str) -> LinkedInProfile:
+    profile = None
+
+    # TODO: Check DB for serialized instance of profile
+
+    profile_json = get_linked_in_profile_by_email(user_email)
+
+    if profile_json is None:
+        login_to_linkedin(driver, wait, user_email, user_password)
+
+        profile_url = "https://www.linkedin.com/in/"
+        driver.get(profile_url)  # Need the page to redirect
+        time.sleep(2)
+        profile_url = driver.current_url  # Get the updated url
+
+        profile_data = get_linkedin_profile_from_url(driver, wait, profile_url)
+
+        if profile_data:
+
+            profile = LinkedInProfile(**profile_data)
+            # Add email and password to profile for later use
+            profile.email = user_email
+            profile.password = user_password
+
+            # Add profile to DB for faster future retrieval
+            if add_linkedin_profile(profile):
+                myprint(f"Profile saved to DB: {profile.full_name}")
+        else:
+            myprint("Failed to get my profile data")
+    else:
+        # Ensure profile_json is a string
+        profile_json_str = profile_json[0] if isinstance(profile_json, tuple) else profile_json
+        # Create a LinkedInProfile object from json string data
+        profile = LinkedInProfile.model_validate_json(profile_json_str)
+        myprint(f"Profile Restored from DB: {profile.full_name}")
+
+    return profile
+
+
+def get_linkedin_profile_from_url(driver, wait, profile_url):
+    # Get the profile from the DB if it exists
+    profile_json = get_linked_in_profile_by_url(profile_url)
+
+    if profile_json is None:
+
+        # Set to empty dictionary
+        profile_data = {}
+
+        if profile_url != driver.current_url:
+            # Open the profile URL
+            driver.get(profile_url)
+
+        # Get the company name
+        company_element = get_element_wait_retry(driver, wait, '//button[contains(@aria-label,"Current company")]',
+                                                 "Finding Company Name", element_always_expected=False)
+
+        companyName = None
+        if company_element:
+            companyName = getText(company_element)
+
+        profile_data = returnProfileInfo(driver, profile_url, companyName)
+
+        if profile_data:
+            profile = LinkedInProfile(**profile_data)
+            # Save the profile to the DB
+            if add_linkedin_profile(profile):
+                myprint(f"Profile saved to DB: {profile.full_name}")
+
+        # Use json to output to string
+        # myprint(json.dumps(profile_data, indent=4))
+
+    else:
+        # Ensure profile_json is a string
+        profile_json_str = profile_json[0] if isinstance(profile_json, tuple) else profile_json
+        # Create a LinkedInProfile object from json string data
+        profile = LinkedInProfile.model_validate_json(profile_json_str)
+        profile_data = profile.to_dict()
+        myprint(f"Profile Restored from DB: {profile.full_name}")
+
+    return profile_data

@@ -1,4 +1,4 @@
-import atexit
+import json
 import json
 import random
 import signal
@@ -17,16 +17,14 @@ from selenium.webdriver.common.by import By
 # from selenium.webdriver.chrome.webdriver import WebDriver
 from selenium.webdriver.remote.webdriver import WebDriver
 from selenium.webdriver.support import expected_conditions as EC
-from selenium.webdriver.support.wait import WebDriverWait
 
 from cqc_lem.linked_in_profile import LinkedInProfile
 # from celery import shared_task
 from cqc_lem.my_celery import app as shared_task
 from cqc_lem.utilities.date import convert_viewed_on_to_date
-from cqc_lem.utilities.db import get_user_password_pair_by_id
+from cqc_lem.utilities.db import get_user_password_pair_by_id, get_user_id
 from cqc_lem.utilities.env_constants import LI_USER, LI_PASSWORD
-from cqc_lem.utilities.linked_in_helper import login_to_linkedin
-from cqc_lem.utilities.linked_in_scrapper import returnProfileInfo
+from cqc_lem.utilities.linked_in_helper import login_to_linkedin, get_my_profile, get_linkedin_profile_from_url
 from cqc_lem.utilities.logger import myprint
 from cqc_lem.utilities.selenium_util import create_driver, click_element_wait_retry, \
     get_element_wait_retry, get_elements_as_list_wait_stale, getText, close_tab, get_driver_wait, get_driver_wait_pair
@@ -268,9 +266,14 @@ def generate_ai_response(post_content, profile: LinkedInProfile, post_img_url=No
     return comment
 
 
+@shared_task.task
 @debug_function
-def post_comment(driver, wait, post_link, comment_text):
+def post_comment(user_id: int, post_link, comment_text):
     """Post a comment to the currently opened post in the driver window"""
+
+    driver, wait = get_driver_wait_pair()
+
+    user_email, user_password = get_user_password_pair_by_id(user_id)
 
     if post_link != driver.current_url:
         # Switch to post url
@@ -570,7 +573,11 @@ def generate_and_post_comment(driver, wait, post_link, my_profile: LinkedInProfi
     #    time.sleep(random.uniform(0.05, 0.15))  # Simulate human typing speed
 
     # Comment out the actual posting of the comment for now
-    post_comment.delay(driver, wait, post_link, comment_text)
+    post_comment.delay(
+        kwargs={'user_id': get_user_id(my_profile.email),
+                'post_link': post_link,
+                'comment_text': comment_text}
+    )
 
     myprint("Comment Posted")
 
@@ -756,30 +763,6 @@ def automate_profile_viewer_dms(user_id: int, loop_for_duration=None, **kwargs):
         close_tab(driver)
 
     driver.quit()
-
-
-def get_linkedin_profile_from_url(driver, wait, profile_url):
-    if profile_url != driver.current_url:
-        # Open the profile URL
-        driver.get(profile_url)
-
-    # Get the profile data
-    profile_data = {}
-
-    # Get the company name
-    company_element = get_element_wait_retry(driver, wait, '//button[contains(@aria-label,"Current company")]',
-                                             "Finding Company Name", element_always_expected=False)
-
-    companyName = None
-    if company_element:
-        companyName = getText(company_element)
-
-    profile_data = returnProfileInfo(driver, profile_url, companyName)
-
-    # Use json to output to string
-    # myprint(json.dumps(profile_data, indent=4))
-
-    return profile_data
 
 
 def get_ai_description_of_profile(linked_in_profile: LinkedInProfile):
@@ -1003,7 +986,11 @@ def send_dm(driver, wait, my_profile: LinkedInProfile, viewer_url, viewer_name):
                 message = "Hi, I noticed we're connected on LinkedIn and wanted to reach out. I'm currently working on a project that I think you might find interesting. Would you be open to a quick chat to discuss it further?"
 
                 # Send actual DM
-                send_private_dm.delay(driver, wait, profile.profile_url, message, my_profile.email, my_profile.password)
+                send_private_dm.delay(
+                    kwargs={'user_id': get_user_id(my_profile.email),
+                            'profile_url': profile.profile_url,
+                            'message': message}
+                )
         else:
             # myprint(f"We Are {profile.connection} Connections")
             # If not connected send them a connection request
@@ -1016,15 +1003,24 @@ def send_dm(driver, wait, my_profile: LinkedInProfile, viewer_url, viewer_name):
             myprint(f"Refined Response: {refined_response}")
 
             # Send connection request with this message
-            invite_to_connect.delay(driver, wait, str(profile.profile_url), refined_response)
+            invite_to_connect.delay(
+                kwargs={'user_id': get_user_id(my_profile.email),
+                        'profile_url': profile.profile_url,
+                        'message': refined_response}
+            )
     else:
         myprint(f"Failed to get profile data for {viewer_name}")
 
 
 @shared_task.task
 @debug_function
-def send_private_dm(driver, wait, profile_url, message, user_email: str, user_password: str):
+def send_private_dm(user_id: int, profile_url: str, message: str):
     """ Send dm message to a profile. Must be a 1st connection"""
+
+    user_email, user_password = get_user_password_pair_by_id(user_id)
+
+    driver, wait = get_driver_wait_pair()
+
     login_to_linkedin(driver, wait, user_email, user_password)
 
     # Open the profile URL
@@ -1038,13 +1034,20 @@ def send_private_dm(driver, wait, profile_url, message, user_email: str, user_pa
     return dm_sent
 
 
+@shared_task.task
 @debug_function
-def invite_to_connect(driver: WebDriver, wait: WebDriverWait, connection_url, connection_message: str = None):
-    if connection_url != driver.current_url:
-        # Open the profile URL
-        driver.get(connection_url)
+def invite_to_connect(user_id: int, profile_url: str, message: str = None):
+    user_email, user_password = get_user_password_pair_by_id(user_id)
 
-    myprint(f"Inviting to connect: {connection_url}")
+    driver, wait = get_driver_wait_pair()
+
+    login_to_linkedin(driver, wait, user_email, user_password)
+
+    if profile_url != driver.current_url:
+        # Open the profile URL
+        driver.get(profile_url)
+
+    myprint(f"Inviting to connect: {profile_url}")
 
     # Locate the connect button
     try:
@@ -1078,7 +1081,7 @@ def invite_to_connect(driver: WebDriver, wait: WebDriverWait, connection_url, co
             return False
 
     # If connection_message exist click the With note button
-    if connection_message:
+    if message:
         try:
             click_element_wait_retry(driver, wait, '//button[contains(@aria-label,"Add a note")]',
                                      "Finding Add a Note Button", use_action_chain=True)
@@ -1099,13 +1102,13 @@ def invite_to_connect(driver: WebDriver, wait: WebDriverWait, connection_url, co
             # Message must be less than 300 characters. Try 3 times to get a revised message under that limit
             for i in range(3):
                 # Check Message character length
-                if len(connection_message) > 300:
-                    connection_message = get_ai_message_refinement(connection_message, 300)
+                if len(message) > 300:
+                    message = get_ai_message_refinement(message, 300)
                 else:
                     break
 
             # Put the text in the message box
-            message_box.send_keys(connection_message)
+            message_box.send_keys(message)
 
             myprint("Added message to message box")
 
@@ -1145,34 +1148,36 @@ def start_process():
     drivers_needed = 3
 
     # build as many drivers as there are threads, so each thread gets own driver
-    drivers_with_waits = [get_driver_wait_pair() for _ in range(drivers_needed)]
-    all_drivers = [driver for driver, _ in drivers_with_waits]
+    # drivers_with_waits = [get_driver_wait_pair() for _ in range(drivers_needed)]
+    # all_drivers = [driver for driver, _ in drivers_with_waits]
 
-    def signal_handler(sig, frame):
-        # Get list of all drivers from drivers_with_waits
+    #def signal_handler(sig, frame):
 
-        final_method(all_drivers)
+    # Get list of all drivers from drivers_with_waits
+
+    # final_method(all_drivers)
 
     # Register the signal handler for SIGINT
-    signal.signal(signal.SIGINT, signal_handler)
+    #signal.signal(signal.SIGINT, signal_handler)
 
     # Register the final_method to be called on exit
-    atexit.register(final_method, all_drivers)
+    # atexit.register(final_method, all_drivers)
 
     # Create the countdown timer in a separate thread
     with ThreadPoolExecutor(max_workers=max(4, drivers_needed)) as executor:
         executor.submit(countdown_timer, time_remaining_seconds)
         # Get a driver/wait set
-        driver, wait = drivers_with_waits.pop(0)
-        executor.submit(automate_commenting, LI_USER, LI_PASSWORD)
+        # driver, wait = drivers_with_waits.pop(0)
+        executor.submit(automate_commenting, kwargs={'user_id': get_user_id(LI_USER)})
         # Get another driver/wait set
-        driver2, wait2 = drivers_with_waits.pop(0)
-        executor.submit(automate_profile_viewer_dms, LI_USER,
-                        LI_PASSWORD)  # TODO: Make this wait till there 10 min or less left on timer
+        # driver2, wait2 = drivers_with_waits.pop(0)
+        executor.submit(automate_profile_viewer_dms,
+                        kwargs={'user_id': get_user_id(
+                            LI_USER)})  # TODO: Make this wait till there 10 min or less left on timer
 
     myprint("Time is up. Closing the browser")
 
-    final_method(all_drivers)
+    # final_method(all_drivers)
 
 
 def final_method(drivers: List[WebDriver]):
@@ -1218,31 +1223,6 @@ def test_linked_in_profile():
 
     # Print a summary of the profile
     myprint(profile.profile_summary)
-
-
-def get_my_profile(driver, wait, user_email: str, user_password: str) -> LinkedInProfile:
-    profile = None
-
-    # TODO: Check DB for serialized instance of profile
-
-    login_to_linkedin(driver, wait, user_email, user_password)
-
-    profile_url = "https://www.linkedin.com/in/"
-    driver.get(profile_url)  # NEed the page to redirect
-    time.sleep(2)
-    profile_url = driver.current_url  # Get the updated url
-
-    profile_data = get_linkedin_profile_from_url(driver, wait, profile_url)
-
-    if profile_data:
-        profile = LinkedInProfile(**profile_data)
-        # Add email and password to profile for later use
-        profile.email = user_email
-        profile.password = user_password
-    else:
-        myprint("Failed to get my profile data")
-
-    return profile
 
 
 def test_get_linkedin_profile_from_url():

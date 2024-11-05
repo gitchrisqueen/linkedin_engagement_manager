@@ -4,6 +4,8 @@ from datetime import datetime, timedelta
 import mysql.connector
 from dotenv import load_dotenv
 
+from cqc_lem.linked_in_profile import LinkedInProfile
+from cqc_lem.utilities.logger import myprint
 from cqc_lem.utilities.utils import get_top_level_domain
 
 # Load .env file
@@ -149,6 +151,7 @@ def update_db_post(content: str, scheduled_time: str, post_type: str, post_id: i
 
     return success
 
+
 def update_db_post_status(post_id: int, status: str) -> bool:
     connection = get_db_connection()
     cursor = connection.cursor()
@@ -207,10 +210,12 @@ def get_post_content(post_id: int):
 def get_ready_to_post_posts(pre_post_time: datetime = None) -> list:
     """Query the database for any pending posts that are scheduled to post now or earlier"""
 
+    now = datetime.now()
     if pre_post_time is None:
-        now = datetime.now()
-        # Get time for 15 minutes prior to now
-        pre_post_time = now - timedelta(minutes=15)
+        # Get time for 15 minutes after to now
+        pre_post_time = now + timedelta(minutes=15)
+
+    myprint(f"Pre-post time: {pre_post_time}")
 
     conn = get_db_connection()
     cursor = conn.cursor()
@@ -218,13 +223,17 @@ def get_ready_to_post_posts(pre_post_time: datetime = None) -> list:
     cursor.execute(
         """SELECT p.id, p.scheduled_time, p.user_id 
             FROM posts AS p
-            WHERE status = 'approved' AND scheduled_time <= %s 
+            WHERE status = 'approved' AND scheduled_time BETWEEN %s AND %s 
             ORDER BY scheduled_time ASC 
-            LIMIT 1""",
-        (pre_post_time,))  # Get the first post that is scheduled to post now or earlier
+            """,
+        (now - timedelta(days=1), pre_post_time))  # Get the first post that is scheduled to post now or earlier
     posts = cursor.fetchall()
 
+    # Print the id's ready to post
+    myprint(f"Posts ready to post: {[post[0] for post in posts]}")
+
     return posts
+
 
 def get_user_password_pair_by_id(user_id: int):
     connection = get_db_connection()
@@ -252,3 +261,71 @@ def get_user_password_pairs():
     connection.close()
 
     return user_password_pairs
+
+
+def add_linkedin_profile(profile: LinkedInProfile):
+    connection = get_db_connection()
+    cursor = connection.cursor()
+    cursor.execute("""
+        INSERT INTO profiles (profile_url, email, data) 
+        VALUES (%s, %s, %s)
+        ON DUPLICATE KEY UPDATE
+                profile_url = VALUES(profile_url),
+                email = VALUES(email),
+                data = VALUES(data)
+        """,
+                   (str(profile.profile_url), profile.email, profile.model_dump_json()))
+
+    connection.commit()
+    success = cursor.rowcount == 1
+    cursor.close()
+    connection.close()
+    return success
+
+
+def get_linked_in_profile_by_url(profile_url: str, updated_less_than_days_ago: int = 1):
+    connection = get_db_connection()
+    cursor = connection.cursor()
+
+    cursor.execute("SELECT data FROM profiles WHERE profile_url = %s AND updated_at > NOW() - INTERVAL %s DAY", (profile_url, updated_less_than_days_ago))
+    profile_data = cursor.fetchone()
+
+    cursor.close()
+    connection.close()
+
+    return profile_data
+
+
+def get_linked_in_profile_by_email(profile_email: str, updated_less_than_days_ago: int = 1):
+    connection = get_db_connection()
+    cursor = connection.cursor()
+
+    cursor.execute("SELECT data FROM profiles WHERE email = %s AND updated_at > NOW() - INTERVAL %s DAY", (profile_email, updated_less_than_days_ago))
+    profile_data = cursor.fetchone()
+
+    cursor.close()
+    connection.close()
+
+    return profile_data
+
+
+def remove_linked_in_profile_by_url(profile_url: str):
+    connection = get_db_connection()
+    cursor = connection.cursor()
+
+    cursor.execute("DELETE FROM profiles WHERE profile_url = %s", (profile_url,))
+    connection.commit()
+
+    cursor.close()
+    connection.close()
+
+
+def remove_linked_in_profile_by_email(profile_email: str):
+    connection = get_db_connection()
+    cursor = connection.cursor()
+
+    cursor.execute("DELETE FROM profiles WHERE email = %s", (profile_email,))
+    connection.commit()
+
+    cursor.close()
+    connection.close()
