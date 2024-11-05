@@ -247,7 +247,7 @@ def get_profile_recent_activity(driver, employeeLink):
     found_text = [text.getText().strip() for text in texts]
     posted_dates = source.select(
         'div[class*="fie-impression-container"] div.relative span[class*="update-components-actor__sub-description"] span[aria-hidden="true"]')
-    found_dates = [date.getText(date).strip() for date in posted_dates]
+    found_dates = [date.getText().strip() for date in posted_dates]
 
     # print_header("Recent Activity")
     # print("Found Links", found_links)
