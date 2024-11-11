@@ -108,6 +108,6 @@ def update_post(post_id: int, post: PostRequest) -> ResponseModel:
     """Endpoint to update a post."""
 
     if update_db_post(post.content, post.scheduled_time, post.post_type, post_id, post.status):
-        return ResponseModel(status_code=200, detail="Post updated successfull")
+        return ResponseModel(status_code=200, detail="Post updated successful")
     else:
         raise HTTPException(status_code=405, detail="Post could not be updated")

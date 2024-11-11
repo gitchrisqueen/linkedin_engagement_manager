@@ -9,6 +9,9 @@ LinkedIn Engagement Manager (LEM) is an automated solution for managing engageme
 - **AI-Generated Content**: Modular AI services generate carousel, text, and video content.
 - **Sentiment Analysis**: Ensures content is appropriate, aligned with user preferences.
 - **Approval Workflow**: Preview and approve content before publishing or allow for automatic approval.
+- **Video Creation**: Generate videos from prompts using AI.
+- **Summarizing Recent Activity**: Summarize recent LinkedIn activities and craft personalized responses.
+- **Date-Time Picker for Scheduled Posts**: Edit scheduled posts with a date-time picker for easy scheduling.
 - **Dockerized Environment**: Easily deployable to the cloud using Docker containers.
 - **Modular Design**: Content generation modules can be swapped out for any SaaS services.
 - **User Dashboard**: Mobile and web-friendly dashboard for monitoring and controlling the engagement process.
@@ -18,7 +21,7 @@ LinkedIn Engagement Manager (LEM) is an automated solution for managing engageme
 - **MySQL** as the relational database.
 - **Docker** to containerize the application for local development and cloud deployment.
 - **AI Services**: Integrated AI models to generate content and perform sentiment analysis.
-- **React.js** (optional) for the web-based dashboard.
+- **Streamlit** for the user interface.
 
 ## Getting Started
 
@@ -26,6 +29,8 @@ LinkedIn Engagement Manager (LEM) is an automated solution for managing engageme
 1. **Docker** installed on your system.
 2. **Python 3.9+** for local development.
 3. **MySQL 8.0** or above (can be run inside Docker).
+4. **Streamlit** for running the user interface.
+5. Necessary API keys for AI services (e.g., OpenAI API key).
 
 ### Installation
 

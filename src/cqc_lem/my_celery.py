@@ -29,7 +29,7 @@ app.conf.update(
     beat_schedule={
         'check-scheduled-posts': {
             'task': 'cqc_lem.run_scheduler.check_scheduled_posts',
-            'schedule': timedelta(minutes=1),  # TODO: change back to 5 Check every 5 minutes
+            'schedule': timedelta(minutes=5),  # TODO: change back to 5 Check every 5 minutes
         },
         'send-appreciation-dms': {
             'task': 'cqc_lem.run_scheduler.start_appreciate_dms',

@@ -157,6 +157,27 @@ services:
   #  environment:
   #    - SE_ENABLE_TRACING=false
 
+  linkedin-preview:
+    build:
+      context: .
+      dockerfile: ./compose/local/linkedinpreview/Dockerfile
+    image: ${DOCKER_IMAGE_NAME}_linkedinpreview
+    container_name: linkedin-preview
+    environment:
+      - NEXT_PUBLIC_GTM_MEASUREMENT_ID=replace_me # TODO: is this needed?
+    ports:
+      - "8081:3000"  # For the web interface
+    volumes:
+      - ./compose/local/linkedinpreview/app:/usr/src/app/app
+      - ./compose/local/linkedinpreview/components:/usr/src/app/components
+      - ./compose/local/linkedinpreview/config:/usr/src/app/config
+      - ./compose/local/linkedinpreview/contents:/usr/src/app/contents
+      - ./compose/local/linkedinpreview/hooks:/usr/src/app/hooks
+      - ./compose/local/linkedinpreview/public:/usr/src/app/public
+      - ./compose/local/linkedinpreview/styles:/usr/src/app/styles
+      - ./compose/local/linkedinpreview/types:/usr/src/app/types
+      - ./compose/local/linkedinpreview/utils:/usr/src/app/utils
+
 volumes:
   db_data:
   redis_data:

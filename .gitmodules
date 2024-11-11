@@ -1,0 +1,3 @@
+[submodule "compose/local/linkedinpreview"]
+	path = compose/local/linkedinpreview
+	url = https://github.com/gatteo/linkedinpreview.com.git

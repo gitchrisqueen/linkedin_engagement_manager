@@ -201,10 +201,9 @@ def returnProfileInfo(driver: webdriver, profile_url, company_name=None):
 
     # Get the industry - TODO: This may not be publicly visible
     # TODO: Get the mutual connections
-    # TODO: Get the endorsements
     # TODO: Get the awards
-    # TODO: Get Interest
-    # TODO: Get Groups
+    # TODO: Get Interest (top voices, companies, groups, newsletters
+
 
     # print_header("Profile")
     # print(profile)

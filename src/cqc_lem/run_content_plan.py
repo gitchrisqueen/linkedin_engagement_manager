@@ -2,10 +2,12 @@ import random
 from datetime import datetime, timedelta
 
 from cqc_lem.my_celery import app as shared_task
-from cqc_lem.utilities.date import get_datetime
+from cqc_lem.utilities.ai.ai_helper import get_video_content_from_ai
 from cqc_lem.utilities.db import get_post_type_counts, insert_planned_post, update_db_post_content, \
-    get_planned_posts_for_current_week, get_last_planned_post_date_for_user
+    get_planned_posts_for_current_week, get_last_planned_post_date_for_user, get_user_password_pair_by_id
+from cqc_lem.utilities.linked_in_helper import get_my_profile
 from cqc_lem.utilities.logger import myprint
+from cqc_lem.utilities.selenium_util import get_driver_wait_pair
 from cqc_lem.utilities.utils import get_best_posting_time
 
 
@@ -26,7 +28,7 @@ def generate_content(user_id: int):
     percentages = {post_type: (count / total_posts) * 100 for post_type, count in current_counts.items()}
 
     # Log the current representation for debugging
-    myprint(f"Current Content Percentages: {percentages}")
+    #myprint(f"Current Content Percentages: {percentages}")
 
     # 2. Determine the target distribution of post types for the next 30 days
     # Based on the percentages, calculate how many posts of each type are needed to balance the content
@@ -35,62 +37,61 @@ def generate_content(user_id: int):
     days_in_month = datetime.now().replace(day=1).replace(month=datetime.now().month+1, day=1) - datetime.now().replace(day=1)
     days_in_month = days_in_month.days
 
-    myprint(f"Days in Month: {days_in_month}")
+    #myprint(f"Days in Month: {days_in_month}")
 
     # Determine the start date as the day after the last scheduled post in planning status
     last_planned_date = get_last_planned_post_date_for_user(user_id)
 
-    myprint(f"Last Planned Date: {last_planned_date}")
+    #myprint(f"Last Planned Date: {last_planned_date}")
 
     if last_planned_date:
-        start_date = last_planned_date + timedelta(days=1)
+        start_date = last_planned_date + timedelta(days=1) # Start with the next day
     else:
-        start_date = datetime.now()
+        start_date = datetime.now() + timedelta(days=1) # Start with the next day
 
-    myprint(f"Start Date: {start_date}")
+    #myprint(f"Start Date: {start_date}")
 
     # Determine how many days are left in this month
     days_left_in_month = days_in_month - start_date.day
 
-    myprint(f"Days Left in Month after Start Date: {days_left_in_month}")
+    #myprint(f"Days Left in Month after Start Date: {days_left_in_month}")
 
     # 4. Create content for each post type and buyer journey stage
     # Example logic: randomly select a post type and buyer journey stage for each post
-    target_posts = days_left_in_month - 1  # Total posts till the end of the month - 1 day (not including today)
+    target_posts = days_left_in_month + 1   # Total posts till the end of the month
 
-    myprint(f"Target Posts: {target_posts}")
+    #myprint(f"Target Posts: {target_posts}")
 
     needed_posts = {post_type: target_posts // 3 for post_type in ['carousel', 'text', 'video']}
 
-    myprint(f"Needed Posts: {needed_posts}")
+    #myprint(f"Needed Posts: {needed_posts}")
 
     # Ensure all post types are present in current_counts and percentages
     for post_type in ['carousel', 'text', 'video']:
         if post_type not in percentages:
             percentages[post_type] = 0.0
 
-    myprint(f"Updated Content Percentages: {percentages}" )
+    #myprint(f"Updated Content Percentages: {percentages}" )
 
-    # Adjust post counts to meet distribution targets
-    # Example logic: if 'carousel' is underrepresented, increase its target posts
-    # Calculate the variance in percentages
-    total_variance = sum(33.33 - percentages[post_type] for post_type in percentages)
+    # Loop until the total needed posts equals the target posts
+    while sum(needed_posts.values()) != target_posts:
+        max_key = get_max_key(percentages)
+        min_key = get_min_key(percentages)
 
-    myprint(f"Total Variance: {percentages}")
+        # Adjust the counts
+        if sum(needed_posts.values()) < target_posts:
+            needed_posts[min_key] += 1
+        else:
+            needed_posts[max_key] -= 1
 
-    # Distribute the variance evenly among the needed_posts
-    for post_type in needed_posts:
-        needed_posts[post_type] += int(total_variance / len(needed_posts))
+        # Recalculate percentages
+        total_posts = sum(needed_posts.values())
+        for post_type in percentages:
+            percentages[post_type] = (needed_posts[post_type] / total_posts) * 100
 
-    myprint(f"Needed Posts (after variance adjustment): {needed_posts}")
-
-    # Adjust post counts to meet distribution targets
-    for post_type in needed_posts:
-        if percentages[post_type] < 33.33:  # Less than a third of content
-            needed_posts[post_type] += 1  # Adjust to bring balance
-
-    # Log the target distribution for debugging
-    myprint(f"Target content distribution (balanced): {needed_posts}")
+    # Output the final needed_posts and percentages
+    #myprint(f"Final Needed Posts: {needed_posts}")
+    #myprint(f"Final Percentages: {percentages}")
 
     # 3. Plan content across the buyer journey stages
     # Define buyer journey stages: Awareness, Consideration, Decision
@@ -120,7 +121,7 @@ def generate_content(user_id: int):
         create_content(post_type, stage)
 
         # Add this post to the daily plan
-        post_date = start_date + timedelta(days=day+1) #  Starting with tomorrow
+        post_date = start_date + timedelta(days=day)
 
         # Get the best time for the selected date
         post_time = get_best_posting_time(post_date.date())
@@ -138,19 +139,33 @@ def generate_content(user_id: int):
         needed_posts[post_type] -= 1
 
     # Log the final content plan for the next 30 days
-    myprint(f"Generated content plan: {daily_plan}")
+    #myprint(f"Generated content plan: {daily_plan}")
+    myprint(f"Generated content plan")
 
     # 4. Save the daily plan to the database for tracking and scheduling
     save_content_plan(user_id, daily_plan)
 
+# Function to find the key with the highest value in a dictionary
+def get_max_key(d):
+    return max(d, key=d.get)
 
+# Function to find the key with the lowest value in a dictionary
+def get_min_key(d):
+    return min(d, key=d.get)
 
-def create_content(post_type: str, stage: str):
+def create_content(user_id: int, post_type: str, stage: str):
     """Create content based on the specified post type and buyer journey stage."""
-    # This function would call another service or AI generator to create the content
-    # Example: generate_carousel_content(stage), generate_text_content(stage), etc.
 
-    content = f"Content created for {post_type} in the {stage} stage. However, this is unfinished"
+    user_email, user_password = get_user_password_pair_by_id(user_id)
+    driver, wait = get_driver_wait_pair()
+    my_profile = get_my_profile(driver, wait, user_email, user_password)
+
+    if post_type == "video":
+        content = get_video_content_from_ai(my_profile, stage)
+    elif post_type == "carousel":
+        content = f"Content created for {post_type} in the {stage} stage. However, this is unfinished"
+    else:
+        content = f"Content created for {post_type} in the {stage} stage. However, this is unfinished"
 
     return content
 
@@ -170,12 +185,13 @@ def create_weekly_content():
     planned_posts = get_planned_posts_for_current_week()
 
     for post in planned_posts:
+        user_id = post['user_id']
         post_id = post['id']
         post_type = post['post_type']
         stage = post['buyer_stage']
 
         # For each content create it
-        content = create_content(post_type, stage)
+        content = create_content(user_id, post_type, stage)
 
         # Update the database with the created content
         myprint(f"Updating post content for post_id: {post_id}")

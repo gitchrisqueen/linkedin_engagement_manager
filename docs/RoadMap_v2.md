@@ -11,7 +11,7 @@ This roadmap outlines the steps to take LinkedIn Engagement Manager (LEM) from s
 
 ---
 
-### Day 1: Initial Setup and Infrastructure
+### Day 1: Initial Setup and Infrastructure (Monday, October 28, 2024)
 
 - **Goal**: Set up the core infrastructure, including Docker, MySQL, and project skeleton.
 - **Tasks**:
@@ -31,17 +31,17 @@ This roadmap outlines the steps to take LinkedIn Engagement Manager (LEM) from s
 
 ---
 
-### Day 2: Basic Automation and AI Integration
+### Day 2: Basic Automation and AI Integration (Tuesday, October 29, 2024)
 
 - **Goal**: Automate LinkedIn tasks and integrate AI content generation.
 - **Tasks**:
 
 | Status | Task Description                                                                                                       |
 |--------|------------------------------------------------------------------------------------------------------------------------|
-| ✅      | Extend the Selenium script to: Comment on posts,                                                                       
-| 🟡 | Extend Selenium to: Send direct messages to profile viewers.                                                           |
+| ✅      | Extend the Selenium script to: Comment on posts.                                                           |
+| 🟡      | Extend Selenium to: Send direct messages to profile viewers.                                                           |
 | ✅      | Integrate AI content generation modules: Generate simple text for comments and DMs using an AI service (e.g., OpenAI). |
-| 🟡     | Store AI-generated content in MySQL for scheduling purposes.                                                           |
+| ✅     | Store AI-generated content in MySQL for scheduling purposes.                                                           |
 
 - **Testing**:
   - Automate commenting and DM-sending functionality on LinkedIn.
@@ -49,7 +49,7 @@ This roadmap outlines the steps to take LinkedIn Engagement Manager (LEM) from s
 
 ---
 
-### Day 3: Post Scheduling and Sentiment Analysis
+### Day 3: Post Scheduling and Sentiment Analysis (Wednesday, October 30, 2024)
 
 - **Goal**: Add post scheduling and sentiment analysis for content validation.
 - **Tasks**:
@@ -67,7 +67,7 @@ This roadmap outlines the steps to take LinkedIn Engagement Manager (LEM) from s
 
 ---
 
-### Day 4: Preview and Approval System
+### Day 4: Preview and Approval System (Thursday, October 31, 2024)
 
 - **Goal**: Enable a manual preview and approval workflow for all generated content.
 - **Tasks**:
@@ -83,7 +83,7 @@ This roadmap outlines the steps to take LinkedIn Engagement Manager (LEM) from s
 
 ---
 
-### Day 5: MVP Completion and Final Testing
+### Day 5: MVP Completion and Final Testing (Friday, November 1, 2024)
 
 - **Goal**: Polish the app and complete the MVP version.
 - **Tasks**:
@@ -108,3 +108,21 @@ This roadmap outlines the steps to take LinkedIn Engagement Manager (LEM) from s
   2. Add support for more social media platforms (e.g., Twitter, Facebook).
   3. Explore options for AI-driven responses to comments.
   4. Expand the dashboard with deeper analytics and user customization options.
+
+---
+
+### This Week's Tasks (Starting Monday, October 28, 2024)
+
+- **Goal**: Complete unfinished tasks and address TODO comments.
+- **Tasks**:
+
+| Status | Task Description |
+|--------|------------------|
+| 🔴 | Implement advanced content analytics to measure engagement performance. |
+| 🔴 | Add support for more social media platforms (e.g., Twitter, Facebook). |
+| 🔴 | Explore options for AI-driven responses to comments. |
+| 🔴 | Expand the dashboard with deeper analytics and user customization options. |
+| 🔴 | Add error handling and logging for API requests in `src/cqc_lem_streamlit/pages/2_Review_Schedule.py`. |
+| 🔴 | Refactor `create_video_from_prompt` function in `src/cqc_lem/utilities/ai/ai_helper.py` to handle different video formats. |
+| 🔴 | Optimize the performance of the Streamlit interface in `src/cqc_lem_streamlit/pages/2_Review_Schedule.py`. |
+| 🔴 | Add unit tests for AI content generation functions in `src/cqc_lem/utilities/ai/ai_helper.py`. |

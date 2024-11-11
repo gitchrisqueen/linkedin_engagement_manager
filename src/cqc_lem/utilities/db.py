@@ -380,7 +380,7 @@ def get_planned_posts_for_current_week():
     cursor = connection.cursor(dictionary=True)
 
     cursor.execute(
-        "SELECT id, post_type, buyer_stage FROM posts WHERE status = 'planning' AND WEEK(scheduled_time) = WEEK(NOW())")
+        "SELECT user_id, id, post_type, buyer_stage FROM posts WHERE status = 'planning' AND WEEK(scheduled_time) = WEEK(NOW())")
     planned_content = cursor.fetchall()
 
     cursor.close()
