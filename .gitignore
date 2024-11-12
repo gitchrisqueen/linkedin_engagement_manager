@@ -171,3 +171,8 @@ logs/*
 
 # exception to the logs folder rule
 !logs/.gitkeep
+
+
+# Exlude selenium profile folders
+*selenium_profiles/
+selenium/
