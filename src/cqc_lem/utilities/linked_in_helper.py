@@ -153,7 +153,7 @@ def get_linkedin_profile_from_url(driver, wait, profile_url):
         profile_json_str = profile_json[0] if isinstance(profile_json, tuple) else profile_json
         # Create a LinkedInProfile object from json string data
         profile = LinkedInProfile.model_validate_json(profile_json_str)
-        profile_data = profile.to_dict()
+        profile_data = profile.model_dump()
         myprint(f"Profile Restored from DB: {profile.full_name}")
 
     return profile_data

@@ -1,0 +1,40 @@
+[node]
+detect-drivers = false
+max-sessions = 4
+
+[vnc]
+no-password = 1
+
+[docker]
+# Configs have a mapping between the Docker image to use and the capabilities that need to be matched to
+# start a container with the given image.
+configs = [
+    #"selenium/standalone-firefox:latest", '{"browserName": "firefox", "platformName": "linux", "version": "latest"}',
+    #"selenium/standalone-chrome:latest", '{"browserName": "chrome", "platformName": "linux", "browserVersion": "105.0", "version": "latest"}'
+    #"selenium/standalone-edge:latest", '{"browserName": "MicrosoftEdge", "platformName": "linux", "version": "latest"}'
+    # This works #
+    "selenium/standalone-chrome:93.0", "{\"browserName\": \"chrome\", \"browserVersion\": \"91\"}"
+    #"selenium/standalone-chrome:127.0", "{\"browserName\": \"chrome\", \"browserVersion\": \"127\"}"
+    #"selenium/standalone-chrome:4.26.0-20241101", '{"browserName": "chrome", "platformName": "mac", "browserVersion": "116"}'
+    #"selenium/standalone-chrome:latest", '{"browserName": "chrome", "browserVersion": "130.0.6723.91"}'
+    #"selenium/standalone-chrome:latest", "{\"browserName\": \"chrome\", \"browserVersion\": \"130\", \"version\": \"latest\"}"
+    #"selenium/standalone-chrome:latest", "{\"browserName\": \"chrome\"}"
+    ]
+
+#host-config-keys = ["Dns", "DnsOptions", "DnsSearch", "ExtraHosts", "Binds"]
+
+# URL for connecting to the docker daemon
+# host.docker.internal works for macOS and Windows.
+# Linux could use --net=host in the `docker run` instruction or 172.17.0.1 in the URI below.
+# To have Docker listening through tcp on macOS, install socat and run the following command
+# socat -4 TCP-LISTEN:2375,fork UNIX-CONNECT:/var/run/docker.sock
+url = "http://127.0.0.1:2375"
+# Docker image used for video recording
+video-image = "selenium/video:latest"
+#video-image = "selenium/video:ffmpeg-7.1-20241101"
+
+# Uncomment the following section if you are running the node on a separate VM
+# Fill out the placeholders with appropriate values
+#[server]
+#host = <ip-from-node-machine>
+#port = <port-from-node-machine>

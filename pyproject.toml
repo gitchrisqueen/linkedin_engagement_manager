@@ -39,7 +39,7 @@ bs4 = "^0.0.2"
 pandas = "^2.2.3"
 datetime = "^5.5"
 dateparser = "^1.2.0"
-celery = "^5.4.0"
+celery = {version = "^5.4.0", extras = ["redis"]}
 fastapi = "^0.115.4"
 uvicorn = "^0.32.0"
 markdownify = "^0.13.1"

@@ -157,7 +157,7 @@ def create_content(user_id: int, post_type: str, stage: str):
     """Create content based on the specified post type and buyer journey stage."""
 
     user_email, user_password = get_user_password_pair_by_id(user_id)
-    driver, wait = get_driver_wait_pair()
+    driver, wait = get_driver_wait_pair(session_name='Create Content')
     my_profile = get_my_profile(driver, wait, user_email, user_password)
 
     if post_type == "video":

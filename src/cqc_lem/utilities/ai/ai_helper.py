@@ -331,7 +331,7 @@ def summarize_recent_activity(recent_activity_profile: LinkedInProfile, main_pro
                                              enumerate(recent_activity_profile.recent_activities)])
 
     # Clone the main profile and remove recent activities to reduce confusion form AI
-    main_profile = main_profile.clone()
+    main_profile = main_profile.model_copy(deep=True)
     main_profile.recent_activities = []
 
     main_profile_json = main_profile.model_dump_json()

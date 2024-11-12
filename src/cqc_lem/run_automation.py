@@ -7,8 +7,7 @@ from datetime import datetime
 from typing import List
 
 from dotenv import load_dotenv
-from openai import OpenAI
-from selenium.common import NoSuchElementException, ElementClickInterceptedException
+from selenium.common import NoSuchElementException, ElementClickInterceptedException, TimeoutException
 from selenium.webdriver import ActionChains
 from selenium.webdriver.common.by import By
 # from selenium.webdriver.chrome.webdriver import WebDriver
@@ -73,14 +72,16 @@ def navigate_to_feed(driver, wait):
     click_element_wait_retry(driver, wait, '//button/hr',
                              "Clicking Sort By Dropdown", use_action_chain=True)
 
-    # time.sleep(1)
+    time.sleep(1)
 
     # Select "Recent" from the dropdown
+    try:
+        click_element_wait_retry(driver, wait, '//div[contains(@class,"artdeco-dropdown")]/ul/li[2]',
+                                 "Selecting Recent Option")
 
-    click_element_wait_retry(driver, wait, '//div[contains(@class,"artdeco-dropdown__content--is-open")]//ul/li[2]',
-                             "Selecting Recent Option")
-
-    time.sleep(3)  # Wait for the page to refresh with recent posts
+        time.sleep(3)  # Wait for the page to refresh with recent posts
+    except TimeoutException as te:
+        myprint("Timeout Exception: " + str(te))
 
     # are_you_satisfied()
 
@@ -149,9 +150,11 @@ def simulate_writing_time(content):
 def post_comment(user_id: int, post_link, comment_text):
     """Post a comment to the currently opened post in the driver window"""
 
-    driver, wait = get_driver_wait_pair()
+    driver, wait = get_driver_wait_pair(session_name='Post Comment')
 
     user_email, user_password = get_user_password_pair_by_id(user_id)
+
+    login_to_linkedin(driver, wait, user_email, user_password)
 
     if post_link != driver.current_url:
         # Switch to post url
@@ -237,6 +240,8 @@ def post_comment(user_id: int, post_link, comment_text):
             else:
                 myprint(f"Failed to click Post Reaction: {e}")
 
+    driver.quit() # Close the driver
+
 
 def check_commented(driver, wait):
     """See if the current open url we've already posted on"""
@@ -268,7 +273,7 @@ def automate_commenting(user_id: int, loop_for_duration=None, **kwargs):
 
     myprint("Starting Automate Commenting Thread...")
 
-    driver, wait = get_driver_wait_pair()
+    driver, wait = get_driver_wait_pair(session_name='Automate Commenting')
 
     user_email, user_password = get_user_password_pair_by_id(user_id)
 
@@ -328,7 +333,7 @@ def automate_reply_commenting(user_id: int, loop_for_duration=None, **kwargs):
 
     user_email, user_password = get_user_password_pair_by_id(user_id)
 
-    driver, wait = get_driver_wait_pair()
+    driver, wait = get_driver_wait_pair(session_name='Reply to Comments')
 
     login_to_linkedin(driver, wait, user_email, user_password)
 
@@ -358,7 +363,7 @@ def automate_appreciation_dms(user_id: int, loop_for_duration=None):
 
     user_email, user_password = get_user_password_pair_by_id(user_id)
 
-    driver, wait = get_driver_wait_pair()
+    driver, wait = get_driver_wait_pair(session_name='Automate Appreciation DMs')
 
     # After Accepting a Connection Request:
 
@@ -451,11 +456,10 @@ def generate_and_post_comment(driver, wait, post_link, my_profile: LinkedInProfi
     #    time.sleep(random.uniform(0.05, 0.15))  # Simulate human typing speed
 
     # Comment out the actual posting of the comment for now
-    post_comment.delay(
-        kwargs={'user_id': get_user_id(my_profile.email),
-                'post_link': post_link,
-                'comment_text': comment_text}
-    )
+    kwargs = {'user_id': get_user_id(my_profile.email),
+              'post_link': post_link,
+              'comment_text': comment_text}
+    post_comment.apply_async(kwargs=kwargs)
 
     myprint("Comment Posted")
 
@@ -487,7 +491,7 @@ def automate_profile_viewer_dms(user_id: int, loop_for_duration=None, **kwargs):
 
     user_email, user_password = get_user_password_pair_by_id(user_id)
 
-    driver, wait = get_driver_wait_pair()
+    driver, wait = get_driver_wait_pair(session_name='Profile Viewer DMs')
 
     # Wait until there are 10 minutes or less on the timer
     while True:
@@ -672,11 +676,10 @@ def send_dm(driver, wait, my_profile: LinkedInProfile, viewer_url, viewer_name):
                 message = "Hi, I noticed we're connected on LinkedIn and wanted to reach out. I'm currently working on a project that I think you might find interesting. Would you be open to a quick chat to discuss it further?"
 
                 # Send actual DM
-                send_private_dm.delay(
-                    kwargs={'user_id': get_user_id(my_profile.email),
-                            'profile_url': profile.profile_url,
-                            'message': message}
-                )
+                kwargs = {'user_id': get_user_id(my_profile.email),
+                          'profile_url': str(profile.profile_url),
+                          'message': message}
+                send_private_dm.apply_async(kwargs=kwargs)
         else:
             # myprint(f"We Are {profile.connection} Connections")
             # If not connected send them a connection request
@@ -689,11 +692,10 @@ def send_dm(driver, wait, my_profile: LinkedInProfile, viewer_url, viewer_name):
             myprint(f"Refined Response: {refined_response}")
 
             # Send connection request with this message
-            invite_to_connect.delay(
-                kwargs={'user_id': get_user_id(my_profile.email),
-                        'profile_url': profile.profile_url,
-                        'message': refined_response}
-            )
+            kwargs = {'user_id': get_user_id(my_profile.email),
+                      'profile_url': str(profile.profile_url),
+                      'message': refined_response}
+            invite_to_connect.apply_async(kwargs=kwargs)
     else:
         myprint(f"Failed to get profile data for {viewer_name}")
 
@@ -705,7 +707,7 @@ def send_private_dm(user_id: int, profile_url: str, message: str):
 
     user_email, user_password = get_user_password_pair_by_id(user_id)
 
-    driver, wait = get_driver_wait_pair()
+    driver, wait = get_driver_wait_pair(session_name='Private DM')
 
     login_to_linkedin(driver, wait, user_email, user_password)
 
@@ -717,6 +719,8 @@ def send_private_dm(user_id: int, profile_url: str, message: str):
 
     dm_sent = False
 
+    driver.quit()  # Close the driver
+
     return dm_sent
 
 
@@ -725,7 +729,7 @@ def send_private_dm(user_id: int, profile_url: str, message: str):
 def invite_to_connect(user_id: int, profile_url: str, message: str = None):
     user_email, user_password = get_user_password_pair_by_id(user_id)
 
-    driver, wait = get_driver_wait_pair()
+    driver, wait = get_driver_wait_pair(session_name='Invite to Connect')
 
     login_to_linkedin(driver, wait, user_email, user_password)
 
@@ -824,6 +828,7 @@ def invite_to_connect(user_id: int, profile_url: str, message: str = None):
             myprint(f"Failed to find send without a note connection button. Error: {str(e)}")
             return False
 
+    driver.quit()  # Close the driver
 
 def start_process():
     global time_remaining_seconds
@@ -837,14 +842,14 @@ def start_process():
     # drivers_with_waits = [get_driver_wait_pair() for _ in range(drivers_needed)]
     # all_drivers = [driver for driver, _ in drivers_with_waits]
 
-    #def signal_handler(sig, frame):
+    # def signal_handler(sig, frame):
 
     # Get list of all drivers from drivers_with_waits
 
     # final_method(all_drivers)
 
     # Register the signal handler for SIGINT
-    #signal.signal(signal.SIGINT, signal_handler)
+    # signal.signal(signal.SIGINT, signal_handler)
 
     # Register the final_method to be called on exit
     # atexit.register(final_method, all_drivers)

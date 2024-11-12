@@ -21,11 +21,47 @@ from selenium.webdriver.support.wait import WebDriverWait
 from webdriver_manager.chrome import ChromeDriverManager
 
 from cqc_lem.utilities.env_constants import *
-from cqc_lem.utilities.utils import create_folder_if_not_exists
 from cqc_lem.utilities.logger import myprint
+from cqc_lem.utilities.utils import create_folder_if_not_exists
 
 
-def get_docker_driver(headless=True):
+def get_available_session_driver_id(wait_for_available=True, wait_time=60, retry=3):
+    # Query the Selenium Grid for available sessions
+    url = f"http://{SELENIUM_HUB_HOST_IP}:4444/status"
+    response = requests.get(url)
+    data = response.json()
+
+    # Find an available session
+    session_id = None
+    for node in data['value']['nodes']:
+        for slot in node['slots']:
+            if slot['session'] is None:
+                session_id = slot['id']['id']
+                break
+                # return session_id # No available sessions
+
+            else:
+                session = slot['session']
+                # myprint(f"Session: {session}")
+                session_id = session['sessionId']
+                break
+        if session_id:
+            break
+
+    if not session_id:
+        if wait_for_available:
+            if retry > 0:
+                time.sleep(wait_time)
+                return get_available_session_driver_id(wait_for_available, wait_time, retry - 1)
+            else:
+                raise TimeoutError("Timeout while waiting for available session")
+        else:
+            raise TimeoutError("No available session")
+
+    return session_id
+
+
+def get_docker_driver(headless=True, session_name: str = "ChromeTests"):
     options = getBaseOptions()
     # options.headless = headless
     if headless:
@@ -34,9 +70,32 @@ def get_docker_driver(headless=True):
     options.add_argument('--ignore-ssl-errors=yes')
     options.add_argument('--ignore-certificate-errors')
 
+    # Enable recording video
+    options.set_capability('se:recordVideo', True)
+    options.set_capability('se:timeZone', "America/New_York")
+    options.set_capability('se:screenResolution', '1920x1080')
+    options.set_capability('se:name', 'CQC_LEM (' + session_name + ')')
+
+    desired_capabilities = {}
+    # try:
+    #    session_id = get_available_session_driver_id()
+    #    if session_id:
+    #        myprint(f"Got Session ID: {session_id}")
+    #        options.add_argument(f'--session_id={session_id}')
+    #        #options.set_capability('session_id', session_id)
+    #    else:
+    #        myprint("No available session found")
+    # except TimeoutError as te:
+    #    myprint(te)
+
+    # Try unique browser name - This didn't work but caused queue to fill and not create session
+    # options.set_capability('browserName', 'chrome_rand_'+str(random.randint(1000, 9999)))
+
+    # myprint(f"Options: {vars(options)}")
+
     driver = webdriver.Remote(
-        #command_executor=f'http://{SELENIUM_HUB_HOST_IP}:4444', # Works but one call controls all sessins
-        command_executor=f'http://{SELENIUM_HUB_HOST_IP}:4444/wd/hub', # Is this working ??
+        command_executor=f'http://{SELENIUM_HUB_HOST_IP}:4444',  # Works but one call controls all sessions
+        # command_executor=f'http://{SELENIUM_HUB_HOST_IP}:4444/wd/hub', # Works but one call controls all sessions
         options=options
     )
 
@@ -350,10 +409,10 @@ def get_driver_wait(driver):
                          ])
 
 
-def get_driver_wait_pair(headless=False):
+def get_driver_wait_pair(headless=False, session_name: str = "ChromeTests"):
     # Create the driver
     if USE_DOCKER_BROWSER:
-        driver = get_docker_driver(headless=headless)
+        driver = get_docker_driver(headless=headless, session_name=session_name)
     else:
         driver = create_driver(headless=headless)
     wait = get_driver_wait(driver)
@@ -366,7 +425,7 @@ def get_driver_wait_pair(headless=False):
     myprint("Window handle found. Returning driver and wait pair.")
 
     # Give some time for multiple calls
-    #time.sleep(2)
+    # time.sleep(2)
 
     return driver, wait
 

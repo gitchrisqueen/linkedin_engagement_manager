@@ -53,20 +53,24 @@ def test_linked_login_over_multiple_sessions():
     driver, wait = get_driver_wait_pair(False)
 
     login_to_linkedin(driver, wait, LI_USER, LI_PASSWORD)
+    print("Logged Into LinkedIn")
 
     # Get another docker chrome instance
     driver2, wait2 = get_driver_wait_pair(False)
 
     login_to_linkedin(driver2, wait2, LI_USER, LI_PASSWORD)
+    print("Logged Into LinkedIn 2nd TIme")
 
     # Navigate driver 2 to google.com
     driver2.get("https://www.google.com")  # TODO: Why does this change all sessions instead of just one ???
+    print("Navigated to: https://www.google.com")
 
-    time.sleep(5 * 60)
+    #time.sleep(5 * 60) # 5 minutes
+    time.sleep(1 * 60) # 1 minute
 
-    # Close the browser
-    driver.quit()
+    # Close the browser # NOTE: Hast to be closed in revers order they were opened
     driver2.quit()
+    driver.quit()
 
 
 def test_get_user_password_pair():
@@ -105,8 +109,8 @@ def test_get_my_profile():
 if __name__ == "__main__":
     # test_multiple_sessions()
 
-    # test_linked_login_over_multiple_sessions()# TODO: Get this working
+    test_linked_login_over_multiple_sessions()# TODO: Get this working
 
     # test_get_user_password_pair()
     # test_get_ready_to_post_posts()
-    test_get_my_profile()
+    # test_get_my_profile()

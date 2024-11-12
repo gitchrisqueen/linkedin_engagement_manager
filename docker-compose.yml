@@ -53,7 +53,7 @@ services:
       - ./src/database/setup.sql:/docker-entrypoint-initdb.d/setup.sql
 
   flyway:
-    image: redgate/flyway
+    image: redgate/flyway:latest-alpine
     container_name: flyway
     entrypoint: /flyway-entrypoint.sh
     env_file:
@@ -64,11 +64,27 @@ services:
     depends_on:
       - mysql
 
-  celery_worker:
+  celery_worker_1:
     image:  ${DOCKER_IMAGE_NAME}
-    container_name: celery_worker
+    container_name: celery_worker_1
     command: /start-celeryworker
-    restart: always
+    #restart: always
+    #volumes:
+    #  - ./src:/app/src
+    volumes_from:
+      - web-app
+    env_file:
+      - .env
+    depends_on:
+      - redis
+      - mysql
+      - selenium-hub
+
+  celery_worker_2:
+    image: ${DOCKER_IMAGE_NAME}
+    container_name: celery_worker_2
+    command: /start-celeryworker
+    #restart: always
     #volumes:
     #  - ./src:/app/src
     volumes_from:
@@ -84,7 +100,7 @@ services:
     image:  ${DOCKER_IMAGE_NAME}
     container_name: celery_beat
     command: /start-celerybeat
-    restart: always
+    #restart: always
     #volumes:
     # - ./src:/app/src
     volumes_from:
@@ -100,7 +116,9 @@ services:
     container_name: celery_flower
     command: /start-flower
     restart: always
-    #volumes:
+    volumes:
+      - ./logs:/app/logs
+      - flower_db:/var/lib/flower/flowerdb/flower_db
     #  - ./src:/app/src
     volumes_from:
       - web-app
@@ -108,59 +126,73 @@ services:
       - .env
     environment:
       - FLOWER_UNAUTHENTICATED_API=True
+      - FLOWER_PERSISTENT=True
+      - FLOWER_SAVE_STATE_INTERVAL=5000  # 5s
     ports:
-      - "5555:5555"
+      - "8555:5555"
     depends_on:
       - redis
       - mysql
-      - celery_worker
-  chrome:
-    image: selenium/node-chrome:latest
-    container_name: chrome
+
+  jaeger:
+    image: jaegertracing/all-in-one:1.60
+    container_name: jaeger
+    ports:
+      - "16686:16686"
+      - "4317:4317"
+
+  node-docker:
+    image: selenium/node-docker:latest
+    container_name: node-docker
     shm_size: 2gb
     volumes:
       - chrome_profile:/tmp # to persist the chrome user Data dir
+      - ./assets:/opt/selenium/assets
+      - ./compose/local/node-docker/config.toml:/opt/selenium/docker.toml
+      - /var/run/docker.sock:/var/run/docker.sock
     depends_on:
       - selenium-hub
     environment:
       - SE_EVENT_BUS_HOST=selenium-hub
       - SE_EVENT_BUS_PUBLISH_PORT=4442
       - SE_EVENT_BUS_SUBSCRIBE_PORT=4443
-      - SE_ENABLE_TRACING=false
+      - SE_NODE_DOCKER_CONFIG_FILENAME=docker.toml
+      - SE_VIDEO_FILE_NAME=auto
+      #- SE_ENABLE_TRACING=false # Use this if bottom 3 are commented out
+      - SE_ENABLE_TRACING=true
+      - SE_OTEL_TRACES_EXPORTER=otlp
+      - SE_OTEL_EXPORTER_ENDPOINT=http://jaeger:4317
       - SE_VNC_NO_PASSWORD=1
       - SE_NODE_MAX_SESSIONS=4 # This should not be more than the available CPUS
       - SE_NODE_OVERRIDE_MAX_SESSIONS=true # To allow the override of the max sessions
+      - SE_START_XVFB=false # Don't start the Xvfb, as we are running headless
+    ports:
+      - "5555:5555"
 
   selenium-hub:
     image: selenium/hub:latest
     container_name: selenium-hub
     hostname: selenium-hub
+    depends_on:
+      - jaeger
     environment:
-      - SE_ENABLE_TRACING=false
+      #- SE_ENABLE_TRACING=false # Use this if bottom 3 are commented out
+      - SE_ENABLE_TRACING=true
+      - SE_OTEL_TRACES_EXPORTER=otlp
+      - SE_OTEL_EXPORTER_ENDPOINT=http://jaeger:4317
       - SE_VNC_NO_PASSWORD=1
       - SE_ENABLE_BROWSER_LEFTOVERS_CLEANUP=true # Cleanup browser leftovers
       - SE_BROWSER_LEFTOVERS_INTERVAL_SECS=1800 # 30 Minutes
       - SE_BROWSER_LEFTOVERS_TEMPFILES_DAYS=14 # 14 Days
     ports:
-      #- "4442:4442"
-      #- "4443:4443"
+      - "4442:4442"
+      - "4443:4443"
       - "4444:4444"
-  #chrome:
-  #  image: selenium/standalone-chrome:latest
-  #  container_name: chrome
-  #  hostname: chrome
-  #  privileged: true
-  #  shm_size: 2g
-  #  ports:
-  #    - "4444:4444"
-  #    - "7900:7900"
-  #  environment:
-  #    - SE_ENABLE_TRACING=false
 
   linkedin-preview:
     build:
-      context: .
-      dockerfile: ./compose/local/linkedinpreview/Dockerfile
+      context: ./compose/local/linkedinpreview
+      dockerfile: ./Dockerfile
     image: ${DOCKER_IMAGE_NAME}_linkedinpreview
     container_name: linkedin-preview
     environment:
@@ -182,3 +214,4 @@ volumes:
   db_data:
   redis_data:
   chrome_profile:
+  flower_db:

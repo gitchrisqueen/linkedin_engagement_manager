@@ -22,9 +22,8 @@ def check_scheduled_posts():
 
         base_kwargs = {'user_id': user_id, 'loop_for_duration': 60 * 15}
 
-        # Start the pre-post commenting task (loop for 15 minutes
-        automate_commenting.delay(
-            kwargs=base_kwargs)
+        # Start the pre-post commenting task (loop for 15 minutes)
+        automate_commenting.apply_async(kwargs=base_kwargs)
 
         # 10 minutes before the scheduled_time
         pre_post_dm_time = scheduled_time - timedelta(minutes=10)
@@ -34,8 +33,8 @@ def check_scheduled_posts():
         automate_profile_viewer_dms.apply_async(kwargs=base_kwargs, eta=pre_post_dm_time)
 
         # Schedule the post to be posted
-        base_kwargs['post_id'] = post_id
-        post_to_linkedin.apply_async(kwargs=base_kwargs, eta=scheduled_time)
+        post_kwargs = {'user_id': user_id, 'post_id': post_id}
+        post_to_linkedin.apply_async(kwargs=post_kwargs, eta=scheduled_time)
 
         # Answer comments for 30 minutes
         base_kwargs['loop_for_duration'] = 60 * 30
@@ -51,13 +50,16 @@ def start_appreciate_dms():
         user_email, user_password = user
 
         # Send appreciation DM for 5 minutes
-        automate_appreciation_dms.delay(  # TODO: Should this be spaced out over some interval if user amounts grow
-            kwargs={
-                'user_email': user_email,
-                'user_password': user_password,
-                'loop_for_duration': 60 * 5
-            }
-        )
+        kwargs = {
+            'user_email': user_email,
+            'user_password': user_password,
+            'loop_for_duration': 60 * 5
+        }
+
+        # TODO: Should this be spaced out over some interval if user numbers grow
+        # time.sleep()
+
+        automate_appreciation_dms.apply_async(kwargs=kwargs )
 
 
 @shared_task.task

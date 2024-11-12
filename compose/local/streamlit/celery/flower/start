@@ -17,4 +17,13 @@ done
 # TODO: Check on the -A param here
 celery -A cqc_lem.my_celery  \
     --broker="${CELERY_BROKER_URL}" \
-    flower
+    flower \
+    --broker-api="${CELERY_BROKER_URL}" \
+    --logging="DEBUG" \
+    --logfile="/app/logs" \
+    #--persistent=True \
+    --debug=True \
+    --db=/var/lib/flower/flowerdb/flower_db \
+    #--state_save_interval=5000 \
+    #-Q (your queue name)
+

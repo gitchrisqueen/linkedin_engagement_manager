@@ -8,14 +8,16 @@ ENV PYTHONFAULTHANDLER=1 \
 
 # Install dependencies
 RUN apt-get update && apt-get install --no-install-suggests --no-install-recommends --yes \
-    curl \
-    unzip \
-    xvfb \
-    libxi6 \
-    libgconf-2-4 \
-    build-essential \
+    #curl \
+    #unzip \
+    #xvfb \
+    #libxi6 \
+    #libgconf-2-4 \
+    #build-essential \
     # Additional dependencies
-    && apt-get install -y telnet netcat-traditional \
+    #&& apt-get install -y  \
+    telnet  \
+    netcat-traditional \
     # cleaning up unused files
     && apt-get purge -y --auto-remove -o APT::AutoRemove::RecommendsImportant=false \
     && rm -rf /var/lib/apt/lists/*
@@ -40,9 +42,8 @@ ENV PIP_DEFAULT_TIMEOUT=100 \
     PIP_NO_CACHE_DIR=1
 
 
-RUN pip install "poetry==$POETRY_VERSION"
-# Make sure teh export plugin is included
-RUN poetry self add poetry-plugin-export
+# Install poetry and make sure the export plugin is included
+RUN pip install "poetry==$POETRY_VERSION" && poetry self add poetry-plugin-export
 
 # Copy the poetry.lock and pyproject.toml
 COPY ../../../pyproject.toml ../../../poetry.lock ./
@@ -54,7 +55,7 @@ RUN poetry install --no-root && rm -rf $POETRY_CACHE_DIR
 
 # Now let's build the runtime image from the builder.
 #   We'll just copy the env and the PATH reference.
-FROM builder AS final
+FROM builder AS my_app_code
 
 ENV VIRTUAL_ENV=/app/.venv
 ENV PATH="/app/.venv/bin:$PATH"
@@ -69,30 +70,17 @@ COPY ../../../README.md ./
 #   This may save some MBs.
 RUN poetry install && rm -rf $POETRY_CACHE_DIR
 
+FROM my_app_code AS final
 
+# Copy and set permissions for entrypoint and other scripts
 COPY ./compose/local/streamlit/entrypoint /entrypoint
-RUN sed -i 's/\r$//g' /entrypoint
-RUN chmod +x /entrypoint
-
 COPY ./compose/local/streamlit/wait-for-it /wait-for-it
-RUN sed -i 's/\r$//g' /wait-for-it
-RUN chmod +x /wait-for-it
-
 COPY ./compose/local/streamlit/start /start
-RUN sed -i 's/\r$//g' /start
-RUN chmod +x /start
-
 COPY ./compose/local/streamlit/celery/worker/start /start-celeryworker
-RUN sed -i 's/\r$//g' /start-celeryworker
-RUN chmod +x /start-celeryworker
-
 COPY ./compose/local/streamlit/celery/beat/start /start-celerybeat
-RUN sed -i 's/\r$//g' /start-celerybeat
-RUN chmod +x /start-celerybeat
-
 COPY ./compose/local/streamlit/celery/flower/start /start-flower
-RUN sed -i 's/\r$//g' /start-flower
-RUN chmod +x /start-flower
+
+RUN chmod +x /entrypoint /wait-for-it /start /start-celeryworker /start-celerybeat /start-flower
 
 # Create a logs folder
 RUN mkdir -p /app/logs
