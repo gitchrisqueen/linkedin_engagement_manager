@@ -46,20 +46,18 @@ LinkedIn Engagement Manager (LEM) is an automated solution for managing engageme
    # Fill in necessary API keys, MySQL credentials, etc.
    ```
 
-3. Build and run the Docker containers:
+3. (Optional) Install ngrok via Homebrew with the following command:
    ```bash
-   docker-compose up --build
+   brew install ngrok/ngrok/ngrok
+   ```
+
+4. Build and run the Docker containers via shell scriopt:
+   ```bash
+   ./run.sh
    ```
 
 4. Access the web dashboard:
-   Open [http://localhost:5000](http://localhost:5000) in your browser.
-
-### Running the Automation Scripts
-1. Make sure Docker containers are running.
-2. Use the following command to trigger Selenium automation:
-   ```bash
-   docker exec -it selenium-app python run_automation.py
-   ```
+   Open the urls printed in the console in your browser.
 
 ### Contributing
 We welcome contributions to the project. Please submit a pull request with clear documentation of any changes.

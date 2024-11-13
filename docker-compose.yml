@@ -2,9 +2,10 @@
 services:
   web-app:
     build:
-      context: .
+      #context: .
+      context: https://github.com/gitchrisqueen/linkedin_engagement_manager.git
       dockerfile: ./compose/local/streamlit/Dockerfile
-    image: ${DOCKER_IMAGE_NAME}
+    image: "${DOCKER_IMAGE_NAME}:latest"
     container_name: web-app
     command: /start
     depends_on:
@@ -191,7 +192,8 @@ services:
 
   linkedin-preview:
     build:
-      context: ./compose/local/linkedinpreview
+      #context: ./compose/local/linkedinpreview
+      context: https://github.com/gitchrisqueen/linkedinpreview.com.git
       dockerfile: ./Dockerfile
     image: ${DOCKER_IMAGE_NAME}_linkedinpreview
     container_name: linkedin-preview

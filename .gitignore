@@ -177,3 +177,7 @@ logs/*
 *selenium_profiles/
 selenium/
 assets/
+
+
+# Exclude ngrok config
+ngrok-config.yml

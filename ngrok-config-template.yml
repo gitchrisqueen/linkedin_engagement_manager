@@ -1,0 +1,29 @@
+# ngrok-config-template.yml
+version: 3
+
+agent:
+  authtoken: ${NGROK_AUTH_TOKEN}
+  web_addr: 0.0.0.0:4040
+
+tunnels:
+  lem-app:
+    addr: 8501
+    labels:
+      - hostname=app
+      - edge=${NGROK_EDGE_TOKEN}
+  lem-api:
+    proto: http
+    addr: 8000
+    domain: ${NGROK_API_PREFIX}.${NGROK_FREE_DOMAIN}
+  lem-flower:
+    proto: http
+    addr: 8555
+    domain: ${NGROK_FLOWER_PREFIX}.${NGROK_FREE_DOMAIN}
+  lem-chrome:
+    proto: http
+    addr: 4444
+    domain: ${NGROK_CHROME_PREFIX}.${NGROK_FREE_DOMAIN}
+  lem-lipreview:
+    proto: http
+    addr: 8081
+    domain: ${NGROK_LIPREVIEW_PREFIX}.${NGROK_FREE_DOMAIN}

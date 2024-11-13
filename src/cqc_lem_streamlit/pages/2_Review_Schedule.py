@@ -13,10 +13,18 @@ if "posts" not in st.session_state:
     st.session_state.posts = []
 
 
+# API Base URL
+#API_BASE_URL = "http://localhost:8000" # TODO: Get this from env
+API_BASE_URL = "https://cqc-lem-api.ngrok-free.dev"
+
 # API endpoint to get posts
-GET_POSTS_URL = "http://localhost:8000/posts/"
+GET_POSTS_URL = API_BASE_URL+"/posts/"
 # API endpoint to update posts
-UPDATE_POST_URL = "http://localhost:8000/update_post/"
+UPDATE_POST_URL = API_BASE_URL+"/update_post/"
+
+# LinkedIN Preview URL
+#LINKEDIN_PREVIEW_URL = "http://localhost:8081" # TODO: Get this from env
+LINKEDIN_PREVIEW_URL = "https://cqc-lem-lipreview.ngrok-free.dev"
 
 st.title("Review and Edit Scheduled Posts")
 
@@ -145,7 +153,7 @@ if st.session_state.posts:
         #st.write(selected_content)
 
         encoded_post_content = urllib.parse.quote(selected_content)
-        preview_url = f"http://localhost:8081/tool?content={encoded_post_content}"
+        preview_url = f"{LINKEDIN_PREVIEW_URL}/tool?content={encoded_post_content}"
         st.components.v1.iframe(preview_url, height=600, width=1024, scrolling=True)
     else:
         st.warning("Please select a cell in the 'content' column to preview the content.")
