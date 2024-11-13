@@ -305,10 +305,15 @@ def add_linkedin_profile(profile: LinkedInProfile):
         """,
                    (str(profile.profile_url), profile.email, profile.model_dump_json()))
 
-    connection.commit()
-    success = cursor.rowcount == 1
-    cursor.close()
-    connection.close()
+    try:
+        connection.commit()
+        success = True
+    except mysql.connector.Error as err:
+        myprint(f"DB Error: {err}")
+        success = False
+    finally:
+        cursor.close()
+        connection.close()
     return success
 
 
@@ -400,3 +405,29 @@ def get_last_planned_post_date_for_user(user_id: int):
     connection.close()
 
     return last_planned_date[0] if last_planned_date else None
+
+def get_user_blog_url(user_id: int):
+    """Query the database to get the blog URL for the given user."""
+    connection = get_db_connection()
+    cursor = connection.cursor()
+
+    cursor.execute("SELECT blog_url FROM users WHERE id = %s", (user_id,))
+    blog_url = cursor.fetchone()
+
+    cursor.close()
+    connection.close()
+
+    return blog_url[0] if blog_url else None
+
+def get_user_sitemap_url(user_id: int):
+    """Query the database to get the sitemap URL for the given user."""
+    connection = get_db_connection()
+    cursor = connection.cursor()
+
+    cursor.execute("SELECT sitemap_url FROM users WHERE id = %s", (user_id,))
+    sitemap_url = cursor.fetchone()
+
+    cursor.close()
+    connection.close()
+
+    return sitemap_url[0] if sitemap_url else None

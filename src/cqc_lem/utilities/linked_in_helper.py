@@ -80,11 +80,11 @@ def login_to_linkedin(driver: WebDriver, wait: WebDriverWait, user_email: str, u
 def get_my_profile(driver, wait, user_email: str, user_password: str) -> LinkedInProfile:
     profile = None
 
-    # TODO: Check DB for serialized instance of profile
-
+    # Check DB for serialized instance of profile
     profile_json = get_linked_in_profile_by_email(user_email)
 
     if profile_json is None:
+        myprint(f"Previous Profile not found (or stale )DB: {user_email}")
         login_to_linkedin(driver, wait, user_email, user_password)
 
         profile_url = "https://www.linkedin.com/in/"
@@ -104,6 +104,8 @@ def get_my_profile(driver, wait, user_email: str, user_password: str) -> LinkedI
             # Add profile to DB for faster future retrieval
             if add_linkedin_profile(profile):
                 myprint(f"Profile saved to DB: {profile.full_name}")
+            else:
+                myprint(f"Failed to save profile to DB: {profile.full_name}")
         else:
             myprint("Failed to get my profile data")
     else:

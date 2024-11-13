@@ -117,13 +117,10 @@ def generate_ai_response(post_content, profile: LinkedInProfile, post_img_url=No
         "content": content
     }
 
-    # Choose temperature between .5 and .7 rounded to 2 decimal places
-    temperature = round(random.uniform(.5, .7), 2)
-
     response = client.chat.completions.create(
         model="gpt-4o-mini",
         messages=[system_prompt, user_message],  # System prompt + current user prompt
-        temperature=temperature,  # Adjust this parameter as per your needs
+        temperature=round(random.uniform(0.4, 0.6), 2),  # Rand temp between .5 and .7
         # max_tokens=150  # Set token limit as required
     )
 
@@ -261,7 +258,7 @@ def get_video_content_from_ai(linked_user_profile: LinkedInProfile, buyer_stage:
     myprint(f"Pre-Prompt: {prompt}")
 
     # Add the Linked JSon profile to end of prompt
-    prompt += f"\n ###LinkedIn Profile: {linked_in_profile_json}"
+    prompt += f"\n ### LinkedIn Profile: {linked_in_profile_json}"
 
     content = [{"type": "text", "text": prompt}]
 
@@ -317,7 +314,7 @@ def get_video_content_from_ai(linked_user_profile: LinkedInProfile, buyer_stage:
         messages=[system_prompt, user_message],  # System prompt + current user prompt
         # temperature=0.3,  # Adjust this parameter as per your needs
         # max_tokens=150  # Set token limit as required
-        #response_format={"type": "json_object"},
+        # response_format={"type": "json_object"},
     )
 
     # Extract and return the model's response
@@ -399,12 +396,590 @@ def summarize_recent_activity(recent_activity_profile: LinkedInProfile, main_pro
     result = response.choices[0].message.content.strip()
     return result
 
-def create_video_from_prompt(prompt :str):
+
+def create_video_from_prompt(prompt: str):
     response = openai.Video.create(
         model="video-davinci-003",
-        prompt="Create a video from the following: "+prompt
+        prompt="Create a video from the following: " + prompt
     )
 
     video_url = response['data']['url']
     myprint(f"Video URL: {video_url}")
     return video_url
+
+
+def get_thought_leadership_post_from_ai(linked_user_profile: LinkedInProfile, buyer_stage: str):
+    """
+        Generate a thought leadership post based on user's expertise and industry.
+        Uses the user's profile (e.g., job title, industry) and intended buyer_stage to form an insightful post.
+    """
+
+    # Use json to output to string
+    linked_in_profile_json = linked_user_profile.model_dump_json()
+
+    prompt = f"""Please create a thought leadership post for me based on my LinkedIn Profile information.
+
+        Craft the post to appeal to readers who are currently in the {buyer_stage} of their journey.
+        
+        # Buyer Stages:
+        - Awareness: Introduce key industry challenges and trends that my expertise addresses.
+        - Consideration: Highlight unique solutions, strategies, or frameworks that showcase my approach to common industry problems.
+        - Decision: Provide insight into how my experience and skills make me a strong partner for organizations seeking expertise in relevant industries or skills areas].
+        
+        Conclude with an engaging call to action that encourages readers at the specified stage to connect or learn more.
+        
+        {get_viral_linked_post_prompt_suffix()}
+        
+        """
+
+    # Add the Linked JSON profile to end of prompt
+    prompt += f"\n ### LinkedIn Profile: {linked_in_profile_json}"
+
+    content = [{"type": "text", "text": prompt}]
+
+    # System prompt to be included in every request
+    system_prompt = {
+        "role": "system",
+        "content": f"""Act like an experienced thought leadership content creator. You have years of expertise crafting high-impact insights tailored to an executive audience across various industries. Your goal is to develop a compelling, informative, and engaging thought leadership post that reflects the user’s unique perspective and experience. Follow the steps carefully to ensure the content is insightful and relevant.
+
+        ### Objective
+        Create a thought leadership post based on the user’s expertise and current industry trends. This post should:
+        - Position the user as an authority in their field.
+        - Offer unique insights or innovative solutions to challenges in their industry.
+        - Encourage engagement by inspiring readers to reflect, comment, or share.
+        
+        ### Instructions
+        1. **Analyze User Profile**:  
+           Use the following details provided by the user:
+           - Job Title (e.g., “Chief Technology Officer,” “Senior Marketing Strategist”)
+           - Industry (e.g., “Healthcare Technology,” “Financial Services,” “Renewable Energy”)
+           - Years of Experience and Key Skills, if available.
+        
+        2. **Identify Key Industry Trends**:  
+           Based on the user’s industry, identify one or two current challenges, emerging trends, or transformations affecting the field. For example, if the user is in Healthcare Technology, potential themes might include digital transformation in patient care or regulatory compliance with data privacy.
+        
+        3. **Develop Core Insight**:  
+           Draw from the user's job title and experience to present an insight or perspective that:
+           - Tackles a common pain point or goal in the user’s industry.
+           - Reflects forward-thinking or innovative approaches.
+           - Incorporates specific, actionable advice when possible.
+        
+        4. **Create Engaging Introduction**:  
+           Start the post with a hook to capture reader interest, such as:
+           - A bold statement, question, or statistic that underscores the importance of the issue.
+           - A relatable scenario in which many readers in the field might find themselves.
+        
+        5. **Expand with Depth and Expertise**:  
+           In the main content, build upon the user’s insight with examples, strategies, or industry-specific approaches. Use phrases like:
+           - “In my experience as a [Job Title]…”
+           - “One of the biggest challenges in [Industry] today is…”
+           - “A strategy I’ve found effective involves…”
+        
+        6. **Close with a Call to Action**:  
+           End with a thought-provoking question or prompt that encourages engagement, such as:
+           - “How is your organization addressing [trend or challenge]?”
+           - “What strategies have you found successful in navigating [relevant issue]?”
+        
+        **Final Reminder**: Focus on clarity, avoid jargon, and write in a tone that is both authoritative and accessible.
+        
+        Take a deep breath and work on this problem step-by-step.
+    """
+    }
+
+    # User prompt to be sent with each API call
+    user_message = {
+        "role": "user",
+        "content": content
+    }
+
+    # Call the API with the system and user prompt only (no memory of past prompts)
+    response = client.chat.completions.create(
+        model="gpt-4o-mini",  # Specify the model you want to use
+        messages=[system_prompt, user_message],  # System prompt + current user prompt
+        temperature=round(random.uniform(0.5, 0.7), 2),  # Rand temp between .5 and .7
+        # max_tokens=150  # Set token limit as required
+        # response_format={"type": "json_object"},
+    )
+
+    # Extract and return the model's response
+    content = response.choices[0].message.content.strip()
+    return content
+
+
+def get_industry_news_post_from_ai(linked_user_profile: LinkedInProfile, buyer_stage: str):
+    """
+       Generate a post sharing industry news based on the LinkedIn user's profile and the intended buyer stage, along with the user's commentary.
+    """
+    # Find trending topics or news in the user's industry and craft a commentary around it
+    # Example content: "With recent changes in [industry], we’re seeing a shift toward..."
+
+    # Use json to output to string
+    linked_in_profile_json = linked_user_profile.model_dump_json()
+
+    prompt = f"""Please create a post sharing recent industry news based on my LinkedIn Profile information provided below. 
+    Tailor the post to readers in the {buyer_stage} of their journey and include my own commentary to add perspective.
+            
+    # Buyer Stages to Consider:
+    - Awareness: Introduce the news topic with broad insights on its relevance to the industry.
+    - Consideration: Frame the topic in a way that helps readers think strategically about addressing this development.
+    - Decision: Emphasize the importance of expert insights and how my expertise can be valuable in navigating this trend.
+    
+    """
+
+    # Add the Linked JSON profile to end of prompt
+    prompt += f"\n ### LinkedIn Profile: {linked_in_profile_json}"
+
+    prompt += f"""\n\n
+    --- 
+    \n
+    Make the post insightful and end with a question or prompt that invites engagement from readers.
+
+    {get_viral_linked_post_prompt_suffix()}
+
+    """
+
+    content = [{"type": "text", "text": prompt}]
+
+    # System prompt to be included in every request
+    system_prompt = {
+        "role": "system",
+        "content": f"""Act like a seasoned industry analyst and content strategist. You specialize in creating timely, relevant posts that share current industry news while showcasing the user's unique insights and expertise. Your goal is to craft a post based on trending topics or news in the user's industry, as inferred from their LinkedIn profile. Tailor the post to align with the buyer’s current stage in their journey—whether they are at the Awareness, Consideration, or Decision stage.
+ 
+        ### Instructions:
+        1. **Analyze the User’s Profile**:  
+           Use information about the user’s role, industry, and expertise from their LinkedIn profile.
+         
+        2. **Identify Relevant Industry News**:  
+           Identify a recent trend or piece of news in the user’s industry. Ensure the topic is significant, relevant, and likely to catch the attention of readers in the intended buyer stage.
+         
+        3. **Compose the Post**:
+            - **For Awareness Stage**: Introduce the news in a way that highlights broad industry implications, focusing on why this development matters and its potential impact on the field. Example: “With recent changes in [industry], we’re seeing a shift toward…”
+            - **For Consideration Stage**: Provide context on the topic’s importance and suggest how readers might think strategically about addressing the issue. Example: “As organizations face [issue], it’s crucial to consider approaches like…”
+            - **For Decision Stage**: Focus on the practical impact of this news for decision-makers and highlight the user's expertise or offerings as a valuable resource. Example: “Given this development, partnering with an expert in [user’s specialty] can ensure…”
+         
+        4. **Add User Commentary**:  
+           Write a thoughtful commentary that reflects the user’s experience and perspective. Use phrases like:
+           - “In my experience as a [Job Title]…”
+           - “One key takeaway I see here is…”
+         
+        5. **Close with Engagement**:  
+           Encourage readers to engage by asking a relevant question or prompting them to share their own experiences.
+         
+        Take a deep breath and work on this problem step-by-step.
+        
+        """
+    }
+
+    # User prompt to be sent with each API call
+    user_message = {
+        "role": "user",
+        "content": content
+    }
+
+    # Call the API with the system and user prompt only (no memory of past prompts)
+    response = client.chat.completions.create(
+        model="gpt-4o-mini",  # Specify the model you want to use
+        messages=[system_prompt, user_message],  # System prompt + current user prompt
+        temperature=round(random.uniform(0.3, 0.5), 2),  # Rand temp between .3 and .5
+        # max_tokens=150  # Set token limit as required
+        # response_format={"type": "json_object"},
+    )
+
+    # Extract and return the model's response
+    content = response.choices[0].message.content.strip()
+    return content
+
+
+def get_personal_story_post_from_ai(linked_user_profile: LinkedInProfile, stage: str):
+    """
+    Generate a post sharing a personal or professional story, based on the user's profile.
+    """
+    # Pull from the user's recent milestones, achievements, or challenges
+    # Example content: "Reflecting on my journey as a [job title], I’ve learned that..."
+
+    # Use json to output to string
+    linked_in_profile_json = linked_user_profile.model_dump_json()
+
+    prompt = f"""Please create a story-based post for me, reflecting on a personal or professional milestone, achievement, or challenge, using the information from my LinkedIn Profile provided below. 
+    Tailor the story to connect with readers in the {stage} stage of their journey.
+    
+    # Buyer Stages to Consider:
+    - Awareness: Share a story that introduces me as a thoughtful leader, highlighting a key career insight or turning point.
+    - Consideration: Emphasize lessons learned from a specific challenge or achievement, showing how my experience can guide or inspire similar efforts.
+    - Decision: Position my expertise as a valuable resource for those facing similar challenges, demonstrating the depth of my skills and experience.
+    
+    """
+
+    # Add the Linked JSON profile to end of prompt
+    prompt += f"\n ### LinkedIn Profile: {linked_in_profile_json}"
+
+    prompt += f"""\n\n
+        --- 
+        \n
+        Conclude with an engaging question or prompt that encourages readers to reflect on similar experiences.
+
+        {get_viral_linked_post_prompt_suffix()}
+
+        """
+
+    content = [{"type": "text", "text": prompt}]
+
+    # System prompt to be included in every request
+    system_prompt = {
+        "role": "system",
+        "content": f"""Act like a professional storyteller and content strategist. Your goal is to create a meaningful post that shares a personal or professional story from the user’s career journey, highlighting key milestones, achievements, or challenges. Craft a narrative that resonates with readers, giving them insights into the user’s experiences and growth within their field.
+ 
+        ### Instructions:
+        1. **Analyze the User’s Profile**:  
+           Use information provided from the user’s LinkedIn profile, such as job title, years of experience, industry, key skills, recent achievements, or challenges.
+         
+        2. **Identify a Story Theme**:  
+           Select a relevant theme for the story, based on milestones or lessons learned in the user’s career. Consider:
+            - **Milestones**: A promotion, award, or significant project completion.
+            - **Achievements**: Professional accomplishments, certifications, or goals reached.
+            - **Challenges**: Professional hurdles, difficult projects, or industry shifts the user had to navigate.
+         
+        3. **Craft the Story**:
+            - Begin with a relatable opening, such as: “Reflecting on my journey as a [job title]…” or “One of the most challenging moments in my career came when…”
+            - Describe the situation briefly but vividly, focusing on what the user faced and how they approached it.
+            - Include key learnings or insights that readers in the user’s industry might find valuable or inspiring.
+         
+        4. **Add a Personal Touch**:  
+           Include the user’s reflections on how this experience shaped them professionally or personally. Use phrases like:
+           - “This experience taught me that…”
+           - “One key takeaway for me was…”
+         
+        5. **Close with a Call to Engage**:  
+           Encourage readers to reflect on their own journeys by ending with a question or prompt, such as:
+           - “What experiences have shaped your professional growth?”
+           - “I’d love to hear how others in [industry] have handled similar challenges.”
+         
+        Take a deep breath and work on this problem step-by-step.
+
+        """
+    }
+
+    # User prompt to be sent with each API call
+    user_message = {
+        "role": "user",
+        "content": content
+    }
+
+    # Call the API with the system and user prompt only (no memory of past prompts)
+    response = client.chat.completions.create(
+        model="gpt-4o-mini",  # Specify the model you want to use
+        messages=[system_prompt, user_message],  # System prompt + current user prompt
+        temperature=round(random.uniform(0.6, 0.8), 2),  # Rand temp between .6 and .8
+        # max_tokens=150  # Set token limit as required
+        # response_format={"type": "json_object"},
+    )
+
+    # Extract and return the model's response
+    content = response.choices[0].message.content.strip()
+    return content
+
+
+def generate_engagement_prompt_post(linked_user_profile: LinkedInProfile, stage: str):
+    """
+    Generate a question or prompt that encourages engagement from followers.
+    """
+    # Create a question or engagement prompt related to the user's field
+    # Example content: "As a [job title], I’m curious to hear how others are handling [challenge]..."
+
+    # Use json to output to string
+    linked_in_profile_json = linked_user_profile.model_dump_json()
+
+    prompt = f"""Please generate a question or prompt to encourage engagement from my followers based on the information in my LinkedIn Profile below. 
+    Tailor the question to resonate with readers in the {stage} of their journey.
+
+    # Buyer Stages to Consider:
+    - Awareness: Ask a thought-provoking question to spark curiosity about industry challenges or trends.
+    - Consideration: Pose a question that invites followers to share strategies or insights on common challenges.
+    - Decision: Encourage a deeper conversation around specific pain points or decision-making criteria, drawing on my expertise.
+    
+    """
+
+    # Add the Linked JSON profile to end of prompt
+    prompt += f"\n ### LinkedIn Profile: {linked_in_profile_json}"
+
+    prompt += f"""\n\n
+            --- 
+            \n
+            Make the question open-ended and relatable to create meaningful engagement.
+
+            {get_viral_linked_post_prompt_suffix()}
+
+            """
+
+    content = [{"type": "text", "text": prompt}]
+
+    # System prompt to be included in every request
+    system_prompt = {
+        "role": "system",
+        "content": f"""Act like a social media engagement strategist with expertise in crafting questions that spark meaningful conversations among professionals. Your task is to generate an engaging question or prompt that encourages the user’s followers to share their insights, experiences, or thoughts on a relevant industry topic.
+ 
+    ### Instructions:
+    1. **Analyze the User’s Profile**:  
+       Use information from the user’s LinkedIn profile, including their job title, industry, key skills, and recent professional topics or challenges.
+     
+    2. **Identify a Relevant Topic for Engagement**:  
+       Select a topic relevant to the user’s field that aligns with current trends, challenges, or frequent discussions. Examples include:
+       - **Emerging Trends**: Innovations, new technologies, or industry shifts.
+       - **Challenges**: Common obstacles or pain points within the user’s role or industry.
+       - **Best Practices**: Insights or advice on strategies or approaches in the user’s field.
+     
+    3. **Craft an Engaging Question or Prompt**:
+        - Formulate a question or prompt that invites followers to share their own experiences or perspectives. Use phrases like:
+          - “As a [job title] in [industry], I’m curious to hear…”
+          - “How are others in [industry] addressing…?”
+          - “What strategies have you found effective for…?”
+        - Ensure the question is open-ended to encourage detailed responses rather than simple yes/no answers.
+     
+    4. **Make it Relatable**:  
+       Use language that resonates with followers in the user’s industry or role. The question should feel authentic, reflecting the user’s voice and curiosity as an industry professional.
+     
+    5. **Close with a Call to Action**:  
+       Prompt followers to respond directly by saying, for example:
+       - “I’d love to hear your thoughts!”
+       - “Share your experiences below!”
+     
+    Take a deep breath and work on this problem step-by-step.
+
+           """
+    }
+
+    # User prompt to be sent with each API call
+    user_message = {
+        "role": "user",
+        "content": content
+    }
+
+    # Call the API with the system and user prompt only (no memory of past prompts)
+    response = client.chat.completions.create(
+        model="gpt-4o-mini",  # Specify the model you want to use
+        messages=[system_prompt, user_message],  # System prompt + current user prompt
+        temperature=round(random.uniform(0.6, 0.9), 2),  # Rand temp between .6 and .9
+        # max_tokens=150  # Set token limit as required
+        # response_format={"type": "json_object"},
+    )
+
+    # Extract and return the model's response
+    content = response.choices[0].message.content.strip()
+    return content
+
+
+def get_blog_summary_post_from_ai(blog_post_url: str, blog_post_content: str, linked_user_profile: LinkedInProfile,
+                                  stage: str):
+    """
+    Generate a summary post for a blog article using the provide post url and post content from user to create interest using relevance to the provided LinkedIn Profile.
+    """
+    # create a LinkedIn-friendly summary
+
+    # Use json to output to string
+    linked_in_profile_json = linked_user_profile.model_dump_json()
+
+    prompt = f"""Please generate a LinkedIn-friendly summary post for the blog article provided below. 
+    Tailor the post to appeal to readers in the {stage} of their journey, using my LinkedIn profile details to make the summary relevant to my role and industry.
+
+    """
+
+    # Add the Linked JSON profile to end of prompt
+    prompt += f"\n ### LinkedIn Profile: {linked_in_profile_json}"
+
+    prompt += f"""\n\n Buyer Stages to Consider:
+    - Awareness: Summarize the article with broad insights into industry trends and challenges.
+    - Consideration: Frame the post to highlight actionable strategies or best practices discussed in the article.
+    - Decision: Emphasize the practical value of the insights for decision-makers and align the tone to demonstrate my expertise in the area.
+    
+    ### Blog Post URL: {blog_post_url}
+    
+    --- 
+    
+    ### Blog Post Content: {blog_post_content}
+    
+    ---
+    
+    Ensure the post is engaging, includes a clear call to action, and ends with a link inviting readers to read the full article.
+    
+    {get_viral_linked_post_prompt_suffix()}
+    
+    """
+
+    content = [{"type": "text", "text": prompt}]
+
+    # System prompt to be included in every request
+    system_prompt = {
+        "role": "system",
+        "content": f"""Act as an informed LinkedIn content strategist with expertise in the user’s industry. You will be provided with a blog article URL, the article content, and LinkedIn profile information from the user. Create an engaging LinkedIn-friendly summary post that highlights the relevance of the article to the user’s industry and expertise.
+ 
+        ### Instructions:
+        1. **Summarize the Main Idea**:  
+           Begin with a clear, concise summary of the article's main message or insight, focusing on how it relates to the user’s industry. Avoid using complex terminology to keep the content accessible and engaging.
+         
+        2. **Personalize with Relatable Elements**:  
+           Incorporate a relatable comment or anecdote that connects the article’s content to the user’s role or experience. Use phrases like:
+           - “As a [Job Title], I often see…”
+           - “In the world of [Industry], this trend is particularly relevant because…”
+         
+        3. **Add Engaging Elements**:  
+           Include a question, a call to action, or a compelling statistic from the article to prompt followers to engage with the post. You can use emojis (such as 📊, 🌟, or ❓) to add personality, but only if it aligns with the user’s tone and industry norms.
+         
+        4. **Incorporate Relevant Hashtags**:  
+           Use up to 5 relevant hashtags, based on the article’s subject and the user’s industry. Suggested tags may include broader industry terms (#Innovation, #AI, #Leadership) and niche terms directly related to the content.
+         
+        5. **Tone Adaptation**:  
+           Adjust the tone to match the article’s content and the LinkedIn user’s profile. Whether the tone is formal, casual, motivational, or insightful, ensure it feels authentic to the user's voice.
+         
+        6. **Encourage Readers to Read the Full Article**:  
+           Conclude with an invitation for readers to explore the topic further by including the article link with a phrase like:
+           - “Read the full article here: [insert URL]”
+           - “Explore more insights in the full piece: [insert URL]”
+        
+        Take a deep breath and work on this problem step-by-step.
+
+        """
+    }
+
+    # User prompt to be sent with each API call
+    user_message = {
+        "role": "user",
+        "content": content
+    }
+
+    # Call the API with the system and user prompt only (no memory of past prompts)
+    response = client.chat.completions.create(
+        model="gpt-4o-mini",  # Specify the model you want to use
+        messages=[system_prompt, user_message],  # System prompt + current user prompt
+        temperature=round(random.uniform(0.5, 0.7), 2),  # Rand temp between .5 and .7
+        # max_tokens=150  # Set token limit as required
+        # response_format={"type": "json_object"},
+    )
+
+    # Extract and return the model's response
+    content = response.choices[0].message.content.strip()
+    return content
+
+
+def get_website_content_post_from_ai(content: str, url: str, linked_user_profile: LinkedInProfile, stage: str):
+    """
+        Generate a summary post for a blog article using the provide post url and post content from user to create interest using relevance to the provided LinkedIn Profile.
+        """
+    # create a LinkedIn-friendly summary
+
+    # Use json to output to string
+    linked_in_profile_json = linked_user_profile.model_dump_json()
+
+    prompt = f"""Please generate a LinkedIn-friendly summary post for the website content provided below. 
+        Tailor the post to appeal to readers in the {stage} of their journey, using my LinkedIn profile details to make the summary relevant to my role and industry.
+
+               """
+
+    # Add the Linked JSON profile to end of prompt
+    prompt += f"\n ### LinkedIn Profile: {linked_in_profile_json}"
+
+    prompt += f"""---\n\n Buyer Stages to Consider:
+        - Awareness: Summarize the website content with broad insights into industry trends and challenges.
+        - Consideration: Frame the post to highlight actionable strategies or best practices discussed in the website content.
+        - Decision: Emphasize the practical value of the insights for decision-makers and align the tone to demonstrate my expertise in the area.
+
+        ### Website URL: {url}
+
+        --- 
+
+        ### Website Content: {content}
+
+        ---
+
+        Ensure the post is engaging, includes a clear call to action, and ends with a link to the website url.
+        
+        {get_viral_linked_post_prompt_suffix()}
+        """
+
+    content = [{"type": "text", "text": prompt}]
+
+    # System prompt to be included in every request
+    system_prompt = {
+        "role": "system",
+        "content": f"""Act as an informed LinkedIn content strategist with expertise in the user’s industry. You will be provided with a website URL, the website content, and LinkedIn profile information from the user. 
+        Create an engaging LinkedIn-friendly summary post that highlights the relevance of the website content to the user’s industry and expertise.
+
+            ### Instructions:
+            1. **Summarize the Main Idea**:  
+               Begin with a clear, concise summary of the website content's main message or insight, focusing on how it relates to the user’s industry. Avoid using complex terminology to keep the content accessible and engaging.
+
+            2. **Personalize with Relatable Elements**:  
+               Incorporate a relatable comment or anecdote that connects the website’s content to the user’s role or experience. Use phrases like:
+               - “As a [Job Title], I often see…”
+               - “In the world of [Industry], this trend is particularly relevant because…”
+
+            3. **Add Engaging Elements**:  
+               Include a question, a call to action, or a compelling statistic from the website content to prompt followers to engage with the post. You can use emojis (such as 📊, 🌟, or ❓) to add personality, but only if it aligns with the user’s tone and industry norms.
+
+            4. **Incorporate Relevant Hashtags**:  
+               Use up to 5 relevant hashtags, based on the website content’s subject and the user’s industry. Suggested tags may include broader industry terms (#Innovation, #AI, #Leadership) and niche terms directly related to the content.
+
+            5. **Tone Adaptation**:  
+               Adjust the tone to match the website’s content and the LinkedIn user’s profile. Whether the tone is formal, casual, motivational, or insightful, ensure it feels authentic to the user's voice.
+
+            6. **Encourage Readers to visit the website url**:  
+               Conclude with an invitation for readers to explore further by including the website url link with a phrase like:
+               - “Read the more from here: [insert URL]”
+               - “Explore more here: [insert URL]”
+
+            Take a deep breath and work on this problem step-by-step.
+
+            """
+    }
+
+    # User prompt to be sent with each API call
+    user_message = {
+        "role": "user",
+        "content": content
+    }
+
+    # Call the API with the system and user prompt only (no memory of past prompts)
+    response = client.chat.completions.create(
+        model="gpt-4o-mini",  # Specify the model you want to use
+        messages=[system_prompt, user_message],  # System prompt + current user prompt
+        temperature=round(random.uniform(0.5, 0.7), 2),  # Rand temp between .5 and .7
+        # max_tokens=150  # Set token limit as required
+        # response_format={"type": "json_object"},
+    )
+
+    # Extract and return the model's response
+    content = response.choices[0].message.content.strip()
+    return content
+
+def get_viral_linked_post_prompt_suffix():
+    return """After crafting your response, using the Viral Post Creation Framework detailed below, update your response to a viral post for LinkedIn readers.
+    ---
+    
+    # Viral Post Creation Framework
+    
+    Must start with a hook from the Catch Hook Framework. Use the topic and pillar(s) from your original response as the focus. Write the post with each sentence being no more than ten words, ensuring clarity and impact in every line. Add a line space after each period to enhance readability. Include a call-to-action at the end, inviting engagement or reflection from my audience. The format should keep the message sharp, inviting readers to pause and engage with my content thoughtfully. End with 10 relevant hashtags to the post all on one line. Use relevant emoticons as bullet points when needed.
+    
+    I want you to critique your post according to the SUCKS framework. S: Is it specific? U: Is it unique, useful, and undeniable? C: Is it clear, curious, and conversational? K: Is it kept simple? S: Is it structured?
+    If your answer is "no" to any of the the SUCKS frameworks questions fix the post so that the answer becomes "yes".
+    
+    ---
+    
+    # Catchy Hook Framework
+    
+    Act like an experienced social media expert with more than 20 years of experience in digital marketing, capturing people's attention and writing copy. I want you to write the perfect hook for my post.
+    
+    My post is missing a hook, which is the first 1-3 lines of the post. You will create its hook. You know well that the hook is 80% of the result of a post. It is essential for my job that my hook is perfect.
+    
+    I want you to generate 1 perfect hook. What’s a perfect hook? It’s creative. Outside the box. Eye-catching. It creates an emotion, a feeling. It makes people stop scrolling. It avoids jargon, fancy words, questions, and emojis at all costs. Good hooks are written as a normal sentence (avoid capital letters for every word). Some of the hooks are one-liners, some are three-liners (with line breaks). Switch between the two. Your hook must be perfect.
+    
+    Hooks are short sentences. Impactful. If the sentence is long, cut it in 2 and put a line break. Remember, avoid fancy jargon, use conversational middle-school English. Be as simple as possible. 
+    
+    ---
+    
+    ### Your Final Steps: 
+    - Take a deep breath and work on this problem step-by-step.
+    - Only provide the final response once it perfectly reflects the LinkedIn user’s style.
+    - Do not surround your response in quotes or added any additional system text. 
+    - Do not share your thoughts nor show your work. 
+    - Only respond with one final Viral Post response.
+    
+    """

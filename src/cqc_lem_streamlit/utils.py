@@ -5,13 +5,10 @@ import zipfile
 from random import randint
 from typing import Tuple, Any
 
-from openai import OpenAI
-
-from markdownify import markdownify as md
-
 import streamlit as st
 import streamlit_ext as ste
-from streamlit.elements.lib.mutable_status_container import StatusContainer
+from markdownify import markdownify as md
+from openai import OpenAI
 from streamlit.runtime.uploaded_file_manager import UploadedFile
 
 CODE_LANGUAGES = [
@@ -773,8 +770,6 @@ def get_openai_client_instance(temperature: float, model: str) -> OpenAI:
         # api_key=os.environ.get("OPENAI_API_KEY"),
     )
 
-
-
     """
     This function returns a cached instance of ChatOpenAI based on the temperature and model.
     If the temperature or model changes, a new instance will be created and cached.
@@ -969,7 +964,6 @@ def get_file_mime_type(file_extension: str):
             key = None
             value = None
 
-
         if key in mime_dict:
             mime_dict[key].append(value)
         else:
@@ -1021,7 +1015,6 @@ def prefix_content_file_name(filename: str, content: str):
     return "# File: " + filename + "\n\n" + content
 
 
-
 @st.cache_data
 def convert_content_to_markdown(content: str) -> str:
     return md(content)
@@ -1059,4 +1052,3 @@ def read_file(file_path: str, convert_to_markdown: bool = False) -> str:
             contents = f.read()
 
     return str(contents)
-

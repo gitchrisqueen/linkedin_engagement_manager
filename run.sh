@@ -4,16 +4,19 @@
 export $(grep -v '^#' .env | xargs)
 
 # Step 1: Prompt the user if they want to build the latest docker image
-read -p "Do you want to build the latest Docker image? (y/n): " build_image
+read -p "Do you want to build the latest Docker image(s)? (y/n): " build_image
 if [ "$build_image" == "y" ]; then
     echo "Building Docker images (${DOCKER_IMAGE_NAME}:latest)..."
     docker-compose build
-    # Push all built images
-    #docker-compose push
-    # Push the web app image
-    docker-compose push web-app
-     # Push the web the linkedin preview image
-    #docker-compose push linkedin-preview
+    read -p "Do you want to push the built Docker image(s)? (y/n): " push_image
+    if [ "$push_image" == "y" ]; then
+      # Push all built images
+      #docker-compose push
+      # Push the web app image
+      docker-compose push web-app
+      # Push the web the linkedin preview image
+      #docker-compose push linkedin-preview
+    fi
 fi
 
 

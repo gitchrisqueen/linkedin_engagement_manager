@@ -2,8 +2,8 @@
 services:
   web-app:
     build:
-      #context: .
-      context: https://github.com/gitchrisqueen/linkedin_engagement_manager.git
+      context: .
+      #context: https://github.com/gitchrisqueen/linkedin_engagement_manager.git
       dockerfile: ./compose/local/streamlit/Dockerfile
     image: "${DOCKER_IMAGE_NAME}:latest"
     container_name: web-app
