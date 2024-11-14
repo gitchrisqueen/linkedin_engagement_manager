@@ -71,7 +71,7 @@ def generate_content_for_user(user_id: int):
     # myprint(f"Start Date: {start_date}")
 
     # Determine how many days are left in this month
-    days_left_in_month = days_in_month - start_date.day
+    days_left_in_month = days_in_month - start_date.day +1 # dont cont today
 
     # myprint(f"Days Left in Month after Start Date: {days_left_in_month}")
 

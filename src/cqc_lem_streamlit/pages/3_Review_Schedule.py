@@ -123,6 +123,7 @@ if st.session_state.posts:
             post_data = {
                 #"content": row["content"].replace('\n', '<br>'),  # Convert new lines to \n
                 #"content": row["content"].replace('\n', '\\n'),  # Convert new lines to \n
+                "content": row["content"],
                 "scheduled_datetime": row["scheduled_time"],
                 "post_type": row["post_type"],
                 "status": row["status"],
