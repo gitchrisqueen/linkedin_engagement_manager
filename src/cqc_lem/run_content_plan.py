@@ -14,7 +14,7 @@ from cqc_lem.utilities.ai.ai_helper import get_video_content_from_ai, get_though
     get_industry_news_post_from_ai, get_personal_story_post_from_ai, generate_engagement_prompt_post
 from cqc_lem.utilities.db import get_post_type_counts, insert_planned_post, update_db_post_content, \
     get_planned_posts_for_current_week, get_last_planned_post_date_for_user, get_user_password_pair_by_id, \
-    get_user_blog_url, get_user_sitemap_url, get_active_user_ids
+    get_user_blog_url, get_user_sitemap_url, get_active_user_ids, get_planned_posts_for_next_week
 from cqc_lem.utilities.linked_in_helper import get_my_profile
 from cqc_lem.utilities.logger import myprint
 from cqc_lem.utilities.selenium_util import get_driver_wait_pair
@@ -574,8 +574,11 @@ def save_content_plan(user_id: int, daily_plan: list[dict]):
 def create_weekly_content():
     """Creates content for the week from the planed content in the database"""
 
-    # Get the planned content for the current week
-    planned_posts = get_planned_posts_for_current_week()
+    # Get the planned content for the current week or next week if today is saturday
+    if datetime.now().weekday() == 5:
+        planned_posts = get_planned_posts_for_next_week()
+    else:
+        planned_posts = get_planned_posts_for_current_week()
 
     for post in planned_posts:
         user_id = post['user_id']

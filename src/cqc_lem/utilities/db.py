@@ -393,6 +393,21 @@ def get_planned_posts_for_current_week():
 
     return planned_content
 
+def get_planned_posts_for_next_week():
+    """Query the database to get the planned content for the next week."""
+    connection = get_db_connection()
+    cursor = connection.cursor(dictionary=True)
+
+    cursor.execute(
+        "SELECT user_id, id, post_type, buyer_stage FROM posts WHERE status = 'planning' AND WEEK(scheduled_time) = WEEK(NOW()) +1")
+    planned_content = cursor.fetchall()
+
+    cursor.close()
+    connection.close()
+
+    return planned_content
+
+
 def get_last_planned_post_date_for_user(user_id: int):
     """Query the database to get the last planned post date for the given user."""
     connection = get_db_connection()
