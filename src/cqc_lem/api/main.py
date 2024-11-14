@@ -1,3 +1,4 @@
+import os
 import time
 from datetime import datetime
 from enum import Enum
@@ -5,9 +6,13 @@ from typing import Optional, Any
 
 from fastapi import FastAPI, Query
 from fastapi import HTTPException
+from fastapi.responses import RedirectResponse
+from linkedin_api.clients.auth.client import AuthClient
+from linkedin_api.clients.restli.client import RestliClient
 from pydantic import BaseModel, computed_field
 
-from cqc_lem.utilities.db import insert_post, get_post_by_email, get_user_id, update_db_post
+from cqc_lem.utilities.db import insert_post, get_post_by_email, get_user_id, update_db_post, add_user_with_access_token
+from cqc_lem.utilities.logger import myprint
 
 app = FastAPI()
 
@@ -111,3 +116,52 @@ def update_post(post_id: int, post: PostRequest) -> ResponseModel:
         return ResponseModel(status_code=200, detail="Post updated successful")
     else:
         raise HTTPException(status_code=405, detail="Post could not be updated")
+
+
+@app.get("/auth/linkedin/callback")
+def linkedin_callback(code: str, state: str):
+    """ Handle LinkedIn OAuth callback and retrieve user details"""
+
+    # Verify the state parame matches the state from teh environment variable
+    if state != os.getenv("LI_STATE_SALT"):
+        raise HTTPException(status_code=400, detail="Invalid state parameter")
+    else:
+        # Get needed environment variables
+        client_id = os.getenv("LI_CLIENT_ID")
+        client_secret = os.getenv("LI_CLIENT_SECRET")
+        redirect_url = os.getenv("LI_REDIRECT_URL")
+        resource_path = os.getenv("LI_USERINFO_RESOURCE")
+
+        #  Exchange code for access token
+        client = AuthClient(client_id, client_secret, redirect_url)
+        access_token_response = client.exchange_auth_code_for_access_token(code)
+
+        myprint("Access token Response from api call")
+        for key, value in access_token_response.__dict__.items():
+            myprint(f"{key}: {value}")
+
+        # Get the user email using access token
+
+        restli_client = RestliClient()
+
+        response = restli_client.get(
+            resource_path=resource_path,
+            access_token=access_token_response.access_token,
+            #query_params={"fields": "id,firstName:(localized),lastName, emailAddress"},
+        )
+
+        myprint(f"Response from {resource_path} api call:")
+        for key, value in response.__dict__.items():
+            myprint(f"{key}: {value}")
+
+        # Update the database with user email and access token
+        add_user_with_access_token(response.entity['email'],
+                                   response.entity['sub'],
+                                   access_token_response.access_token,
+                                   access_token_response.expires_in,
+                                   access_token_response.refresh_token,
+                                   access_token_response.refresh_token_expires_in)
+
+        # Redirect the user to the main Streamlit app from env variable
+        streamlit_url = os.environ.get('NGROK_CUSTOM_DOMAIN')
+        return RedirectResponse(url=f"https://{streamlit_url}") # TODO: Figure out better redirect. Should we just close the window

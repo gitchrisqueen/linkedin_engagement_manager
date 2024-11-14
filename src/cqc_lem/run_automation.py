@@ -250,7 +250,7 @@ def check_commented(driver, wait):
 
     # Check if we have already commented on this post
 
-    # TODO:  1. Check against Database
+    # TODO:  1. Check against Database (in logs)
 
     # 2. Check against LinkedIn Recent Activity Comments
     if not already_commented:
@@ -328,7 +328,7 @@ def automate_commenting(user_id: int, loop_for_duration=None, **kwargs):
 @shared_task.task
 @debug_function
 def automate_reply_commenting(user_id: int, loop_for_duration=None, **kwargs):
-    """"Reply to recent comments"""
+    """Reply to recent comments"""
     # TODO: Implement this function
 
     user_email, user_password = get_user_password_pair_by_id(user_id)
@@ -556,7 +556,7 @@ def automate_profile_viewer_dms(user_id: int, loop_for_duration=None, **kwargs):
                 # myprint(f"Last Viewed on Date: {last_viewed_date}")
 
                 # if the last viewed on date is Greater than 24 hours break the while loop
-                if (datetime.now() - last_viewed_date).days > 1:  # TODO: Change this to 1
+                if (datetime.now() - last_viewed_date).days > 1:
                     # myprint("Last viewed on date is more than 24 hours ago")
                     break  # Break the while loop
             else:

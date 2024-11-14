@@ -52,6 +52,7 @@ tldextract = "^5.1.2"
 imessage-reader = "^0.6.1"
 nltk = "^3.9.1"
 fpdf = "^1.7.2"
+linkedin-api-client = "^0.3.0"
 
 
 

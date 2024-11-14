@@ -1,11 +1,14 @@
+import os
 from datetime import timedelta
+
+from linkedin_api.clients.restli.client import RestliClient
 
 from cqc_lem.my_celery import app as shared_task
 # from celery import shared_task
 from cqc_lem.run_automation import automate_commenting, automate_profile_viewer_dms, \
     automate_appreciation_dms, automate_reply_commenting
 from cqc_lem.utilities.db import get_ready_to_post_posts, get_user_password_pairs, get_post_content, \
-    update_db_post_status, get_user_password_pair_by_id
+    update_db_post_status, get_user_password_pair_by_id, get_user_linked_sub_id, get_user_access_token
 from cqc_lem.utilities.logger import myprint
 
 
@@ -16,7 +19,7 @@ def check_scheduled_posts():
     posts = get_ready_to_post_posts()
 
     for post in posts:
-        post_id, scheduled_time, user_id= post
+        post_id, scheduled_time, user_id = post
 
         myprint(f"Ready to Post ID: {post_id}")
 
@@ -59,22 +62,56 @@ def start_appreciate_dms():
         # TODO: Should this be spaced out over some interval if user numbers grow
         # time.sleep()
 
-        automate_appreciation_dms.apply_async(kwargs=kwargs )
+        automate_appreciation_dms.apply_async(kwargs=kwargs)
 
 
 @shared_task.task
 def post_to_linkedin(user_id: int, post_id, **kwargs):
+    # TODO: Write code to login an publish post to linkedin
+    user_email, user_password = get_user_password_pair_by_id(user_id)
+    myprint(f"Posting to LinkedIn as user: {user_email}")
+
     # Get the post content
     content = get_post_content(post_id)
     myprint(f"Posting to LinkedIn: {content}")
 
-    # TODO: Write code to login an publish post to linkedin
-    user_email, user_password = get_user_password_pair_by_id(user_id)
-    myprint(f"Posting to as user: {user_email}")
+    restli_client = RestliClient()
+    restli_client.session.hooks["response"].append(lambda r: r.raise_for_status())
+
+    linked_sub_id = get_user_linked_sub_id(user_id)
+
+    access_token = get_user_access_token(user_id)
+
+    posts_create_response = restli_client.create(
+        resource_path="/posts",
+        entity={
+            "author": f"urn:li:person:{linked_sub_id}",
+            "lifecycleState": "PUBLISHED",
+            "visibility": "PUBLIC",
+            "commentary": content,
+            "distribution": {
+                "feedDistribution": "MAIN_FEED",
+                "targetEntities": [],
+                "thirdPartyDistributionChannels": [],
+            },
+        },
+        version_string=os.getenv("LI_API_VERSION"),
+        access_token=access_token,
+    )
+
+    myprint("Post Create Response from api call")
+    for key, value in posts_create_response.__dict__.items():
+        myprint(f"{key}: {value}")
+
+    if posts_create_response.entity_id:
+        myprint(f"Successfully created post using /posts: {posts_create_response.entity_id}")
+
+        # Update DB with status=posted
+        update_db_post_status(post_id, 'posted')
+    else:
+        myprint(f"Failed to create post using /posts")
 
 
-    # Update DB with status=posted
-    update_db_post_status(post_id, 'posted')
 
 
 if __name__ == "__main__":

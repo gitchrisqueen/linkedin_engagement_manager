@@ -1700,6 +1700,20 @@ yaml = ["PyYAML (>=3.10)"]
 zookeeper = ["kazoo (>=2.8.0)"]
 
 [[package]]
+name = "linkedin-api-client"
+version = "0.3.0"
+description = "Official Python client library for LinkedIn APIs"
+optional = false
+python-versions = ">=3.7,<4.0"
+files = [
+    {file = "linkedin_api_client-0.3.0-py3-none-any.whl", hash = "sha256:2d47745ca2487def4daec8ace4f341b64a59ee59878943cac5e7f22cff3443a6"},
+    {file = "linkedin_api_client-0.3.0.tar.gz", hash = "sha256:318cc34d06be32ebb2c8f8f25c57e928532deb3ed231c51f9d8adec5a816abb2"},
+]
+
+[package.dependencies]
+requests = "*"
+
+[[package]]
 name = "markdown-it-py"
 version = "3.0.0"
 description = "Python port of markdown-it. Markdown parsing, done right!"
@@ -4245,4 +4259,4 @@ testing = ["coverage[toml]", "zope.event", "zope.testing"]
 [metadata]
 lock-version = "2.0"
 python-versions = ">=3.12,<4.0"
-content-hash = "7e56f055011f88a79ecc9f920e42ea48e36e898cb9358aa3b8d53f6d8f5cc045"
+content-hash = "ee24bee1d58d95c130cdf47724e6830243dd32e086a1518ed26d6f334c244855"

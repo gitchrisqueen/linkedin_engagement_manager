@@ -101,6 +101,69 @@ def add_user(email: str, password: str):
         connection.close()
 
 
+def add_user_with_access_token(email: str, linked_sub_id: str, access_token: str, access_token_expires_in: str, refresh_token: str = None,
+                               refresh_token_expires_in: str = None):
+    connection = get_db_connection()
+    cursor = connection.cursor()
+
+    access_token_created_at = datetime.now()
+
+    if refresh_token is not None:
+        refresh_token_created_at = datetime.now()
+    else:
+        refresh_token_created_at = None
+
+    try:
+        cursor.execute("""INSERT INTO users (email, linked_sub_id, access_token, access_token_expires_in, access_token_created_at, refresh_token, refresh_token_expires_in, refresh_token_created_at) 
+        VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+        ON DUPLICATE KEY UPDATE
+                linked_sub_id = VALUES(linked_sub_id),
+                access_token = VALUES(access_token),
+                access_token_expires_in = VALUES(access_token_expires_in),
+                access_token_created_at = VALUES(access_token_created_at),
+                refresh_token = VALUES(refresh_token),
+                refresh_token_expires_in = VALUES(refresh_token_expires_in),
+                refresh_token_created_at = VALUES(refresh_token_created_at)
+                
+        """, (
+        email,
+        linked_sub_id,
+        access_token, access_token_expires_in, access_token_created_at,
+        refresh_token, refresh_token_expires_in, refresh_token_created_at))
+        connection.commit()
+    except mysql.connector.errors.IntegrityError as e:
+        if e.errno == mysql.connector.errorcode.ER_DUP_ENTRY:
+            print(f"User with email {email} already exists.")
+        else:
+            print(f"An error occurred: {e}")
+    finally:
+        cursor.close()
+        connection.close()
+
+def get_user_linked_sub_id(user_id: int):
+    connection = get_db_connection()
+    cursor = connection.cursor(dictionary=True)
+
+    cursor.execute("SELECT linked_sub_id FROM users WHERE id = %s", (user_id,))
+
+    linked_sub_id = cursor.fetchone()
+    cursor.close()
+    connection.close()
+    return linked_sub_id['linked_sub_id'] if linked_sub_id else None
+
+
+def get_user_access_token(user_id: int):
+    connection = get_db_connection()
+    cursor = connection.cursor(dictionary=True)
+
+    cursor.execute("SELECT access_token FROM users WHERE id = %s", (user_id,))
+    # TODO: Add where clause to only return non-expired tokens ????
+
+    access_token = cursor.fetchone()
+    cursor.close()
+    connection.close()
+    return access_token['access_token'] if access_token else None
+
 def get_user_id(email: str):
     connection = get_db_connection()
     cursor = connection.cursor(dictionary=True)
@@ -134,6 +197,7 @@ def insert_post(email, content, scheduled_time, post_type) -> bool:
     connection.close()
     return success
 
+
 def insert_planned_post(user_id: int, scheduled_time, post_type: str, buyer_stage: str) -> bool:
     connection = get_db_connection()
     cursor = connection.cursor()
@@ -148,6 +212,7 @@ def insert_planned_post(user_id: int, scheduled_time, post_type: str, buyer_stag
     cursor.close()
     connection.close()
     return success
+
 
 def update_db_post(content: str, scheduled_time: str, post_type: str, post_id: int, status: str) -> bool:
     connection = get_db_connection()
@@ -165,6 +230,7 @@ def update_db_post(content: str, scheduled_time: str, post_type: str, post_id: i
 
     return success
 
+
 def update_db_post_content(post_id: int, content: str) -> bool:
     connection = get_db_connection()
     cursor = connection.cursor()
@@ -180,6 +246,7 @@ def update_db_post_content(post_id: int, content: str) -> bool:
     connection.close()
 
     return success
+
 
 def update_db_post_status(post_id: int, status: str) -> bool:
     connection = get_db_connection()
@@ -321,7 +388,8 @@ def get_linked_in_profile_by_url(profile_url: str, updated_less_than_days_ago: i
     connection = get_db_connection()
     cursor = connection.cursor()
 
-    cursor.execute("SELECT data FROM profiles WHERE profile_url = %s AND updated_at > NOW() - INTERVAL %s DAY", (profile_url, updated_less_than_days_ago))
+    cursor.execute("SELECT data FROM profiles WHERE profile_url = %s AND updated_at > NOW() - INTERVAL %s DAY",
+                   (profile_url, updated_less_than_days_ago))
     profile_data = cursor.fetchone()
 
     cursor.close()
@@ -334,7 +402,8 @@ def get_linked_in_profile_by_email(profile_email: str, updated_less_than_days_ag
     connection = get_db_connection()
     cursor = connection.cursor()
 
-    cursor.execute("SELECT data FROM profiles WHERE email = %s AND updated_at > NOW() - INTERVAL %s DAY", (profile_email, updated_less_than_days_ago))
+    cursor.execute("SELECT data FROM profiles WHERE email = %s AND updated_at > NOW() - INTERVAL %s DAY",
+                   (profile_email, updated_less_than_days_ago))
     profile_data = cursor.fetchone()
 
     cursor.close()
@@ -393,6 +462,7 @@ def get_planned_posts_for_current_week():
 
     return planned_content
 
+
 def get_planned_posts_for_next_week():
     """Query the database to get the planned content for the next week."""
     connection = get_db_connection()
@@ -413,13 +483,16 @@ def get_last_planned_post_date_for_user(user_id: int):
     connection = get_db_connection()
     cursor = connection.cursor()
 
-    cursor.execute("SELECT MAX(scheduled_time) AS last_planned_date FROM posts WHERE user_id = %s AND status = 'planning'", (user_id,))
+    cursor.execute(
+        "SELECT MAX(scheduled_time) AS last_planned_date FROM posts WHERE user_id = %s AND status = 'planning'",
+        (user_id,))
     last_planned_date = cursor.fetchone()
 
     cursor.close()
     connection.close()
 
     return last_planned_date[0] if last_planned_date else None
+
 
 def get_user_blog_url(user_id: int):
     """Query the database to get the blog URL for the given user."""
@@ -434,6 +507,7 @@ def get_user_blog_url(user_id: int):
 
     return blog_url[0] if blog_url else None
 
+
 def get_user_sitemap_url(user_id: int):
     """Query the database to get the sitemap URL for the given user."""
     connection = get_db_connection()
@@ -447,12 +521,13 @@ def get_user_sitemap_url(user_id: int):
 
     return sitemap_url[0] if sitemap_url else None
 
+
 def get_active_user_ids():
     """Query the database to get the user ids of active users."""
     connection = get_db_connection()
     cursor = connection.cursor()
 
-    #cursor.execute("SELECT id FROM users WHERE active = 1") # TODO:  Update this when you have a way to see who is active (timestamp of login or paid ???)
+    # cursor.execute("SELECT id FROM users WHERE active = 1") # TODO:  Update this when you have a way to see who is active (timestamp of login or paid ???)
     cursor.execute("SELECT id FROM users ")
     active_user_ids = [row[0] for row in cursor.fetchall()]
 

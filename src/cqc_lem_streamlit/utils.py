@@ -1,4 +1,5 @@
 #  Copyright (c) 2024. Christopher Queen Consulting LLC (http://www.ChristopherQueenConsulting.com/)
+import base64
 import os
 import tempfile
 import zipfile
@@ -1052,3 +1053,10 @@ def read_file(file_path: str, convert_to_markdown: bool = False) -> str:
             contents = f.read()
 
     return str(contents)
+
+def get_file_as_data_image(file_path: str):
+    file_ = open(file_path, "rb")
+    contents = file_.read()
+    data_url = base64.b64encode(contents).decode("utf-8")
+    file_.close()
+    return "data:image/png;base64," + data_url
