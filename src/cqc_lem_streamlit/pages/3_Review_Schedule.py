@@ -98,8 +98,8 @@ if st.session_state.posts:
 
     if selected_row is not None:
         selected_content = selected_row['content'][0]
-        st.write("Selected content:")
-        st.write(selected_content)
+        #st.write("Selected content:")
+        #st.write(selected_content)
 
         selected_post_id = selected_row['post_id'][0]
     else:

@@ -431,3 +431,17 @@ def get_user_sitemap_url(user_id: int):
     connection.close()
 
     return sitemap_url[0] if sitemap_url else None
+
+def get_active_user_ids():
+    """Query the database to get the user ids of active users."""
+    connection = get_db_connection()
+    cursor = connection.cursor()
+
+    #cursor.execute("SELECT id FROM users WHERE active = 1") # TODO:  Update this when you have a way to see who is active (timestamp of login or paid ???)
+    cursor.execute("SELECT id FROM users ")
+    active_user_ids = [row[0] for row in cursor.fetchall()]
+
+    cursor.close()
+    connection.close()
+
+    return active_user_ids

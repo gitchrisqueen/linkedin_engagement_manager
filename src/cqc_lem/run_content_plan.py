@@ -8,15 +8,13 @@ from bs4 import BeautifulSoup
 from requests.adapters import HTTPAdapter
 from urllib3 import Retry
 
-#from requests.packages.urllib3.util.retry import Retry
-
 from cqc_lem.my_celery import app as shared_task
 from cqc_lem.utilities.ai.ai_helper import get_blog_summary_post_from_ai, get_website_content_post_from_ai
 from cqc_lem.utilities.ai.ai_helper import get_video_content_from_ai, get_thought_leadership_post_from_ai, \
     get_industry_news_post_from_ai, get_personal_story_post_from_ai, generate_engagement_prompt_post
 from cqc_lem.utilities.db import get_post_type_counts, insert_planned_post, update_db_post_content, \
     get_planned_posts_for_current_week, get_last_planned_post_date_for_user, get_user_password_pair_by_id, \
-    get_user_blog_url, get_user_sitemap_url
+    get_user_blog_url, get_user_sitemap_url, get_active_user_ids
 from cqc_lem.utilities.linked_in_helper import get_my_profile
 from cqc_lem.utilities.logger import myprint
 from cqc_lem.utilities.selenium_util import get_driver_wait_pair
@@ -24,7 +22,15 @@ from cqc_lem.utilities.utils import get_best_posting_time
 
 
 @shared_task.task
-def generate_content(user_id: int):
+def generate_content():
+    # Get active users from DB
+    active_users = get_active_user_ids()
+    # For each user generate content for the next 30 days
+    for user_id in active_users:
+        generate_content_for_user(user_id)
+
+
+def generate_content_for_user(user_id: int):
     """
     Generate and plan content for the next 30 days based on current content representation in the database.
     Ensures a balanced distribution of post types (carousel, text, video) and buyer journey stages.
@@ -173,7 +179,8 @@ def create_content(user_id: int, post_type: str, stage: str):
     """Create content based on the specified post type and buyer journey stage."""
 
     if post_type == "video":
-        content = create_video_content(user_id, stage)
+        #content = create_video_content(user_id, stage) # TODO: Find a way to implement this
+        content = f"Content created for {post_type} in the {stage} stage. However, this is unfinished"
     elif post_type == "carousel":
         content = f"Content created for {post_type} in the {stage} stage. However, this is unfinished"
     else:
@@ -586,7 +593,7 @@ def create_weekly_content():
 
 if __name__ == '__main__':
     myprint("Generating content plan for 30 days")
-    generate_content(1)
+    generate_content()
     myprint("Creating weekly content")
     create_weekly_content()
     myprint("Process finished")

@@ -1,4 +1,4 @@
-from cqc_lem.run_content_plan import create_content
+from cqc_lem.run_content_plan import create_content, generate_content, create_weekly_content
 from cqc_lem.utilities.db import get_user_password_pair_by_id
 from cqc_lem.utilities.linked_in_helper import get_my_profile
 from cqc_lem.utilities.logger import myprint
@@ -34,9 +34,14 @@ def test_user_profile_load_from_db():
     driver.quit()
 
 
+def test_content_plan_and_create():
+    generate_content()
+    create_weekly_content()
+
 if __name__ == "__main__":
     # Clear selenium sessions
     clear_sessions()
 
     #test_user_profile_load_from_db()
-    test_create_content()
+    #test_create_content()
+    test_content_plan_and_create()
