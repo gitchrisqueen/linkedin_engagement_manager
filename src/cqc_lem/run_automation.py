@@ -193,11 +193,13 @@ def post_comment(user_id: int, post_link, comment_text):
         click_element_wait_retry(driver, wait, '//button[contains(@class, "comments-comment-box__submit-button--cr")]',
                                  "Clicking Post Button")
 
+        myprint(f"Added Post via Post Button")
         # TODO: Update database with record of comment to this post (use the link)
 
     except NoSuchElementException:
         # If the post button is not found, send a return key to post the comment
         comment_box.send_keys('\n')
+        myprint(f"Added Post return key. This might not have worked")
 
     # Get the main like button
     main_like_button = get_element_wait_retry(driver, wait,
@@ -233,6 +235,7 @@ def post_comment(user_id: int, post_link, comment_text):
                 choices.append(insightful_button)
             button_to_click = random.choice(choices)
             button_to_click.click()
+            myprint(f"Added Post Reaction: {e}")
             break  # Exit loop if click is successful
         except ElementClickInterceptedException as e:
             if attempt < max_retries - 1:
@@ -328,6 +331,8 @@ def automate_commenting(user_id: int, loop_for_duration=None, **kwargs):
 @shared_task.task
 @debug_function
 def automate_reply_commenting(user_id: int, loop_for_duration=None, **kwargs):
+    # TODO: Should the post urn of our post be used to auto reply to just those comment or any comments we are tagged in?
+
     """Reply to recent comments"""
     # TODO: Implement this function
 

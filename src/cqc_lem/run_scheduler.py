@@ -8,7 +8,8 @@ from cqc_lem.my_celery import app as shared_task
 from cqc_lem.run_automation import automate_commenting, automate_profile_viewer_dms, \
     automate_appreciation_dms, automate_reply_commenting
 from cqc_lem.utilities.db import get_ready_to_post_posts, get_user_password_pairs, get_post_content, \
-    update_db_post_status, get_user_password_pair_by_id, get_user_linked_sub_id, get_user_access_token
+    update_db_post_status, get_user_password_pair_by_id, get_user_linked_sub_id, get_user_access_token, \
+    get_active_user_ids
 from cqc_lem.utilities.logger import myprint
 
 
@@ -23,39 +24,36 @@ def check_scheduled_posts():
 
         myprint(f"Ready to Post ID: {post_id}")
 
-        base_kwargs = {'user_id': user_id, 'loop_for_duration': 60 * 15}
+        base_kwargs = {'user_id': user_id}
 
-        # Start the pre-post commenting task (loop for 15 minutes)
-        automate_commenting.apply_async(kwargs=base_kwargs)
 
-        # 10 minutes before the scheduled_time
-        pre_post_dm_time = scheduled_time - timedelta(minutes=10)
-
-        # Schedule the pre-post profile viewer dm task (loop for 10 minutes)
+        # Schedule the pre-post profile viewer dm task 10 minutes before scheduled post (loop for 10 minutes)
         base_kwargs['loop_for_duration'] = 60 * 10
-        automate_profile_viewer_dms.apply_async(kwargs=base_kwargs, eta=pre_post_dm_time)
+        automate_profile_viewer_dms.apply_async(kwargs=base_kwargs, eta=scheduled_time - timedelta(minutes=10))
 
         # Schedule the post to be posted
         post_kwargs = {'user_id': user_id, 'post_id': post_id}
         post_to_linkedin.apply_async(kwargs=post_kwargs, eta=scheduled_time)
 
-        # Answer comments for 30 minutes
+        # Schedule Answer comments for 30 minutes (5 minutes after scheduled post time)
         base_kwargs['loop_for_duration'] = 60 * 30
-        automate_reply_commenting.apply_async(kwargs=base_kwargs, eta=scheduled_time)
+        automate_reply_commenting.apply_async(kwargs=base_kwargs, eta=scheduled_time + timedelta(minutes=5))
+
+        # Start the pre-post commenting task now (loop for 15 minutes)
+        base_kwargs['loop_for_duration'] = 60 * 15
+        automate_commenting.apply_async(kwargs=base_kwargs)
 
 
 @shared_task.task
 def start_appreciate_dms():
     # For each user schedule appreciate DMS
-    users = get_user_password_pairs()
+    users = get_active_user_ids()
 
-    for user in users:
-        user_email, user_password = user
+    for user_id in users:
 
         # Send appreciation DM for 5 minutes
         kwargs = {
-            'user_email': user_email,
-            'user_password': user_password,
+            'user_id': user_id,
             'loop_for_duration': 60 * 5
         }
 

@@ -308,21 +308,23 @@ def get_ready_to_post_posts(pre_post_time: datetime = None) -> list:
 
     now = datetime.now()
     if pre_post_time is None:
-        # Get time for 15 minutes after to now
+        # Get time for 15 minutes after now
         pre_post_time = now + timedelta(minutes=15)
 
-    myprint(f"Pre-post time: {pre_post_time}")
+    yesterday = now - timedelta(days=1)
+
+    myprint(f"Getting post between : {yesterday} and {pre_post_time}")
 
     conn = get_db_connection()
     cursor = conn.cursor()
-    # TODO: Need to get posts that have scheduled time in the next 15 minutes - move this to db.py function
+    # Get posts that have scheduled time between 24 hours ago and the next 15 minutes
     cursor.execute(
         """SELECT p.id, p.scheduled_time, p.user_id 
             FROM posts AS p
             WHERE status = 'approved' AND scheduled_time BETWEEN %s AND %s 
             ORDER BY scheduled_time ASC 
             """,
-        (now - timedelta(days=1), pre_post_time))  # Get the first post that is scheduled to post now or earlier
+        (yesterday, pre_post_time,))
     posts = cursor.fetchall()
 
     # Print the id's ready to post

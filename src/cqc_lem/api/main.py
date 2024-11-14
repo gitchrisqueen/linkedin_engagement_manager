@@ -119,11 +119,11 @@ def update_post(post_id: int, post: PostRequest) -> ResponseModel:
 
 
 @app.get("/auth/linkedin/callback")
-def linkedin_callback(code: str, state: str):
+def linkedin_callback(code: str, state: str = None):
     """ Handle LinkedIn OAuth callback and retrieve user details"""
 
     # Verify the state parame matches the state from teh environment variable
-    if state != os.getenv("LI_STATE_SALT"):
+    if state is not None and state != os.getenv("LI_STATE_SALT"):
         raise HTTPException(status_code=400, detail="Invalid state parameter")
     else:
         # Get needed environment variables
