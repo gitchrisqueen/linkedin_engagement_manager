@@ -623,6 +623,7 @@ def automate_profile_viewer_dms(user_id: int, loop_for_duration=None, **kwargs):
         driver.get(viewer_url)
 
         # Send a DM to the viewer
+        # TODO: update to celery async task method
         send_dm(driver, wait, my_profile, viewer_url, viewer_name)
 
         # Close tab when done
@@ -630,7 +631,7 @@ def automate_profile_viewer_dms(user_id: int, loop_for_duration=None, **kwargs):
 
     driver.quit()
 
-
+# TODO: make this a celery task
 def send_dm(driver, wait, my_profile: LinkedInProfile, viewer_url, viewer_name):
     myprint(f"Sending DM from: {my_profile.full_name} to: {viewer_name}")
 
