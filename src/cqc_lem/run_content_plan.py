@@ -17,7 +17,7 @@ from cqc_lem.utilities.db import get_post_type_counts, insert_planned_post, upda
     get_user_blog_url, get_user_sitemap_url, get_active_user_ids, get_planned_posts_for_next_week
 from cqc_lem.utilities.linked_in_helper import get_my_profile
 from cqc_lem.utilities.logger import myprint
-from cqc_lem.utilities.selenium_util import get_driver_wait_pair
+from cqc_lem.utilities.selenium_util import get_driver_wait_pair, quit_gracefully
 from cqc_lem.utilities.utils import get_best_posting_time
 
 
@@ -198,7 +198,7 @@ def create_video_content(user_id: int, stage: str):
 
     content = get_video_content_from_ai(my_profile, stage)
 
-    driver.quit()
+    quit_gracefully(driver)
 
     return content
 
@@ -229,7 +229,7 @@ def create_text_post(user_id: int, stage: str, post_type: str = None, user_profi
         user_email, user_password = get_user_password_pair_by_id(user_id)
         driver, wait = get_driver_wait_pair(session_name='Create Text Post')
         user_profile = get_my_profile(driver, wait, user_email, user_password)
-        driver.quit()
+        quit_gracefully(driver)
 
     # Generate the post based on the selected type
     myprint(f"Creating text post of type: {post_type} for stage: {stage}")
@@ -571,14 +571,17 @@ def save_content_plan(user_id: int, daily_plan: list[dict]):
 
 
 @shared_task.task
-def create_weekly_content():
+def create_weekly_content(user_id: int = None):
     """Creates content for the week from the planed content in the database"""
+
+    if user_id is not None:
+        myprint(f"Creating weekly content for user id: {user_id}")
 
     # Get the planned content for the current week or next week if today is saturday
     if datetime.now().weekday() == 5:
-        planned_posts = get_planned_posts_for_next_week()
+        planned_posts = get_planned_posts_for_next_week(user_id)
     else:
-        planned_posts = get_planned_posts_for_current_week()
+        planned_posts = get_planned_posts_for_current_week(user_id)
 
     for post in planned_posts:
         user_id = post['user_id']
@@ -592,6 +595,9 @@ def create_weekly_content():
         # Update the database with the created content
         myprint(f"Updating post content for post_id: {post_id}")
         update_db_post_content(post_id, content)
+
+
+
 
 
 if __name__ == '__main__':

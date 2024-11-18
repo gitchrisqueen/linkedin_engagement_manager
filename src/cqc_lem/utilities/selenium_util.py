@@ -25,6 +25,14 @@ from cqc_lem.utilities.logger import myprint
 from cqc_lem.utilities.utils import create_folder_if_not_exists
 
 
+def quit_gracefully(driver: WebDriver):
+    try:
+        driver.quit()
+    except Exception as e:
+        myprint(f"Error while quitting driver: {e}")
+        pass
+
+
 def get_available_session_driver_id(wait_for_available=True, wait_time=60, retry=3):
     # Query the Selenium Grid for available sessions
     url = f"http://{SELENIUM_HUB_HOST_IP}:4444/status"

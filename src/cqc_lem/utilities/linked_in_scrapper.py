@@ -341,7 +341,11 @@ def get_profile_experiences(driver, employeeLink):
                 new_position['title'] = title
                 # Start and End Date is here
                 sesi = start_identifier_map["experience_company|start_end_date"]
-                (start_date, end_date) = get_start_end_dates(row[sesi][:len(row[sesi]) // 2])
+                try:
+                    (start_date, end_date) = get_start_end_dates(row[sesi][:len(row[sesi]) // 2])
+                except IndexError:
+                    start_date, end_date = None, None
+
                 new_position['start_date'] = start_date
                 new_position['end_date'] = end_date
                 experience['positions'].append(new_position)

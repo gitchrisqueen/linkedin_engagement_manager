@@ -2,6 +2,7 @@ import os
 import time
 from datetime import datetime
 from enum import Enum
+from http.client import responses
 from typing import Optional, Any
 
 from fastapi import FastAPI, Query
@@ -38,6 +39,7 @@ class PostType(str, Enum):
 
 
 class PostStatus(str, Enum):
+    planning = "planning"
     pending = "pending"
     approved = "approved"
     rejected = "rejected"
@@ -83,12 +85,28 @@ def schedule_post(post: PostRequest) -> ResponseModel:
     else:
         raise HTTPException(status_code=404, detail="Could not schedule post")
 
+@app.get('/user_id/',  responses={
+    200: {"description": "User ID retrieved successfully"},
+    **{k: v for k, v in error_responses.items() if k in [400, 404]}
+})
+def get_user_id_from_email(email: str) -> ResponseModel:
+    """Endpoint to get user id by email."""
+    if not email:
+        raise HTTPException(status_code=400, detail="Email is required")
+
+    user_id = get_user_id(email)
+
+    if not user_id:
+        raise HTTPException(status_code=403, detail="User not found")
+
+    return ResponseModel(status_code=200, detail=user_id)
+
 
 @app.get("/posts/", responses={
     200: {"description": "Post scheduled successfully"},
     **{k: v for k, v in error_responses.items() if k in [400, 404]}
 })
-def get_posts(email: Optional[str] = Query(None)) -> ResponseModel:
+def get_posts(email: str) -> ResponseModel:
     """Endpoint to get posts by email."""
     if not email:
         raise HTTPException(status_code=400, detail="Email is required")

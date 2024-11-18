@@ -24,7 +24,7 @@ from cqc_lem.utilities.env_constants import LI_USER, LI_PASSWORD
 from cqc_lem.utilities.linked_in_helper import login_to_linkedin, get_my_profile, get_linkedin_profile_from_url
 from cqc_lem.utilities.logger import myprint
 from cqc_lem.utilities.selenium_util import click_element_wait_retry, \
-    get_element_wait_retry, get_elements_as_list_wait_stale, getText, close_tab, get_driver_wait_pair
+    get_element_wait_retry, get_elements_as_list_wait_stale, getText, close_tab, get_driver_wait_pair, quit_gracefully
 from cqc_lem.utilities.utils import debug_function
 
 # Load .env file
@@ -235,7 +235,7 @@ def post_comment(user_id: int, post_link, comment_text):
                 choices.append(insightful_button)
             button_to_click = random.choice(choices)
             button_to_click.click()
-            myprint(f"Added Post Reaction: {e}")
+            myprint(f"Added Post Reaction")
             break  # Exit loop if click is successful
         except ElementClickInterceptedException as e:
             if attempt < max_retries - 1:
@@ -243,7 +243,7 @@ def post_comment(user_id: int, post_link, comment_text):
             else:
                 myprint(f"Failed to click Post Reaction: {e}")
 
-    driver.quit() # Close the driver
+    quit_gracefully(driver)  # Close the driver
 
 
 def check_commented(driver, wait):
@@ -325,7 +325,7 @@ def automate_commenting(user_id: int, loop_for_duration=None, **kwargs):
     # Switch back to tab
     driver.switch_to.window(current_tab)
 
-    driver.quit()
+    quit_gracefully(driver)
 
 
 @shared_task.task
@@ -358,7 +358,7 @@ def automate_reply_commenting(user_id: int, loop_for_duration=None, **kwargs):
 
         time.sleep(15)  # Sleep for 15 seconds
 
-    driver.quit()
+    quit_gracefully(driver)
 
 
 @shared_task.task
@@ -399,7 +399,7 @@ def automate_appreciation_dms(user_id: int, loop_for_duration=None):
 
         time.sleep(10)  # Sleep for 10 seconds
 
-    driver.quit()
+    quit_gracefully(driver)
 
 
 def generate_and_post_comment(driver, wait, post_link, my_profile: LinkedInProfile) -> bool:
@@ -497,22 +497,6 @@ def automate_profile_viewer_dms(user_id: int, loop_for_duration=None, **kwargs):
     user_email, user_password = get_user_password_pair_by_id(user_id)
 
     driver, wait = get_driver_wait_pair(session_name='Profile Viewer DMs')
-
-    # Wait until there are 10 minutes or less on the timer
-    while True:
-        if loop_for_duration:
-            break  # This overrides the remaining time and threading setup
-
-        remaining_minutes = get_time_remaining_minutes()
-
-        # Else do this (loop_for_duration overrides this break)
-        if remaining_minutes <= 10:
-            break
-        # Sleep for the remaining time needed to be less than 10 minutes
-        remaining_seconds = get_time_remaining_seconds()
-        sleep_time = max(remaining_seconds - (10 * 60), 2)
-        myprint(f"Waiting for {sleep_time} seconds to start Profile Viewer DMs")
-        time.sleep(sleep_time)
 
     myprint(f"Starting Profile Viewer DMs")
 
@@ -623,16 +607,30 @@ def automate_profile_viewer_dms(user_id: int, loop_for_duration=None, **kwargs):
         driver.get(viewer_url)
 
         # Send a DM to the viewer
-        # TODO: update to celery async task method
-        send_dm(driver, wait, my_profile, viewer_url, viewer_name)
+        kwargs = {'user_id': get_user_id(my_profile.email),
+                  'viewer_url': viewer_url,
+                  'viewer_name': viewer_name}
+        send_dm.apply_async(kwargs=kwargs)
 
         # Close tab when done
         close_tab(driver)
 
-    driver.quit()
+    quit_gracefully(driver)
 
-# TODO: make this a celery task
-def send_dm(driver, wait, my_profile: LinkedInProfile, viewer_url, viewer_name):
+
+@shared_task.task
+@debug_function
+def send_dm(user_id: int, viewer_url, viewer_name):
+    user_email, user_password = get_user_password_pair_by_id(user_id)
+
+    driver, wait = get_driver_wait_pair(session_name='Profile Viewer DMs')
+
+    myprint(f"Starting Profile Viewer DMs")
+
+    login_to_linkedin(driver, wait, user_email, user_password)
+
+    my_profile = get_my_profile(driver, wait, user_email, user_password)
+
     myprint(f"Sending DM from: {my_profile.full_name} to: {viewer_name}")
 
     if viewer_url != driver.current_url:
@@ -648,22 +646,22 @@ def send_dm(driver, wait, my_profile: LinkedInProfile, viewer_url, viewer_name):
         if profile.is_1st_connection:
             myprint("We Are 1st Connections")
             # engage with their content (
-            green_activities = profile.recent_activities
+            recent_activities = profile.recent_activities
 
-            myprint(f"Green Activities Count: {len(green_activities)}")
+            myprint(f"Recent Activities Count: {len(recent_activities)}")
 
             # Filter activities by posted date less than a week ago
-            green_activities = [activity for activity in green_activities if
+            recent_activities = [activity for activity in recent_activities if
                                 (datetime.now() - activity.posted).days <= 7]
 
-            myprint(f"Green Activities Filtered (1 week) Count: {len(green_activities)}")
+            myprint(f"Recemt Activities Filtered (1 week) Count: {len(recent_activities)}")
 
             # DONT: Shuffle the activities (they are already in order of latest to oldest)
             # random.shuffle(green_activities)
             able_to_comment = False
 
             # Filter list to activities I haven't commented on
-            for activity in green_activities:
+            for activity in recent_activities:
                 # Navigate to Link
                 myprint(f"Navigating To: {activity.link}")
                 driver.get(str(activity.link))
@@ -725,7 +723,7 @@ def send_private_dm(user_id: int, profile_url: str, message: str):
 
     dm_sent = False
 
-    driver.quit()  # Close the driver
+    quit_gracefully(driver)  # Close the driver
 
     return dm_sent
 
@@ -834,7 +832,8 @@ def invite_to_connect(user_id: int, profile_url: str, message: str = None):
             myprint(f"Failed to find send without a note connection button. Error: {str(e)}")
             return False
 
-    driver.quit()  # Close the driver
+    quit_gracefully(driver)  # Close the driver
+
 
 def start_process():
     global time_remaining_seconds
@@ -870,7 +869,7 @@ def start_process():
         # driver2, wait2 = drivers_with_waits.pop(0)
         executor.submit(automate_profile_viewer_dms,
                         kwargs={'user_id': get_user_id(
-                            LI_USER)})  # TODO: Make this wait till there 10 min or less left on timer
+                            LI_USER)})
 
     myprint("Time is up. Closing the browser")
 
@@ -880,7 +879,7 @@ def start_process():
 def final_method(drivers: List[WebDriver]):
     global stop_all_thread
     stop_all_thread.set()  # Set the flag to stop other threads
-    for driver in drivers: driver.quit()  # Quit all the drivers
+    for driver in drivers: quit_gracefully(driver)  # Quit all the drivers
     myprint("All drivers stopped. Program has exited.")
     sys.exit(0)
 

@@ -1,9 +1,12 @@
 import urllib.parse
+
 import pandas as pd
 import requests
 import streamlit as st
-from setuptools.command.editable_wheel import editable_wheel
 from st_aggrid import AgGrid, GridOptionsBuilder, DataReturnMode, GridUpdateMode
+
+from cqc_lem.api.main import PostStatus
+from cqc_lem.run_content_plan import create_weekly_content
 
 # Initialize the session state
 if "email" not in st.session_state:
@@ -12,18 +15,19 @@ if "email" not in st.session_state:
 if "posts" not in st.session_state:
     st.session_state.posts = []
 
-
 # API Base URL
-#API_BASE_URL = "http://localhost:8000" # TODO: Get this from env
+# API_BASE_URL = "http://localhost:8000" # TODO: Get this from env
 API_BASE_URL = "https://cqc-lem-api.ngrok-free.dev"
 
 # API endpoint to get posts
-GET_POSTS_URL = API_BASE_URL+"/posts/"
+GET_POSTS_URL = API_BASE_URL + "/posts/"
 # API endpoint to update posts
-UPDATE_POST_URL = API_BASE_URL+"/update_post/"
+UPDATE_POST_URL = API_BASE_URL + "/update_post/"
+# API endpoint to get user id
+GET_USER_ID_URL = API_BASE_URL + "/user_id/"
 
 # LinkedIN Preview URL
-#LINKEDIN_PREVIEW_URL = "http://localhost:8081" # TODO: Get this from env
+# LINKEDIN_PREVIEW_URL = "http://localhost:8081" # TODO: Get this from env
 LINKEDIN_PREVIEW_URL = "https://cqc-lem-lipreview.ngrok-free.dev"
 
 st.title("Review and Edit Scheduled Posts")
@@ -33,7 +37,19 @@ email = st.text_input("Enter your email address")
 
 # On email address change make the call to get posts
 if st.session_state.email != email:
+
     st.session_state.email = email
+
+    # Get the user id
+    response = requests.get(f"{GET_USER_ID_URL}?email={st.session_state.email}")
+    if response.status_code == 200:
+        #st.success(f"User id fetched successfully: {str(response.json())}")
+        st.session_state.user_id = response.json()['detail']
+    else:
+        st.session_state.user_id = None
+        st.error(
+            f"Failed to get user id. Error ({response.status_code}): {response.json()['detail']}")
+
     response = requests.get(f"{GET_POSTS_URL}?email={email}")
 
     if response.status_code == 200:
@@ -43,6 +59,11 @@ if st.session_state.email != email:
         st.error(f"Error ({response.status_code}): {response.json()["detail"]}")
 
 if st.session_state.posts:
+
+    if st.session_state.user_id:
+        # Add button to fire the create_weekly_content function
+        st.button("Create Content for the Week", on_click=create_weekly_content, args=[st.session_state.user_id])
+
     posts = st.session_state.posts
 
     # Convert posts to a DataFrame
@@ -51,7 +72,7 @@ if st.session_state.posts:
     # Configure the editable grid
     gb = GridOptionsBuilder.from_dataframe(df)
     gb.configure_pagination(paginationAutoPageSize=False, paginationPageSize=20)  # Show 20 rows per page
-    #gb.configure_pagination(paginationAutoPageSize=True)
+    # gb.configure_pagination(paginationAutoPageSize=True)
     gb.configure_default_column(editable=True)
     # Make the post_id column non-editable
     gb.configure_column("post_id", editable=False, hide=True)
@@ -63,9 +84,8 @@ if st.session_state.posts:
     gb.configure_column("post_type", editable=True, cellEditor='agSelectCellEditor',
                         cellEditorParams={'values': ['text', 'carousel', 'video']})
     # Configure status column as a dropdown with custom values
-    gb.configure_column("status", editable_wheel=True,  cellEditor='agSelectCellEditor',
-                        cellEditorParams={'values': ['pending', 'approved', 'rejected', 'scheduled', 'posted']})
-
+    gb.configure_column("status", editable_wheel=True, cellEditor='agSelectCellEditor',
+                        cellEditorParams={'values': [status.value for status in PostStatus]})
     # Configure scheduled_time column with a date-time picker and pretty format
     gb.configure_column("scheduled_time", editable=True, cellEditor='agDateCellEditor',
                         valueFormatter="(new Date(value)).toLocaleString()")
@@ -87,19 +107,18 @@ if st.session_state.posts:
         height=600  # Set the overall grid height
     )
 
-    #st.write(grid_response)
+    # st.write(grid_response)
 
     # Get the selected cell
     selected_row = grid_response['selected_data']
 
-    #st.write("Selected Data:")
-    #st.write(selected_row)
-
+    # st.write("Selected Data:")
+    # st.write(selected_row)
 
     if selected_row is not None:
         selected_content = selected_row['content'][0]
-        #st.write("Selected content:")
-        #st.write(selected_content)
+        # st.write("Selected content:")
+        # st.write(selected_content)
 
         selected_post_id = selected_row['post_id'][0]
     else:
@@ -121,8 +140,8 @@ if st.session_state.posts:
 
             index_str = str(int(index) + 1)
             post_data = {
-                #"content": row["content"].replace('\n', '<br>'),  # Convert new lines to \n
-                #"content": row["content"].replace('\n', '\\n'),  # Convert new lines to \n
+                # "content": row["content"].replace('\n', '<br>'),  # Convert new lines to \n
+                # "content": row["content"].replace('\n', '\\n'),  # Convert new lines to \n
                 "content": row["content"],
                 "scheduled_datetime": row["scheduled_time"],
                 "post_type": row["post_type"],
@@ -134,7 +153,8 @@ if st.session_state.posts:
             if response.status_code == 200:
                 st.success(f"Post {index_str} updated successfully")
             else:
-                st.error(f"Failed to update post {index_str}. Error ({response.status_code}): {response.json()['detail']}")
+                st.error(
+                    f"Failed to update post {index_str}. Error ({response.status_code}): {response.json()['detail']}")
 
     # Add custom CSS to set iframe background to transparent
     st.markdown(
@@ -150,8 +170,8 @@ if st.session_state.posts:
 
     # Embed the linkedinpreview.com service
     if selected_content:
-        #st.write("Post content:")
-        #st.write(selected_content)
+        # st.write("Post content:")
+        # st.write(selected_content)
 
         encoded_post_content = urllib.parse.quote(selected_content)
         preview_url = f"{LINKEDIN_PREVIEW_URL}/tool?content={encoded_post_content}"

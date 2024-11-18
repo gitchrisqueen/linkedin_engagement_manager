@@ -450,13 +450,17 @@ def get_post_type_counts(user_id: int):
     return post_counts
 
 
-def get_planned_posts_for_current_week():
+def get_planned_posts_for_current_week(user_id: int = None):
     """Query the database to get the planned content for the current week."""
     connection = get_db_connection()
     cursor = connection.cursor(dictionary=True)
 
+    where_clause = ''
+    if user_id:
+        where_clause = f"AND user_id = {user_id}"
+
     cursor.execute(
-        "SELECT user_id, id, post_type, buyer_stage FROM posts WHERE status = 'planning' AND WEEK(scheduled_time) = WEEK(NOW())")
+        f"SELECT user_id, id, post_type, buyer_stage FROM posts WHERE status = 'planning' {where_clause} AND WEEK(scheduled_time) = WEEK(NOW())")
     planned_content = cursor.fetchall()
 
     cursor.close()
@@ -465,13 +469,17 @@ def get_planned_posts_for_current_week():
     return planned_content
 
 
-def get_planned_posts_for_next_week():
+def get_planned_posts_for_next_week(user_id: int = None):
     """Query the database to get the planned content for the next week."""
     connection = get_db_connection()
     cursor = connection.cursor(dictionary=True)
 
+    where_clause = ''
+    if user_id:
+        where_clause = f"AND user_id = {user_id}"
+
     cursor.execute(
-        "SELECT user_id, id, post_type, buyer_stage FROM posts WHERE status = 'planning' AND WEEK(scheduled_time) = WEEK(NOW()) +1")
+        f"SELECT user_id, id, post_type, buyer_stage FROM posts WHERE status = 'planning' {where_clause} AND WEEK(scheduled_time) = WEEK(NOW()) +1")
     planned_content = cursor.fetchall()
 
     cursor.close()
