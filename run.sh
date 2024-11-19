@@ -48,9 +48,9 @@ fi
 # Step 6: Define arrays with URLs and titles
 titles=("Streamlit Web App" "API Docs" "Flower Celery Monitoring" "Docker Chrome VNC" "LinkedIn Preview" "Ngrok Web Interface" "Jaeger Error Tracing" "Open AI usage Cost")
 #Local URLs
-urls_local=("http://localhost:8501" "http://localhost:8000/docs" "http://localhost:8555" "http://localhost:4444" "http://localhost:8081" "N/A" "http://localhost:8666" "https://platform.openai.com/usage")
+urls_local=("http://localhost:${STREAMLIT_PORT}" "http://localhost:${API_PORT}/docs" "http://localhost:${CELERY_FLOWER_PORT}" "http://localhost:${SELENIUM_HUB_PORT}" "http://localhost:${LI_PREVIEW_PORT}" "N/A" "http://localhost:${JAEGER_UI_PORT}" "https://platform.openai.com/usage")
 # NGrok URLs
-urls_ngrok=("https://${NGROK_CUSTOM_DOMAIN}" "https://${NGROK_API_PREFIX}.${NGROK_FREE_DOMAIN}/docs" "https://${NGROK_FLOWER_PREFIX}.${NGROK_FREE_DOMAIN}" "https://${NGROK_CHROME_PREFIX}.${NGROK_FREE_DOMAIN}" "https://${NGROK_LIPREVIEW_PREFIX}.${NGROK_FREE_DOMAIN}" "http://0.0.0.0:4040" "https://${NGROK_JAEGER_PREFIX}.${NGROK_FREE_DOMAIN}" "https://platform.openai.com/usage")
+urls_ngrok=("https://${NGROK_CUSTOM_DOMAIN}" "https://${NGROK_API_PREFIX}.${NGROK_FREE_DOMAIN}/docs" "https://${NGROK_FLOWER_PREFIX}.${NGROK_FREE_DOMAIN}" "https://${NGROK_CHROME_PREFIX}.${NGROK_FREE_DOMAIN}" "https://${NGROK_LIPREVIEW_PREFIX}.${NGROK_FREE_DOMAIN}" "http://0.0.0.0:${NGROK_UI_PORT}" "https://${NGROK_JAEGER_PREFIX}.${NGROK_FREE_DOMAIN}" "https://platform.openai.com/usage")
 # set urls variable if NGROK_AUTH_TOKEN env is not empty
 urls=("${urls_local[@]}")
 [ -n "$NGROK_AUTH_TOKEN" ] && urls=("${urls_ngrok[@]}")

@@ -15,7 +15,7 @@ done
 >&2 echo 'Celery workers is available'
 
 # TODO: Check on the -A param here
-celery -A cqc_lem.my_celery  \
+celery --app cqc_lem.my_celery  \
     --broker="${CELERY_BROKER_URL}" \
     flower \
     --broker-api="${CELERY_BROKER_URL}" \

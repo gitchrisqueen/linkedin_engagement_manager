@@ -35,7 +35,7 @@ def quit_gracefully(driver: WebDriver):
 
 def get_available_session_driver_id(wait_for_available=True, wait_time=60, retry=3):
     # Query the Selenium Grid for available sessions
-    url = f"http://{SELENIUM_HUB_HOST_IP}:4444/status"
+    url = f"http://{SELENIUM_HUB_HOST}:{SELENIUM_HUB_PORT}/status"
     response = requests.get(url)
     data = response.json()
 
@@ -102,7 +102,7 @@ def get_docker_driver(headless=True, session_name: str = "ChromeTests"):
     # myprint(f"Options: {vars(options)}")
 
     driver = webdriver.Remote(
-        command_executor=f'http://{SELENIUM_HUB_HOST_IP}:4444',  # Works but one call controls all sessions
+        command_executor=f'http://{SELENIUM_HUB_HOST}:{SELENIUM_HUB_PORT}',  # Works but one call controls all sessions
         # command_executor=f'http://{SELENIUM_HUB_HOST_IP}:4444/wd/hub', # Works but one call controls all sessions
         options=options
     )
@@ -439,7 +439,7 @@ def get_driver_wait_pair(headless=False, session_name: str = "ChromeTests"):
 
 
 def clear_sessions():
-    url = f"http://{SELENIUM_HUB_HOST_IP}:4444/status"
+    url = f"http://{SELENIUM_HUB_HOST}:{SELENIUM_HUB_PORT}/status"
     response = requests.get(url)
     data = json.loads(response.text)
 
@@ -447,7 +447,7 @@ def clear_sessions():
         for slot in node['slots']:
             if slot['session']:
                 session_id = slot['session']['sessionId']
-                delete_url = f"http://{SELENIUM_HUB_HOST_IP}:4444/session/{session_id}"
+                delete_url = f"http://{SELENIUM_HUB_HOST}:{SELENIUM_HUB_PORT}/session/{session_id}"
                 requests.delete(delete_url)
 
 

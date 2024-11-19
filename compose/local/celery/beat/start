@@ -12,4 +12,4 @@ python -c "from cqc_lem.utilities.selenium_util import clear_sessions; clear_ses
 
 
 # TODO: Check on the -A param here
-celery -A cqc_lem.my_celery beat -l info
+celery --app cqc_lem.my_celery beat -l info

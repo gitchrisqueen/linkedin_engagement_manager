@@ -7,10 +7,17 @@ from cqc_lem.my_celery import app as shared_task
 # from celery import shared_task
 from cqc_lem.run_automation import automate_commenting, automate_profile_viewer_dms, \
     automate_appreciation_dms, automate_reply_commenting
-from cqc_lem.utilities.db import get_ready_to_post_posts, get_user_password_pairs, get_post_content, \
+from cqc_lem.utilities.db import get_ready_to_post_posts, get_post_content, \
     update_db_post_status, get_user_password_pair_by_id, get_user_linked_sub_id, get_user_access_token, \
     get_active_user_ids
 from cqc_lem.utilities.logger import myprint
+
+
+@shared_task.task
+def test_error_tracing():
+    """Generates a traceable error to test the jaeger tracing configs"""
+    myprint("Starting test_error_tracing")
+    raise ValueError("This is a test error")
 
 
 @shared_task.task
@@ -44,14 +51,12 @@ def check_scheduled_posts():
         automate_reply_commenting.apply_async(kwargs=base_kwargs, eta=scheduled_time + timedelta(minutes=5))
 
 
-
 @shared_task.task
 def start_appreciate_dms():
     # For each user schedule appreciate DMS
     users = get_active_user_ids()
 
     for user_id in users:
-
         # Send appreciation DM for 5 minutes
         kwargs = {
             'user_id': user_id,
@@ -109,8 +114,6 @@ def post_to_linkedin(user_id: int, post_id, **kwargs):
         update_db_post_status(post_id, 'posted')
     else:
         myprint(f"Failed to create post using /posts")
-
-
 
 
 if __name__ == "__main__":

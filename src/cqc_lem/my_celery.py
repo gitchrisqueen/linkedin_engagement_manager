@@ -1,13 +1,26 @@
 import importlib
 import inspect
+import os
 import pkgutil
 from datetime import timedelta
 
 from celery import Celery
 from celery.schedules import crontab
+from celery.signals import worker_process_init
+from dotenv import load_dotenv
+from opentelemetry import trace
+# NOTE: Must change http to gprc (or vice versa) in the following import statement to use the proper span exporter
+from opentelemetry.exporter.otlp.proto.http.trace_exporter import (
+    OTLPSpanExporter,
+)
+from opentelemetry.instrumentation.celery import CeleryInstrumentor
+from opentelemetry.sdk.resources import Resource
+from opentelemetry.sdk.trace import TracerProvider
+from opentelemetry.sdk.trace.export import BatchSpanProcessor
 
 import cqc_lem
 from cqc_lem import celeryconfig
+from cqc_lem.utilities.logger import myprint
 
 # Create default Celery app
 app = Celery(
@@ -27,9 +40,14 @@ app.autodiscover_tasks()
 app.conf.update(
     result_expires=3600,
     beat_schedule={
+        # TODO: Comment error tracing out
+        'test-error-tracing': {
+            'task': 'cqc_lem.run_scheduler.test_error_tracing',
+            'schedule': timedelta(minutes=1),  # Run every 1 minutes
+        },
         'check-scheduled-posts': {
             'task': 'cqc_lem.run_scheduler.check_scheduled_posts',
-            'schedule': timedelta(minutes=5), # Run every 5 minutes
+            'schedule': timedelta(minutes=5),  # Run every 5 minutes
         },
         'send-appreciation-dms': {
             'task': 'cqc_lem.run_scheduler.start_appreciate_dms',
@@ -48,6 +66,46 @@ app.conf.update(
 
     }
 )
+
+# Load .env file
+load_dotenv()
+
+
+@worker_process_init.connect(weak=False)
+def init_celery_tracing(*args, **kwargs):
+    # Instrument Celery
+    ci = CeleryInstrumentor()
+    ci.instrument()
+
+    resource = Resource.create({
+        "service.name": "cqc-lem.celery-worker",
+    })
+
+    tracer_provider = TracerProvider(resource=resource)
+
+    trace.set_tracer_provider(tracer_provider)
+
+    # Retrieve Jaeger Configs from environment variables
+    jaeger_host = os.getenv("JAEGER_AGENT_HOST")
+    jaeger_port = int(os.getenv("JAEGER_SPANS_HTTP_PORT", 4318))
+    #jaeger_port2 = int(os.getenv("JAEGER_SPANS_GRPC_PORT", 4317))
+
+
+    # Configure OTel to export traces to Jaeger
+    tracer_provider.add_span_processor(
+        BatchSpanProcessor(
+            OTLPSpanExporter(
+                endpoint=f"http://{jaeger_host}:{jaeger_port}/v1/traces", # For using HTTP
+                #endpoint=f"http://{jaeger_host}:{jaeger_port2}", # For using gRPC
+            )
+        )
+    )
+
+    tracer = trace.get_tracer(__name__)
+
+    with tracer.start_as_current_span("run/cqc-lem.my_celery.init_celery_tracing"):
+        myprint("Instrumented Celery for tracing")
+
 
 # Iterate through all modules in the cqc_lem namespace
 for _, module_name, _ in pkgutil.iter_modules(cqc_lem.__path__, cqc_lem.__name__ + "."):

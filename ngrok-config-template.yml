@@ -3,31 +3,31 @@ version: 3
 
 agent:
   authtoken: ${NGROK_AUTH_TOKEN}
-  web_addr: 0.0.0.0:4040
+  web_addr: 0.0.0.0:${NGROK_UI_PORT}
 
 tunnels:
   lem-app:
-    addr: 8501
+    addr: ${STREAMLIT_PORT}
     labels:
       - hostname=app
       - edge=${NGROK_EDGE_TOKEN}
   lem-api:
     proto: http
-    addr: 8000
+    addr: ${API_PORT}
     domain: ${NGROK_API_PREFIX}.${NGROK_FREE_DOMAIN}
   lem-flower:
     proto: http
-    addr: 8555
+    addr: ${CELERY_FLOWER_PORT}
     domain: ${NGROK_FLOWER_PREFIX}.${NGROK_FREE_DOMAIN}
   lem-chrome:
     proto: http
-    addr: 4444
+    addr: ${SELENIUM_HUB_PORT}
     domain: ${NGROK_CHROME_PREFIX}.${NGROK_FREE_DOMAIN}
   lem-lipreview:
     proto: http
-    addr: 8081
+    addr: ${LI_PREVIEW_PORT}
     domain: ${NGROK_LIPREVIEW_PREFIX}.${NGROK_FREE_DOMAIN}
   lem-jaeger:
     proto: http
-    addr: 8666
+    addr: ${JAEGER_UI_PORT}
     domain: ${NGROK_JAEGER_PREFIX}.${NGROK_FREE_DOMAIN}

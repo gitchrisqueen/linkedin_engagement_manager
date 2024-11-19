@@ -25,7 +25,7 @@ services:
       - .env
     ports:
       #  - "5000:5000"  # For the web interface
-      - "8000:8000"  # For API endpoints
+      - "${API_PORT}:${API_PORT}"  # For API endpoints
       - "${STREAMLIT_PORT}:${STREAMLIT_PORT}"  # For the streamlit app
 
 
@@ -36,7 +36,7 @@ services:
       volumes:
         - redis_data:/data
       ports:
-      - "6379:6379"
+      - "${REDIS_PORT}:6379"
 
   mysql:
     image: mysql:8.0
@@ -124,7 +124,7 @@ services:
       - FLOWER_PERSISTENT=True
       - FLOWER_SAVE_STATE_INTERVAL=5000  # 5s
     ports:
-      - "8555:5555"
+      - "${CELERY_FLOWER_PORT}:5555"
     depends_on:
       - redis
       - mysql
@@ -135,22 +135,27 @@ services:
     volumes:
       - ./compose/local/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
     ports:
-      - "9090:9090"
+      - "${PROMETHEUS_PORT}:9090"
 
   error_tracing:
-    image: jaegertracing/all-in-one:1.60
+    image: jaegertracing/all-in-one:1.63.0
     container_name: error_tracing
+    hostname: ${JAEGER_AGENT_HOST}
     ports:
-      - "8666:16686"
-      - "4317:4317"
-      - "14268:14268"
-      - "14250:14250"
-      - "14269:14269"
+      - "${JAEGER_UI_PORT}:16686" # Jaeger UI port
+      - "${JAEGER_SPANS_HTTP_PORT}:4318"  # Reporting Protobuf/JSON spans over HTTP
+      - "${JAEGER_SPANS_GRPC_PORT}:4317"  # Reporting Protobuf spans over gRPC
+      - "14268:14268" # HTTP/JSON Sampling Collector ports
+      - "${JAEGER_SAMPLE_COLLECTOR_GRPC_PORT}:14250" # gPRC Sampling Collector ports
+      - "14269:14269" # Metrics collecting ports
+      - "9411:9411" # Zipkin collector ports
     environment:
+      - OTEL_TRACES_SAMPLER=always_off # Turn of tracing of Jaeger's own components
       - COLLECTOR_ZIPKIN_HTTP_PORT=9411
       - COLLECTOR_OTLP_ENABLED=true
       - METRICS_STORAGE_TYPE=prometheus
-      - PROMETHEUS_SERVER_URL=http://prometheus:9090
+      - PROMETHEUS_SERVER_URL=http://prometheus:${PROMETHEUS_PORT}
+      - JAEGER_AGENT_HOST=${JAEGER_AGENT_HOST}
     depends_on:
       - prometheus
 
@@ -166,7 +171,7 @@ services:
     depends_on:
       - selenium_hub
     environment:
-      - SE_EVENT_BUS_HOST=selenium_hub
+      - SE_EVENT_BUS_HOST=${SELENIUM_HUB_HOST}
       - SE_EVENT_BUS_PUBLISH_PORT=4442
       - SE_EVENT_BUS_SUBSCRIBE_PORT=4443
       - SE_NODE_DOCKER_CONFIG_FILENAME=docker.toml
@@ -174,7 +179,7 @@ services:
       #- SE_ENABLE_TRACING=false # Use this if bottom 3 are commented out
       - SE_ENABLE_TRACING=true
       - SE_OTEL_TRACES_EXPORTER=otlp
-      - SE_OTEL_EXPORTER_ENDPOINT=http://error_tracing:4317
+      - SE_OTEL_EXPORTER_ENDPOINT=http://${JAEGER_AGENT_HOST}:${JAEGER_SPANS_GRPC_PORT}
       - SE_VNC_NO_PASSWORD=1
       - SE_NODE_MAX_SESSIONS=4 # This should not be more than the available CPUS
       - SE_NODE_OVERRIDE_MAX_SESSIONS=true # To allow the override of the max sessions
@@ -185,14 +190,14 @@ services:
   selenium_hub:
     image: selenium/hub:latest
     container_name: selenium_hub
-    hostname: selenium_hub
+    hostname: ${SELENIUM_HUB_HOST}
     depends_on:
       - error_tracing
     environment:
       #- SE_ENABLE_TRACING=false # Use this if bottom 3 are commented out
       - SE_ENABLE_TRACING=true
       - SE_OTEL_TRACES_EXPORTER=otlp
-      - SE_OTEL_EXPORTER_ENDPOINT=http://error_tracing:4317
+      - SE_OTEL_EXPORTER_ENDPOINT=http://${JAEGER_AGENT_HOST}:${JAEGER_SPANS_GRPC_PORT}
       - SE_VNC_NO_PASSWORD=1
       - SE_ENABLE_BROWSER_LEFTOVERS_CLEANUP=true # Cleanup browser leftovers
       - SE_BROWSER_LEFTOVERS_INTERVAL_SECS=1800 # 30 Minutes
@@ -200,7 +205,7 @@ services:
     ports:
       - "4442:4442"
       - "4443:4443"
-      - "4444:4444"
+      - "${SELENIUM_HUB_PORT}:4444"
 
   linkedin-preview:
     build:
@@ -212,7 +217,7 @@ services:
     environment:
       - NEXT_PUBLIC_GTM_MEASUREMENT_ID=replace_me # TODO: is this needed?
     ports:
-      - "8081:3000"  # For the web interface
+      - "${LI_PREVIEW_PORT}:3000"  # For the web interface
     volumes:
       - ./compose/local/linkedinpreview/app:/usr/src/app/app
       - ./compose/local/linkedinpreview/components:/usr/src/app/components

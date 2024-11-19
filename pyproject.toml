@@ -55,6 +55,10 @@ fpdf = "^1.7.2"
 linkedin-api-client = "^0.3.0"
 python-pptx = "^1.0.2"
 pydantic-extra-types = "^2.10.0"
+opentelemetry-api = "^1.28.2"
+opentelemetry-sdk = "^1.28.2"
+opentelemetry-instrumentation-celery = "^0.49b2"
+opentelemetry-exporter-otlp = "^1.28.2"
 
 
 

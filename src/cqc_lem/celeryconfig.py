@@ -1,13 +1,13 @@
 import os
 
+# Redis port
+REDIS_PORT = os.getenv('REDIS_PORT', '6379')
+
 # Broker settings.
-broker_url = os.getenv('CELERY_BROKER_URL','redis://redis:6379/0')
+broker_url = os.getenv('CELERY_BROKER_URL',f'redis://redis:{REDIS_PORT}/0')
 
 ## Using the database to store task state and results.
-result_backend = os.getenv('CELERY_RESULT_BACKEND','redis://redis:6379/1')
-
-# The Redis backend health checks every 5 minutes (300 seconds)
-redis_backend_health_check_interval = 300
+result_backend = os.getenv('CELERY_RESULT_BACKEND',f'redis://redis:{REDIS_PORT}/1')
 
 # The Redis backend visibility timout
 result_backend_transport_options = {'visibility_timeout': (60*30)}  # 30 minutes
@@ -17,6 +17,9 @@ result_backend_always_retry = True
 
 # This is the maximum of retries in case of recoverable exceptions.
 result_backend_max_retries=3
+
+# The Redis backend health checks every 5 minutes (300 seconds)
+redis_backend_health_check_interval = 300
 
 timezone = os.getenv('TZ')
 
