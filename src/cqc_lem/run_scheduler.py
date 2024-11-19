@@ -17,6 +17,7 @@ from cqc_lem.utilities.logger import myprint
 def check_scheduled_posts():
     """Checks if there are any posts to publish."""
 
+    # Get post that should have run between yesterday and in the next 20 mins
     posts = get_ready_to_post_posts()
 
     for post in posts:
@@ -26,6 +27,9 @@ def check_scheduled_posts():
 
         base_kwargs = {'user_id': user_id}
 
+        # Start the pre-post commenting task now (loop for 15 minutes)
+        base_kwargs['loop_for_duration'] = 60 * 15
+        automate_commenting.apply_async(kwargs=base_kwargs, eta=scheduled_time - timedelta(minutes=15))
 
         # Schedule the pre-post profile viewer dm task 10 minutes before scheduled post (loop for 10 minutes)
         base_kwargs['loop_for_duration'] = 60 * 10
@@ -39,9 +43,6 @@ def check_scheduled_posts():
         base_kwargs['loop_for_duration'] = 60 * 30
         automate_reply_commenting.apply_async(kwargs=base_kwargs, eta=scheduled_time + timedelta(minutes=5))
 
-        # Start the pre-post commenting task now (loop for 15 minutes)
-        base_kwargs['loop_for_duration'] = 60 * 15
-        automate_commenting.apply_async(kwargs=base_kwargs)
 
 
 @shared_task.task

@@ -27,3 +27,7 @@ tunnels:
     proto: http
     addr: 8081
     domain: ${NGROK_LIPREVIEW_PREFIX}.${NGROK_FREE_DOMAIN}
+  lem-jaeger:
+    proto: http
+    addr: 8666
+    domain: ${NGROK_JAEGER_PREFIX}.${NGROK_FREE_DOMAIN}

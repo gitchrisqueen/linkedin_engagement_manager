@@ -308,8 +308,8 @@ def get_ready_to_post_posts(pre_post_time: datetime = None) -> list:
 
     now = datetime.now()
     if pre_post_time is None:
-        # Get time for 15 minutes after now
-        pre_post_time = now + timedelta(minutes=15)
+        # Get time for 20 minutes after now
+        pre_post_time = now + timedelta(minutes=20)
 
     yesterday = now - timedelta(days=1)
 
@@ -317,7 +317,7 @@ def get_ready_to_post_posts(pre_post_time: datetime = None) -> list:
 
     conn = get_db_connection()
     cursor = conn.cursor()
-    # Get posts that have scheduled time between 24 hours ago and the next 15 minutes
+    # Get posts that have scheduled time between 24 hours ago and the next 20 minutes
     cursor.execute(
         """SELECT p.id, p.scheduled_time, p.user_id 
             FROM posts AS p

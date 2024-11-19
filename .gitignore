@@ -163,20 +163,19 @@ cython_debug/
 #.idea/
 
 
-# exclude everything in tmp folder
+# Exlude these folders and contents
 tmp/*
-
-# exclude everything in logs folder
 logs/*
-
-# exception to the logs folder rule
-!logs/.gitkeep
-
-
-# Exlude selenium profile folders
 *selenium_profiles/
 selenium/
-assets/
+assets/*
+src/cqc_lem/utilities/generated_designs/*
+
+
+# exception to the exclude folder rules
+!logs/.gitkeep
+!assets/.gitkeep
+!src/cqc_lem/utilities/generated_designs/.gitkeep
 
 
 # Exclude ngrok config

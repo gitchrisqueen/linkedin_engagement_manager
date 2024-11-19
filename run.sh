@@ -13,7 +13,7 @@ if [ "$build_image" == "y" ]; then
       # Push all built images
       #docker-compose push
       # Push the web app image
-      docker-compose push web-app
+      docker-compose push web_app
       # Push the web the linkedin preview image
       #docker-compose push linkedin-preview
     fi
@@ -22,7 +22,7 @@ fi
 
 # Step 2: Run the Docker containers
 echo "Starting Docker Containers..."
-docker-compose up -d
+docker-compose up -d --remove-orphans
 
 # Step 3: (Optional) Add cleanup commands, if needed
 # docker-compose down
@@ -46,11 +46,11 @@ if [ -n "$NGROK_AUTH_TOKEN" ]; then
     ngrok start --config ./ngrok-config.yml --all --log='stdout' > ./logs/ngrok.log &
 fi
 # Step 6: Define arrays with URLs and titles
-titles=("Streamlit Web App" "API Docs" "Flower Celery Monitoring" "Docker Chrome VNC" "LinkedIn Preview" "Ngrok Web Interface" "Open AI usage Cost")
+titles=("Streamlit Web App" "API Docs" "Flower Celery Monitoring" "Docker Chrome VNC" "LinkedIn Preview" "Ngrok Web Interface" "Jaeger Error Tracing" "Open AI usage Cost")
 #Local URLs
-urls_local=("http://localhost:8501" "http://localhost:8000/docs" "http://localhost:8555" "http://localhost:4444" "http://localhost:8081" "N/A" "https://platform.openai.com/usage")
+urls_local=("http://localhost:8501" "http://localhost:8000/docs" "http://localhost:8555" "http://localhost:4444" "http://localhost:8081" "N/A" "http://localhost:8666" "https://platform.openai.com/usage")
 # NGrok URLs
-urls_ngrok=("https://${NGROK_CUSTOM_DOMAIN}" "https://${NGROK_API_PREFIX}.${NGROK_FREE_DOMAIN}/docs" "https://${NGROK_FLOWER_PREFIX}.${NGROK_FREE_DOMAIN}" "https://${NGROK_CHROME_PREFIX}.${NGROK_FREE_DOMAIN}" "https://${NGROK_LIPREVIEW_PREFIX}.${NGROK_FREE_DOMAIN}" "http://0.0.0.0:4040" "https://platform.openai.com/usage")
+urls_ngrok=("https://${NGROK_CUSTOM_DOMAIN}" "https://${NGROK_API_PREFIX}.${NGROK_FREE_DOMAIN}/docs" "https://${NGROK_FLOWER_PREFIX}.${NGROK_FREE_DOMAIN}" "https://${NGROK_CHROME_PREFIX}.${NGROK_FREE_DOMAIN}" "https://${NGROK_LIPREVIEW_PREFIX}.${NGROK_FREE_DOMAIN}" "http://0.0.0.0:4040" "https://${NGROK_JAEGER_PREFIX}.${NGROK_FREE_DOMAIN}" "https://platform.openai.com/usage")
 # set urls variable if NGROK_AUTH_TOKEN env is not empty
 urls=("${urls_local[@]}")
 [ -n "$NGROK_AUTH_TOKEN" ] && urls=("${urls_ngrok[@]}")

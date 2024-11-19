@@ -237,7 +237,7 @@ def post_comment(user_id: int, post_link, comment_text):
             button_to_click.click()
             myprint(f"Added Post Reaction")
             break  # Exit loop if click is successful
-        except ElementClickInterceptedException as e:
+        except Exception as e:
             if attempt < max_retries - 1:
                 time.sleep(1)  # Wait a bit before retrying
             else:
@@ -657,7 +657,7 @@ def send_dm(user_id: int, viewer_url, viewer_name):
             myprint(f"Recemt Activities Filtered (1 week) Count: {len(recent_activities)}")
 
             # DONT: Shuffle the activities (they are already in order of latest to oldest)
-            # random.shuffle(green_activities)
+            # random.shuffle(recent_activities)
             able_to_comment = False
 
             # Filter list to activities I haven't commented on

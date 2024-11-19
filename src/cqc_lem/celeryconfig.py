@@ -9,6 +9,15 @@ result_backend = os.getenv('CELERY_RESULT_BACKEND','redis://redis:6379/1')
 # The Redis backend health checks every 5 minutes (300 seconds)
 redis_backend_health_check_interval = 300
 
+# The Redis backend visibility timout
+result_backend_transport_options = {'visibility_timeout': (60*30)}  # 30 minutes
+
+# Backend will try to retry on the event of recoverable exceptions instead of propagating the exception. It will use an exponential backoff sleep time between 2 retries.
+result_backend_always_retry = True
+
+# This is the maximum of retries in case of recoverable exceptions.
+result_backend_max_retries=3
+
 timezone = os.getenv('TZ')
 
 broker_connection_retry_on_startup=True

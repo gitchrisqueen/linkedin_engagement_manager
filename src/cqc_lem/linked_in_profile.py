@@ -93,7 +93,7 @@ class LinkedInProfile(BaseModel):
 
     @property
     def is_1st_connection(self):
-        return '1' in self.connection
+        return self.connection is not None and '1' in self.connection
 
     @property
     def profile_summary(self):

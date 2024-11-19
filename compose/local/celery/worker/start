@@ -3,6 +3,5 @@
 set -o errexit
 set -o nounset
 
-# TODO: Check on the -A param here
-celery -A cqc_lem.my_celery worker --loglevel=INFO
+celery -A cqc_lem.my_celery worker --loglevel=INFO --autoscale=4,2
 #celery --skip-checks -A cqc_lem.my_celery worker --loglevel=DEBUG -E

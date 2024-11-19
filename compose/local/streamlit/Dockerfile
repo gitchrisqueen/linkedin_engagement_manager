@@ -1,4 +1,7 @@
 FROM python:3.13-slim AS base
+#FROM python:3.13-bullseye AS base
+
+
 
 ENV PYTHONFAULTHANDLER=1 \
     PYTHONHASHSEED=random \
@@ -7,7 +10,7 @@ ENV PYTHONFAULTHANDLER=1 \
 
 
 # Install dependencies
-RUN apt-get update && apt-get install --no-install-suggests --no-install-recommends --yes \
+RUN apt-get update -y && apt-get install --no-install-suggests --no-install-recommends --yes \
     #curl \
     #unzip \
     #xvfb \
@@ -16,11 +19,22 @@ RUN apt-get update && apt-get install --no-install-suggests --no-install-recomme
     #build-essential \
     # Additional dependencies
     #&& apt-get install -y  \
-    telnet  \
+    # Below is needed for pptx - Verify these
+    #libgdiplus \
+    #pkg-config \
+    #libicu-dev \
+    #libpython3.13 \
+    # Verify above packages are needed or not
     netcat-traditional \
     # cleaning up unused files
     && apt-get purge -y --auto-remove -o APT::AutoRemove::RecommendsImportant=false \
     && rm -rf /var/lib/apt/lists/*
+
+# Create a symbolic link for libpython if necessary
+#RUN ln -s /usr/lib/x86_64-linux-gnu/libpython3.13m.so.1.0 /usr/lib/libpython3.13m.so.1.0 || true
+
+# Upgrade Pip
+RUN python3 -m pip install --upgrade pip
 
 WORKDIR /app
 
@@ -76,9 +90,9 @@ FROM my_app_code AS final
 COPY ./compose/local/streamlit/entrypoint /entrypoint
 COPY ./compose/local/streamlit/wait-for-it /wait-for-it
 COPY ./compose/local/streamlit/start /start
-COPY ./compose/local/streamlit/celery/worker/start /start-celeryworker
-COPY ./compose/local/streamlit/celery/beat/start /start-celerybeat
-COPY ./compose/local/streamlit/celery/flower/start /start-flower
+COPY ./compose/local/celery/worker/start /start-celeryworker
+COPY ./compose/local/celery/beat/start /start-celerybeat
+COPY ./compose/local/celery/flower/start /start-flower
 
 RUN chmod +x /entrypoint /wait-for-it /start /start-celeryworker /start-celerybeat /start-flower
 
