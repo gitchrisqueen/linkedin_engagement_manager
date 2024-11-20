@@ -3,6 +3,7 @@ import requests
 from datetime import datetime, time
 
 from cqc_lem.api.main import PostRequest
+from cqc_lem.utilities.jaeger_tracer_helper import get_jaeger_tracer
 from cqc_lem.utilities.utils import get_best_posting_time, get_12h_format_best_time
 
 st.title("Schedule Your Post")
@@ -35,27 +36,30 @@ scheduled_datetime = datetime.combine(selected_date, selected_time)
 # Add input for email address
 email = st.text_input("Email Address")
 
+tracer = get_jaeger_tracer("streamlit", __name__)
 
-# Button to submit the form
-if st.button("Schedule Post"):
-    if content and scheduled_datetime and email:
-        try:
-            post_request = PostRequest(content=content, post_type="text", scheduled_datetime=scheduled_datetime, email=email)
+with tracer.start_as_current_span("schedule_post"):
 
-            #st.write(str(post_request.post_json))
+    # Button to submit the form
+    if st.button("Schedule Post"):
+        if content and scheduled_datetime and email:
+            try:
+                post_request = PostRequest(content=content, post_type="text", scheduled_datetime=scheduled_datetime, email=email)
 
-            #response = requests.post("http://localhost:8000/schedule_post/", json={
-            #    "content": content,
-            #    "scheduled_time": scheduled_datetime.isoformat()
-            #})
-            response = requests.post("http://localhost:8000/schedule_post/", json=post_request.post_json)
-            if response.status_code == 200:
-                st.success("Post scheduled successfully!")
-                # Clear the content field
-                st.session_state.content = ''
-            else:
-                st.error(f"Error ({response.status_code}): {response.json()["detail"]}")
-        except ValueError as ve:
-            st.error(f"Error: {ve}")
-    else:
-        st.error("Please provide content,scheduled time and email address.")
+                #st.write(str(post_request.post_json))
+
+                #response = requests.post("http://localhost:8000/schedule_post/", json={
+                #    "content": content,
+                #    "scheduled_time": scheduled_datetime.isoformat()
+                #})
+                response = requests.post("http://localhost:8000/schedule_post/", json=post_request.post_json)
+                if response.status_code == 200:
+                    st.success("Post scheduled successfully!")
+                    # Clear the content field
+                    st.session_state.content = ''
+                else:
+                    st.error(f"Error ({response.status_code}): {response.json()["detail"]}")
+            except ValueError as ve:
+                st.error(f"Error: {ve}")
+        else:
+            st.error("Please provide content,scheduled time and email address.")

@@ -3,7 +3,7 @@
 # Load the .env file (optional, Docker Compose will load this automatically if the .env is in the root)
 export $(grep -v '^#' .env | xargs)
 
-# Step 1: Prompt the user if they want to build the latest docker image
+# Step 1a: Prompt the user if they want to build the latest docker image
 read -p "Do you want to build the latest Docker image(s)? (y/n): " build_image
 if [ "$build_image" == "y" ]; then
     echo "Building Docker images (${DOCKER_IMAGE_NAME}:latest)..."
@@ -19,6 +19,8 @@ if [ "$build_image" == "y" ]; then
     fi
 fi
 
+# Step 1b: Build the prometheus config
+./compose/local/prometheus/generate-prometheus-config.sh
 
 # Step 2: Run the Docker containers
 echo "Starting Docker Containers..."
@@ -56,25 +58,67 @@ urls=("${urls_local[@]}")
 [ -n "$NGROK_AUTH_TOKEN" ] && urls=("${urls_ngrok[@]}")
 
 
-# Function to print the separator line
-# shellcheck disable=SC2120
-print_separator() {
-    local num_equals=${1:-60}
-    printf "%${num_equals}s\n" | tr ' ' '='
+# Function to print the titles and URLs with a dynamic separator line
+print_urls() {
+    # shellcheck disable=SC2178
+    #local -n titles="$1"
+    # shellcheck disable=SC2178
+    #local -n urls="$2"
+
+    local -a titles=("${!1}")
+    local -a urls=("${!2}")
+
+    #echo "Array 1: ${titles[@]}"
+    #echo "Array 2: ${urls[@]}"
+
+    # Initialize variables
+    local max_length=0
+    local print_contents=()
+    local max_title_length=0
+
+    # Find the longest title length
+    for title in "${titles[@]}"; do
+        if (( ${#title} > max_title_length )); then
+            max_title_length=${#title}
+        fi
+    done
+
+    # Build the print contents and find the longest title-URL combination
+    for i in "${!titles[@]}"; do
+        local line
+        line=$(printf "%-${max_title_length}s\t%s" "${titles[$i]}" "${urls[$i]}")
+        local length=${#line}
+        if (( length > max_length )); then
+            max_length=$length
+        fi
+        print_contents+=("$line")
+    done
+
+    # Add padding to the max length
+    (( max_length += 10 ))
+
+    # Create the separator line
+    local separator=$(printf "%${max_length}s\n" | tr ' ' '=')
+
+    # Calculate padding for centered headers
+    local service_padding=$(( ((max_title_length + 4 ) / 2) - (7/2) )) # Half the title length minus half the word "Service" length
+    local service_padding_right=$(( max_title_length - service_padding + 5 )) # The rest of the padding + half the max_length padding
+    local url_remainder=$(( max_length - service_padding - service_padding_right - 7 )) # The remaining space for the URL
+    local url_padding=$(( ((max_length - url_remainder ) / 2) + (3/2) )) # Half the URL remainder length minus half the word "URL" length
+    local url_padding_right=$(( url_remainder - url_padding  )) # The rest of the padding
+
+    # Create the header with centered text
+    local header
+    header=$(printf "| %*s%-*s | %*s%-*s |" $service_padding " " $service_padding_right "Service" $url_padding " " $url_padding_right "URL")
+
+    # Print the separator, header, separator, contents, and separator again
+    printf "\n\n%s\n%s\n%s\n%s\n%s\n\n\n" "$separator" "$header" "$separator" "$(printf "%s\n" "${print_contents[@]}")" "$separator"
+
 }
 
-# Step 7: Print the URLs
+# Pass the arrays by reference
+print_urls "titles[@]" "urls[@]"
 
-# Print the separator line
-print_separator
-
-# Print the titles and URLs in a tabular format
-for i in "${!titles[@]}"; do
-    printf "%-30s\t%s\n" "${titles[$i]}" "${urls[$i]}"
-done
-
-# Print the separator line again
-print_separator
 
 # Step Final: Prompt the user if they want to open all the urls
 #read -p "Do you want to Open these urls? (y/n): " open_chrome

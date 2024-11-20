@@ -4,4 +4,4 @@ global:
 scrape_configs:
   - job_name: 'jaeger_error_tracing'
     static_configs:
-      - targets: ['error_tracing:14268']
+      - targets: ['${JAEGER_AGENT_HOST}:${JAEGER_METRICS_COLLECTION_PORT}']

@@ -10,12 +10,19 @@ from fastapi import HTTPException
 from fastapi.responses import RedirectResponse
 from linkedin_api.clients.auth.client import AuthClient
 from linkedin_api.clients.restli.client import RestliClient
+from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
 from pydantic import BaseModel, computed_field
 
 from cqc_lem.utilities.db import insert_post, get_post_by_email, get_user_id, update_db_post, add_user_with_access_token
+from cqc_lem.utilities.jaeger_tracer_helper import get_jaeger_tracer
 from cqc_lem.utilities.logger import myprint
 
 app = FastAPI()
+
+tracer = get_jaeger_tracer("api", __name__)
+
+# Instrument FastAPI
+FastAPIInstrumentor.instrument_app(app)
 
 error_responses = {
     400: {"description": "Bad Request"},

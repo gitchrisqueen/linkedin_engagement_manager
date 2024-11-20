@@ -128,10 +128,11 @@ services:
     depends_on:
       - redis
       - mysql
+
   prometheus:
     image: prom/prometheus:latest
     container_name: prometheus
-    hostname: prometheus
+    hostname: ${PROMETHEUS_HOST}
     volumes:
       - ./compose/local/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
     ports:
@@ -147,15 +148,17 @@ services:
       - "${JAEGER_SPANS_GRPC_PORT}:4317"  # Reporting Protobuf spans over gRPC
       - "14268:14268" # HTTP/JSON Sampling Collector ports
       - "${JAEGER_SAMPLE_COLLECTOR_GRPC_PORT}:14250" # gPRC Sampling Collector ports
-      - "14269:14269" # Metrics collecting ports
+      - "${JAEGER_METRICS_COLLECTION_PORT}:14269" # Metrics collecting ports
       - "9411:9411" # Zipkin collector ports
     environment:
+      # TODO: Review this url for monitoring configs : https://github.com/jaegertracing/jaeger/tree/main/docker-compose/monitor
       - OTEL_TRACES_SAMPLER=always_off # Turn of tracing of Jaeger's own components
       - COLLECTOR_ZIPKIN_HTTP_PORT=9411
       - COLLECTOR_OTLP_ENABLED=true
       - METRICS_STORAGE_TYPE=prometheus
-      - PROMETHEUS_SERVER_URL=http://prometheus:${PROMETHEUS_PORT}
+      - PROMETHEUS_SERVER_URL=http://${PROMETHEUS_HOST}:${PROMETHEUS_PORT}
       - JAEGER_AGENT_HOST=${JAEGER_AGENT_HOST}
+      - LOG_LEVEL=debug # Used for debugging Metrics on Monitor Tab
     depends_on:
       - prometheus
 

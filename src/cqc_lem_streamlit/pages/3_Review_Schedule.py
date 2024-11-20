@@ -7,6 +7,7 @@ from st_aggrid import AgGrid, GridOptionsBuilder, DataReturnMode, GridUpdateMode
 
 from cqc_lem.api.main import PostStatus
 from cqc_lem.run_content_plan import create_weekly_content
+from cqc_lem.utilities.jaeger_tracer_helper import get_jaeger_tracer
 
 # Initialize the session state
 if "email" not in st.session_state:
@@ -35,146 +36,150 @@ st.title("Review and Edit Scheduled Posts")
 # Input field for email address
 email = st.text_input("Enter your email address")
 
-# On email address change make the call to get posts
-if st.session_state.email != email:
+tracer = get_jaeger_tracer("streamlit", __name__)
 
-    st.session_state.email = email
+with tracer.start_as_current_span("review_schedule"):
 
-    # Get the user id
-    response = requests.get(f"{GET_USER_ID_URL}?email={st.session_state.email}")
-    if response.status_code == 200:
-        #st.success(f"User id fetched successfully: {str(response.json())}")
-        st.session_state.user_id = response.json()['detail']
-    else:
-        st.session_state.user_id = None
-        st.error(
-            f"Failed to get user id. Error ({response.status_code}): {response.json()['detail']}")
+    # On email address change make the call to get posts
+    if st.session_state.email != email:
 
-    response = requests.get(f"{GET_POSTS_URL}?email={email}")
+        st.session_state.email = email
 
-    if response.status_code == 200:
-        st.success("Posts fetched successfully")
-        st.session_state.posts = response.json()['detail']
-    else:
-        st.error(f"Error ({response.status_code}): {response.json()["detail"]}")
+        # Get the user id
+        response = requests.get(f"{GET_USER_ID_URL}?email={st.session_state.email}")
+        if response.status_code == 200:
+            #st.success(f"User id fetched successfully: {str(response.json())}")
+            st.session_state.user_id = response.json()['detail']
+        else:
+            st.session_state.user_id = None
+            st.error(
+                f"Failed to get user id. Error ({response.status_code}): {response.json()['detail']}")
 
-if st.session_state.posts:
+        response = requests.get(f"{GET_POSTS_URL}?email={email}")
 
-    if st.session_state.user_id:
-        # Add button to fire the create_weekly_content function
-        st.button("Create Content for the Week", on_click=create_weekly_content, args=[st.session_state.user_id])
+        if response.status_code == 200:
+            st.success("Posts fetched successfully")
+            st.session_state.posts = response.json()['detail']
+        else:
+            st.error(f"Error ({response.status_code}): {response.json()["detail"]}")
 
-    posts = st.session_state.posts
+    if st.session_state.posts:
 
-    # Convert posts to a DataFrame
-    df = pd.DataFrame(posts, columns=["post_id", "content", "scheduled_time", "post_type", "status"])
+        if st.session_state.user_id:
+            # Add button to fire the create_weekly_content function
+            st.button("Create Content for the Week", on_click=create_weekly_content, args=[st.session_state.user_id])
 
-    # Configure the editable grid
-    gb = GridOptionsBuilder.from_dataframe(df)
-    gb.configure_pagination(paginationAutoPageSize=False, paginationPageSize=20)  # Show 20 rows per page
-    # gb.configure_pagination(paginationAutoPageSize=True)
-    gb.configure_default_column(editable=True)
-    # Make the post_id column non-editable
-    gb.configure_column("post_id", editable=False, hide=True)
-    # Configure the content column to allow multiple lines
-    gb.configure_column("content", editable=True, cellEditor='agLargeTextCellEditor',
-                        cellEditorParams={'maxLength': 500, 'rows': 10, 'cols': 50})
+        posts = st.session_state.posts
 
-    # Configure post_type column as a dropdown with enum values
-    gb.configure_column("post_type", editable=True, cellEditor='agSelectCellEditor',
-                        cellEditorParams={'values': ['text', 'carousel', 'video']})
-    # Configure status column as a dropdown with custom values
-    gb.configure_column("status", editable_wheel=True, cellEditor='agSelectCellEditor',
-                        cellEditorParams={'values': [status.value for status in PostStatus]})
-    # Configure scheduled_time column with a date-time picker and pretty format
-    gb.configure_column("scheduled_time", editable=True, cellEditor='agDateCellEditor',
-                        valueFormatter="(new Date(value)).toLocaleString()")
+        # Convert posts to a DataFrame
+        df = pd.DataFrame(posts, columns=["post_id", "content", "scheduled_time", "post_type", "status"])
 
-    # Enable cell selection
-    gb.configure_selection('single', use_checkbox=False, pre_selected_rows=[])
+        # Configure the editable grid
+        gb = GridOptionsBuilder.from_dataframe(df)
+        gb.configure_pagination(paginationAutoPageSize=False, paginationPageSize=20)  # Show 20 rows per page
+        # gb.configure_pagination(paginationAutoPageSize=True)
+        gb.configure_default_column(editable=True)
+        # Make the post_id column non-editable
+        gb.configure_column("post_id", editable=False, hide=True)
+        # Configure the content column to allow multiple lines
+        gb.configure_column("content", editable=True, cellEditor='agLargeTextCellEditor',
+                            cellEditorParams={'maxLength': 500, 'rows': 10, 'cols': 50})
 
-    grid_options = gb.build()
-    grid_options['rowHeight'] = 100  # Adjust the height as needed
+        # Configure post_type column as a dropdown with enum values
+        gb.configure_column("post_type", editable=True, cellEditor='agSelectCellEditor',
+                            cellEditorParams={'values': ['text', 'carousel', 'video']})
+        # Configure status column as a dropdown with custom values
+        gb.configure_column("status", editable_wheel=True, cellEditor='agSelectCellEditor',
+                            cellEditorParams={'values': [status.value for status in PostStatus]})
+        # Configure scheduled_time column with a date-time picker and pretty format
+        gb.configure_column("scheduled_time", editable=True, cellEditor='agDateCellEditor',
+                            valueFormatter="(new Date(value)).toLocaleString()")
 
-    # Display the editable grid
-    grid_response = AgGrid(
-        df,
-        gridOptions=grid_options,
-        data_return_mode=DataReturnMode.FILTERED_AND_SORTED,
-        update_mode=GridUpdateMode.MODEL_CHANGED,
-        fit_columns_on_grid_load=True,
-        enable_enterprise_modules=True,
-        height=600  # Set the overall grid height
-    )
+        # Enable cell selection
+        gb.configure_selection('single', use_checkbox=False, pre_selected_rows=[])
 
-    # st.write(grid_response)
+        grid_options = gb.build()
+        grid_options['rowHeight'] = 100  # Adjust the height as needed
 
-    # Get the selected cell
-    selected_row = grid_response['selected_data']
+        # Display the editable grid
+        grid_response = AgGrid(
+            df,
+            gridOptions=grid_options,
+            data_return_mode=DataReturnMode.FILTERED_AND_SORTED,
+            update_mode=GridUpdateMode.MODEL_CHANGED,
+            fit_columns_on_grid_load=True,
+            enable_enterprise_modules=True,
+            height=600  # Set the overall grid height
+        )
 
-    # st.write("Selected Data:")
-    # st.write(selected_row)
+        # st.write(grid_response)
 
-    if selected_row is not None:
-        selected_content = selected_row['content'][0]
-        # st.write("Selected content:")
-        # st.write(selected_content)
+        # Get the selected cell
+        selected_row = grid_response['selected_data']
 
-        selected_post_id = selected_row['post_id'][0]
-    else:
-        selected_content = None
-        selected_post_id = None
+        # st.write("Selected Data:")
+        # st.write(selected_row)
 
-    # Get the updated data from the grid
-    updated_df = grid_response["data"]
+        if selected_row is not None:
+            selected_content = selected_row['content'][0]
+            # st.write("Selected content:")
+            # st.write(selected_content)
 
-    # Check if the DataFrame has been updated
-    if not df.equals(updated_df):
-        # Send the updated data back to the API
-        for index, row in updated_df.iterrows():
-            post_id = row["post_id"]
-            # Only if index equals the selected ro index
+            selected_post_id = selected_row['post_id'][0]
+        else:
+            selected_content = None
+            selected_post_id = None
 
-            if selected_post_id != post_id:
-                continue
+        # Get the updated data from the grid
+        updated_df = grid_response["data"]
 
-            index_str = str(int(index) + 1)
-            post_data = {
-                # "content": row["content"].replace('\n', '<br>'),  # Convert new lines to \n
-                # "content": row["content"].replace('\n', '\\n'),  # Convert new lines to \n
-                "content": row["content"],
-                "scheduled_datetime": row["scheduled_time"],
-                "post_type": row["post_type"],
-                "status": row["status"],
-                "email": email
+        # Check if the DataFrame has been updated
+        if not df.equals(updated_df):
+            # Send the updated data back to the API
+            for index, row in updated_df.iterrows():
+                post_id = row["post_id"]
+                # Only if index equals the selected ro index
+
+                if selected_post_id != post_id:
+                    continue
+
+                index_str = str(int(index) + 1)
+                post_data = {
+                    # "content": row["content"].replace('\n', '<br>'),  # Convert new lines to \n
+                    # "content": row["content"].replace('\n', '\\n'),  # Convert new lines to \n
+                    "content": row["content"],
+                    "scheduled_datetime": row["scheduled_time"],
+                    "post_type": row["post_type"],
+                    "status": row["status"],
+                    "email": email
+                }
+                # Add the post_id to the request query
+                response = requests.post(f"{UPDATE_POST_URL}?post_id={post_id}", json=post_data)
+                if response.status_code == 200:
+                    st.success(f"Post {index_str} updated successfully")
+                else:
+                    st.error(
+                        f"Failed to update post {index_str}. Error ({response.status_code}): {response.json()['detail']}")
+
+        # Add custom CSS to set iframe background to transparent
+        st.markdown(
+            """
+            <style>
+            iframe {
+                background: transparent !important;
             }
-            # Add the post_id to the request query
-            response = requests.post(f"{UPDATE_POST_URL}?post_id={post_id}", json=post_data)
-            if response.status_code == 200:
-                st.success(f"Post {index_str} updated successfully")
-            else:
-                st.error(
-                    f"Failed to update post {index_str}. Error ({response.status_code}): {response.json()['detail']}")
+            </style>
+            """,
+            unsafe_allow_html=True
+        )
 
-    # Add custom CSS to set iframe background to transparent
-    st.markdown(
-        """
-        <style>
-        iframe {
-            background: transparent !important;
-        }
-        </style>
-        """,
-        unsafe_allow_html=True
-    )
+        # Embed the linkedinpreview.com service
+        if selected_content:
+            # st.write("Post content:")
+            # st.write(selected_content)
 
-    # Embed the linkedinpreview.com service
-    if selected_content:
-        # st.write("Post content:")
-        # st.write(selected_content)
-
-        encoded_post_content = urllib.parse.quote(selected_content)
-        preview_url = f"{LINKEDIN_PREVIEW_URL}/tool?content={encoded_post_content}"
-        st.components.v1.iframe(preview_url, height=600, width=1024, scrolling=True)
-    else:
-        st.warning("Please select a cell in the 'content' column to preview the content.")
+            encoded_post_content = urllib.parse.quote(selected_content)
+            preview_url = f"{LINKEDIN_PREVIEW_URL}/tool?content={encoded_post_content}"
+            st.components.v1.iframe(preview_url, height=600, width=1024, scrolling=True)
+        else:
+            st.warning("Please select a cell in the 'content' column to preview the content.")

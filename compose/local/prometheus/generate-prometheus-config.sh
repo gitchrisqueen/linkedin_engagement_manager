@@ -7,6 +7,6 @@ export $(grep -v '^#' .env | xargs)
 SCRIPT_DIR=$(dirname "$0")
 
 # Replace environment variables in the template and create ngrok-config.yml
-envsubst < "$SCRIPT_DIR/ngrok-config-template.yml" > "$SCRIPT_DIR/ngrok-config.yml"
+envsubst < "$SCRIPT_DIR/prometheus.yml.template" > "$SCRIPT_DIR/prometheus.yml"
 
-echo "Ngrok config file has been generated."
+echo "Prometheus config file has been generated."

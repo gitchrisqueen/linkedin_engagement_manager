@@ -178,5 +178,6 @@ src/cqc_lem/utilities/generated_designs/*
 !src/cqc_lem/utilities/generated_designs/.gitkeep
 
 
-# Exclude ngrok config
+# Exclude configs that are created dynamically
 ngrok-config.yml
+compose/local/prometheus/prometheus.yml
