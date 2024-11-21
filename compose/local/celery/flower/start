@@ -19,10 +19,10 @@ celery --app cqc_lem.my_celery  \
     --broker-api="${CELERY_BROKER_URL}" \
     --logging="DEBUG" \
     --logfile="/app/logs" \
-    --persistent=True \
+    #--persistent=True \
     --debug=True \
     --db=/data/flower.db \
-    --basic_auth=admin:${CELERY_FLOWER_PASSWORD} \
+    #--basic_auth=admin:${CELERY_FLOWER_PASSWORD} \
     #--state_save_interval=5000 \
     #-Q (your queue name)
 
