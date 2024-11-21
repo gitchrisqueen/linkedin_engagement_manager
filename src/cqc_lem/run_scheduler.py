@@ -5,12 +5,12 @@ from linkedin_api.clients.restli.client import RestliClient
 
 from cqc_lem.my_celery import app as shared_task
 # from celery import shared_task
-from cqc_lem.run_automation import automate_commenting, automate_profile_viewer_dms, \
+from cqc_lem.run_automation import automate_commenting, automate_profile_viewer_engagement, \
     send_appreciation_dms_for_user, automate_reply_commenting
 from cqc_lem.utilities.date import add_local_tz_to_datetime
 from cqc_lem.utilities.db import get_ready_to_post_posts, get_post_content, \
     update_db_post_status, get_user_password_pair_by_id, get_user_linked_sub_id, get_user_access_token, \
-    get_active_user_ids
+    get_active_user_ids, insert_new_log, LogActionType, LogResultType
 from cqc_lem.utilities.logger import myprint
 
 
@@ -31,7 +31,7 @@ def check_scheduled_posts():
     for post in posts:
         post_id, scheduled_time, user_id = post
 
-        scheduled_time = add_local_tz_to_datetime(scheduled_time) # Must add timezone info to this
+        scheduled_time = add_local_tz_to_datetime(scheduled_time)  # Must add timezone info to this
 
         myprint(f"Ready to Post ID: {post_id}")
 
@@ -43,7 +43,7 @@ def check_scheduled_posts():
 
         # Schedule the pre-post profile viewer dm task 10 minutes before scheduled post (loop for 10 minutes)
         base_kwargs['loop_for_duration'] = 60 * 10
-        automate_profile_viewer_dms.apply_async(kwargs=base_kwargs, eta=scheduled_time - timedelta(minutes=10))
+        automate_profile_viewer_engagement.apply_async(kwargs=base_kwargs, eta=scheduled_time - timedelta(minutes=10))
 
         # Schedule the post to be posted
         post_kwargs = {'user_id': user_id, 'post_id': post_id}
@@ -58,8 +58,8 @@ def check_scheduled_posts():
                                      }
                                      )
 
-    if len(posts)==0:
-        return  f"No Post to Schedule"
+    if len(posts) == 0:
+        return f"No Post to Schedule"
     else:
         return f"Started Process for {len(posts)} post(s)"
 
@@ -83,14 +83,14 @@ def automate_appreciate_dms():
                                                        'interval_start': 60,
                                                        'interval_step': 30
                                                    })
-    if len(users)==0:
+    if len(users) == 0:
         return f"No Active Users"
     else:
         return f"Started Process for {len(users)} user(s)"
 
 
 @shared_task.task(rate_limit='2/m')
-def post_to_linkedin(user_id: int, post_id, **kwargs):
+def post_to_linkedin(user_id: int, post_id: int, **kwargs):
     # Login and publish post to LinkedIn
     user_email, user_password = get_user_password_pair_by_id(user_id)
     myprint(f"Posting to LinkedIn as user: {user_email}")
@@ -135,16 +135,25 @@ def post_to_linkedin(user_id: int, post_id, **kwargs):
 
         # Schedule Answer comments for 30 minutes now that this has been posted
         base_kwargs = {
-            post_id: post_id,
+            'user_id': user_id,
+            'post_id': post_id,
             'loop_for_duration': 60 * 30
         }
         automate_reply_commenting.apply_async(kwargs=base_kwargs)
+
+        # Update DB with status=success in the logs table and the post url
+        insert_new_log(user_id=user_id, action_type=LogActionType.POST, result=LogResultType.SUCCESS, post_id=post_id,
+                       post_url=posts_create_response.entity_id,
+                       message="Successfully created post using /posts API endpoint. Results: " + str(
+                           posts_create_response))
 
         return f"Post successfully created"
 
     else:
         myprint(f"Failed to create post using /posts API endpoint")
-        # TODO: Update DB with status=failed in the logs table
+        # Update DB with status=failed in the logs table
+        insert_new_log(user_id=user_id, action_type=LogActionType.POST, result=LogResultType.FAILURE, post_id=post_id,
+                       message="Failed to create post using /posts API endpoint. Result: " + str(posts_create_response))
 
         return f"Post successfully failed"
 

@@ -20,6 +20,8 @@ def main():
         unsafe_allow_html=True
     )
 
+     # TODO: Emulate the main page from http://commentify.co (Research what its built on)  - Develop a similar pricing structure with a free timee trial tier
+
     st.header("Welcome!!! 👋")
 
     # Get the ReadMe Markdown and display it

@@ -19,8 +19,9 @@ from cqc_lem.linked_in_profile import LinkedInProfile
 from cqc_lem.my_celery import app as shared_task
 from cqc_lem.utilities.ai.ai_helper import generate_ai_response, get_ai_message_refinement, summarize_recent_activity
 from cqc_lem.utilities.date import convert_viewed_on_to_date
-from cqc_lem.utilities.db import get_user_password_pair_by_id, get_user_id
-from cqc_lem.utilities.env_constants import LI_USER, LI_PASSWORD
+from cqc_lem.utilities.db import get_user_password_pair_by_id, get_user_id, insert_new_log, LogActionType, \
+    LogResultType, has_user_commented_on_post_url, get_post_url_from_log_for_user
+from cqc_lem.utilities.env_constants import LI_USER
 from cqc_lem.utilities.linked_in_helper import login_to_linkedin, get_my_profile, get_linkedin_profile_from_url
 from cqc_lem.utilities.logger import myprint
 from cqc_lem.utilities.selenium_util import click_element_wait_retry, \
@@ -147,8 +148,8 @@ def simulate_writing_time(content):
 
 @shared_task.task(rate_limit='2/m')
 @debug_function
-def post_comment(user_id: int, post_link, comment_text):
-    """Post a comment to the currently opened post in the driver window"""
+def comment_on_post(user_id: int, post_link: str, comment_text: str):
+    """Post a comment to the given post link"""
 
     driver, wait = get_driver_wait_pair(session_name='Post Comment')
 
@@ -198,11 +199,16 @@ def post_comment(user_id: int, post_link, comment_text):
         myprint(f"Added Post via Post Button")
         method_result = f"Added Post via Post Button"
 
-        # TODO: Update database with record of comment to this post (use the link)
+        # Update database with record of comment to this post
+        insert_new_log(user_id=user_id, action_type=LogActionType.COMMENT, result=LogResultType.SUCCESS,
+                       post_url=post_link, message=comment_text)
 
     except NoSuchElementException:
         # If the post button is not found, send a return key to post the comment
         comment_box.send_keys('\n')
+        # Update database with record of comment to this post
+        insert_new_log(user_id=user_id, action_type=LogActionType.COMMENT, result=LogResultType.FAILURE,
+                       post_url=post_link, message=comment_text)
         myprint(f"Added Post via return key. This might not have worked")
         method_result = f"Added Post via return key. This might not have worked"
 
@@ -255,14 +261,16 @@ def post_comment(user_id: int, post_link, comment_text):
     return method_result
 
 
-def check_commented(driver, wait):
+def check_commented(driver, wait, user_id: int = None, post_url: str = None):
     """See if the current open url we've already posted on"""
     already_commented = False
     post_link = driver.current_url
 
     # Check if we have already commented on this post
 
-    # TODO:  1. Check against Database (in logs)
+    # Check against Database (in logs table)
+    if user_id and post_url:
+        already_commented = has_user_commented_on_post_url(user_id, post_url)
 
     # 2. Check against LinkedIn Recent Activity Comments
     if not already_commented:
@@ -339,14 +347,8 @@ def automate_commenting(user_id: int, loop_for_duration=None, **kwargs):
 
 @shared_task.task
 @debug_function
-def automate_reply_commenting(post_id: int, loop_for_duration=None, **kwargs):
-    # TODO: Should the post urn of our post be used to auto reply to just those comment or any comments we are tagged in?
-
-    """Reply to recent comments"""
-    # TODO: Implement this function
-
-    # Get user_id from post_id
-    user_id = 60  # TODO: Update this
+def automate_reply_commenting(user_id: int, post_id: int, loop_for_duration=None, **kwargs):
+    """Reply to recent comments left on the post recently posted"""
 
     user_email, user_password = get_user_password_pair_by_id(user_id)
 
@@ -360,11 +362,21 @@ def automate_reply_commenting(post_id: int, loop_for_duration=None, **kwargs):
 
         myprint("Responding to Comments here...")
 
-        # Navigate to the Post
+        # Use the user id and the post id to get the post_url from the database
+        post_url = get_post_url_from_log_for_user(user_id, post_id)
 
-        # Review Comments
+        if post_url:
+            # Navigate to the Post
+            if driver.current_url != post_url:
+                driver.get(post_url)
 
-        # Respond to Comments
+            #TODO: Review Comments
+
+            #TODO: Respond to Comments
+            pass
+        else:
+            myprint("Could not find successful post for this user and post_id. Sleeping...")
+            time.sleep(60)  # Sleep for 60 seconds
 
         if loop_for_duration:
             elapsed_time = datetime.now() - start_time
@@ -431,8 +443,11 @@ def generate_and_post_comment(driver, wait, post_link, my_profile: LinkedInProfi
         # Switch to post url
         driver.get(post_link)
 
-    # Check to make sure we haven't already commented on this post
-    if check_commented(driver, wait):
+    # Get my user_id
+    user_id = get_user_id(my_profile.email)
+
+    # Check to make sure user hasn't already commented on this post
+    if check_commented(driver, wait, user_id, post_link):
         myprint("Already commented on this post. Skipping...")
         return False  # Skip posts we've already commented on
     else:
@@ -488,7 +503,7 @@ def generate_and_post_comment(driver, wait, post_link, my_profile: LinkedInProfi
     kwargs = {'user_id': get_user_id(my_profile.email),
               'post_link': post_link,
               'comment_text': comment_text}
-    post_comment.apply_async(kwargs=kwargs, retry=True, retry_policy={
+    comment_on_post.apply_async(kwargs=kwargs, retry=True, retry_policy={
         'max_retries': 3,
         'interval_start': 60,
         'interval_step': 30
@@ -499,27 +514,9 @@ def generate_and_post_comment(driver, wait, post_link, my_profile: LinkedInProfi
     return True
 
 
-def test_already_commented(driver, wait):
-    login_to_linkedin(driver, wait, LI_USER, LI_PASSWORD)
-
-    post_links = [
-        "https://www.linkedin.com/posts/axellemalek_this-is-a-sketch-to-photo-ai-from-ideogram-ugcPost-7246808027901661184-_ewe/?utm_source=share&utm_medium=member_desktop",
-        'https://www.linkedin.com/feed/update/urn:li:activity:7254086938373095424/']
-
-    # Check each post_link to see if we commented
-    for post_link in post_links:
-        myprint(f"Checking Commented Status for {post_link}")
-        # Navigate to the url first
-        driver.get(post_link)
-        if check_commented(driver, wait):
-            myprint("Already commented on this post. Skipping...")
-        else:
-            myprint("Not commented on this post yet. Proceeding...")
-
-
 @shared_task.task
 @debug_function
-def automate_profile_viewer_dms(user_id: int, loop_for_duration=None, **kwargs):
+def automate_profile_viewer_engagement(user_id: int, loop_for_duration=None, **kwargs):
     global stop_all_thread
 
     user_email, user_password = get_user_password_pair_by_id(user_id)
@@ -634,12 +631,12 @@ def automate_profile_viewer_dms(user_id: int, loop_for_duration=None, **kwargs):
         # Switch to viewer_url
         driver.get(viewer_url)
 
-        # Send a DM to the viewer
+        # Engage with the viewer
         kwargs = {'user_id': get_user_id(my_profile.email),
                   'viewer_url': viewer_url,
                   'viewer_name': viewer_name}
-        send_dm.apply_async(kwargs=kwargs, retry=True,
-                            retry_policy={
+        engage_with_profile_viewer.apply_async(kwargs=kwargs, retry=True,
+                                               retry_policy={
                                 'max_retries': 3,
                                 'interval_start': 60,
                                 'interval_step': 30
@@ -654,18 +651,18 @@ def automate_profile_viewer_dms(user_id: int, loop_for_duration=None, **kwargs):
 
 @shared_task.task(rate_limit='2/m')
 @debug_function
-def send_dm(user_id: int, viewer_url, viewer_name):
+def engage_with_profile_viewer(user_id: int, viewer_url, viewer_name):
     user_email, user_password = get_user_password_pair_by_id(user_id)
 
-    driver, wait = get_driver_wait_pair(session_name='Profile Viewer DMs')
+    driver, wait = get_driver_wait_pair(session_name='Profile Viewer Engagement')
 
-    myprint(f"Starting Profile Viewer DMs")
+    myprint(f"Starting Profile Viewer Engagement")
 
     login_to_linkedin(driver, wait, user_email, user_password)
 
     my_profile = get_my_profile(driver, wait, user_email, user_password)
 
-    myprint(f"Sending DM from: {my_profile.full_name} to: {viewer_name}")
+    myprint(f"Engaging from: {my_profile.full_name} to: {viewer_name}")
 
     if viewer_url != driver.current_url:
         # Switch to viewer_url
@@ -688,7 +685,7 @@ def send_dm(user_id: int, viewer_url, viewer_name):
             recent_activities = [activity for activity in recent_activities if
                                  (datetime.now() - activity.posted).days <= 7]
 
-            myprint(f"Recemt Activities Filtered (1 week) Count: {len(recent_activities)}")
+            myprint(f"Recent Activities Filtered (1 week) Count: {len(recent_activities)}")
 
             # DONT: Shuffle the activities (they are already in order of latest to oldest)
             # random.shuffle(recent_activities)
@@ -915,7 +912,7 @@ def start_process():
         executor.submit(automate_commenting, kwargs={'user_id': get_user_id(LI_USER)})
         # Get another driver/wait set
         # driver2, wait2 = drivers_with_waits.pop(0)
-        executor.submit(automate_profile_viewer_dms,
+        executor.submit(automate_profile_viewer_engagement,
                         kwargs={'user_id': get_user_id(
                             LI_USER)})
 

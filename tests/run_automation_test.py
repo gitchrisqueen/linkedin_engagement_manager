@@ -1,7 +1,7 @@
 import json
 
 from cqc_lem.linked_in_profile import LinkedInProfile
-from cqc_lem.run_automation import send_dm, post_comment, invite_to_connect
+from cqc_lem.run_automation import engage_with_profile_viewer, comment_on_post, invite_to_connect, check_commented
 from cqc_lem.utilities.ai.ai_helper import generate_ai_response, get_ai_description_of_profile, \
     get_ai_message_refinement, summarize_recent_activity
 from cqc_lem.utilities.date import convert_viewed_on_to_date
@@ -100,12 +100,12 @@ def test_send_dm():
     # 2nd Connection
     profile_url = "https://www.linkedin.com/in/eric-partaker-5560b92"
     name = "Eric Partaker"
-    send_dm(driver, wait, my_profile, profile_url, name)
+    engage_with_profile_viewer(driver, wait, my_profile, profile_url, name)
 
     # 1st Connection
     profile_url_2 = "https://www.linkedin.com/in/byron-mcclure-0a20a837/"
     name_2 = "Bryon McClure"
-    send_dm(driver, wait, my_profile, profile_url_2, name_2)
+    engage_with_profile_viewer(driver, wait, my_profile, profile_url_2, name_2)
 
     # driver.quit()
 
@@ -176,7 +176,7 @@ def test_post_comment():
     
     In the meantime, we’ll keep monitoring the performance metrics and adjust our approach based on what we learn. If you have any tips or insights on how to boost engagement, we’d love to hear them! Thanks for being part of our little experiment—let's see where this goes!"""
 
-    post_comment(driver, wait, comment)
+    comment_on_post(driver, wait, comment)
 
 
 def test_invite_to_connect():
@@ -219,3 +219,21 @@ if __name__ == "__main__":
     # test_post_comment()
 
     pass
+
+
+def test_already_commented(driver, wait):
+    login_to_linkedin(driver, wait, LI_USER, LI_PASSWORD)
+
+    post_links = [
+        "https://www.linkedin.com/posts/axellemalek_this-is-a-sketch-to-photo-ai-from-ideogram-ugcPost-7246808027901661184-_ewe/?utm_source=share&utm_medium=member_desktop",
+        'https://www.linkedin.com/feed/update/urn:li:activity:7254086938373095424/']
+
+    # Check each post_link to see if we commented
+    for post_link in post_links:
+        myprint(f"Checking Commented Status for {post_link}")
+        # Navigate to the url first
+        driver.get(post_link)
+        if check_commented(driver, wait):
+            myprint("Already commented on this post. Skipping...")
+        else:
+            myprint("Not commented on this post yet. Proceeding...")

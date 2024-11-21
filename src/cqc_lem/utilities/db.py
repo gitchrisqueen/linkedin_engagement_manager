@@ -1,5 +1,6 @@
 import os
 from datetime import datetime, timedelta
+from enum import StrEnum
 
 import mysql.connector
 from dotenv import load_dotenv
@@ -28,6 +29,20 @@ def get_db_connection():
         password=MYSQL_PASSWORD,
         database=MYSQL_DATABASE
     )
+
+
+# Enum for log actions types
+class LogActionType(StrEnum):
+    COMMENT = 'comment'
+    DM = 'dm'
+    REPLY = 'reply'
+    POST = 'post'
+
+
+# ENum for log result options
+class LogResultType(StrEnum):
+    SUCCESS = 'success'
+    FAILURE = 'failure'
 
 
 def store_cookies(user_email: str, cookies: list[dict]):
@@ -101,7 +116,8 @@ def add_user(email: str, password: str):
         connection.close()
 
 
-def add_user_with_access_token(email: str, linked_sub_id: str, access_token: str, access_token_expires_in: str, refresh_token: str = None,
+def add_user_with_access_token(email: str, linked_sub_id: str, access_token: str, access_token_expires_in: str,
+                               refresh_token: str = None,
                                refresh_token_expires_in: str = None):
     connection = get_db_connection()
     cursor = connection.cursor()
@@ -126,10 +142,10 @@ def add_user_with_access_token(email: str, linked_sub_id: str, access_token: str
                 refresh_token_created_at = VALUES(refresh_token_created_at)
                 
         """, (
-        email,
-        linked_sub_id,
-        access_token, access_token_expires_in, access_token_created_at,
-        refresh_token, refresh_token_expires_in, refresh_token_created_at))
+            email,
+            linked_sub_id,
+            access_token, access_token_expires_in, access_token_created_at,
+            refresh_token, refresh_token_expires_in, refresh_token_created_at))
         connection.commit()
     except mysql.connector.errors.IntegrityError as e:
         if e.errno == mysql.connector.errorcode.ER_DUP_ENTRY:
@@ -139,6 +155,7 @@ def add_user_with_access_token(email: str, linked_sub_id: str, access_token: str
     finally:
         cursor.close()
         connection.close()
+
 
 def get_user_linked_sub_id(user_id: int):
     connection = get_db_connection()
@@ -163,6 +180,7 @@ def get_user_access_token(user_id: int):
     cursor.close()
     connection.close()
     return access_token['access_token'] if access_token else None
+
 
 def get_user_id(email: str):
     connection = get_db_connection()
@@ -545,3 +563,47 @@ def get_active_user_ids():
     connection.close()
 
     return active_user_ids
+
+
+def insert_new_log(user_id: int, action_type: LogActionType, result: LogResultType, post_id: int = None,
+                   post_url: str = None, message: str = None):
+    connection = get_db_connection()
+    cursor = connection.cursor()
+
+    cursor.execute("""
+        INSERT INTO logs (user_id, action_type, post_id, post_url, message, result)
+        VALUES (%s, %s, %s, %s, %s, %s)
+    """, (user_id, action_type, post_id, post_url, message, result))
+
+    connection.commit()
+    success = cursor.rowcount == 1
+    cursor.close()
+    connection.close()
+    return success
+
+
+def has_user_commented_on_post_url(user_id: int, post_url: str):
+    connection = get_db_connection()
+    cursor = connection.cursor()
+
+    cursor.execute("SELECT COUNT(*) FROM logs WHERE user_id = %s AND post_url = %s AND action_type = %s AND result = %s",
+                   (user_id, post_url, LogActionType.COMMENT, LogResultType.SUCCESS))
+    count = cursor.fetchone()[0]
+
+    cursor.close()
+    connection.close()
+
+    return count > 0
+
+def get_post_url_from_log_for_user(user_id: int, post_id: int):
+    connection = get_db_connection()
+    cursor = connection.cursor()
+
+    cursor.execute("SELECT post_url FROM logs WHERE user_id = %s AND post_id = %s AND action_type = %s AND result = %s",
+                   (user_id, post_id, LogActionType.POST, LogResultType.SUCCESS))
+    post_url = cursor.fetchone()[0]
+
+    cursor.close()
+    connection.close()
+
+    return post_url
