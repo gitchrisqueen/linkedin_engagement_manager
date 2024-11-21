@@ -114,7 +114,7 @@ def source_as_row(s: PageElement) -> List[str]:
 
 
 def get_start_identifier(list_text: List[str]) -> int:
-    startIdentifier = 0
+    startIdentifier = -1
     for e in list_text:
         if e == '' or e == ' ':
             startIdentifier += 1
@@ -181,8 +181,8 @@ def returnProfileInfo(driver: webdriver, profile_url, company_name=None):
     # print(alltext)
     # si = get_start_identifier(alltext)
     # Print the start identifier and the first 20 characters of the row from the start identifier
-    # print("Start Index: " + str(si), " | ", alltext[si][:20]) # TODO: For Debugging
-    # print("Start Index: " + str(si), " | ", str(alltext))  # TODO: For Debugging
+    # print("Start Index: " + str(si), " | ", alltext[si][:20]) # For Debugging
+    # print("Start Index: " + str(si), " | ", str(alltext))  # For Debugging
 
     functions = [
         ('education', lambda: get_profile_education(driver, profile_url)),
@@ -199,7 +199,7 @@ def returnProfileInfo(driver: webdriver, profile_url, company_name=None):
         # print("Calling function to get: ", key)
         profile[key] = func()
 
-    # Get the industry - TODO: This may not be publicly visible
+    # TODO: Get the industry - This may not be publicly visible
     # TODO: Get the mutual connections
     # TODO: Get the awards
     # TODO: Get Interest (top voices, companies, groups, newsletters
@@ -505,7 +505,7 @@ def get_profile_skills(driver, employeeLink):
         si = get_start_identifier(row)
         # print("Start Index: " + str(si), " | ", str(row))
 
-        # TODO: Below is for debugging
+        # Below is for debugging
         # skills_search_word_frequency = record_search_word_frequency(row, si, ['endorsements'], skills_search_word_frequency)
 
         if si == start_identifier_map['skills']:
@@ -523,10 +523,10 @@ def get_profile_skills(driver, employeeLink):
                 if profile_skills:
                     profile_skills[-1]['endorsements'] = endorsements
 
-    # TODO: Below is for debugging
+    # Below is for debugging
     # print_header("Search Word Frequency")
     # print(skills_search_word_frequency)
-    # TODO: Above is for debugging
+    # Above is for debugging
 
     return profile_skills
 

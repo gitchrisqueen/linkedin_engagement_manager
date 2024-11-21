@@ -69,7 +69,14 @@ services:
   celery_worker:
     image:  ${DOCKER_IMAGE_NAME}
     container_name: celery_worker
+    hostname: ${CELERY_WORKER_HOST}
     command: /start-celeryworker
+    deploy:
+      resources:
+        limits:
+          cpus: '4'   # Limit the container to use at most 4 CPUs
+        reservations:
+          cpus: '2'   # Reserve at least 2 CPUs for this container
     #restart: always
     volumes:
       # Below used to override the start
@@ -87,12 +94,6 @@ services:
     image:  ${DOCKER_IMAGE_NAME}
     container_name: celery_beat
     command: /start-celerybeat
-    deploy:
-      resources:
-        limits:
-          cpus: '4'   # Limit the container to use at most 4 CPUs
-        reservations:
-          cpus: '2'   # Reserve at least 2 CPUs for this container
     #restart: always
     volumes:
       # Below used to override the start
@@ -112,9 +113,12 @@ services:
     restart: always
     volumes:
       - ./logs:/app/logs
-      - flower_db:/var/lib/flower/flowerdb/flower_db
+      - flower_db:/data
       # Below used to override the start
       - ./compose/local/celery/flower/start:/start-flower
+      # Override the flower css with our own (Disabled for now)
+      #- ./compose/local/celery/flower/static/css/flower.css:/app/.venv/lib/python3.13/site-packages/flower/static/css/flower.css
+      #- ./compose/local/celery/flower/static/css/datatables-1.13.4.min.css:/app/.venv/lib/python3.13/site-packages/flower/static/css/datatables-1.13.4.min.css
     volumes_from:
       - web_app
     env_file:
@@ -218,7 +222,7 @@ services:
     image: ${DOCKER_IMAGE_NAME}_linkedinpreview
     container_name: linkedin-preview
     environment:
-      - NEXT_PUBLIC_GTM_MEASUREMENT_ID=replace_me # TODO: is this needed?
+      - NEXT_PUBLIC_GTM_MEASUREMENT_ID=replace_me # TODO: What should this be officially?
     ports:
       - "${LI_PREVIEW_PORT}:3000"  # For the web interface
     volumes:

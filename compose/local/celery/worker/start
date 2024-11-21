@@ -3,5 +3,21 @@
 set -o errexit
 set -o nounset
 
-celery --app cqc_lem.my_celery worker --loglevel=INFO --autoscale=4,2
+# Define the non-root user
+CELERY_USER=celeryworker
+
+# Create the user if it doesn't exist
+if ! id -u $CELERY_USER > /dev/null 2>&1; then
+    printf "Creating non-root user: %s\n" "$CELERY_USER"
+    useradd -m $CELERY_USER
+fi
+
+# Change ownership of the application directory to the non-root user
+printf "Changing ownership of the application directory to: %s\n" "$CELERY_USER"
+chown -R $CELERY_USER:$CELERY_USER /app
+
+
+# Start Celery worker
+printf "Starting Celery Worker as: %s\n" "$CELERY_USER"
+su $CELERY_USER -c "celery --app cqc_lem.my_celery worker --loglevel=INFO --autoscale=4,2 -E"
 #celery --skip-checks --app cqc_lem.my_celery worker --loglevel=DEBUG -E

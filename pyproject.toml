@@ -60,6 +60,7 @@ opentelemetry-sdk = "^1.28.2"
 opentelemetry-instrumentation-celery = "^0.49b2"
 opentelemetry-exporter-otlp = "^1.28.2"
 opentelemetry-instrumentation-fastapi = "^0.49b2"
+pexels-api = "^1.0.1"
 
 
 

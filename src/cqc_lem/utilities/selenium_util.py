@@ -141,7 +141,7 @@ def add_headless_options(options: Options) -> Options:
 
 def getBaseOptions(base_download_directory: str = None):
     options = Options()
-    # options.add_argument("--incognito") # TODO: May cause issues with tabs
+    # options.add_argument("--incognito") # May cause issues with tabs
     if base_download_directory is None:
         base_download_directory = os.getcwd()
     prefs = {"download.default_directory": base_download_directory + '/downloads',

@@ -6,7 +6,8 @@ from linkedin_api.clients.restli.client import RestliClient
 from cqc_lem.my_celery import app as shared_task
 # from celery import shared_task
 from cqc_lem.run_automation import automate_commenting, automate_profile_viewer_dms, \
-    automate_appreciation_dms, automate_reply_commenting
+    send_appreciation_dms_for_user, automate_reply_commenting
+from cqc_lem.utilities.date import add_local_tz_to_datetime
 from cqc_lem.utilities.db import get_ready_to_post_posts, get_post_content, \
     update_db_post_status, get_user_password_pair_by_id, get_user_linked_sub_id, get_user_access_token, \
     get_active_user_ids
@@ -24,11 +25,13 @@ def test_error_tracing():
 def check_scheduled_posts():
     """Checks if there are any posts to publish."""
 
-    # Get post that should have run between yesterday and in the next 20 mins
+    # Get post that should have run between yesterday and in the next 20 minutes
     posts = get_ready_to_post_posts()
 
     for post in posts:
         post_id, scheduled_time, user_id = post
+
+        scheduled_time = add_local_tz_to_datetime(scheduled_time) # Must add timezone info to this
 
         myprint(f"Ready to Post ID: {post_id}")
 
@@ -44,15 +47,25 @@ def check_scheduled_posts():
 
         # Schedule the post to be posted
         post_kwargs = {'user_id': user_id, 'post_id': post_id}
-        post_to_linkedin.apply_async(kwargs=post_kwargs, eta=scheduled_time)
+        post_to_linkedin.apply_async(kwargs=post_kwargs,
+                                     eta=scheduled_time,
+                                     retry=True,
+                                     retry_policy={
+                                         'max_retries': 3,
+                                         'interval_start': 60,
+                                         'interval_step': 30
 
-        # Schedule Answer comments for 30 minutes (5 minutes after scheduled post time)
-        base_kwargs['loop_for_duration'] = 60 * 30
-        automate_reply_commenting.apply_async(kwargs=base_kwargs, eta=scheduled_time + timedelta(minutes=5))
+                                     }
+                                     )
+
+    if len(posts)==0:
+        return  f"No Post to Schedule"
+    else:
+        return f"Started Process for {len(posts)} post(s)"
 
 
 @shared_task.task
-def start_appreciate_dms():
+def automate_appreciate_dms():
     # For each user schedule appreciate DMS
     users = get_active_user_ids()
 
@@ -63,15 +76,22 @@ def start_appreciate_dms():
             'loop_for_duration': 60 * 5
         }
 
-        # TODO: Should this be spaced out over some interval if user numbers grow
-        # time.sleep()
+        # No need to worry as this task is rate limited to 2 per minute
+        send_appreciation_dms_for_user.apply_async(kwargs=kwargs, retry=True,
+                                                   retry_policy={
+                                                       'max_retries': 3,
+                                                       'interval_start': 60,
+                                                       'interval_step': 30
+                                                   })
+    if len(users)==0:
+        return f"No Active Users"
+    else:
+        return f"Started Process for {len(users)} user(s)"
 
-        automate_appreciation_dms.apply_async(kwargs=kwargs)
 
-
-@shared_task.task
+@shared_task.task(rate_limit='2/m')
 def post_to_linkedin(user_id: int, post_id, **kwargs):
-    # TODO: Write code to login an publish post to linkedin
+    # Login and publish post to LinkedIn
     user_email, user_password = get_user_password_pair_by_id(user_id)
     myprint(f"Posting to LinkedIn as user: {user_email}")
 
@@ -108,12 +128,25 @@ def post_to_linkedin(user_id: int, post_id, **kwargs):
         myprint(f"{key}: {value}")
 
     if posts_create_response.entity_id:
-        myprint(f"Successfully created post using /posts: {posts_create_response.entity_id}")
+        myprint(f"Successfully created post using /posts API endpoint: {posts_create_response.entity_id}")
 
         # Update DB with status=posted
         update_db_post_status(post_id, 'posted')
+
+        # Schedule Answer comments for 30 minutes now that this has been posted
+        base_kwargs = {
+            post_id: post_id,
+            'loop_for_duration': 60 * 30
+        }
+        automate_reply_commenting.apply_async(kwargs=base_kwargs)
+
+        return f"Post successfully created"
+
     else:
-        myprint(f"Failed to create post using /posts")
+        myprint(f"Failed to create post using /posts API endpoint")
+        # TODO: Update DB with status=failed in the logs table
+
+        return f"Post successfully failed"
 
 
 if __name__ == "__main__":

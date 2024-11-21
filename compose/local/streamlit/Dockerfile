@@ -76,7 +76,6 @@ ENV PATH="/app/.venv/bin:$PATH"
 ENV USE_DOCKER_BROWSER=True
 
 # Copy app code
-# TODO: Can we just copy the needed files and folder instead of everything
 COPY ../../../src ./src
 COPY ../../../README.md ./
 

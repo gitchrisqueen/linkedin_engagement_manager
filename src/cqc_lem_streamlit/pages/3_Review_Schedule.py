@@ -7,6 +7,7 @@ from st_aggrid import AgGrid, GridOptionsBuilder, DataReturnMode, GridUpdateMode
 
 from cqc_lem.api.main import PostStatus
 from cqc_lem.run_content_plan import create_weekly_content
+from cqc_lem.utilities.env_constants import API_BASE_URL, LINKEDIN_PREVIEW_URL
 from cqc_lem.utilities.jaeger_tracer_helper import get_jaeger_tracer
 
 # Initialize the session state
@@ -16,20 +17,12 @@ if "email" not in st.session_state:
 if "posts" not in st.session_state:
     st.session_state.posts = []
 
-# API Base URL
-# API_BASE_URL = "http://localhost:8000" # TODO: Get this from env
-API_BASE_URL = "https://cqc-lem-api.ngrok-free.dev"
-
 # API endpoint to get posts
 GET_POSTS_URL = API_BASE_URL + "/posts/"
 # API endpoint to update posts
 UPDATE_POST_URL = API_BASE_URL + "/update_post/"
 # API endpoint to get user id
 GET_USER_ID_URL = API_BASE_URL + "/user_id/"
-
-# LinkedIN Preview URL
-# LINKEDIN_PREVIEW_URL = "http://localhost:8081" # TODO: Get this from env
-LINKEDIN_PREVIEW_URL = "https://cqc-lem-lipreview.ngrok-free.dev"
 
 st.title("Review and Edit Scheduled Posts")
 

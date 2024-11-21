@@ -7,7 +7,7 @@ from datetime import datetime
 from typing import List
 
 from dotenv import load_dotenv
-from selenium.common import NoSuchElementException, ElementClickInterceptedException, TimeoutException
+from selenium.common import NoSuchElementException, TimeoutException
 from selenium.webdriver import ActionChains
 from selenium.webdriver.common.by import By
 # from selenium.webdriver.chrome.webdriver import WebDriver
@@ -145,7 +145,7 @@ def simulate_writing_time(content):
     return round(writing_time)
 
 
-@shared_task.task
+@shared_task.task(rate_limit='2/m')
 @debug_function
 def post_comment(user_id: int, post_link, comment_text):
     """Post a comment to the currently opened post in the driver window"""
@@ -188,18 +188,23 @@ def post_comment(user_id: int, post_link, comment_text):
     # Sleep so post button shows up
     time.sleep(2)
 
+    method_result = ''
+
     try:
         # Find and click the post button
         click_element_wait_retry(driver, wait, '//button[contains(@class, "comments-comment-box__submit-button--cr")]',
                                  "Clicking Post Button")
 
         myprint(f"Added Post via Post Button")
+        method_result = f"Added Post via Post Button"
+
         # TODO: Update database with record of comment to this post (use the link)
 
     except NoSuchElementException:
         # If the post button is not found, send a return key to post the comment
         comment_box.send_keys('\n')
-        myprint(f"Added Post return key. This might not have worked")
+        myprint(f"Added Post via return key. This might not have worked")
+        method_result = f"Added Post via return key. This might not have worked"
 
     # Get the main like button
     main_like_button = get_element_wait_retry(driver, wait,
@@ -236,14 +241,18 @@ def post_comment(user_id: int, post_link, comment_text):
             button_to_click = random.choice(choices)
             button_to_click.click()
             myprint(f"Added Post Reaction")
+            method_result += f" | Added Post Reaction"
             break  # Exit loop if click is successful
         except Exception as e:
             if attempt < max_retries - 1:
                 time.sleep(1)  # Wait a bit before retrying
             else:
                 myprint(f"Failed to click Post Reaction: {e}")
+                method_result += f" | Added Post Reaction | Error: {e}"
 
     quit_gracefully(driver)  # Close the driver
+
+    return method_result
 
 
 def check_commented(driver, wait):
@@ -330,11 +339,14 @@ def automate_commenting(user_id: int, loop_for_duration=None, **kwargs):
 
 @shared_task.task
 @debug_function
-def automate_reply_commenting(user_id: int, loop_for_duration=None, **kwargs):
+def automate_reply_commenting(post_id: int, loop_for_duration=None, **kwargs):
     # TODO: Should the post urn of our post be used to auto reply to just those comment or any comments we are tagged in?
 
     """Reply to recent comments"""
     # TODO: Implement this function
+
+    # Get user_id from post_id
+    user_id = 60  # TODO: Update this
 
     user_email, user_password = get_user_password_pair_by_id(user_id)
 
@@ -347,6 +359,12 @@ def automate_reply_commenting(user_id: int, loop_for_duration=None, **kwargs):
     while True:
 
         myprint("Responding to Comments here...")
+
+        # Navigate to the Post
+
+        # Review Comments
+
+        # Respond to Comments
 
         if loop_for_duration:
             elapsed_time = datetime.now() - start_time
@@ -361,25 +379,14 @@ def automate_reply_commenting(user_id: int, loop_for_duration=None, **kwargs):
     quit_gracefully(driver)
 
 
-@shared_task.task
+@shared_task.task(rate_limit='2/m')
 @debug_function
-def automate_appreciation_dms(user_id: int, loop_for_duration=None):
+def send_appreciation_dms_for_user(user_id: int, loop_for_duration=None):
     # TODO: Implement this function
 
     user_email, user_password = get_user_password_pair_by_id(user_id)
 
     driver, wait = get_driver_wait_pair(session_name='Automate Appreciation DMs')
-
-    # After Accepting a Connection Request:
-
-    # After Receiving a Recommendation:
-
-    # After an Interview:
-
-    # For a Successful Collaboration:
-
-    # General Appreciation:
-    # "Hi [Name], I really appreciate your insights on [topic]. Your perspective helped me see things differently, and I'm grateful for the opportunity to learn from you."
 
     login_to_linkedin(driver, wait, user_email, user_password)
 
@@ -388,6 +395,21 @@ def automate_appreciation_dms(user_id: int, loop_for_duration=None):
     while True:
 
         myprint("Sending Appreciations here...")
+
+        # After Accepting a Connection Request:
+
+        # After Receiving a Recommendation:
+
+        # After an Interview:
+
+        # For a Successful Collaboration:
+
+        # General Appreciation:
+        # "Hi [Name], I really appreciate your insights on [topic]. Your perspective helped me see things differently, and I'm grateful for the opportunity to learn from you."
+
+        # profile_url = '' # TODO: Update
+        # message = '' # TODO: Update
+        # TODO: Use this line #send_private_dm.apply_async(kwargs={"user_id": user_id, "profile_url": profile_url, "message": message})
 
         if loop_for_duration:
             elapsed_time = datetime.now() - start_time
@@ -400,6 +422,8 @@ def automate_appreciation_dms(user_id: int, loop_for_duration=None):
         time.sleep(10)  # Sleep for 10 seconds
 
     quit_gracefully(driver)
+
+    return "Appreciation DMs Sent"
 
 
 def generate_and_post_comment(driver, wait, post_link, my_profile: LinkedInProfile) -> bool:
@@ -464,7 +488,11 @@ def generate_and_post_comment(driver, wait, post_link, my_profile: LinkedInProfi
     kwargs = {'user_id': get_user_id(my_profile.email),
               'post_link': post_link,
               'comment_text': comment_text}
-    post_comment.apply_async(kwargs=kwargs)
+    post_comment.apply_async(kwargs=kwargs, retry=True, retry_policy={
+        'max_retries': 3,
+        'interval_start': 60,
+        'interval_step': 30
+    })
 
     myprint("Comment Posted")
 
@@ -610,7 +638,13 @@ def automate_profile_viewer_dms(user_id: int, loop_for_duration=None, **kwargs):
         kwargs = {'user_id': get_user_id(my_profile.email),
                   'viewer_url': viewer_url,
                   'viewer_name': viewer_name}
-        send_dm.apply_async(kwargs=kwargs)
+        send_dm.apply_async(kwargs=kwargs, retry=True,
+                            retry_policy={
+                                'max_retries': 3,
+                                'interval_start': 60,
+                                'interval_step': 30
+
+                            })
 
         # Close tab when done
         close_tab(driver)
@@ -618,7 +652,7 @@ def automate_profile_viewer_dms(user_id: int, loop_for_duration=None, **kwargs):
     quit_gracefully(driver)
 
 
-@shared_task.task
+@shared_task.task(rate_limit='2/m')
 @debug_function
 def send_dm(user_id: int, viewer_url, viewer_name):
     user_email, user_password = get_user_password_pair_by_id(user_id)
@@ -652,7 +686,7 @@ def send_dm(user_id: int, viewer_url, viewer_name):
 
             # Filter activities by posted date less than a week ago
             recent_activities = [activity for activity in recent_activities if
-                                (datetime.now() - activity.posted).days <= 7]
+                                 (datetime.now() - activity.posted).days <= 7]
 
             myprint(f"Recemt Activities Filtered (1 week) Count: {len(recent_activities)}")
 
@@ -683,7 +717,13 @@ def send_dm(user_id: int, viewer_url, viewer_name):
                 kwargs = {'user_id': get_user_id(my_profile.email),
                           'profile_url': str(profile.profile_url),
                           'message': message}
-                send_private_dm.apply_async(kwargs=kwargs)
+                send_private_dm.apply_async(kwargs=kwargs, retry=True,
+                                            retry_policy={
+                                                'max_retries': 3,
+                                                'interval_start': 60,
+                                                'interval_step': 30
+
+                                            })
         else:
             # myprint(f"We Are {profile.connection} Connections")
             # If not connected send them a connection request
@@ -699,12 +739,18 @@ def send_dm(user_id: int, viewer_url, viewer_name):
             kwargs = {'user_id': get_user_id(my_profile.email),
                       'profile_url': str(profile.profile_url),
                       'message': refined_response}
-            invite_to_connect.apply_async(kwargs=kwargs)
+            invite_to_connect.apply_async(kwargs=kwargs, retry=True,
+                                          retry_policy={
+                                              'max_retries': 3,
+                                              'interval_start': 60,
+                                              'interval_step': 30
+
+                                          })
     else:
         myprint(f"Failed to get profile data for {viewer_name}")
 
 
-@shared_task.task
+@shared_task.task(rate_limit='2/m')
 @debug_function
 def send_private_dm(user_id: int, profile_url: str, message: str):
     """ Send dm message to a profile. Must be a 1st connection"""
@@ -718,17 +764,17 @@ def send_private_dm(user_id: int, profile_url: str, message: str):
     # Open the profile URL
     driver.get(profile_url)
 
+    dm_sent = False
+
     # TODO: Add code to post the dm message
     myprint("Sending DM: " + message)
 
-    dm_sent = False
-
     quit_gracefully(driver)  # Close the driver
 
-    return dm_sent
+    return "DM Sent Successfully" if dm_sent else "DM Failed"
 
 
-@shared_task.task
+@shared_task.task(rate_limit='2/m')
 @debug_function
 def invite_to_connect(user_id: int, profile_url: str, message: str = None):
     user_email, user_password = get_user_password_pair_by_id(user_id)
@@ -771,8 +817,8 @@ def invite_to_connect(user_id: int, profile_url: str, message: str = None):
 
             myprint("Found Connect Button and clicked it")
         except Exception as e:
-            myprint(f"Failed to find more button or connect button: Error: {str(e)}")
-            return False
+            myprint(f"Failed to find more or connect button: Error: {str(e)}")
+            return f"Failed to find more or connect button: Error: {str(e)}"
 
     # If connection_message exist click the With note button
     if message:
@@ -819,7 +865,7 @@ def invite_to_connect(user_id: int, profile_url: str, message: str = None):
             myprint("Found Send Connection Button and clicked it")
         except Exception as e:
             myprint(f"Failed to Add a note. Error: {str(e)}")
-            return False
+            return f"Failed to Add a note. Error: {str(e)}"
     else:
         # Else click send connection
         try:
@@ -830,9 +876,11 @@ def invite_to_connect(user_id: int, profile_url: str, message: str = None):
             myprint("Found Send Without a Note Button and clicked it")
         except Exception as e:
             myprint(f"Failed to find send without a note connection button. Error: {str(e)}")
-            return False
+            return f"Failed to find send without a note connection button. Error: {str(e)}"
 
     quit_gracefully(driver)  # Close the driver
+
+    return "Connection Request Sent Successfully"
 
 
 def start_process():

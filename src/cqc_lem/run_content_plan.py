@@ -5,6 +5,7 @@ from xml.etree import ElementTree
 
 import requests
 from bs4 import BeautifulSoup
+from celery.worker.control import rate_limit
 from requests.adapters import HTTPAdapter
 from urllib3 import Retry
 
@@ -22,14 +23,15 @@ from cqc_lem.utilities.utils import get_best_posting_time
 
 
 @shared_task.task
-def generate_content():
+def auto_generate_content():
     # Get active users from DB
     active_users = get_active_user_ids()
     # For each user generate content for the next 30 days
     for user_id in active_users:
-        generate_content_for_user(user_id)
+        generate_content_for_user.apply_async(kwargs={"user_id":user_id})
 
 
+@shared_task.task(rate_limit='2/m')
 def generate_content_for_user(user_id: int):
     """
     Generate and plan content for the next 30 days based on current content representation in the database.
@@ -602,7 +604,7 @@ def create_weekly_content(user_id: int = None):
 
 if __name__ == '__main__':
     myprint("Generating content plan for 30 days")
-    generate_content()
+    auto_generate_content()
     myprint("Creating weekly content")
     create_weekly_content()
     myprint("Process finished")

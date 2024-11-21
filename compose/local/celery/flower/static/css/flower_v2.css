@@ -1,0 +1,51 @@
+.bg-green {
+  background-color: #ffffcc; /* Dark Gold */
+}
+
+.dataTables_wrapper {
+  border: 1px solid #e9d437; /* Light Gold */
+  background-color: #333; /* Dark background */
+  color: #f9e78d; /* Light Gold text */
+}
+
+.dataTables_filter input {
+  width: 50%;
+  text-indent: 5px;
+  background-color: #444; /* Darker input background */
+  color: #f9e78d; /* Light Gold text */
+  border: 1px solid #ffffcc; /* Dark Gold border */
+}
+
+.dataTables_length {
+  margin: 10px;
+  color: #f9e78d; /* Light Gold text */
+}
+
+div.dataTables_wrapper .dataTables_filter input {
+  width: 100%;
+  margin: 10px;
+  border: 1px solid #ffffcc; /* Dark Gold border */
+  background-color: #444; /* Darker input background */
+  color: #f9e78d; /* Light Gold text */
+}
+
+.dataTables_info {
+  padding: 5px;
+  color: #f9e78d; /* Light Gold text */
+}
+
+@media (min-width: 768px) {
+  div.dataTables_wrapper .dataTables_filter input {
+      width: 500px;
+  }
+}
+
+.overflow-auto {
+  max-width: 400px;
+  text-overflow: ellipsis;
+  color: #f9e78d; /* Light Gold text */
+}
+
+.overflow-auto::-webkit-scrollbar {
+  display: none;
+}

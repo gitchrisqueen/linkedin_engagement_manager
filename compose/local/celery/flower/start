@@ -4,8 +4,7 @@ set -o errexit
 set -o nounset
 
 worker_ready() {
-    # TODO: Check on the -A param here
-    celery -A cqc_lem.my_celery inspect ping
+    celery --app cqc_lem.my_celery inspect ping
 }
 
 until worker_ready; do
@@ -14,16 +13,16 @@ until worker_ready; do
 done
 >&2 echo 'Celery workers is available'
 
-# TODO: Check on the -A param here
 celery --app cqc_lem.my_celery  \
     --broker="${CELERY_BROKER_URL}" \
     flower \
     --broker-api="${CELERY_BROKER_URL}" \
     --logging="DEBUG" \
     --logfile="/app/logs" \
-    #--persistent=True \
+    --persistent=True \
     --debug=True \
-    --db=/var/lib/flower/flowerdb/flower_db \
+    --db=/data/flower.db \
+    --basic_auth=admin:${CELERY_FLOWER_PASSWORD} \
     #--state_save_interval=5000 \
     #-Q (your queue name)
 

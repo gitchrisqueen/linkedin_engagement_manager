@@ -206,3 +206,16 @@ def test_invite_to_connect():
         invite_to_connect(driver, wait, invite, message)
         # Clear message after first invite
         message = None
+
+
+if __name__ == "__main__":
+    # test_ai_responses()
+    # test_dates()
+    # test_linked_in_profile()
+    # test_get_linkedin_profile_from_url()
+    # test_send_dm()
+    # test_describe_profile()
+    # test_describe_summarize_interesting_activity()
+    # test_post_comment()
+
+    pass

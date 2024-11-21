@@ -3,6 +3,7 @@ import math
 import re
 
 import dateparser
+import tzlocal
 
 
 def format_year(year: str) -> str:
@@ -23,6 +24,10 @@ def format_year(year: str) -> str:
         y = year % 100
 
     return str(y)
+
+def add_local_tz_to_datetime(dt: DT.datetime) -> DT.datetime:
+    return dt.replace(tzinfo=tzlocal.get_localzone())
+
 
 
 def get_datetime(text: str) -> DT.datetime:

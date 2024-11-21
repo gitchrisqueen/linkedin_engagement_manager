@@ -62,7 +62,7 @@ def test_linked_login_over_multiple_sessions():
     print("Logged Into LinkedIn 2nd TIme")
 
     # Navigate driver 2 to google.com
-    driver2.get("https://www.google.com")  # TODO: Why does this change all sessions instead of just one ???
+    driver2.get("https://www.google.com")
     print("Navigated to: https://www.google.com")
 
     #time.sleep(5 * 60) # 5 minutes
@@ -109,7 +109,7 @@ def test_get_my_profile():
 if __name__ == "__main__":
     # test_multiple_sessions()
 
-    test_linked_login_over_multiple_sessions()# TODO: Get this working
+    test_linked_login_over_multiple_sessions()
 
     # test_get_user_password_pair()
     # test_get_ready_to_post_posts()

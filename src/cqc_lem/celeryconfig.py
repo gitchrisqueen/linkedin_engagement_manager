@@ -31,8 +31,11 @@ worker_timer_precision = 10
 
 # The number of concurrent worker processes/threads/green threads executing tasks.
 # Default: Number of CPU cores.
-worker_concurrency=1
+#worker_concurrency=1 # Turned off for dynamic worker scaling
 
 # How many messages to prefetch at a time multiplied by the number of concurrent processes.
 # The default is 4 (four messages for each process)
 worker_prefetch_multiplier=1
+
+# The maximum number of tasks a worker can execute before it’s replaced by a new process.
+worker_max_tasks_per_child=25

@@ -1,0 +1,93 @@
+/*!
+ TODO: Fix this Styling
+*/
+
+:root {
+    --dt-row-selected: 169, 152, 22; /* Dark Gold */
+    --dt-row-selected-text: 0, 0, 0; /* Black */
+    --dt-row-selected-link: 233, 212, 55; /* Light Gold */
+}
+
+body {
+    background-color: #000; /* Black */
+    color: #e9d437; /* Light Gold */
+}
+
+table.dataTable {
+    width: 100%;
+    margin: 0 auto;
+    clear: both;
+    border-collapse: separate;
+    border-spacing: 0;
+    background-color: #000; /* Black */
+    color: #e9d437; /* Light Gold */
+}
+
+table.dataTable thead th, table.dataTable thead td {
+    padding: 10px;
+    border-bottom: 1px solid #ffffcc; /* Dark Gold */
+    color: #fff; /* White */
+}
+
+table.dataTable tbody tr {
+    background-color: #ffffcc; /* Dark Gold */
+    color: #fff; /* Black */
+}
+
+table.dataTable tbody tr.selected > * {
+    box-shadow: inset 0 0 0 9999px rgba(169, 152, 22, 0.9); /* Dark Gold */
+    color: #fff; /* Black */
+}
+
+table.dataTable tbody th, table.dataTable tbody td {
+    padding: 8px 10px;
+    border-top: 1px solid #e9d437; /* Light Gold */
+}
+
+.dataTables_wrapper {
+    border: 1px solid #e9d437; /* Light Gold */
+    background-color: #fff; /* Black */
+    color: #f9e78d; /* Light Gold */
+}
+
+.dataTables_filter input {
+    width: 50%;
+    text-indent: 5px;
+    background-color: #444; /* Darker input background */
+    color: #f9e78d; /* Light Gold */
+    border: 1px solid #ffffcc; /* Dark Gold */
+}
+
+.dataTables_length {
+    margin: 10px;
+    color: #f9e78d; /* Light Gold */
+}
+
+div.dataTables_wrapper .dataTables_filter input {
+    width: 100%;
+    margin: 10px;
+    border: 1px solid #ffffcc; /* Dark Gold */
+    background-color: #444; /* Darker input background */
+    color: #f9e78d; /* Light Gold */
+}
+
+.dataTables_info {
+    padding: 5px;
+    color: #f9e78d; /* Light Gold */
+}
+
+@media (min-width: 768px) {
+    div.dataTables_wrapper .dataTables_filter input {
+        width: 500px;
+    }
+}
+
+.overflow-auto {
+    max-width: 400px;
+    text-overflow: ellipsis;
+    color: #f9e78d; /* Light Gold */
+}
+
+.overflow-auto::-webkit-scrollbar {
+    display: none;
+}

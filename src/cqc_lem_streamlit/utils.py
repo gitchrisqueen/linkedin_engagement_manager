@@ -6,8 +6,11 @@ import zipfile
 from random import randint
 from typing import Tuple, Any
 
+import mammoth
+import pandas as pd
 import streamlit as st
 import streamlit_ext as ste
+from docx import Document
 from markdownify import markdownify as md
 from openai import OpenAI
 from streamlit.runtime.uploaded_file_manager import UploadedFile
@@ -1021,6 +1024,29 @@ def convert_content_to_markdown(content: str) -> str:
     return md(content)
 
 
+def convert_tables_to_json_in_tmp__file(doc: Document) -> str:
+    for table in doc.tables:
+        data = [[cell.text for cell in row.cells] for row in table.rows]
+        df = pd.DataFrame(data)
+
+        # Remove the table
+        t = table._element
+        parent = t.getparent()
+        parent.remove(t)
+
+        # Add new json string to the parent in its place
+        doc.add_paragraph(df.to_json(orient="records"))
+
+        # Clear the table reference
+        t._t = t._element = None
+
+    # Save to temp file
+    temp_file = tempfile.NamedTemporaryFile(delete=False, suffix='.docx')
+    doc.save(temp_file.name)
+
+    return temp_file.name
+
+
 @st.cache_data
 def read_file(file_path: str, convert_to_markdown: bool = False) -> str:
     """ Return the file contents in string format. If file ends in .docx will convert it to json and return"""
@@ -1032,27 +1058,29 @@ def read_file(file_path: str, convert_to_markdown: bool = False) -> str:
             results = mammoth.convert_to_html(f)
             contents = convert_content_to_markdown(results.value)
         # contents = results.value
-    elif file_extension == ".docx":
-        # read in a document
-        my_doc = docx.Document(file_path)
-
-        # Find any tables and replace with json strings
-        tmp_file = convert_tables_to_json_in_tmp__file(my_doc)
-
-        # coerce to JSON using the standard options
-
-        # contents = simplify(my_doc)
-
-        # contents = textract.parsers.process(file_path)
-        # print("Extracting contents from: %s" % tmp_file)
-        contents = textract.process(tmp_file).decode('utf-8')
-        os.remove(tmp_file)
-
+        # TODO: Need to find alternative to textract as it conflicts with current/needed version of python-pptx
+        cant_use_with_this_project = """elif file_extension == ".docx":
+            # read in a document
+            my_doc = docx.Document(file_path)
+    
+            # Find any tables and replace with json strings
+            tmp_file = convert_tables_to_json_in_tmp__file(my_doc)
+    
+            # coerce to JSON using the standard options
+    
+            # contents = simplify(my_doc)
+    
+            # contents = textract.parsers.process(file_path)
+            # print("Extracting contents from: %s" % tmp_file)
+            contents = textract.process(tmp_file).decode('utf-8')
+            os.remove(tmp_file)
+        """
     else:
-        with open(file_path, mode='r') as f:  # TODO: Make sure you want to open with rb option
+        with open(file_path, mode='r') as f:
             contents = f.read()
 
     return str(contents)
+
 
 def get_file_as_data_image(file_path: str):
     file_ = open(file_path, "rb")

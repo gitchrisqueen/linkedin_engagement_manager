@@ -8,7 +8,7 @@ from cqc_lem_streamlit.utils import get_file_as_data_image
 
 # Function to load user data (replace with actual data loading logic)
 def load_user_data():
-    # TODO: Implement thisi function
+    # TODO: Implement this function
     return {
         "username": "christopher.queen",
         "email": "christopher.queen@gmail.com",
@@ -28,7 +28,7 @@ def main():
 
     st.header("My Account")
 
-    # Load user data
+    # Load user data once they login
     user_data = load_user_data()
 
     # Display user information

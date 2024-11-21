@@ -32,7 +32,7 @@ app.autodiscover_tasks()
 app.conf.update(
     result_expires=3600,
     beat_schedule={
-        # TODO: Comment error tracing out
+        # Comment error tracing out
         #'test-error-tracing': {
         #    'task': 'cqc_lem.run_scheduler.test_error_tracing',
         #    'schedule': timedelta(minutes=1),  # Run every 1 minutes

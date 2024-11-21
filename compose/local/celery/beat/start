@@ -10,6 +10,4 @@ rm -f './celerybeat.pid'
 echo "Clearing selenium sessions"
 python -c "from cqc_lem.utilities.selenium_util import clear_sessions; clear_sessions()"
 
-
-# TODO: Check on the -A param here
 celery --app cqc_lem.my_celery beat -l info
