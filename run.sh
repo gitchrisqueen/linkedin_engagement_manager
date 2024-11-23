@@ -20,6 +20,7 @@ if [ "$build_image" == "y" ]; then
 fi
 
 # Step 1b: Build the prometheus config
+echo "Generating Prometheus Configs..."
 ./compose/local/prometheus/generate-prometheus-config.sh
 
 # Step 2: Run the Docker containers

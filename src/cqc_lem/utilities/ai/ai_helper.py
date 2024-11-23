@@ -200,7 +200,11 @@ def get_ai_message_refinement(original_message: str, character_limit: int = 300)
             3. Improve engagement: The message should feel personalized and engaging. Identify opportunities to make the message more concise and approachable, particularly in the introduction and closing.
             4. Polish for professionalism: Ensure a professional tone throughout, appropriate for business communication.
             
+            All your responses will be used as final drafts by the user. Thus you may not ask for additional information. Use whatever information you currently have to refine the message.
+            
             A final direct refined response without a subject line is all that is needed. 
+            
+            ---
             
             Take a deep breath and work on this problem step-by-step.
             """
@@ -324,6 +328,11 @@ def get_video_content_from_ai(linked_user_profile: LinkedInProfile, buyer_stage:
 
 
 def summarize_recent_activity(recent_activity_profile: LinkedInProfile, main_profile: LinkedInProfile):
+    # If recent_activity_profile.recent_activities is None or length is 0, return None
+    if not recent_activity_profile.recent_activities or len(recent_activity_profile.recent_activities) == 0:
+        return None
+
+
     recent_activity_profile_sting = ''.join([f"{i + 1}. {activity.text} - [{activity.link}]\n" for i, activity in
                                              enumerate(recent_activity_profile.recent_activities)])
 

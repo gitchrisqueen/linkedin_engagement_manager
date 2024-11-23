@@ -370,9 +370,9 @@ def automate_reply_commenting(user_id: int, post_id: int, loop_for_duration=None
             if driver.current_url != post_url:
                 driver.get(post_url)
 
-            #TODO: Review Comments
+            # TODO: Review Comments
 
-            #TODO: Respond to Comments
+            # TODO: Respond to Comments
             pass
         else:
             myprint("Could not find successful post for this user and post_id. Sleeping...")
@@ -389,6 +389,38 @@ def automate_reply_commenting(user_id: int, post_id: int, loop_for_duration=None
         time.sleep(15)  # Sleep for 15 seconds
 
     quit_gracefully(driver)
+
+
+def accept_connection_request(user_id: int):
+    """Accept connection requests for the given user."""
+
+    user_email, user_password = get_user_password_pair_by_id(user_id)
+
+    driver, wait = get_driver_wait_pair(session_name='Accept Connection Requests')
+
+    login_to_linkedin(driver, wait, user_email, user_password)
+
+    # Navigate to the invitations manager page
+    driver.get("https://www.linkedin.com/mynetwork/invitation-manager/")
+
+    # Get all the invitation use the href and text (invitee name) to send a DM
+    invitations = get_elements_as_list_wait_stale(wait,
+                                                  "(//div[contains(@class,'invitation-card__container')]//div[contains(@class,'details')]//a)[2]",
+                                                  "Finding Invitation Names and Urls")
+
+    # For each invitation store the url and name to a dict using url as the key
+    invitation_data = {invitation.get_attribute('href'): getText(invitation) for invitation in invitations}
+
+    # Find and click all the accept buttons
+    accept_buttons = get_elements_as_list_wait_stale(wait, '//button[contains(@aria-label,"Accept")]',
+                                                     "Finding Accept Buttons")
+
+    for accept_button in accept_buttons:
+        accept_button.click()
+        time.sleep(2)  # Wait for 2 seconds
+
+    # Return the invitations list
+    return invitation_data
 
 
 @shared_task.task(rate_limit='2/m')
@@ -409,6 +441,11 @@ def send_appreciation_dms_for_user(user_id: int, loop_for_duration=None):
         myprint("Sending Appreciations here...")
 
         # After Accepting a Connection Request:
+        invitations_accepted = accept_connection_request(user_id)
+        # Send a private DM for each inviations
+        for profile_url, name in invitations_accepted.items():
+            message = f"Hi {name}, I appreciate you connecting with me on LinkedIn. I look forward to learning more about you and your work."
+            send_private_dm.apply_async(kwargs={"user_id": user_id, "profile_url": profile_url, "message": message})
 
         # After Receiving a Recommendation:
 
@@ -641,11 +678,11 @@ def automate_profile_viewer_engagement(user_id: int, loop_for_duration=None, **k
                   'viewer_name': viewer_name}
         engage_with_profile_viewer.apply_async(kwargs=kwargs, retry=True,
                                                retry_policy={
-                                'max_retries': 3,
-                                'interval_start': 60,
-                                'interval_step': 30
+                                                   'max_retries': 3,
+                                                   'interval_start': 60,
+                                                   'interval_step': 30
 
-                            })
+                                               })
 
         # Close tab when done
         close_tab(driver)
@@ -770,9 +807,44 @@ def send_private_dm(user_id: int, profile_url: str, message: str):
     # TODO: Add code to post the dm message
     myprint("Sending DM: " + message)
 
-    quit_gracefully(driver)  # Close the driver
+    final_result = "DM "
 
-    return "DM Sent Successfully" if dm_sent else "DM Failed"
+    try:
+
+        # Click on message button
+        click_element_wait_retry(driver, wait, '//main//button[contains(@aria-label,"Message")]', "Finding Message Button")
+
+        # Paste the message in the message box
+        message_box = click_element_wait_retry(driver, wait, '//div[contains(@class,"msg-form__contenteditable")]', "Finding Message Box")
+
+        # Clear the message box
+        message_box.clear()
+
+        message_box.send_keys(message)
+
+        # Sleep so send button can become active
+        time.sleep(2)
+
+        # Click the send button
+        click_element_wait_retry(driver, wait, "//button[contains(@class,'msg-form__send-butto')]",   "Finding Send Button")
+
+        dm_sent = True
+
+        quit_gracefully(driver)  # Close the driver
+
+        final_result+=" Sent Successfully"
+
+    except Exception as e:
+        myprint(f"Failed to send DM: {str(e)}")
+        final_result += f"Failed. Error: {str(e)}"
+
+    #Update DB logs with DM Sent
+    insert_new_log(user_id=user_id, action_type=LogActionType.DM,
+                   result=LogResultType.SUCCESS if dm_sent else LogResultType.FAILURE,
+                   post_url=profile_url, message=message)
+
+
+    return final_result
 
 
 @shared_task.task(rate_limit='2/m')

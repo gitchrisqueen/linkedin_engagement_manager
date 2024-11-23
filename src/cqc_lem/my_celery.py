@@ -33,10 +33,10 @@ app.conf.update(
     result_expires=3600,
     beat_schedule={
         # Comment error tracing out
-        #'test-error-tracing': {
+        # 'test-error-tracing': {
         #    'task': 'cqc_lem.run_scheduler.test_error_tracing',
         #    'schedule': timedelta(minutes=1),  # Run every 1 minutes
-        #},
+        # },
         'check-scheduled-posts': {
             'task': 'cqc_lem.run_scheduler.check_scheduled_posts',
             'schedule': timedelta(minutes=5),  # Run every 5 minutes
@@ -75,9 +75,11 @@ def init_celery_tracing(*args, **kwargs):
         myprint("Instrumented Celery for tracing")
 
 
-# Iterate through all modules in the cqc_lem namespace
-for _, module_name, _ in pkgutil.iter_modules(cqc_lem.__path__, cqc_lem.__name__ + "."):
-    module = importlib.import_module(module_name)
-    for name, obj in inspect.getmembers(module):
-        if inspect.isfunction(obj) and hasattr(obj, 'shared_task'):
-            globals()[name] = obj  # Register the function with the decorator to use in Celery worker
+@worker_process_init.connect(weak=False)
+def find_all_modules(*args, **kwargs):
+    # Iterate through all modules in the cqc_lem namespace
+    for _, module_name, _ in pkgutil.iter_modules(cqc_lem.__path__, cqc_lem.__name__ + "."):
+        module = importlib.import_module(module_name)
+        for name, obj in inspect.getmembers(module):
+            if inspect.isfunction(obj) and hasattr(obj, 'shared_task'):
+                globals()[name] = obj  # Register the function with the decorator to use in Celery worker

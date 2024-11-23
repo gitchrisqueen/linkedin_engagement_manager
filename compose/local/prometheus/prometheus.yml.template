@@ -5,3 +5,6 @@ scrape_configs:
   - job_name: 'jaeger_error_tracing'
     static_configs:
       - targets: ['${JAEGER_AGENT_HOST}:${JAEGER_METRICS_COLLECTION_PORT}']
+  - job_name: flower
+    static_configs:
+      - targets: ['${NGROK_FLOWER_PREFIX}.${NGROK_FREE_DOMAIN}', 'localhost:${CELERY_FLOWER_PORT}']
