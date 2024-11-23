@@ -158,7 +158,7 @@ def post_to_linkedin(user_id: int, post_id: int, **kwargs):
         insert_new_log(user_id=user_id, action_type=LogActionType.POST, result=LogResultType.FAILURE, post_id=post_id,
                        message="Failed to create post using /posts API endpoint. Result: " + str(posts_create_response))
 
-        return f"Post successfully failed"
+        return f"Failed to create post using /posts API endpoint"
 
 
 if __name__ == "__main__":

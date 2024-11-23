@@ -200,6 +200,9 @@ def create_video_content(user_id: int, stage: str):
 
     content = get_video_content_from_ai(my_profile, stage)
 
+    # TODO: NEed to store video somewhere untill its uploaded to LI
+    # TODO: Video content will need text to go with it (should call create_text_post to get this or maybe call this first to generate video from it)
+
     quit_gracefully(driver)
 
     return content

@@ -197,7 +197,10 @@ def returnProfileInfo(driver: webdriver, profile_url, company_name=None):
 
     for key, func in functions:
         # print("Calling function to get: ", key)
-        profile[key] = func()
+        try:
+            profile[key] = func()
+        except Exception as e:
+            print("Error getting ", key, " | ", e)
 
     # TODO: Get the industry - This may not be publicly visible
     # TODO: Get the mutual connections
