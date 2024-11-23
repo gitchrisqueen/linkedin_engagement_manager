@@ -536,7 +536,9 @@ def automate_profile_viewer_engagement(user_id: int, loop_for_duration=None, **k
 
     viewed_on_xpath = './/div[contains(@class,"artdeco-entity-lockup__caption ember-view")]'
 
-    while True:  # Keep looping until we find a viewed on date out of range
+    continue_process = True
+
+    while continue_process:  # Keep looping until we find a viewed on date out of range
         # Get Each Viewer within the last day (or time of dm run via database log)
         viewer_elements = get_elements_as_list_wait_stale(wait,
                                                           '//ul[@aria-label="List of Entities"]//a[contains(@href,"linkedin.com/in") and not(contains(@aria-label,"Update"))]',
@@ -598,7 +600,7 @@ def automate_profile_viewer_engagement(user_id: int, loop_for_duration=None, **k
     current_tab = driver.current_window_handle
     handles = driver.window_handles
 
-    # Get all the viewer names and urls into list so that elements dont go stale
+    # Get all the viewer names and urls into list so that elements don't go stale
     viewer_names = [
         getText(e.find_element(By.XPATH, './/div[contains(@class,"artdeco-entity-lockup__title")]/span/span[1]')) for e
         in viewer_elements]
@@ -613,9 +615,11 @@ def automate_profile_viewer_engagement(user_id: int, loop_for_duration=None, **k
             elapsed_time = datetime.now() - start_time
             if elapsed_time.total_seconds() >= loop_for_duration:
                 myprint("Loop duration reached. Stopping Automate Commenting thread...")
+                continue_process = False
                 break
         elif stop_all_thread.is_set():
             myprint("Stopping Automate Profile Viewers DMs thread...")
+            continue_process = False
             break
 
         # Switch back to tab

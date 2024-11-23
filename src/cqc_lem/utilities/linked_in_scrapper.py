@@ -390,6 +390,8 @@ def get_profile_experiences(driver, employeeLink):
                 skills = row[si][:len(row[si]) // 2]
                 last_position['skills'] = skills.split(":")[1].split(" · ")
             else:
+                # TODO: Fix for when prefix is empty
+
                 # Using the first 10 characters of the row[si] details as prefix
                 prefix = row[si][:10]
                 # Details equals row[si] and stops at the second index of the prefix

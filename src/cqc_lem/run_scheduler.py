@@ -58,6 +58,9 @@ def check_scheduled_posts():
                                      }
                                      )
 
+        # Update the DB with post status = scheduled so it won't get processed again
+        update_db_post_status(post_id, 'scheduled')
+
     if len(posts) == 0:
         return f"No Post to Schedule"
     else:
