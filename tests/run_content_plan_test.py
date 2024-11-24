@@ -1,4 +1,4 @@
-from cqc_lem.run_content_plan import create_content, auto_generate_content, create_weekly_content
+from cqc_lem.run_content_plan import create_content, auto_generate_content, auto_create_weekly_content
 from cqc_lem.run_scheduler import post_to_linkedin
 from cqc_lem.utilities.db import get_user_password_pair_by_id
 from cqc_lem.utilities.linked_in_helper import get_my_profile
@@ -37,7 +37,7 @@ def test_user_profile_load_from_db():
 
 def test_content_plan_and_create():
     auto_generate_content()
-    create_weekly_content()
+    auto_create_weekly_content()
 
 def test_post_to_linkedin():
     post_to_linkedin(60,1)

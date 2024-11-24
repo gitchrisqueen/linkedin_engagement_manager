@@ -9,7 +9,7 @@ import selenium
 from pyvirtualdisplay import Display
 from selenium import webdriver
 from selenium.common import JavascriptException, ElementNotInteractableException, StaleElementReferenceException, \
-    TimeoutException, WebDriverException, NoSuchElementException
+    TimeoutException, WebDriverException, NoSuchElementException, SessionNotCreatedException
 from selenium.webdriver import ActionChains
 from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.chrome.service import Service
@@ -28,6 +28,7 @@ from cqc_lem.utilities.utils import create_folder_if_not_exists
 def quit_gracefully(driver: WebDriver):
     try:
         driver.quit()
+        myprint(f"Driver session closed.")
     except Exception as e:
         myprint(f"Error while quitting driver: {e}")
         pass
@@ -417,12 +418,21 @@ def get_driver_wait(driver):
                          ])
 
 
-def get_driver_wait_pair(headless=False, session_name: str = "ChromeTests"):
+def get_driver_wait_pair(headless=False, session_name: str = "ChromeTests", max_retry=3):
     # Create the driver
     if USE_DOCKER_BROWSER:
-        driver = get_docker_driver(headless=headless, session_name=session_name)
+        for attempt in range(max_retry):
+            try:
+                driver = get_docker_driver(headless=headless, session_name=session_name)
+                break  # Exit the loop if successful
+            except SessionNotCreatedException as e:
+                if attempt == max_retry - 1:
+                    raise e  # Raise the exception if max retries reached
+                wait_time = 30 * (2 ** attempt)  # Exponential backoff starting at 30 seconds
+                time.sleep(wait_time)  # Wait before retrying
     else:
         driver = create_driver(headless=headless)
+
     wait = get_driver_wait(driver)
 
     myprint("Driver and Wait created. Waiting for one window handle")

@@ -5,22 +5,22 @@ import time
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
 from typing import List
+from urllib.parse import urlparse
 
 from dotenv import load_dotenv
 from selenium.common import NoSuchElementException, TimeoutException
 from selenium.webdriver import ActionChains
 from selenium.webdriver.common.by import By
-# from selenium.webdriver.chrome.webdriver import WebDriver
 from selenium.webdriver.remote.webdriver import WebDriver
+from selenium.webdriver.remote.webelement import WebElement
 from selenium.webdriver.support import expected_conditions as EC
 
 from cqc_lem.linked_in_profile import LinkedInProfile
-# from celery import shared_task
 from cqc_lem.my_celery import app as shared_task
 from cqc_lem.utilities.ai.ai_helper import generate_ai_response, get_ai_message_refinement, summarize_recent_activity
 from cqc_lem.utilities.date import convert_viewed_on_to_date
 from cqc_lem.utilities.db import get_user_password_pair_by_id, get_user_id, insert_new_log, LogActionType, \
-    LogResultType, has_user_commented_on_post_url, get_post_url_from_log_for_user
+    LogResultType, has_user_commented_on_post_url, get_post_url_from_log_for_user, get_post_message_from_log_for_user
 from cqc_lem.utilities.env_constants import LI_USER
 from cqc_lem.utilities.linked_in_helper import login_to_linkedin, get_my_profile, get_linkedin_profile_from_url
 from cqc_lem.utilities.logger import myprint
@@ -78,7 +78,7 @@ def navigate_to_feed(driver, wait):
     # Select "Recent" from the dropdown
     try:
         click_element_wait_retry(driver, wait, '//div[contains(@class,"artdeco-dropdown")]/ul/li[2]',
-                                 "Selecting Recent Option")
+                                 "Selecting Recent Option", max_try=1, use_action_chain=True)
 
         time.sleep(3)  # Wait for the page to refresh with recent posts
     except TimeoutException as te:
@@ -146,6 +146,24 @@ def simulate_writing_time(content):
     return round(writing_time)
 
 
+def simulate_typing(driver: WebDriver, editable_element: WebElement, text):
+    # Simulate typing the comment
+    myprint("Typing Text...")
+    for char in text:
+        try:
+            if ord(char) > 0xFFFF:
+                # Use JavaScript to set the value for characters outside the BMP
+                driver.execute_script("arguments[0].value += arguments[1];", editable_element, char)
+            else:
+                editable_element.send_keys(char)
+        except Exception as e:
+            myprint("Error while sending char(" + char + "): " + str(e))
+
+        type_speed_reducer = .5
+        time.sleep(random.uniform(0.05 * type_speed_reducer, 0.15 * type_speed_reducer))  # Simulate human typing speed
+    myprint("Finished Typing!")
+
+
 @shared_task.task(rate_limit='2/m')
 @debug_function
 def comment_on_post(user_id: int, post_link: str, comment_text: str):
@@ -170,21 +188,7 @@ def comment_on_post(user_id: int, post_link: str, comment_text: str):
     comment_box.clear()
 
     # Simulate typing the comment
-    myprint("Typing Comment...")
-    for char in comment_text:
-        try:
-            if ord(char) > 0xFFFF:
-                # Use JavaScript to set the value for characters outside the BMP
-                driver.execute_script("arguments[0].value += arguments[1];", comment_box, char)
-            else:
-                comment_box.send_keys(char)
-        except Exception as e:
-            myprint("Error while sending char(" + char + "): " + str(e))
-
-        type_speed_reducer = .5
-        time.sleep(random.uniform(0.05 * type_speed_reducer, 0.15 * type_speed_reducer))  # Simulate human typing speed
-
-    myprint("Finished Typing Comment!")
+    simulate_typing(driver, comment_box, comment_text)
 
     # Sleep so post button shows up
     time.sleep(2)
@@ -194,7 +198,7 @@ def comment_on_post(user_id: int, post_link: str, comment_text: str):
     try:
         # Find and click the post button
         click_element_wait_retry(driver, wait, '//button[contains(@class, "comments-comment-box__submit-button--cr")]',
-                                 "Clicking Post Button")
+                                 "Clicking Post Button", max_try=1, use_action_chain=True)
 
         myprint(f"Added Post via Post Button")
         method_result = f"Added Post via Post Button"
@@ -356,24 +360,124 @@ def automate_reply_commenting(user_id: int, post_id: int, loop_for_duration=None
 
     login_to_linkedin(driver, wait, user_email, user_password)
 
+    # Get My Profile for later use
+    my_profile = get_my_profile(driver, wait, user_email, user_password)
+
     start_time = datetime.now()
 
     while True:
 
-        myprint("Responding to Comments here...")
+        myprint(f"Replying to Comments of Post ID:{post_id} ...")
 
         # Use the user id and the post id to get the post_url from the database
         post_url = get_post_url_from_log_for_user(user_id, post_id)
+
+        # Get the message content of the post
+        post_message = get_post_message_from_log_for_user(user_id, post_id)
 
         if post_url:
             # Navigate to the Post
             if driver.current_url != post_url:
                 driver.get(post_url)
 
-            # TODO: Review Comments
 
-            # TODO: Respond to Comments
-            pass
+           # If load more comments button exists click it until its gone
+            while True:
+                load_more_comments_button = click_element_wait_retry(driver, wait,
+                                                        '//button[contains(@class,"load-more-comments")]',
+                                                        "Finding Load More Comments Button",
+                                                        use_action_chain=True,
+                                                        max_try=0,
+                                                        element_always_expected=False)
+                if load_more_comments_button:
+                    myprint("Loading More Comments....")
+                    time.sleep(2)
+                else:
+                    break
+
+            # Get all the comments
+            comments = get_elements_as_list_wait_stale(wait,
+                                                       "//div[contains(@class,'comments-comment-list__container')]/article[contains(@class,'comments-comment-entity')]",
+                                                       "Finding Comments")
+
+            # Print how many comments found
+            myprint(f"Comments Found: {len(comments)}")
+
+            # Get the unique_url_name after "in/" and before / or end or profile url
+            path = urlparse(str(my_profile.profile_url)).path
+            unique_url_name = path.split("/")[2] if len(path.split("/")) > 2 else None
+            #myprint(f"Unique URL Name: {unique_url_name}")
+
+            # For each comment element see if we have already replied; if so skip it
+            for comment in comments:
+                # Get the comment text
+                comment_text = getText(comment.find_element(By.XPATH,
+                                                            './/span[contains(@class,"comments-comment-item__main-content")][1]'))
+
+                # Search the comment element using xpath for a child span that contains the text "Author"
+                author_element = get_element_wait_retry(driver, wait, f'.//a[contains(@href,"{unique_url_name}") and contains(@aria-label,"View")]',
+                                                        "Finding Author Element", element_always_expected=False,
+                                                        max_try=0,
+                                                        parent_element=comment)
+
+                if len(comment_text) > 30:
+                    short_comment_text = comment_text[:30]
+                else:
+                    short_comment_text = comment_text
+                if author_element:
+                    myprint(f"We already replied to this comment: {short_comment_text}...")
+                    continue
+                else:
+                    myprint(f"Responding to this comment: {short_comment_text}...")
+
+                    # Use the context of the post, and the comment to generate a response
+                    response = generate_ai_response(post_message, my_profile, post_comment=comment_text)
+                    myprint(f"AI Generated Response to Comment: {response}")
+
+                    try:
+
+                        # Find and click the Reply Button
+                        reply_button = click_element_wait_retry(driver, wait,
+                                                                './/button[contains(@class,"reply")][1]',
+                                                                "Finding Reply Button",
+                                                                use_action_chain=True,
+                                                                parent_element=comment)
+
+                        # Find the text box (should be the element that now has focus
+                        text_box = driver.switch_to.active_element
+
+                        # Simulate typing the comment in the text box
+                        simulate_typing(driver, text_box, response)
+
+                       # Sleep so post button shows up
+                        time.sleep(2)
+
+                        # Click the send button
+                        # Find the parent element of the current text_box element where the parent element is a div with a class containing "comments-comment-texteditor"
+                        parent_element = text_box.find_element(By.XPATH,
+                                                               './ancestor::form')
+
+                        # From this parent element, find the child button element with a span element containing the text "Reply"
+                        reply_button = click_element_wait_retry(driver, wait, './/button[contains(@class, "submit")]',
+                                                                "Finding Send Reply Button",
+                                                                parent_element=parent_element,
+                                                                max_try=1, use_action_chain=True)
+
+                        # Sleep 3 seconds to let the click register
+                        time.sleep(3)
+
+                        # Update DB with log entry
+                        insert_new_log(user_id=user_id, action_type=LogActionType.REPLY, result=LogResultType.SUCCESS,
+                                       post_url=post_url, message=response)
+
+                    except Exception as e:
+                        myprint(f"Error while replying to comment: {e}")
+                        # Update DB with log entry
+                        insert_new_log(user_id=user_id, action_type=LogActionType.REPLY, result=LogResultType.FAILURE,
+                                       post_url=post_url, message=response)
+
+
+
         else:
             myprint("Could not find successful post for this user and post_id. Sleeping...")
             time.sleep(60)  # Sleep for 60 seconds
@@ -442,7 +546,7 @@ def send_appreciation_dms_for_user(user_id: int, loop_for_duration=None):
 
         # After Accepting a Connection Request:
         invitations_accepted = accept_connection_request(user_id)
-        # Send a private DM for each inviations
+        # Send a private DM for each invitation
         for profile_url, name in invitations_accepted.items():
             message = f"Hi {name}, I appreciate you connecting with me on LinkedIn. I look forward to learning more about you and your work."
             send_private_dm.apply_async(kwargs={"user_id": user_id, "profile_url": profile_url, "message": message})
@@ -804,7 +908,6 @@ def send_private_dm(user_id: int, profile_url: str, message: str):
 
     dm_sent = False
 
-    # TODO: Add code to post the dm message
     myprint("Sending DM: " + message)
 
     final_result = "DM "
@@ -812,10 +915,12 @@ def send_private_dm(user_id: int, profile_url: str, message: str):
     try:
 
         # Click on message button
-        click_element_wait_retry(driver, wait, '//main//button[contains(@aria-label,"Message")]', "Finding Message Button")
+        click_element_wait_retry(driver, wait, '//main//button[contains(@aria-label,"Message")]',
+                                 "Finding Message Button", max_try=1, use_action_chain=True)
 
         # Paste the message in the message box
-        message_box = click_element_wait_retry(driver, wait, '//div[contains(@class,"msg-form__contenteditable")]', "Finding Message Box")
+        message_box = click_element_wait_retry(driver, wait, '//div[contains(@class,"msg-form__contenteditable")]',
+                                               "Finding Message Box")
 
         # Clear the message box
         message_box.clear()
@@ -826,23 +931,23 @@ def send_private_dm(user_id: int, profile_url: str, message: str):
         time.sleep(2)
 
         # Click the send button
-        click_element_wait_retry(driver, wait, "//button[contains(@class,'msg-form__send-butto')]",   "Finding Send Button")
+        click_element_wait_retry(driver, wait, "//button[contains(@class,'msg-form__send-button')]",
+                                 "Finding Send Button", max_try=1, use_action_chain=True)
 
         dm_sent = True
 
         quit_gracefully(driver)  # Close the driver
 
-        final_result+=" Sent Successfully"
+        final_result += " Sent Successfully"
 
     except Exception as e:
         myprint(f"Failed to send DM: {str(e)}")
         final_result += f"Failed. Error: {str(e)}"
 
-    #Update DB logs with DM Sent
+    # Update DB logs with DM Sent
     insert_new_log(user_id=user_id, action_type=LogActionType.DM,
                    result=LogResultType.SUCCESS if dm_sent else LogResultType.FAILURE,
                    post_url=profile_url, message=message)
-
 
     return final_result
 
@@ -884,7 +989,7 @@ def invite_to_connect(user_id: int, profile_url: str, message: str = None):
 
             # Click the last connect button
             click_element_wait_retry(driver, wait, '//main//div[contains(@aria-label,"connect")]',
-                                     "Finding Connect Button", max_try=21, use_action_chain=True)
+                                     "Finding Connect Button", max_try=2, use_action_chain=True)
 
             # driver.find_elements(By.XPATH, '//div[contains(@aria-label,"connect")]')[-1].click()
 

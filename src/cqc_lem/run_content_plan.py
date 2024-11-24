@@ -576,7 +576,7 @@ def save_content_plan(user_id: int, daily_plan: list[dict]):
 
 
 @shared_task.task
-def create_weekly_content(user_id: int = None):
+def auto_create_weekly_content(user_id: int = None):
     """Creates content for the week from the planed content in the database"""
 
     if user_id is not None:
@@ -609,5 +609,5 @@ if __name__ == '__main__':
     myprint("Generating content plan for 30 days")
     auto_generate_content()
     myprint("Creating weekly content")
-    create_weekly_content()
+    auto_create_weekly_content()
     myprint("Process finished")

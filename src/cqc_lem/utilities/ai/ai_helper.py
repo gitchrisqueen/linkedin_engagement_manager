@@ -18,6 +18,8 @@ client = OpenAI(
 )
 
 
+
+
 def generate_ai_response_test():
     post_content = "Today was a good day to go outside"
     post_img_url = None,
@@ -58,14 +60,17 @@ def generate_ai_response_test():
     return comment
 
 
-def generate_ai_response(post_content, profile: LinkedInProfile, post_img_url=None):
+def generate_ai_response(post_content, profile: LinkedInProfile, post_img_url=None, post_comment: str = None):
     image_attached = "(image attached)" if post_img_url else ""
+    user_comment = f"\n\nRespond to this Comment Directly: <comment>{post_comment}</comment>\n\nYou are responding as the author of the LinkedIn Content. Keep your response short and sweet without using any hashtags.\n\n" if post_comment else ""
 
     prompt = (f"""Please give me a comment in response to the following LinkedIn Content as the following LinkedIn User,"
               
                 LinkedIn User Profile:\n\n{profile.model_dump_json()}\n\n"
               
-                LinkedIn Content{image_attached}:\n\n'{post_content}'
+                LinkedIn Content{image_attached}: <content>'{post_content}'</content>
+                
+                {user_comment}
 
                 Only provide the final comment once it perfectly reflects the LinkedIn user’s style
                 
@@ -121,6 +126,14 @@ def generate_ai_response(post_content, profile: LinkedInProfile, post_img_url=No
         model="gpt-4o-mini",
         messages=[system_prompt, user_message],  # System prompt + current user prompt
         temperature=round(random.uniform(0.4, 0.6), 2),  # Rand temp between .5 and .7
+
+        # Balances coherent response generation with some degree of creative variation.
+        top_p=round(random.uniform(0.8, 0.9), 2),
+        # Reduces repetition in common responses.
+        frequency_penalty=round(random.uniform(0.2, 0.4), 2),
+        # Supports fresh responses aligned with user-specific tone.
+        presence_penalty=round(random.uniform(0.3, 0.5), 2),
+
         # max_tokens=150  # Set token limit as required
     )
 
@@ -220,6 +233,14 @@ def get_ai_message_refinement(original_message: str, character_limit: int = 300)
     response = client.chat.completions.create(
         model="gpt-4o-mini",  # Specify the model you want to use
         messages=[system_prompt, user_message],  # System prompt + current user prompt
+
+        # Emphasizes succinct, professional outputs over creative variance.
+        top_p=round(random.uniform(0.75, 0.85), 2),
+        # Discourages redundancy in phrase selection.
+        frequency_penalty=round(random.uniform(0.4, 0.6), 2),
+        # Ensures refined and novel phrasings without losing coherence.
+        presence_penalty=round(random.uniform(0.4, 0.6), 2),
+
         # temperature=0.3,  # Adjust this parameter as per your needs
         # max_tokens=150  # Set token limit as required
     )
@@ -345,13 +366,12 @@ def summarize_recent_activity(recent_activity_profile: LinkedInProfile, main_pro
     Analyze the main_profile’s interests and select the most relevant activity from second_profile’s list of recent activities. 
     Then, create a response as if it’s from main_profile to second_profile, mentioning the most relevant recent activity and providing a professional comment.
 
-    Main Profile (User 1):
+    ### Main Profile (User 1):
     {main_profile_json}
     
-    Second Profile (User 2):
+    ### Second Profile (User 2):
     Name: {recent_activity_profile.full_name}
-    Recent Activities:
-    {recent_activity_profile_sting}
+    Recent Activities:<activities>{recent_activity_profile_sting}</activities>
     
     Create a response from {main_profile.full_name} to {recent_activity_profile.full_name} that references the most relevant recent activity from {recent_activity_profile.full_name}’s list.
 
@@ -506,6 +526,11 @@ def get_thought_leadership_post_from_ai(linked_user_profile: LinkedInProfile, bu
         model="gpt-4o-mini",  # Specify the model you want to use
         messages=[system_prompt, user_message],  # System prompt + current user prompt
         temperature=round(random.uniform(0.5, 0.7), 2),  # Rand temp between .5 and .7
+
+        top_p= round(random.uniform(0.85, 0.95), 2), # Encourages diversity in word choice while focusing on high-probability responses for coherent professional content.
+        frequency_penalty= round(random.uniform(0.3, 0.5), 2), # Minimizes repetitive patterns to ensure unique and varied phrasing.
+        presence_penalty= round(random.uniform(0.4, 0.6), 2), #Boosts exploration of new ideas while keeping content relevant to the LinkedIn tone.
+
         # max_tokens=150  # Set token limit as required
         # response_format={"type": "json_object"},
     )
@@ -590,7 +615,12 @@ def get_industry_news_post_from_ai(linked_user_profile: LinkedInProfile, buyer_s
         model="gpt-4o-mini",  # Specify the model you want to use
         messages=[system_prompt, user_message],  # System prompt + current user prompt
         temperature=round(random.uniform(0.3, 0.5), 2),  # Rand temp between .3 and .5
-        # max_tokens=150  # Set token limit as required
+
+        top_p= round(random.uniform(0.8, 0.9), 2), # Ensures focus on high-quality, relevant insights while allowing some variation in tone.
+        frequency_penalty=round(random.uniform(0.2, 0.4), 2), # Helps maintain consistency while reducing overuse of standard expressions.
+        presence_penalty= round(random.uniform(0.3, 0.5), 2), # Allows new perspectives and commentary to emerge.
+
+    # max_tokens=150  # Set token limit as required
         # response_format={"type": "json_object"},
     )
 
@@ -679,6 +709,11 @@ def get_personal_story_post_from_ai(linked_user_profile: LinkedInProfile, stage:
         model="gpt-4o-mini",  # Specify the model you want to use
         messages=[system_prompt, user_message],  # System prompt + current user prompt
         temperature=round(random.uniform(0.6, 0.8), 2),  # Rand temp between .6 and .8
+
+        top_p=round(random.uniform(0.75, 0.85), 2),# Prioritizes more creative storytelling approaches for personal anecdotes.
+        frequency_penalty=round(random.uniform(0.4, 0.6), 2),# Reduces redundancy in narrative details to make the story unique.
+        presence_penalty=round(random.uniform(0.6, 0.8), 2),  # Encourages creative content generation that resonates emotionally.
+
         # max_tokens=150  # Set token limit as required
         # response_format={"type": "json_object"},
     )
@@ -768,6 +803,11 @@ def generate_engagement_prompt_post(linked_user_profile: LinkedInProfile, stage:
         model="gpt-4o-mini",  # Specify the model you want to use
         messages=[system_prompt, user_message],  # System prompt + current user prompt
         temperature=round(random.uniform(0.6, 0.9), 2),  # Rand temp between .6 and .9
+
+        top_p=round(random.uniform(0.7, 0.85), 2),# Balances creativity and relevance in open-ended prompts.
+        frequency_penalty=round(random.uniform(0.5, 0.7), 2),# Prevents repetitive patterns, especially in prompts or questions.
+        presence_penalty=round(random.uniform(0.6, 0.7), 2), # Promotes original and thought-provoking prompts.
+
         # max_tokens=150  # Set token limit as required
         # response_format={"type": "json_object"},
     )
@@ -804,7 +844,7 @@ def get_blog_summary_post_from_ai(blog_post_url: str, blog_post_content: str, li
     
     --- 
     
-    ### Blog Post Content: {blog_post_content}
+    ### Blog Post Content: <blog_content>{blog_post_content}</blog_content>
     
     ---
     
@@ -860,6 +900,14 @@ def get_blog_summary_post_from_ai(blog_post_url: str, blog_post_content: str, li
         model="gpt-4o-mini",  # Specify the model you want to use
         messages=[system_prompt, user_message],  # System prompt + current user prompt
         temperature=round(random.uniform(0.5, 0.7), 2),  # Rand temp between .5 and .7
+
+        # Focuses on concise and accurate summaries while retaining flexibility for phrasing.
+        top_p=round(random.uniform(0.8, 0.9), 2),
+        # Ensures variety in how summaries are structured.
+        frequency_penalty=round(random.uniform(0.3, 0.5), 2),
+        # Encourages fresh perspectives in the summarization process.
+        presence_penalty=round(random.uniform(0.3, 0.5), 2),
+
         # max_tokens=150  # Set token limit as required
         # response_format={"type": "json_object"},
     )
@@ -895,7 +943,7 @@ def get_website_content_post_from_ai(content: str, url: str, linked_user_profile
 
         --- 
 
-        ### Website Content: {content}
+        ### Website Content: <website_content>{content}</<website_content>
 
         ---
 
@@ -951,6 +999,14 @@ def get_website_content_post_from_ai(content: str, url: str, linked_user_profile
         model="gpt-4o-mini",  # Specify the model you want to use
         messages=[system_prompt, user_message],  # System prompt + current user prompt
         temperature=round(random.uniform(0.5, 0.7), 2),  # Rand temp between .5 and .7
+
+        # Focuses on generating insightful and engaging website-related content.
+        top_p=round(random.uniform(0.85, 0.95), 2),
+        # Helps avoid overuse of common phrases while summarizing website content.
+        frequency_penalty=round(random.uniform(0.3, 0.5), 2),
+        # Encourages originality and exploration of unique aspects of website content.
+        presence_penalty=round(random.uniform(0.4, 0.6), 2),
+
         # max_tokens=150  # Set token limit as required
         # response_format={"type": "json_object"},
     )

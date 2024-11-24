@@ -6,7 +6,7 @@ import streamlit as st
 from st_aggrid import AgGrid, GridOptionsBuilder, DataReturnMode, GridUpdateMode
 
 from cqc_lem.api.main import PostStatus
-from cqc_lem.run_content_plan import create_weekly_content
+from cqc_lem.run_content_plan import auto_create_weekly_content
 from cqc_lem.utilities.env_constants import API_BASE_URL, LINKEDIN_PREVIEW_URL
 from cqc_lem.utilities.jaeger_tracer_helper import get_jaeger_tracer
 
@@ -60,7 +60,7 @@ with tracer.start_as_current_span("review_schedule"):
 
         if st.session_state.user_id:
             # Add button to fire the create_weekly_content function
-            st.button("Create Content for the Week", on_click=create_weekly_content, args=[st.session_state.user_id])
+            st.button("Create Content for the Week", on_click=auto_create_weekly_content, args=[st.session_state.user_id])
 
         posts = st.session_state.posts
 

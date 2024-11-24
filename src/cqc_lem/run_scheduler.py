@@ -22,7 +22,7 @@ def test_error_tracing():
 
 
 @shared_task.task
-def check_scheduled_posts():
+def auto_check_scheduled_posts():
     """Checks if there are any posts to publish."""
 
     # Get post that should have run between yesterday and in the next 20 minutes
@@ -131,7 +131,8 @@ def post_to_linkedin(user_id: int, post_id: int, **kwargs):
         myprint(f"{key}: {value}")
 
     if posts_create_response.entity_id:
-        myprint(f"Successfully created post using /posts API endpoint: {posts_create_response.entity_id}")
+        post_url = f"https://www.linkedin.com/feed/update/{posts_create_response.entity_id}/"
+        myprint(f"Successfully created post using /posts API endpoint: {post_url}")
 
         # Update DB with status=posted
         update_db_post_status(post_id, 'posted')
@@ -144,9 +145,10 @@ def post_to_linkedin(user_id: int, post_id: int, **kwargs):
         }
         automate_reply_commenting.apply_async(kwargs=base_kwargs)
 
+
         # Update DB with status=success in the logs table and the post url
         insert_new_log(user_id=user_id, action_type=LogActionType.POST, result=LogResultType.SUCCESS, post_id=post_id,
-                       post_url=posts_create_response.entity_id,
+                       post_url=post_url,
                        message="Successfully created post using /posts API endpoint. Results: " + str(
                            posts_create_response))
 

@@ -56,6 +56,9 @@ class LinkedInProfile(BaseModel):
     # Activity and Engagement
     recent_activities: Optional[List[LinkedInActivity]] = Field(default_factory=list)
 
+    # Recent Posts
+    #recent_posts: Optional[List[LinkedInActivity]] = Field(default_factory=list)
+
     # Mutual connections can now be a list of either string names or LinkedInProfile objects
     mutual_connections: Optional[List[Union[str, 'LinkedInProfile']]] = Field(default_factory=list)
 
@@ -131,7 +134,13 @@ class LinkedInProfile(BaseModel):
                     connections.append(connection.full_name)
                 else:
                     connections.append(connection)
-            message += f" We share a few mutual connections like {', '.join(connections[:2])}."
+            # If there are more than 2 connections
+            if len(connections) >= 2:
+                # Shuffle The Connections
+                random.shuffle(connections)
+                message += f" We share a few mutual connections like {', '.join(connections[:2])} and {len(connections) - 2} others."
+            elif len(connections) == 1:
+                message += f" We share a mutual connection to {connections[0]}."
 
         message += "\n\nLet's connect and explore potential collaboration opportunities!"
 
@@ -139,3 +148,4 @@ class LinkedInProfile(BaseModel):
             message += f"\n\nBest regards,\n{from_name}"
 
         return message
+

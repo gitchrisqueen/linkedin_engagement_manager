@@ -84,7 +84,7 @@ def get_my_profile(driver, wait, user_email: str, user_password: str) -> LinkedI
     profile_json = get_linked_in_profile_by_email(user_email)
 
     if profile_json is None:
-        myprint(f"Previous Profile not found (or stale )DB: {user_email}")
+        myprint(f"Previous Profile not found (or stale) in DB: {user_email}")
         login_to_linkedin(driver, wait, user_email, user_password)
 
         profile_url = "https://www.linkedin.com/in/"

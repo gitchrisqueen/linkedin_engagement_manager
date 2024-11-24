@@ -297,6 +297,20 @@ def get_posts(user_id: int):
 
     return posts
 
+def get_posted_posts(user_id: int):
+    connection = get_db_connection()
+    cursor = connection.cursor(dictionary=True)
+
+    cursor.execute(
+        "SELECT id, content, scheduled_time, post_type, status FROM posts WHERE user_id = %s AND status = 'posted' ORDER BY scheduled_time asc",
+        (user_id,))
+
+    posts = cursor.fetchall()
+    cursor.close()
+    connection.close()
+
+    return posts
+
 
 def get_post_by_email(email: str):
     user_id = get_user_id(email)
@@ -586,8 +600,9 @@ def has_user_commented_on_post_url(user_id: int, post_url: str):
     connection = get_db_connection()
     cursor = connection.cursor()
 
-    cursor.execute("SELECT COUNT(*) FROM logs WHERE user_id = %s AND post_url = %s AND action_type = %s AND result = %s",
-                   (user_id, post_url, LogActionType.COMMENT, LogResultType.SUCCESS))
+    cursor.execute(
+        "SELECT COUNT(*) FROM logs WHERE user_id = %s AND post_url = %s AND action_type = %s AND result = %s",
+        (user_id, post_url, LogActionType.COMMENT, LogResultType.SUCCESS))
     count = cursor.fetchone()[0]
 
     cursor.close()
@@ -595,11 +610,15 @@ def has_user_commented_on_post_url(user_id: int, post_url: str):
 
     return count > 0
 
+
 def get_post_url_from_log_for_user(user_id: int, post_id: int):
     connection = get_db_connection()
     cursor = connection.cursor()
 
-    cursor.execute("SELECT post_url FROM logs WHERE user_id = %s AND post_id = %s AND action_type = %s AND result = %s",
+    cursor.execute("""SELECT post_url FROM logs 
+        WHERE user_id = %s AND post_id = %s AND action_type = %s AND result = %s  
+        ORDER BY created_at DESC 
+        LIMIT 1""",
                    (user_id, post_id, LogActionType.POST, LogResultType.SUCCESS))
     post_url = cursor.fetchone()[0]
 
@@ -607,3 +626,20 @@ def get_post_url_from_log_for_user(user_id: int, post_id: int):
     connection.close()
 
     return post_url
+
+
+def get_post_message_from_log_for_user(user_id: int, post_id: int):
+    connection = get_db_connection()
+    cursor = connection.cursor()
+
+    cursor.execute("""SELECT message FROM logs 
+        WHERE user_id = %s AND post_id = %s AND action_type = %s AND result = %s
+        ORDER BY created_at DESC 
+        LIMIT 1""",
+                   (user_id, post_id, LogActionType.POST, LogResultType.SUCCESS))
+    message = cursor.fetchone()[0]
+
+    cursor.close()
+    connection.close()
+
+    return message

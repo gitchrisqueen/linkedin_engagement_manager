@@ -10,6 +10,8 @@ from selenium import webdriver
 from cqc_lem.utilities.date import convert_datetime_to_start_of_day
 from cqc_lem.utilities.date import convert_viewed_on_to_date
 from cqc_lem.utilities.date import get_linkedin_datetime_from_text
+from cqc_lem.utilities.selenium_util import click_element_wait_retry, get_driver_wait, get_elements_as_list_wait_stale, \
+    getText
 
 start_identifier_map = {
     "education": 19,
@@ -189,7 +191,8 @@ def returnProfileInfo(driver: webdriver, profile_url, company_name=None):
         ('experiences', lambda: get_profile_experiences(driver, profile_url)),
         ('certifications', lambda: get_profile_certifications(driver, profile_url)),
         ('skills', lambda: get_profile_skills(driver, profile_url)),
-        ('recent_activities', lambda: get_profile_recent_activity(driver, profile_url))
+        ('recent_activities', lambda: get_profile_recent_activity(driver, profile_url)),
+        ('mutual_connections', lambda: get_mutual_connections(driver, profile_url))
     ]
 
     # Randomizing the function calls to appear natural and avoid detection
@@ -203,16 +206,35 @@ def returnProfileInfo(driver: webdriver, profile_url, company_name=None):
             print("Error getting ", key, " | ", e)
 
     # TODO: Get the industry - This may not be publicly visible
-    # TODO: Get the mutual connections
     # TODO: Get the awards
     # TODO: Get Interest (top voices, companies, groups, newsletters
-
 
     # print_header("Profile")
     # print(profile)
     # print_header("")
 
     return profile
+
+
+def get_mutual_connections(driver, employeeLink):
+    if employeeLink != driver.current_url:
+        # Open the profile URL
+        driver.get(employeeLink)
+        time.sleep(2)
+
+    wait = get_driver_wait(driver)
+
+    # click the link for mutual connections
+    click_element_wait_retry(driver, wait, "//a[contains(@href,'facetNetwork')]", "Finding Mutual Connections Link")
+
+    # Get the text of the element that contains the connection's name
+    mutual_connections = get_elements_as_list_wait_stale(wait,
+                                                         "//div[contains(@class,'linked-area')]//span[contains(@class,'title')]//a//span//span[1]",
+                                                         "Getting Mutual Conneciton Names")
+    # Get the text from the elements
+    mutual_connections = [getText(mc) for mc in mutual_connections]
+
+    return mutual_connections
 
 
 def get_profile_education(driver, employeeLink):
@@ -256,7 +278,8 @@ def get_profile_recent_activity(driver, employeeLink):
     # print("Found Test", found_text)
 
     # combine the profile activity and the found links into a mapped dict list
-    profile_activity = [{'text': text, 'link': link,
+    profile_activity = [{'text': text,
+                         'link': link,
                          'posted': convert_datetime_to_start_of_day(convert_viewed_on_to_date(date + " ago"))} for
                         text, link, date in zip(found_text, found_links, found_dates)]
 
