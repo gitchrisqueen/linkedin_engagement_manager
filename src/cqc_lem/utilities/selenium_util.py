@@ -85,26 +85,11 @@ def get_docker_driver(headless=True, session_name: str = "ChromeTests"):
     options.set_capability('se:screenResolution', '1920x1080')
     options.set_capability('se:name', 'CQC_LEM (' + session_name + ')')
 
-    desired_capabilities = {}
-    # try:
-    #    session_id = get_available_session_driver_id()
-    #    if session_id:
-    #        myprint(f"Got Session ID: {session_id}")
-    #        options.add_argument(f'--session_id={session_id}')
-    #        #options.set_capability('session_id', session_id)
-    #    else:
-    #        myprint("No available session found")
-    # except TimeoutError as te:
-    #    myprint(te)
-
-    # Try unique browser name - This didn't work but caused queue to fill and not create session
-    # options.set_capability('browserName', 'chrome_rand_'+str(random.randint(1000, 9999)))
-
     # myprint(f"Options: {vars(options)}")
 
     driver = webdriver.Remote(
-        command_executor=f'http://{SELENIUM_HUB_HOST}:{SELENIUM_HUB_PORT}',  # Works but one call controls all sessions
-        # command_executor=f'http://{SELENIUM_HUB_HOST_IP}:4444/wd/hub', # Works but one call controls all sessions
+        command_executor=f'http://{SELENIUM_HUB_HOST}:{SELENIUM_HUB_PORT}',  # Works
+        #command_executor=f'http://{SELENIUM_HUB_HOST}:4444',  # Works
         options=options
     )
 
@@ -158,7 +143,11 @@ def getBaseOptions(base_download_directory: str = None):
     # Options to make us undetectable (Review https://amiunique.org/fingerprint from the browser to verify)
     options.add_argument("window-size=1920x1080")
     options.add_argument(
-        "user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/74.0.3729.169 Safari/537.36")
+        # "user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/74.0.3729.169 Safari/537.36"
+        "user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.6723.91 Safari/537.36"
+    )
+
+    #options.set_capability("browserVersion", "100.0")  # This is needed for this version
 
     # options.page_load_strategy = 'eager'  # interactive
     # options.page_load_strategy = "normal"  # complete
@@ -449,15 +438,16 @@ def get_driver_wait_pair(headless=False, session_name: str = "ChromeTests", max_
 
 
 def clear_sessions():
-    url = f"http://{SELENIUM_HUB_HOST}:{SELENIUM_HUB_PORT}/status"
-    response = requests.get(url)
+    #base_url = f"http://{SELENIUM_HUB_HOST}:4444"
+    base_url = f"http://{SELENIUM_HUB_HOST}:{SELENIUM_HUB_PORT}"
+    response = requests.get(f"{base_url}/status")
     data = json.loads(response.text)
 
     for node in data['value']['nodes']:
         for slot in node['slots']:
             if slot['session']:
                 session_id = slot['session']['sessionId']
-                delete_url = f"http://{SELENIUM_HUB_HOST}:{SELENIUM_HUB_PORT}/session/{session_id}"
+                delete_url = f"{base_url}/session/{session_id}"
                 requests.delete(delete_url)
 
 

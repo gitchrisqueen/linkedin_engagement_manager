@@ -380,15 +380,14 @@ def automate_reply_commenting(user_id: int, post_id: int, loop_for_duration=None
             if driver.current_url != post_url:
                 driver.get(post_url)
 
-
-           # If load more comments button exists click it until its gone
+            # If load more comments button exists click it until its gone
             while True:
                 load_more_comments_button = click_element_wait_retry(driver, wait,
-                                                        '//button[contains(@class,"load-more-comments")]',
-                                                        "Finding Load More Comments Button",
-                                                        use_action_chain=True,
-                                                        max_try=0,
-                                                        element_always_expected=False)
+                                                                     '//button[contains(@class,"load-more-comments")]',
+                                                                     "Finding Load More Comments Button",
+                                                                     use_action_chain=True,
+                                                                     max_try=0,
+                                                                     element_always_expected=False)
                 if load_more_comments_button:
                     myprint("Loading More Comments....")
                     time.sleep(2)
@@ -406,7 +405,7 @@ def automate_reply_commenting(user_id: int, post_id: int, loop_for_duration=None
             # Get the unique_url_name after "in/" and before / or end or profile url
             path = urlparse(str(my_profile.profile_url)).path
             unique_url_name = path.split("/")[2] if len(path.split("/")) > 2 else None
-            #myprint(f"Unique URL Name: {unique_url_name}")
+            # myprint(f"Unique URL Name: {unique_url_name}")
 
             # For each comment element see if we have already replied; if so skip it
             for comment in comments:
@@ -415,13 +414,14 @@ def automate_reply_commenting(user_id: int, post_id: int, loop_for_duration=None
                                                             './/span[contains(@class,"comments-comment-item__main-content")][1]'))
 
                 # Search the comment element using xpath for a child span that contains the text "Author"
-                author_element = get_element_wait_retry(driver, wait, f'.//a[contains(@href,"{unique_url_name}") and contains(@aria-label,"View")]',
+                author_element = get_element_wait_retry(driver, wait,
+                                                        f'.//a[contains(@href,"{unique_url_name}") and contains(@aria-label,"View")]',
                                                         "Finding Author Element", element_always_expected=False,
                                                         max_try=0,
                                                         parent_element=comment)
 
-                if len(comment_text) > 30:
-                    short_comment_text = comment_text[:30]
+                if len(comment_text) > 75:
+                    short_comment_text = comment_text[:75]
                 else:
                     short_comment_text = comment_text
                 if author_element:
@@ -449,7 +449,7 @@ def automate_reply_commenting(user_id: int, post_id: int, loop_for_duration=None
                         # Simulate typing the comment in the text box
                         simulate_typing(driver, text_box, response)
 
-                       # Sleep so post button shows up
+                        # Sleep so post button shows up
                         time.sleep(2)
 
                         # Click the send button
@@ -530,8 +530,6 @@ def accept_connection_request(user_id: int):
 @shared_task.task(rate_limit='2/m')
 @debug_function
 def send_appreciation_dms_for_user(user_id: int, loop_for_duration=None):
-    # TODO: Implement this function
-
     user_email, user_password = get_user_password_pair_by_id(user_id)
 
     driver, wait = get_driver_wait_pair(session_name='Automate Appreciation DMs')
@@ -914,18 +912,52 @@ def send_private_dm(user_id: int, profile_url: str, message: str):
 
     try:
 
-        # Click on message button
-        click_element_wait_retry(driver, wait, '//main//button[contains(@aria-label,"Message")]',
-                                 "Finding Message Button", max_try=1, use_action_chain=True)
+        # Click the message anywhere button
+        message_anywhere_button = click_element_wait_retry(driver, wait,
+                                                           "//a[contains(@class,'message-anywhere-button')]",
+                                                           'Finding Message Anywhere Button', max_try=0,
+                                                           use_action_chain=True, element_always_expected=False)
 
-        # Paste the message in the message box
-        message_box = click_element_wait_retry(driver, wait, '//div[contains(@class,"msg-form__contenteditable")]',
-                                               "Finding Message Box")
+        if message_anywhere_button is None:
+            myprint("Message anywhere button not found")
+
+            # TODO: Figure out why this path doesnt work (Send button doesnt enable: Can/Should we force it)
+
+            # Click on message button
+            click_element_wait_retry(driver, wait, '//main//button[contains(@aria-label,"Message")]',
+                                     "Finding Message Button", max_try=1, use_action_chain=True)
+
+            # Find the message box (should be the element that now has focus)
+            # message_box = driver.switch_to.active_element
+            message_box = click_element_wait_retry(driver, wait, '//div[contains(@class,"contenteditable")]',
+                                                   'Finding Message Box', max_try=1, use_action_chain=True)
+
+        else:
+            myprint("Clicked the Message anywhere button")
+            # message_box = driver.switch_to.active_element
+            message_box = click_element_wait_retry(driver, wait, '//div[contains(@class,"contenteditable")]',
+                                                   'Finding Message Box', max_try=1, use_action_chain=True)
+
+        # Send focus to message_box
+        # ActionChains(driver).move_to_element(message_box).click().perform()
 
         # Clear the message box
         message_box.clear()
 
-        message_box.send_keys(message)
+        # Send the message
+        code = f"""
+        var xpath = "//div[contains(@class,'contenteditable')]";
+        var result = document.evaluate(xpath, document, null, XPathResult.FIRST_ORDERED_NODE_TYPE, null);
+        var div = result.singleNodeValue;
+        
+        if (div) {{
+            var element = document.createElement('p');
+            var text = document.createTextNode('{message}');
+            element.appendChild(text);
+            div.appendChild(element);
+        }}
+        """
+        driver.execute_script(code)
 
         # Sleep so send button can become active
         time.sleep(2)

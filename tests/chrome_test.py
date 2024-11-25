@@ -30,7 +30,7 @@ def test_multiple_sessions():
     # Get the driver title
     print("Window Title:", driver2.title)
 
-    time.sleep(5 * 60)
+    time.sleep(2 * 60)
 
     driver.get_cookies()
 
@@ -107,9 +107,9 @@ def test_get_my_profile():
 
 
 if __name__ == "__main__":
-    # test_multiple_sessions()
+    test_multiple_sessions()
 
-    test_linked_login_over_multiple_sessions()
+    #test_linked_login_over_multiple_sessions()
 
     # test_get_user_password_pair()
     # test_get_ready_to_post_posts()

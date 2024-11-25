@@ -34,7 +34,7 @@ app.conf.update(
         # },
         'check-scheduled-posts': {
             'task': 'cqc_lem.run_scheduler.auto_check_scheduled_posts',
-            'schedule': timedelta(minutes=5),  # Run every 5 minutes
+            'schedule': timedelta(minutes=10),  # Run every 10 minutes
         },
         'send-appreciation-dms': {
             'task': 'cqc_lem.run_scheduler.automate_appreciate_dms',

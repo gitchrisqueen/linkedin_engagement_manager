@@ -1042,6 +1042,22 @@ protobuf = ">=3.20.2,<4.21.1 || >4.21.1,<4.21.2 || >4.21.2,<4.21.3 || >4.21.3,<4
 grpc = ["grpcio (>=1.44.0,<2.0.0.dev0)"]
 
 [[package]]
+name = "googlenews"
+version = "1.6.15"
+description = "Google News search for Python"
+optional = false
+python-versions = "*"
+files = [
+    {file = "GoogleNews-1.6.15-py3-none-any.whl", hash = "sha256:9d4d8b742a9631eebc94b63cb5b36673be60e113ddcfd277c8861f9650eeab2d"},
+    {file = "googlenews-1.6.15.tar.gz", hash = "sha256:e3e2a1c70c27e07efa573dbf468752b40ad45e74d2c0427280cbd1b451075f82"},
+]
+
+[package.dependencies]
+beautifulsoup4 = "*"
+dateparser = "*"
+python-dateutil = "*"
+
+[[package]]
 name = "gprof2dot"
 version = "2024.6.6"
 description = "Generate a dot graph from the output of several profilers."
@@ -4974,4 +4990,4 @@ testing = ["coverage[toml]", "zope.event", "zope.testing"]
 [metadata]
 lock-version = "2.0"
 python-versions = ">=3.12,<4.0"
-content-hash = "39072e323986d0fa777448eb9c389e5f500324c7e7b9d586cb3240a6127be846"
+content-hash = "d3a9ed36173f696c679f8f77fc8025957840b1b9811dfdf975c3472973958fac"

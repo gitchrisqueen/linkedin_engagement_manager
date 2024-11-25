@@ -9,17 +9,9 @@ no-password = 1
 # Configs have a mapping between the Docker image to use and the capabilities that need to be matched to
 # start a container with the given image.
 configs = [
-    #"selenium/standalone-firefox:latest", '{"browserName": "firefox", "platformName": "linux", "version": "latest"}',
-    #"selenium/standalone-chrome:latest", '{"browserName": "chrome", "platformName": "linux", "browserVersion": "105.0", "version": "latest"}'
-    #"selenium/standalone-edge:latest", '{"browserName": "MicrosoftEdge", "platformName": "linux", "version": "latest"}'
-    # This works #
-    "selenium/standalone-chrome:93.0", "{\"browserName\": \"chrome\", \"browserVersion\": \"91\"}"
-    #"selenium/standalone-chrome:127.0", "{\"browserName\": \"chrome\", \"browserVersion\": \"127\"}"
-    #"selenium/standalone-chrome:4.26.0-20241101", '{"browserName": "chrome", "platformName": "mac", "browserVersion": "116"}'
-    #"selenium/standalone-chrome:latest", '{"browserName": "chrome", "browserVersion": "130.0.6723.91"}'
-    #"selenium/standalone-chrome:latest", "{\"browserName\": \"chrome\", \"browserVersion\": \"130\", \"version\": \"latest\"}"
-    #"selenium/standalone-chrome:latest", "{\"browserName\": \"chrome\"}"
-    ]
+    #"selenium/standalone-chrome:93.0", "{\"browserName\": \"chrome\"}"
+    "selenium/standalone-chrome:latest", "{\"browserName\": \"chrome\"}" # Works (SE_START_XVFB=false in environment will kill this)
+]
 
 #host-config-keys = ["Dns", "DnsOptions", "DnsSearch", "ExtraHosts", "Binds"]
 
@@ -29,6 +21,7 @@ configs = [
 # To have Docker listening through tcp on macOS, install socat and run the following command
 # socat -4 TCP-LISTEN:2375,fork UNIX-CONNECT:/var/run/docker.sock
 url = "http://127.0.0.1:2375"
+#url = "host.docker.internal"
 # Docker image used for video recording
 video-image = "selenium/video:latest"
 #video-image = "selenium/video:ffmpeg-7.1-20241101"

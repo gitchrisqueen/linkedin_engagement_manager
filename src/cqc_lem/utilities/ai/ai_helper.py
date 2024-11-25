@@ -2,9 +2,9 @@ import random
 
 import openai
 from dotenv import load_dotenv
-from openai import OpenAI
 
 from cqc_lem.linked_in_profile import LinkedInProfile
+from cqc_lem.utilities.ai.client import client
 from cqc_lem.utilities.logger import myprint
 
 # Load .env file
@@ -12,12 +12,6 @@ load_dotenv()
 
 # Retrieve OpenAI API key from environment variables
 # openai.api_key = os.getenv("OPENAI_API_KEY") #<---- This is done be default
-client = OpenAI(
-    # This is the default and can be omitted
-    # api_key=os.environ.get("OPENAI_API_KEY"),
-)
-
-
 
 
 def generate_ai_response_test():
@@ -453,7 +447,7 @@ def get_thought_leadership_post_from_ai(linked_user_profile: LinkedInProfile, bu
         # Buyer Stages:
         - Awareness: Introduce key industry challenges and trends that my expertise addresses.
         - Consideration: Highlight unique solutions, strategies, or frameworks that showcase my approach to common industry problems.
-        - Decision: Provide insight into how my experience and skills make me a strong partner for organizations seeking expertise in relevant industries or skills areas].
+        - Decision: Provide insight into how my experience and skills make me a strong partner for organizations seeking expertise in relevant industries or skills areas.
         
         Conclude with an engaging call to action that encourages readers at the specified stage to connect or learn more.
         

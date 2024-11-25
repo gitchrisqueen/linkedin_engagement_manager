@@ -63,6 +63,7 @@ opentelemetry-instrumentation-fastapi = "^0.49b2"
 pexels-api = "^1.0.1"
 mammoth = "^1.8.0"
 docx = "^0.2.4"
+googlenews = "^1.6.15"
 
 
 

@@ -1,14 +1,15 @@
 import json
 
 from cqc_lem.linked_in_profile import LinkedInProfile
-from cqc_lem.run_automation import engage_with_profile_viewer, comment_on_post, invite_to_connect, check_commented
+from cqc_lem.run_automation import engage_with_profile_viewer, comment_on_post, invite_to_connect, check_commented, \
+    send_private_dm
 from cqc_lem.utilities.ai.ai_helper import generate_ai_response, get_ai_description_of_profile, \
     get_ai_message_refinement, summarize_recent_activity
 from cqc_lem.utilities.date import convert_viewed_on_to_date
 from cqc_lem.utilities.env_constants import LI_USER, LI_PASSWORD
 from cqc_lem.utilities.linked_in_helper import login_to_linkedin, get_linkedin_profile_from_url, get_my_profile
 from cqc_lem.utilities.logger import myprint
-from cqc_lem.utilities.selenium_util import create_driver, get_driver_wait
+from cqc_lem.utilities.selenium_util import create_driver, get_driver_wait, clear_sessions
 
 
 def test_ai_responses():
@@ -208,19 +209,6 @@ def test_invite_to_connect():
         message = None
 
 
-if __name__ == "__main__":
-    # test_ai_responses()
-    # test_dates()
-    # test_linked_in_profile()
-    # test_get_linkedin_profile_from_url()
-    # test_send_dm()
-    # test_describe_profile()
-    # test_describe_summarize_interesting_activity()
-    # test_post_comment()
-
-    pass
-
-
 def test_already_commented(driver, wait):
     login_to_linkedin(driver, wait, LI_USER, LI_PASSWORD)
 
@@ -237,3 +225,29 @@ def test_already_commented(driver, wait):
             myprint("Already commented on this post. Skipping...")
         else:
             myprint("Not commented on this post yet. Proceeding...")
+
+def test_send_private_dm():
+    user_id = 60
+    profile_url = "https://www.linkedin.com/in/alexwang8613818430998/"
+    name= "Alex"
+    message = f"Hi {name}, I appreciate you connecting with me on LinkedIn. I look forward to learning more about you and your work."
+    clear_sessions()
+
+    send_private_dm(user_id, profile_url, message)
+
+
+if __name__ == "__main__":
+    # test_ai_responses()
+    # test_dates()
+    # test_linked_in_profile()
+    # test_get_linkedin_profile_from_url()
+    # test_send_dm()
+    # test_describe_profile()
+    # test_describe_summarize_interesting_activity()
+    # test_post_comment()
+    test_send_private_dm()
+
+    pass
+
+
+

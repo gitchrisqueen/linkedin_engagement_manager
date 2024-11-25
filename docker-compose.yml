@@ -168,11 +168,17 @@ services:
       - prometheus
 
   node_docker:
-    image: selenium/node-docker:latest
+    image: selenium/node-docker:4.26.0-20241101
     container_name: node_docker
+    deploy:
+      resources:
+        limits:
+          cpus: '4'   # Limit the container to use at most 4 CPUs
+        reservations:
+          cpus: '2'   # Reserve at least 2 CPUs for this container
     shm_size: 2gb
     volumes:
-      - chrome_profile:/tmp # to persist the chrome user Data dir
+      #- chrome_profile:/tmp # to persist the chrome user Data dir
       - ./assets:/opt/selenium/assets
       - ./compose/local/node_docker/config.toml:/opt/selenium/docker.toml
       - /var/run/docker.sock:/var/run/docker.sock
@@ -188,15 +194,16 @@ services:
       - SE_ENABLE_TRACING=true
       - SE_OTEL_TRACES_EXPORTER=otlp
       - SE_OTEL_EXPORTER_ENDPOINT=http://${JAEGER_AGENT_HOST}:${JAEGER_SPANS_GRPC_PORT}
-      - SE_VNC_NO_PASSWORD=1
+      - SE_VNC_NO_PASSWORD=true
       - SE_NODE_MAX_SESSIONS=4 # This should not be more than the available CPUS
       - SE_NODE_OVERRIDE_MAX_SESSIONS=true # To allow the override of the max sessions
-      - SE_START_XVFB=false # Don't start the Xvfb, as we are running headless
+      #- SE_START_XVFB=false # This will kill selenium/standalone-chrome:latest
     ports:
       - "5555:5555"
 
+
   selenium_hub:
-    image: selenium/hub:latest
+    image: selenium/hub:4.26.0-20241101
     container_name: selenium_hub
     hostname: ${SELENIUM_HUB_HOST}
     depends_on:
