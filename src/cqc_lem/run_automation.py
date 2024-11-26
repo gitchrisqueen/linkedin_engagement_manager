@@ -1,3 +1,4 @@
+import json
 import random
 import sys
 import threading
@@ -394,10 +395,15 @@ def automate_reply_commenting(user_id: int, post_id: int, loop_for_duration=None
                 else:
                     break
 
-            # Get all the comments
-            comments = get_elements_as_list_wait_stale(wait,
-                                                       "//div[contains(@class,'comments-comment-list__container')]/article[contains(@class,'comments-comment-entity')]",
-                                                       "Finding Comments")
+            try:
+
+                # Get all the comments
+                comments = get_elements_as_list_wait_stale(wait,
+                                                           "//div[contains(@class,'comments-comment-list__container')]/article[contains(@class,'comments-comment-entity')]",
+                                                           "Finding Comments")
+            except Exception as e:
+                myprint(f"Error while finding comments: {e}")
+                comments = []
 
             # Print how many comments found
             myprint(f"Comments Found: {len(comments)}")
@@ -944,7 +950,8 @@ def send_private_dm(user_id: int, profile_url: str, message: str):
         # Clear the message box
         message_box.clear()
 
-        # Send the message
+       # Create javascript to inject the message
+        escaped_message = json.dumps(message)
         code = f"""
         var xpath = "//div[contains(@class,'contenteditable')]";
         var result = document.evaluate(xpath, document, null, XPathResult.FIRST_ORDERED_NODE_TYPE, null);
@@ -952,11 +959,13 @@ def send_private_dm(user_id: int, profile_url: str, message: str):
         
         if (div) {{
             var element = document.createElement('p');
-            var text = document.createTextNode('{message}');
+            var text = document.createTextNode('{escaped_message}');
             element.appendChild(text);
             div.appendChild(element);
         }}
         """
+
+        # Add the message to the message box div
         driver.execute_script(code)
 
         # Sleep so send button can become active
@@ -968,13 +977,14 @@ def send_private_dm(user_id: int, profile_url: str, message: str):
 
         dm_sent = True
 
-        quit_gracefully(driver)  # Close the driver
-
         final_result += " Sent Successfully"
 
     except Exception as e:
         myprint(f"Failed to send DM: {str(e)}")
         final_result += f"Failed. Error: {str(e)}"
+
+
+    quit_gracefully(driver)  # Close the driver
 
     # Update DB logs with DM Sent
     insert_new_log(user_id=user_id, action_type=LogActionType.DM,
