@@ -179,7 +179,7 @@ services:
     shm_size: 2gb
     volumes:
       #- chrome_profile:/tmp # to persist the chrome user Data dir
-      - ./assets:/opt/selenium/assets
+      - ./src/cqc_lem/assets:/opt/selenium/assets
       - ./compose/local/node_docker/config.toml:/opt/selenium/docker.toml
       - /var/run/docker.sock:/var/run/docker.sock
     depends_on:

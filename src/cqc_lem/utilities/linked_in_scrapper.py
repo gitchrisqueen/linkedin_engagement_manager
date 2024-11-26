@@ -158,7 +158,7 @@ def get_page_source(driver, url, scroll_times=0):
 
 
 # returns LinkedIn profile information
-def returnProfileInfo(driver: webdriver, profile_url, company_name=None):
+def returnProfileInfo(driver: webdriver, profile_url, company_name=None, is_main_user = False):
     url = profile_url
     source = get_page_source(driver, url, 0)
     profile = {}
@@ -192,8 +192,31 @@ def returnProfileInfo(driver: webdriver, profile_url, company_name=None):
         ('certifications', lambda: get_profile_certifications(driver, profile_url)),
         ('skills', lambda: get_profile_skills(driver, profile_url)),
         ('recent_activities', lambda: get_profile_recent_activity(driver, profile_url)),
-        ('mutual_connections', lambda: get_mutual_connections(driver, profile_url))
     ]
+
+    # Add mutual_connections function if not is_main_user
+    if not is_main_user:
+        functions.append(('mutual_connections', lambda: get_mutual_connections(driver, profile_url)))
+
+    # Shuffle the functions to make the execution order random
+    random.shuffle(functions)
+
+    # Call each function and add the result to the profile
+    for key, func in functions:
+        try:
+            profile[key] = func()
+        except Exception as e:
+            print("Error getting ", key, " | ", e)
+
+    # TODO: Get the industry - This may not be publicly visible
+    # TODO: Get the awards
+    # TODO: Get Interest (top voices, companies, groups, newsletters
+
+    # print_header("Profile")
+    # print(profile)
+    # print_header("")
+
+    return profile
 
     # Randomizing the function calls to appear natural and avoid detection
     random.shuffle(functions)

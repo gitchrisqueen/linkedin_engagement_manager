@@ -2,7 +2,9 @@ import functools
 import os
 from enum import Enum
 from datetime import datetime, time, date
+from urllib.parse import urlparse
 
+import requests
 import tldextract
 
 DEBUG_LEVEL = 3
@@ -91,3 +93,34 @@ def get_12h_format_best_time(best_time: time):
     # Format the best time to 12-hour format
     best_time_12hr = best_time.strftime("%I:%M %p")
     return best_time_12hr
+
+
+def save_video_url_to_dir(video_url: str, dir_path):
+    # Extract the original file name from the URL
+    parsed_url = urlparse(video_url)
+    file_name = os.path.basename(parsed_url.path)
+
+    # Fetch the content from the URL
+    response = requests.get(video_url)
+    response.raise_for_status()  # Ensure we notice bad responses
+
+    # Save the video to the directory with the original file name
+    video_path = os.path.join(dir_path, file_name)
+    with open(video_path, 'wb') as f:
+        f.write(response.content)
+
+    return video_path
+
+def get_file_extension_from_filepath(file_path: str, remove_leading_dot: bool = False) -> str:
+    basename = os.path.basename(file_path)
+    file_name, file_extension = os.path.splitext(basename)
+    if remove_leading_dot and file_extension.startswith("."):
+        # st.info("Removing leading dot from file extension: " + file_extension)
+        file_extension = file_extension[1:]
+
+    if file_extension:
+        file_extension = file_extension.lower()
+
+    # st.info("Base Name: " + basename + " | File Name: " + file_name + " | File Extension : " + file_extension)
+
+    return file_extension

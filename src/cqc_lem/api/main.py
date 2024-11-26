@@ -1,21 +1,24 @@
 import os
 import time
 from datetime import datetime
-from enum import Enum
-from http.client import responses
 from typing import Optional, Any
 
-from fastapi import FastAPI, Query
+from fastapi import FastAPI
 from fastapi import HTTPException
+from fastapi.responses import FileResponse
 from fastapi.responses import RedirectResponse
 from linkedin_api.clients.auth.client import AuthClient
 from linkedin_api.clients.restli.client import RestliClient
 from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
 from pydantic import BaseModel, computed_field
 
-from cqc_lem.utilities.db import insert_post, get_post_by_email, get_user_id, update_db_post, add_user_with_access_token
+from cqc_lem import assets_dir
+from cqc_lem.utilities.db import insert_post, get_post_by_email, get_user_id, update_db_post, \
+    add_user_with_access_token, PostType, PostStatus
 from cqc_lem.utilities.jaeger_tracer_helper import get_jaeger_tracer
 from cqc_lem.utilities.logger import myprint
+from cqc_lem.utilities.mime_type_helper import get_file_mime_type
+from cqc_lem.utilities.utils import get_file_extension_from_filepath
 
 app = FastAPI()
 
@@ -39,27 +42,13 @@ class ResponseModel(BaseModel):
     detail: Any
 
 
-class PostType(str, Enum):
-    text = "text"
-    carousel = "carousel"
-    video = "video"
-
-
-class PostStatus(str, Enum):
-    planning = "planning"
-    pending = "pending"
-    approved = "approved"
-    rejected = "rejected"
-    scheduled = "scheduled"
-    posted = "posted"
-
-
 class PostRequest(BaseModel):
     content: str
-    post_type: Optional[PostType] = PostType.text
+    video_url: Optional[str] = None
+    post_type: Optional[PostType] = PostType.TEXT
     scheduled_datetime: datetime
-    email: str
-    status: Optional[PostStatus] = PostStatus.pending
+    email: Optional[str] = None
+    status: Optional[PostStatus] = PostStatus.PENDING
 
     @property
     def post_json(self):
@@ -92,7 +81,8 @@ def schedule_post(post: PostRequest) -> ResponseModel:
     else:
         raise HTTPException(status_code=404, detail="Could not schedule post")
 
-@app.get('/user_id/',  responses={
+
+@app.get('/user_id/', responses={
     200: {"description": "User ID retrieved successfully"},
     **{k: v for k, v in error_responses.items() if k in [400, 404]}
 })
@@ -123,7 +113,7 @@ def get_posts(email: str) -> ResponseModel:
         raise HTTPException(status_code=404, detail="No posts found for the given email")
 
     # Convert posts to a list of dictionaries
-    posts_list = [{"post_id": post["id"], "content": post["content"], "scheduled_time": post["scheduled_time"],
+    posts_list = [{"post_id": post["id"], "content": post["content"], "video_url": post["video_url"], "scheduled_time": post["scheduled_time"],
                    "post_type": post["post_type"], "status": post['status']} for post in posts]
 
     return ResponseModel(status_code=200, detail=posts_list)
@@ -137,7 +127,9 @@ def get_posts(email: str) -> ResponseModel:
 def update_post(post_id: int, post: PostRequest) -> ResponseModel:
     """Endpoint to update a post."""
 
-    if update_db_post(post.content, post.scheduled_time, post.post_type, post_id, post.status):
+    print(f"Received Post Request: {post}")
+
+    if update_db_post(post.content, post.video_url, post.scheduled_time, post.post_type, post_id, post.status):
         return ResponseModel(status_code=200, detail="Post updated successful")
     else:
         raise HTTPException(status_code=405, detail="Post could not be updated")
@@ -172,7 +164,7 @@ def linkedin_callback(code: str, state: str = None):
         response = restli_client.get(
             resource_path=resource_path,
             access_token=access_token_response.access_token,
-            #query_params={"fields": "id,firstName:(localized),lastName, emailAddress"},
+            # query_params={"fields": "id,firstName:(localized),lastName, emailAddress"},
         )
 
         myprint(f"Response from {resource_path} api call:")
@@ -189,4 +181,31 @@ def linkedin_callback(code: str, state: str = None):
 
         # Redirect the user to the main Streamlit app from env variable
         streamlit_url = os.environ.get('NGROK_CUSTOM_DOMAIN')
-        return RedirectResponse(url=f"https://{streamlit_url}") # TODO: Figure out better redirect. Should we just close the window
+        return RedirectResponse(
+            url=f"https://{streamlit_url}")  # TODO: Figure out better redirect. Should we just close the window
+
+
+@app.get("/assets", responses={
+    200: {"description": "Asset returned successfully"},
+    **{k: v for k, v in error_responses.items() if k in [400, 404]}
+})
+def get_assets(file_name: str) -> FileResponse:
+    """Endpoint to get video asset by file name."""
+    if not file_name:
+        raise HTTPException(status_code=400, detail="A File Name is required")
+
+    # Check to see if file exists in the assets directory
+    file_path = os.path.join(assets_dir, file_name)
+
+    print(f"File Path: {file_path}")
+
+    if not os.path.exists(file_path):
+        raise HTTPException(status_code=404, detail="File not found")
+
+    # Get the file extension form the file_path
+    file_extension = get_file_extension_from_filepath(file_path)
+
+    # Get the mime type for the file
+    mim_type = get_file_mime_type(file_extension)
+
+    return FileResponse(status_code=200, path=file_path, media_type=mim_type)

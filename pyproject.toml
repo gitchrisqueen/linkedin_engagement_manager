@@ -64,6 +64,10 @@ pexels-api = "^1.0.1"
 mammoth = "^1.8.0"
 docx = "^0.2.4"
 googlenews = "^1.6.15"
+gradio-client = "^1.4.3"
+runwayml = "^2.1.0"
+huggingface-hub = "^0.26.2"
+replicate = "^1.0.4"
 
 
 

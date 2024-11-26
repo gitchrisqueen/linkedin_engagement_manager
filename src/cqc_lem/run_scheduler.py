@@ -10,7 +10,7 @@ from cqc_lem.run_automation import automate_commenting, automate_profile_viewer_
 from cqc_lem.utilities.date import add_local_tz_to_datetime
 from cqc_lem.utilities.db import get_ready_to_post_posts, get_post_content, \
     update_db_post_status, get_user_password_pair_by_id, get_user_linked_sub_id, get_user_access_token, \
-    get_active_user_ids, insert_new_log, LogActionType, LogResultType
+    get_active_user_ids, insert_new_log, LogActionType, LogResultType, get_post_video_url
 from cqc_lem.utilities.logger import myprint
 
 
@@ -94,6 +94,8 @@ def automate_appreciate_dms():
 
 @shared_task.task(rate_limit='2/m')
 def post_to_linkedin(user_id: int, post_id: int, **kwargs):
+    """Posts to LinkedIn using the LinkedIn API - https://learn.microsoft.com/en-us/linkedin/consumer/integrations/self-serve/share-on-linkedin#creating-a-share-on-linkedin"""
+
     # Login and publish post to LinkedIn
     user_email, user_password = get_user_password_pair_by_id(user_id)
     myprint(f"Posting to LinkedIn as user: {user_email}")
@@ -102,12 +104,26 @@ def post_to_linkedin(user_id: int, post_id: int, **kwargs):
     content = get_post_content(post_id)
     myprint(f"Posting to LinkedIn: {content}")
 
+    # Get the post video url
+    video_url = get_post_video_url(post_id)
+
+
+
     restli_client = RestliClient()
     restli_client.session.hooks["response"].append(lambda r: r.raise_for_status())
 
     linked_sub_id = get_user_linked_sub_id(user_id)
 
     access_token = get_user_access_token(user_id)
+
+    if video_url:
+        myprint(f"Video URL: {video_url}")
+        # Send a POST request to the assets API, with the action query parameter to registerUpload.
+        restli_client.p
+
+        # A successful response will contain an uploadUrl and asset that you will need to save for the next steps.
+
+        # Using the uploadUrl returned from Step 1, upload your image or video to LinkedIn. To upload your image or video, send a POST request to the uploadUrl with your image or video included as a binary file. The example below uses cURL to upload an image file.
 
     posts_create_response = restli_client.create(
         resource_path="/posts",

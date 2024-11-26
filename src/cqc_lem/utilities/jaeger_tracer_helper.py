@@ -8,6 +8,8 @@ from opentelemetry.sdk.trace import TracerProvider
 from opentelemetry.sdk.trace.export import BatchSpanProcessor
 
 
+#TODO: Should this be imported in the main module __init__.py ???
+# TODO: How can we automate tracing and add performance metrics for down the road development
 def get_jaeger_tracer(service_name: str, module_name: str) -> trace.Tracer:
     resource = Resource.create({
         "service.name": f"cqc-lem.{service_name}",

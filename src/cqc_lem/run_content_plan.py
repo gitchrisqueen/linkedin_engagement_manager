@@ -1,25 +1,30 @@
 import json
+import os
 import random
 from datetime import datetime, timedelta
 from xml.etree import ElementTree
 
 import requests
 from bs4 import BeautifulSoup
-from celery.worker.control import rate_limit
 from requests.adapters import HTTPAdapter
 from urllib3 import Retry
 
+from cqc_lem import assets_dir
 from cqc_lem.my_celery import app as shared_task
-from cqc_lem.utilities.ai.ai_helper import get_blog_summary_post_from_ai, get_website_content_post_from_ai
-from cqc_lem.utilities.ai.ai_helper import get_video_content_from_ai, get_thought_leadership_post_from_ai, \
+from cqc_lem.utilities.ai.ai_helper import get_blog_summary_post_from_ai, get_website_content_post_from_ai, \
+    get_flux_image_prompt_from_ai, generate_flux1_image_from_prompt, get_runway_ml_video_prompt_from_ai, \
+    create_runway_video
+from cqc_lem.utilities.ai.ai_helper import get_thought_leadership_post_from_ai, \
     get_industry_news_post_from_ai, get_personal_story_post_from_ai, generate_engagement_prompt_post
 from cqc_lem.utilities.db import get_post_type_counts, insert_planned_post, update_db_post_content, \
     get_planned_posts_for_current_week, get_last_planned_post_date_for_user, get_user_password_pair_by_id, \
-    get_user_blog_url, get_user_sitemap_url, get_active_user_ids, get_planned_posts_for_next_week
+    get_user_blog_url, get_user_sitemap_url, get_active_user_ids, get_planned_posts_for_next_week, PostStatus, \
+    update_db_post_video_url, update_db_post_status
+from cqc_lem.utilities.env_constants import API_BASE_URL
 from cqc_lem.utilities.linked_in_helper import get_my_profile
 from cqc_lem.utilities.logger import myprint
 from cqc_lem.utilities.selenium_util import get_driver_wait_pair, quit_gracefully
-from cqc_lem.utilities.utils import get_best_posting_time
+from cqc_lem.utilities.utils import get_best_posting_time, create_folder_if_not_exists, save_video_url_to_dir
 
 
 @shared_task.task
@@ -28,7 +33,7 @@ def auto_generate_content():
     active_users = get_active_user_ids()
     # For each user generate content for the next 30 days
     for user_id in active_users:
-        generate_content_for_user.apply_async(kwargs={"user_id":user_id})
+        generate_content_for_user.apply_async(kwargs={"user_id": user_id})
 
 
 @shared_task.task(rate_limit='2/m')
@@ -73,7 +78,7 @@ def generate_content_for_user(user_id: int):
     # myprint(f"Start Date: {start_date}")
 
     # Determine how many days are left in this month
-    days_left_in_month = days_in_month - start_date.day +1 # dont cont today
+    days_left_in_month = days_in_month - start_date.day + 1  # dont cont today
 
     # myprint(f"Days Left in Month after Start Date: {days_left_in_month}")
 
@@ -180,9 +185,10 @@ def get_min_key(d):
 def create_content(user_id: int, post_type: str, stage: str):
     """Create content based on the specified post type and buyer journey stage."""
 
+    video_url = None
+
     if post_type == "video":
-        #content = create_video_content(user_id, stage) # TODO: Find a way to implement this
-        content = f"Content created for {post_type} in the {stage} stage. However, this is unfinished"
+        content, video_url = create_video_content(user_id, stage)
     elif post_type == "carousel":
         content = f"Content created for {post_type} in the {stage} stage. However, this is unfinished"
     else:
@@ -190,22 +196,41 @@ def create_content(user_id: int, post_type: str, stage: str):
         # Strip leading and ending white spaces
         content = content.strip()
 
-    return content
+    return content, video_url
 
 
-def create_video_content(user_id: int, stage: str):
-    user_email, user_password = get_user_password_pair_by_id(user_id)
-    driver, wait = get_driver_wait_pair(session_name='Create Content')
-    my_profile = get_my_profile(driver, wait, user_email, user_password)
+def create_video_content(user_id: int, stage: str) -> tuple[str, str | None]:
+    # user_email, user_password = get_user_password_pair_by_id(user_id)
+    # driver, wait = get_driver_wait_pair(session_name='Create Content')
+    # my_profile = get_my_profile(driver, wait, user_email, user_password)
 
-    content = get_video_content_from_ai(my_profile, stage)
+    # Get Text Content
+    text_content = create_text_post(user_id, stage)  # TODO: Should we limit this to specific post_types ???
+    # Strip leading and ending white spaces
+    text_content = text_content.strip()
 
-    # TODO: NEed to store video somewhere untill its uploaded to LI
-    # TODO: Video content will need text to go with it (should call create_text_post to get this or maybe call this first to generate video from it)
+    # Create an image prompt from the text content
+    image_prompt = get_flux_image_prompt_from_ai(text_content)
+    print(f"Generated AI Image Prompt: {image_prompt}")
 
-    quit_gracefully(driver)
+    # Create the image from the image prompt using flux1
+    image_path = generate_flux1_image_from_prompt(image_prompt)
+    print(f"Generated Image From Prompt | Path: {image_path}")
 
-    return content
+    # Create a video prompt from the text content and image
+    video_prompt = get_runway_ml_video_prompt_from_ai(text_content, image_prompt)
+    print(f"Runway ML Video Prompt: {video_prompt}")
+
+    # Make sure the video_prompt is less than 512 characters
+    video_prompt = video_prompt[:512]
+
+    # Create a video from the image url and video prompt using Runway ML
+    video_url = create_runway_video(image_path, video_prompt)
+    print(f"Generated Video URL: {video_url}")
+
+    # quit_gracefully(driver)
+
+    return text_content, video_url
 
 
 def create_text_post(user_id: int, stage: str, post_type: str = None, user_profile=None):
@@ -595,14 +620,32 @@ def auto_create_weekly_content(user_id: int = None):
         stage = post['buyer_stage']
 
         # For each content create it
-        content = create_content(user_id, post_type, stage)
+        content, video_url = create_content(user_id, post_type, stage)
+
+        # Copy the video from url to our assets/video folder and store it to the database for later retrieval via api call
+        if video_url:
+            # Define and create assets_dir / videos
+            videos_dir = os.path.join(assets_dir, 'videos', 'runwayml')
+            create_folder_if_not_exists(videos_dir)
+            video_file_path = save_video_url_to_dir(video_url, videos_dir)
+            myprint(f"Video from url: {video_url} | Saved to: {video_file_path}")
+            # Get the file name from the video file path
+            video_file_name = os.path.basename(video_file_path)
+
+            # The video url is our api prefix + 'assets/videos' +  video_file_name
+            api_video_url = f"{API_BASE_URL}/assets?file_name=videos/runwayml/{video_file_name}"
+            myprint(f"Video URL: {api_video_url}")
+
+            # Update the database with the video url
+            update_db_post_video_url(post_id, api_video_url)
 
         # Update the database with the created content
-        myprint(f"Updating post content for post_id: {post_id}")
+        myprint(f"Updating content for post_id: {post_id}")
         update_db_post_content(post_id, content)
 
-
-
+        # Update the status of the post in the db to pending
+        myprint(f"Updating post_id: {post_id} Status={PostStatus.PENDING}")
+        update_db_post_status(post_id, PostStatus.PENDING)
 
 
 if __name__ == '__main__':

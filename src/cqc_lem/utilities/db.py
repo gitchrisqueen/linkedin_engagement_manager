@@ -31,6 +31,21 @@ def get_db_connection():
     )
 
 
+class PostType(StrEnum):
+    TEXT = "text"
+    CAROUSEL = "carousel"
+    VIDEO = "video"
+
+
+class PostStatus(StrEnum):
+    PLANNING = "planning"
+    PENDING = "pending"
+    APPROVED = "approved"
+    REJECTED = "rejected"
+    SCHEDULED = "scheduled"
+    POSTED = "posted"
+
+
 # Enum for log actions types
 class LogActionType(StrEnum):
     COMMENT = 'comment'
@@ -216,14 +231,14 @@ def insert_post(email, content, scheduled_time, post_type) -> bool:
     return success
 
 
-def insert_planned_post(user_id: int, scheduled_time, post_type: str, buyer_stage: str) -> bool:
+def insert_planned_post(user_id: int, scheduled_time, post_type: PostType, buyer_stage: str) -> bool:
     connection = get_db_connection()
     cursor = connection.cursor()
 
     cursor.execute("""
         INSERT INTO posts (scheduled_time, post_type, user_id, buyer_stage, status, content)
         VALUES (%s, %s, %s, %s, %s, %s)
-    """, (scheduled_time, post_type, user_id, buyer_stage, 'planning', 'TBD'))
+    """, (scheduled_time, post_type, user_id, buyer_stage, PostStatus.PLANNING, 'TBD'))
 
     connection.commit()
     success = cursor.rowcount == 1
@@ -232,13 +247,13 @@ def insert_planned_post(user_id: int, scheduled_time, post_type: str, buyer_stag
     return success
 
 
-def update_db_post(content: str, scheduled_time: str, post_type: str, post_id: int, status: str) -> bool:
+def update_db_post(content: str, video_url: str, scheduled_time: str, post_type: PostType, post_id: int, status: PostStatus) -> bool:
     connection = get_db_connection()
     cursor = connection.cursor()
 
     cursor.execute(
-        "UPDATE posts SET content = %s, scheduled_time =%s, post_type = %s, status = %s WHERE id = %s",
-        (content, scheduled_time, post_type, status, post_id)
+        "UPDATE posts SET content = %s, video_url = %s, scheduled_time =%s, post_type = %s, status = %s WHERE id = %s",
+        (content, video_url, scheduled_time, post_type, status, post_id)
     )
 
     connection.commit()
@@ -254,8 +269,25 @@ def update_db_post_content(post_id: int, content: str) -> bool:
     cursor = connection.cursor()
 
     cursor.execute(
-        "UPDATE posts SET content = %s, status = 'pending' WHERE id = %s",
+        "UPDATE posts SET content = %s WHERE id = %s",
         (content, post_id)
+    )
+
+    connection.commit()
+    success = cursor.rowcount == 1
+    cursor.close()
+    connection.close()
+
+    return success
+
+
+def update_db_post_video_url(post_id: int, video_url: str) -> bool:
+    connection = get_db_connection()
+    cursor = connection.cursor()
+
+    cursor.execute(
+        "UPDATE posts SET video_url = %s WHERE id = %s",
+        (video_url, post_id)
     )
 
     connection.commit()
@@ -269,6 +301,8 @@ def update_db_post_content(post_id: int, content: str) -> bool:
 def update_db_post_status(post_id: int, status: str) -> bool:
     connection = get_db_connection()
     cursor = connection.cursor()
+
+    # TODO: Why Enum doesnt work inside this functioin ????
 
     cursor.execute(
         "UPDATE posts SET status = %s WHERE id = %s",
@@ -288,7 +322,7 @@ def get_posts(user_id: int):
     cursor = connection.cursor(dictionary=True)
 
     cursor.execute(
-        "SELECT id, content, scheduled_time, post_type, status FROM posts WHERE user_id = %s ORDER BY scheduled_time asc",
+        "SELECT id, content, video_url, scheduled_time, post_type, status FROM posts WHERE user_id = %s ORDER BY scheduled_time asc",
         (user_id,))
 
     posts = cursor.fetchall()
@@ -296,6 +330,7 @@ def get_posts(user_id: int):
     connection.close()
 
     return posts
+
 
 def get_posted_posts(user_id: int):
     connection = get_db_connection()
@@ -333,6 +368,19 @@ def get_post_content(post_id: int):
     connection.close()
 
     return post['content'] if post else None
+
+
+def get_post_video_url(post_id: int):
+    connection = get_db_connection()
+    cursor = connection.cursor(dictionary=True)
+
+    cursor.execute("SELECT video_url FROM posts WHERE id = %s", (post_id,))
+
+    post = cursor.fetchone()
+    cursor.close()
+    connection.close()
+
+    return post['video_url'] if post else None
 
 
 def get_ready_to_post_posts(pre_post_time: datetime = None) -> list:

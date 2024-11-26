@@ -1,14 +1,27 @@
+import base64
+import os
 import random
+import shutil
+import time
+import uuid
 
 import openai
+import replicate
 from dotenv import load_dotenv
+from gradio_client import Client as GCLIENT
+from huggingface_hub import login
+from runwayml import RunwayML
 
+from cqc_lem import assets_dir
 from cqc_lem.linked_in_profile import LinkedInProfile
 from cqc_lem.utilities.ai.client import client
+from cqc_lem.utilities.ai.tools import search_recent_news
 from cqc_lem.utilities.logger import myprint
+from cqc_lem.utilities.utils import create_folder_if_not_exists, save_video_url_to_dir
 
 # Load .env file
 load_dotenv()
+
 
 # Retrieve OpenAI API key from environment variables
 # openai.api_key = os.getenv("OPENAI_API_KEY") #<---- This is done be default
@@ -161,6 +174,90 @@ def get_ai_description_of_profile(linked_in_profile: LinkedInProfile):
         5. Conclude with a comprehensive summary that combines these insights into a clear picture of the individual’s character traits, citing specific parts of the profile to support your findings.
         
         Take a deep breath and work on this problem step-by-step."""
+    }
+
+    # User prompt to be sent with each API call
+    user_message = {
+        "role": "user",
+        "content": content
+    }
+
+    # Call the API with the system and user prompt only (no memory of past prompts)
+    response = client.chat.completions.create(
+        model="gpt-4o-mini",  # Specify the model you want to use
+        messages=[system_prompt, user_message],  # System prompt + current user prompt
+        # temperature=0.3,  # Adjust this parameter as per your needs
+        # max_tokens=150  # Set token limit as required
+    )
+
+    # Extract and return the model's response
+    comment = response.choices[0].message.content.strip()
+    return comment
+
+
+def get_industries_of_profile_from_ai(linked_in_profile: LinkedInProfile, industry_count: int = 3):
+    """Generate industries based on the LinkedIn user profile."""
+
+    # Use json to output to string
+    linked_in_profile_json = linked_in_profile.model_dump_json()
+    prompt = f"""Please tell me what {industry_count} industry(s) that most align with the following LinkedIn Profile's career and personal interest.
+             A short comma seperated list is all that is needed.
+             
+             Linked Profile: {linked_in_profile_json}
+
+"""
+
+    # myprint(f"Prompt: {prompt}")
+
+    content = [{"type": "text", "text": prompt}]
+
+    # System prompt to be included in every request
+    system_prompt = {
+        "role": "system",
+        "content": f"""Act like a professional career analyst specializing in LinkedIn profile analysis. 
+        You have 15 years of experience identifying professional interests, career trajectories, and industry affiliations based on online profiles. 
+        Your expertise includes assessing user activities, language use, endorsements, skills, and affiliations to infer professional domains and preferences.  
+
+        **Objective:** Analyze the provided LinkedIn profile to:  
+        1. Identify the industries in which the user primarily works.  
+        2. Deduce the industries or domains the user appears to enjoy most.  
+        3. Provide reasoning based on profile content, including skills, endorsements, activity, and affiliations.
+        
+        **Steps to Complete the Task:**  
+        1. **Examine Profile Details:**  
+           - Review the professional headline, experience section, skills, endorsements, and any listed certifications.  
+           - Pay attention to recurring industry-specific terminology or roles.  
+        
+        2. **Analyze Engagement Patterns:**  
+           - Review activities such as posts, comments, or articles for language indicating passion or enjoyment.  
+           - Highlight topics or industries the user engages with most frequently.  
+        
+        3. **Cross-reference Skills and Interests:**  
+           - Match listed skills with industries where these skills are most relevant.  
+           - Evaluate any mentions of hobbies, voluntary roles, or side projects for clues to preferred domains.  
+        
+        4. **Make Inferences:**  
+           - Categorize the user's professional involvement into industries based on job history and skills.  
+           - Suggest industries of enjoyment by interpreting tone, enthusiasm in engagement, or diverse activities.  
+        
+        5. **Present Results:**  
+           - List the industries with brief explanations for each based on evidence from the profile.  
+           - Use bullet points to clearly separate industries worked in versus enjoyed.  
+        
+        #### **Example Output:**
+        
+        Technology, Web Development, Real Estate
+    
+        ---
+        
+        ### Your Final Steps: 
+        - Take a deep breath and work on this problem step-by-step.
+        - Do not surround your response in quotes or added any additional system text. 
+        - Do not share your thoughts nor show your work. 
+        - Only respond with one final response.
+
+
+        """
     }
 
     # User prompt to be sent with each API call
@@ -347,7 +444,6 @@ def summarize_recent_activity(recent_activity_profile: LinkedInProfile, main_pro
     if not recent_activity_profile.recent_activities or len(recent_activity_profile.recent_activities) == 0:
         return None
 
-
     recent_activity_profile_sting = ''.join([f"{i + 1}. {activity.text} - [{activity.link}]\n" for i, activity in
                                              enumerate(recent_activity_profile.recent_activities)])
 
@@ -437,10 +533,17 @@ def get_thought_leadership_post_from_ai(linked_user_profile: LinkedInProfile, bu
         Uses the user's profile (e.g., job title, industry) and intended buyer_stage to form an insightful post.
     """
 
+    trends = get_industry_trend_analysis_based_on_user_profile(linked_user_profile)
+    industry = trends.get("industry", "Technology")
+    analysis = trends.get("analysis", "")
+
+    print(
+        f'Generating Thought Leadership AI Response for {buyer_stage} buyer stage about the {industry} industry.\n\nAnalysis: {analysis} ')
+
     # Use json to output to string
     linked_in_profile_json = linked_user_profile.model_dump_json()
 
-    prompt = f"""Please create a thought leadership post for me based on my LinkedIn Profile information.
+    prompt = f"""Please create a thought leadership post for me based on my LinkedIn Profile information and the current trends in the {industry} industry.
 
         Craft the post to appeal to readers who are currently in the {buyer_stage} of their journey.
         
@@ -456,7 +559,10 @@ def get_thought_leadership_post_from_ai(linked_user_profile: LinkedInProfile, bu
         """
 
     # Add the Linked JSON profile to end of prompt
-    prompt += f"\n ### LinkedIn Profile: {linked_in_profile_json}"
+    prompt += f"\n ### LinkedIn Profile: {linked_in_profile_json}\n\n"
+
+    # Add the industry trend analysis to the prompt
+    prompt += f"\n ### Current {industry} Trends: <analysis>{analysis}</analysis>"
 
     content = [{"type": "text", "text": prompt}]
 
@@ -521,9 +627,12 @@ def get_thought_leadership_post_from_ai(linked_user_profile: LinkedInProfile, bu
         messages=[system_prompt, user_message],  # System prompt + current user prompt
         temperature=round(random.uniform(0.5, 0.7), 2),  # Rand temp between .5 and .7
 
-        top_p= round(random.uniform(0.85, 0.95), 2), # Encourages diversity in word choice while focusing on high-probability responses for coherent professional content.
-        frequency_penalty= round(random.uniform(0.3, 0.5), 2), # Minimizes repetitive patterns to ensure unique and varied phrasing.
-        presence_penalty= round(random.uniform(0.4, 0.6), 2), #Boosts exploration of new ideas while keeping content relevant to the LinkedIn tone.
+        top_p=round(random.uniform(0.85, 0.95), 2),
+        # Encourages diversity in word choice while focusing on high-probability responses for coherent professional content.
+        frequency_penalty=round(random.uniform(0.3, 0.5), 2),
+        # Minimizes repetitive patterns to ensure unique and varied phrasing.
+        presence_penalty=round(random.uniform(0.4, 0.6), 2),
+        # Boosts exploration of new ideas while keeping content relevant to the LinkedIn tone.
 
         # max_tokens=150  # Set token limit as required
         # response_format={"type": "json_object"},
@@ -532,6 +641,34 @@ def get_thought_leadership_post_from_ai(linked_user_profile: LinkedInProfile, bu
     # Extract and return the model's response
     content = response.choices[0].message.content.strip()
     return content
+
+
+def get_industry_trend_analysis_based_on_user_profile(linked_in_profile: LinkedInProfile):
+    my_industries = get_industries_of_profile_from_ai(linked_in_profile, 3)
+    print(f"Likely Industries: {my_industries}")
+
+    # Convert the industries into a list by splitting on comma
+    my_industries_list = my_industries.split(', ')
+
+    # Get one of the industries by random choice
+    industry = random.choice(my_industries_list)
+
+    print(f"Chosen Industry: {industry}")
+
+    # Get Google News articles about that industry
+    articles_dict = search_recent_news(industry, 10)
+
+    articles = articles_dict.get('articles', [])
+
+    print(f"Articles: {articles}")
+
+    # Get the trend analysis of the industry
+    trend_analysis = get_industry_trend_from_ai(industry, articles)
+
+    return {
+        'industry': industry.strip(),
+        'analysis': trend_analysis
+    }
 
 
 def get_industry_news_post_from_ai(linked_user_profile: LinkedInProfile, buyer_stage: str):
@@ -610,17 +747,100 @@ def get_industry_news_post_from_ai(linked_user_profile: LinkedInProfile, buyer_s
         messages=[system_prompt, user_message],  # System prompt + current user prompt
         temperature=round(random.uniform(0.3, 0.5), 2),  # Rand temp between .3 and .5
 
-        top_p= round(random.uniform(0.8, 0.9), 2), # Ensures focus on high-quality, relevant insights while allowing some variation in tone.
-        frequency_penalty=round(random.uniform(0.2, 0.4), 2), # Helps maintain consistency while reducing overuse of standard expressions.
-        presence_penalty= round(random.uniform(0.3, 0.5), 2), # Allows new perspectives and commentary to emerge.
+        top_p=round(random.uniform(0.8, 0.9), 2),
+        # Ensures focus on high-quality, relevant insights while allowing some variation in tone.
+        frequency_penalty=round(random.uniform(0.2, 0.4), 2),
+        # Helps maintain consistency while reducing overuse of standard expressions.
+        presence_penalty=round(random.uniform(0.3, 0.5), 2),  # Allows new perspectives and commentary to emerge.
 
-    # max_tokens=150  # Set token limit as required
+        # max_tokens=150  # Set token limit as required
         # response_format={"type": "json_object"},
     )
 
     # Extract and return the model's response
     content = response.choices[0].message.content.strip()
     return content
+
+
+def get_industry_trend_from_ai(industry: str, articles: list):
+    """Generate industry trend based on the LinkedIn user profile."""
+
+    articles_text = "\n".join([
+        f"- {article['title']} ({article['date']}): {article['link']}"
+        for article in articles
+    ])
+
+    prompt = (
+            f"Here are recent news articles related to the {industry} industry:\n\n"
+            f"{articles_text}\n\n" +
+            "Analyze these articles and provide:\n" +
+            "- A list of key topics or keywords that are trending in this industry.\n" +
+            "- Categories these articles belong to (e.g., Innovation, Finance, Policy).\n" +
+            "- A Summary of the industry and suggestions for further exploration based on the news trends."
+    )
+
+    # myprint(f"Prompt: {prompt}")
+
+    content = [{"type": "text", "text": prompt}]
+
+    # System prompt to be included in every request
+    system_prompt = {
+        "role": "system",
+        "content": f"""Act like a professional market analyst with over 15 years of experience in identifying industry trends and providing actionable insights. Your role is to analyze and interpret data from news articles to uncover patterns, emerging trends, and key industry dynamics.*
+
+        When analyzing news articles:
+        
+        1. **Identify Trends:** Extract and summarize key industry trends, focusing on the specific sectors or industries mentioned in the articles.
+        2. **Provide Context:** Offer detailed explanations of the factors driving these trends, referencing specific information from the articles provided.
+        3. **Highlight Opportunities and Risks:** Identify opportunities and risks for businesses or stakeholders associated with these trends.
+        4. **Synthesize Data:** If multiple articles are provided, synthesize their content to create a cohesive overview of the industry landscape.
+        5. **Support with Evidence:** Base all analysis on the information provided in the articles. Clearly cite data or events from the articles to support your insights.
+        
+        Your outputs should be structured as follows:
+        
+        1. **Summary of Trends:** List the major industry trends identified.
+        2. **Driving Factors:** Provide an analysis of what is causing these trends.
+        3. **Opportunities and Risks:** Detail the potential impacts on businesses and stakeholders, including both positive and negative outcomes.
+        4. **Recommendations:** Suggest strategic actions or considerations for stakeholders to adapt or respond effectively.
+        5. **References:** Include references to specific articles and sections to validate your findings.
+
+        ### Your Final Steps: 
+        - Take a deep breath and work on this problem step-by-step.
+        - Do not surround your response in quotes or added any additional system text. 
+        - Do not share your thoughts nor show your work. 
+        - Only respond with one final response.
+
+            """
+    }
+
+    # User prompt to be sent with each API call
+    user_message = {
+        "role": "user",
+        "content": content
+    }
+
+    # Call the API with the system and user prompt only (no memory of past prompts)
+    response = client.chat.completions.create(
+        model="gpt-4o-mini",  # Specify the model you want to use
+        messages=[system_prompt, user_message],  # System prompt + current user prompt
+
+        temperature=round(random.uniform(0.6, 0.8), 2),  # Rand temp between .6 and .8
+
+        # promoting nuanced and diverse analyses.
+        top_p=round(random.uniform(0.5, 0.7), 2),
+
+        # Ensuring unique phrasing and varied insights across outputs.
+        frequency_penalty=round(random.uniform(0.5, 0.7), 2),
+
+        # Encourages exploration of new ideas while maintaining relevance to the content of the provided articles.
+        presence_penalty=round(random.uniform(0.5, 0.7), 2),
+
+        # max_tokens=150  # Set token limit as required
+    )
+
+    # Extract and return the model's response
+    comment = response.choices[0].message.content.strip()
+    return comment
 
 
 def get_personal_story_post_from_ai(linked_user_profile: LinkedInProfile, stage: str):
@@ -704,9 +924,12 @@ def get_personal_story_post_from_ai(linked_user_profile: LinkedInProfile, stage:
         messages=[system_prompt, user_message],  # System prompt + current user prompt
         temperature=round(random.uniform(0.6, 0.8), 2),  # Rand temp between .6 and .8
 
-        top_p=round(random.uniform(0.75, 0.85), 2),# Prioritizes more creative storytelling approaches for personal anecdotes.
-        frequency_penalty=round(random.uniform(0.4, 0.6), 2),# Reduces redundancy in narrative details to make the story unique.
-        presence_penalty=round(random.uniform(0.6, 0.8), 2),  # Encourages creative content generation that resonates emotionally.
+        top_p=round(random.uniform(0.75, 0.85), 2),
+        # Prioritizes more creative storytelling approaches for personal anecdotes.
+        frequency_penalty=round(random.uniform(0.4, 0.6), 2),
+        # Reduces redundancy in narrative details to make the story unique.
+        presence_penalty=round(random.uniform(0.6, 0.8), 2),
+        # Encourages creative content generation that resonates emotionally.
 
         # max_tokens=150  # Set token limit as required
         # response_format={"type": "json_object"},
@@ -798,9 +1021,10 @@ def generate_engagement_prompt_post(linked_user_profile: LinkedInProfile, stage:
         messages=[system_prompt, user_message],  # System prompt + current user prompt
         temperature=round(random.uniform(0.6, 0.9), 2),  # Rand temp between .6 and .9
 
-        top_p=round(random.uniform(0.7, 0.85), 2),# Balances creativity and relevance in open-ended prompts.
-        frequency_penalty=round(random.uniform(0.5, 0.7), 2),# Prevents repetitive patterns, especially in prompts or questions.
-        presence_penalty=round(random.uniform(0.6, 0.7), 2), # Promotes original and thought-provoking prompts.
+        top_p=round(random.uniform(0.7, 0.85), 2),  # Balances creativity and relevance in open-ended prompts.
+        frequency_penalty=round(random.uniform(0.5, 0.7), 2),
+        # Prevents repetitive patterns, especially in prompts or questions.
+        presence_penalty=round(random.uniform(0.6, 0.7), 2),  # Promotes original and thought-provoking prompts.
 
         # max_tokens=150  # Set token limit as required
         # response_format={"type": "json_object"},
@@ -1009,6 +1233,7 @@ def get_website_content_post_from_ai(content: str, url: str, linked_user_profile
     content = response.choices[0].message.content.strip()
     return content
 
+
 def get_viral_linked_post_prompt_suffix():
     return """After crafting your response, using the Viral Post Creation Framework detailed below, update your response to a viral post for LinkedIn readers.
     ---
@@ -1042,3 +1267,457 @@ def get_viral_linked_post_prompt_suffix():
     - Only respond with one final Viral Post response.
     
     """
+
+
+def get_dall_e_image_prompt_from_ai(post_content: str):
+    """
+       Generate a Dalle-3 image prompt from the provided post content
+       """
+
+    prompt = f"""Please generate a DALL-E-3 image prompt based on the following:
+    
+    Post: <content>{post_content}</content>
+    
+    """
+
+    content = [{"type": "text", "text": prompt}]
+
+    # System prompt to be included in every request
+    system_prompt = {
+        "role": "system",
+        "content": f"""Act as an expert image generator and social media content strategist. 
+        Your task is to analyze the provided LinkedIn post text and craft a detailed prompt for DALL-E 3 
+        to create an image that visually encapsulates the post’s theme, message, and tone.
+
+         ### Desired Image Characteristics:
+        - **Clean and Aesthetic**: The image should not feel overcrowded but should clearly depict the content of the post.
+        - **Professional and Polished**: The image should look modern and inspiring, suitable for LinkedIn.
+        - **Balanced**: Avoid excessive elements; instead, highlight key themes in a visually appealing way.
+        - **Focused**: The image should have its focal point specifically described
+        
+        ### Step-by-Step Instructions:
+        1. **Analyze the Post Content:**
+           - Identify the main topic, message, or story conveyed by the LinkedIn post.
+           - Determine the tone (e.g., professional, motivational, celebratory, reflective) and emotional undertone.
+           - Extract key visual elements or themes mentioned or implied in the text (e.g., "growth," "collaboration," "achievement," "innovation").
+        
+        2. **Specify Visual Representation:**
+           - Translate the key message into a visual scene or concept. Describe the primary subject of the image (e.g., "a team brainstorming in a futuristic office" or "a rising sun symbolizing new beginnings").
+           - Ensure the image aligns with LinkedIn's professional and motivational tone while reflecting the mood of the post.
+        
+        3. **Choose Art Style and Composition:**
+           - Select an art style that matches the post’s tone: photorealistic, professional illustration, minimalistic, vibrant, or corporate-inspired.
+           - Define the composition and perspective, such as close-up, wide-angle, or eye-level.
+        
+        4. **Detail the Setting, Colors, and Mood:**
+           - Specify the setting (e.g., urban office, natural landscape, futuristic environment).
+           - Suggest colors and lighting that enhance the mood (e.g., "warm golden light for optimism" or "sleek blue tones for professionalism").
+        
+        5. **Generate a Complete DALL-E Prompt:**
+           - Combine all the above elements into a concise, richly detailed instruction for DALL-E. Ensure clarity, specificity, and imaginative detail.
+           - Review the Desired Image Characteristics and make sure your prompt incorporates each aspect but does not directly state it in your generated response.
+        
+        ### Output Format:
+        - **DALL-E Prompt:** A fully detailed and descriptive image-generation prompt.
+        
+        
+        ---
+        
+        ### Your Final Steps: 
+        - Take a deep breath and work on this problem step-by-step.
+        - Do not surround your response in quotes or added any additional system text. 
+        - Do not share your thoughts nor show your work. 
+        - Only respond with one final response without the prefix "DALL-E Prompt:".
+            
+        """
+    }
+
+    # User prompt to be sent with each API call
+    user_message = {
+        "role": "user",
+        "content": content
+    }
+
+    # Call the API with the system and user prompt only (no memory of past prompts)
+    response = client.chat.completions.create(
+        model="gpt-4o-mini",  # Specify the model you want to use
+        messages=[system_prompt, user_message],  # System prompt + current user prompt
+        temperature=round(random.uniform(0.4, 0.6), 2),
+        # Ensure logical and structured prompts but allow some creativity for DALL-E descriptions. Slightly tighter control avoids over-creativity that might make outputs unfocused.
+
+        # Focuses on high-probability tokens while leaving room for variation in descriptions.
+        top_p=round(random.uniform(0.85, 0.95), 2),
+        # Ensures the generation focuses on high-probability tokens while leaving room for variation in descriptions.
+        frequency_penalty=round(random.uniform(0.5, 0.7), 2),
+        # Ensures new elements are explored in prompts without becoming overly imaginative or irrelevant.
+        presence_penalty=round(random.uniform(0.4, 0.6), 2),
+
+        # max_tokens=150  # Set token limit as required
+        # response_format={"type": "json_object"},
+    )
+
+    # Extract and return the model's response
+    content = response.choices[0].message.content.strip()
+    return content
+
+
+def generate_dall_e_image_from_prompt(prompt: str, size: str = "1024x1024"):
+    """
+    Generate an image from the provided prompt using the DALL-E-3 model.
+    """
+    # Call the DALL-E-3 model to generate an image based on the prompt
+    response = client.images.generate(
+        model="dall-e-3",
+        prompt=prompt,
+        size=size,
+        quality="hd",  # Standard or hd
+        n=1,  # Only 1 allowed for Dalle-3
+        # style="natural", #Style can be vivid or natural
+        response_format='url'
+    )
+
+    if len(response.data) > 0:
+        return response.data
+    else:
+        return response.data[0].url
+
+
+def get_flux_image_prompt_from_ai(post_content: str):
+    """
+       Generate a Flux.1 image prompt from the provided post content
+       """
+
+    prompt = f"""Please generate an image prompt based on the following:
+
+    Post: <content>{post_content}</content>
+
+    """
+
+    content = [{"type": "text", "text": prompt}]
+
+    # System prompt to be included in every request
+    system_prompt = {
+        "role": "system",
+        "content": f"""Act as a professional visual content creator specializing in crafting prompts for FLUX.1, an advanced AI image generation model. 
+        Your task is to analyze the provided post and construct a highly detailed prompt that includes all necessary elements (subject, style, composition, lighting, color palette, mood, technical details, and additional elements). 
+        Use natural language and reference artistic styles or techniques as needed.
+
+        ### Step-by-Step Instructions:
+        
+        1. **Analyze the Post:**
+           - Identify the main subject of the post.
+           - Extract the tone, key themes, and emotional undercurrents.
+           - Pinpoint any implied or explicit visual metaphors or concepts.
+        
+        2. **Design the Scene:**
+           - **Subject:** Define the primary focus of the image based on the post's message.
+           - **Style:** Choose an artistic approach or visual aesthetic (e.g., photorealistic, abstract, or inspired by a specific artist or movement).
+           - **Composition:** Describe the arrangement of elements in the image, ensuring balance and visual interest.
+           - **Lighting:** Specify the type, intensity, and quality of lighting (e.g., "soft morning light" or "dramatic spotlight").
+           - **Color Palette:** Suggest a dominant color scheme to enhance mood and alignment with the post's tone.
+           - **Mood/Atmosphere:** Capture the emotional tone or ambiance (e.g., celebratory, serene, motivational).
+           - **Technical Details:** Provide details about perspective or camera settings (e.g., "shot from a low angle" or "wide lens").
+        
+        3. **Incorporate Supporting Details:**
+           - Include additional background elements or context relevant to the post's message (e.g., "a city skyline in the distance").
+        
+        4. **Construct the FLUX.1 Prompt:**
+           - Combine all elements into a cohesive, descriptive sentence.
+           - Review the Design the Scene elements and make sure your prompt incorporates each in your generated response.
+           - The final prompt response should be one very detailed paragraph. No new lines between sentences.
+   
+        
+        ### Output Format:
+        - **FLUX.1 Prompt:** A structured, natural-language prompt that captures all essential elements.
+          
+        ---
+
+       ### Your Final Steps: 
+        - Take a deep breath and work on this problem step-by-step.
+        - Do not surround your response in quotes or added any additional system text. 
+        - Do not share your thoughts nor show your work. 
+        - Do not need to say "Create an image" Just start describing it.
+        - Only respond with one final response without the prefix "FLUX.1 Prompt:".
+
+        """
+    }
+
+    # User prompt to be sent with each API call
+    user_message = {
+        "role": "user",
+        "content": content
+    }
+
+    # Call the API with the system and user prompt only (no memory of past prompts)
+    response = client.chat.completions.create(
+        model="gpt-4o-mini",  # Specify the model you want to use
+        messages=[system_prompt, user_message],  # System prompt + current user prompt
+        temperature=round(random.uniform(0.4, 0.6), 2),
+        # Ensure logical and structured prompts but allow some creativity for Flux1 descriptions. Slightly tighter control avoids over-creativity that might make outputs unfocused.
+
+        # Focuses on high-probability tokens while leaving room for variation in descriptions.
+        top_p=round(random.uniform(0.85, 0.95), 2),
+        # Ensures the generation focuses on high-probability tokens while leaving room for variation in descriptions.
+        frequency_penalty=round(random.uniform(0.5, 0.7), 2),
+        # Ensures new elements are explored in prompts without becoming overly imaginative or irrelevant.
+        presence_penalty=round(random.uniform(0.4, 0.6), 2),
+
+        # max_tokens=150  # Set token limit as required
+        # response_format={"type": "json_object"},
+    )
+
+    # Extract and return the model's response
+    content = response.choices[0].message.content.strip()
+    return content
+
+
+def get_flux_image_via_huggingface(prompt: str):
+    # Make sure we are logged into hugging face
+    login(token=os.getenv("HF_TOKEN"))
+
+    # gclient = GCLIENT("black-forest-labs/FLUX.1-dev", hf_token=os.getenv("HF_TOKEN"))
+    gclient = GCLIENT("frostbyte07/FLUX.1-dev", hf_token=os.getenv("HF_TOKEN"))
+    # gclient = GCLIENT.duplicate("black-forest-labs/FLUX.1-dev", hf_token=os.getenv("HF_TOKEN"))
+    job = gclient.submit(
+        prompt=prompt,
+        seed=0,
+        randomize_seed=True,
+        width=1024,
+        height=1024,
+        guidance_scale=3.5,
+        num_inference_steps=28,
+        api_name="/infer"
+    )
+
+    while not job.done():
+        print(f"Job still working. Status: {job.status()}")
+        time.sleep(1)
+
+    print(f"Outputs: {job.outputs()}")
+
+    print(f"Result: {job.result()}")  # This is blocking
+
+    job.result()
+
+    # Get the result
+    result = job.result()
+
+    # If result is a tuple return the first item
+    if isinstance(result, tuple):
+        video_file_path = result[0]
+    else:
+        video_file_path = result
+
+    return video_file_path
+
+
+def get_flux_image_via_replicate(prompt: str, ref: str = "black-forest-labs/flux-dev"):
+    output = replicate.run(
+        ref,
+        input={
+            "prompt": prompt,
+            "go_fast": True,
+            "guidance": 3.5,
+            "megapixels": "1",
+            "num_outputs": 1,
+            "aspect_ratio": "1:1",
+            "output_format": "webp",
+            "output_quality": 80,
+            "prompt_strength": 0.8,
+            "num_inference_steps": 28
+        }
+    )
+
+    print("Flux Image via Replicate:")
+    url = str(output[0])
+    print(url)
+
+    # Get the folder name of the parent of the url image
+    url_image_folder = os.path.basename(os.path.dirname(url))
+
+    # Save the file to assets/videos/replicate folder
+    save_dir = os.path.join(assets_dir, "images",'replicate',url_image_folder)
+
+    print(f"Save to Folder: {save_dir}")
+
+    create_folder_if_not_exists(save_dir)
+
+    # Save the generated image
+    video_file_path = save_video_url_to_dir(url, save_dir)
+
+    return video_file_path
+
+
+def generate_flux1_image_from_prompt(prompt: str):
+
+    """
+    video_file_path = get_flux_image_via_huggingface(prompt)
+
+    # Move the video file path to the assets/gradio dir
+    gradio_dir = os.path.join(assets_dir, "gradio")
+    print(f"Gradio Dir: {gradio_dir}")
+    create_folder_if_not_exists(gradio_dir)
+    video_file_name = os.path.basename(video_file_path)
+    # Get the parent folder name of the video file
+    video_parent_dir = os.path.basename(os.path.dirname(video_file_path))
+    print(f"Video Parent Folder: {video_parent_dir}")
+    # Create dest folder
+    file_dest_folder = os.path.join(gradio_dir, video_parent_dir)
+    create_folder_if_not_exists(file_dest_folder)
+    # Create final file destination
+    video_file_dest = os.path.join(file_dest_folder, video_file_name)
+    print(f"Video File Dest: {video_file_dest}")
+    # Move the video file to the gradio dir
+    shutil.move(video_file_path, video_file_dest)
+
+    # TODO: Verify this final path and move
+
+    return video_file_dest
+    """
+
+    return get_flux_image_via_replicate(prompt)
+
+
+
+def get_runway_ml_video_prompt_from_ai(post_content: str, image_prompt: str):
+    """
+       Generate a RunwayMl video prompt from the provided post content and image prompt
+       """
+
+    prompt = f"""Please generate an video prompt based on the following:
+
+    Post: <content>{post_content}</content>
+    
+    Image Prompt: <image_prompt>{image_prompt}</image_prompt>
+    
+    """
+
+    content = [{"type": "text", "text": prompt}]
+
+    # System prompt to be included in every request
+    system_prompt = {
+        "role": "system",
+        "content": f"""Act like an expert cinematic prompt creator and a master of visual storytelling for Runway Gen-3 Alpha. You specialize in crafting detailed and precise video prompts that transform concepts into immersive 10-second videos. Your task is to create a video prompt based on a provided LinkedIn post and an accompanying image prompt. Leverage both inputs to ensure the final video aligns with the user’s vision and leaves a powerful impact. 
+
+        You must strictly adhere to the following guidelines:
+        
+        ---
+        
+        #### **Step-by-Step Instructions:**
+        
+        1. **Analyze Inputs:**
+           - **Post:** Extract key themes, tone, emotions, and significant keywords from the provided content.
+           - **Image Prompt:** Identify the key visual elements, color schemes, subjects, and mood conveyed by the image.
+           - Combine insights from both inputs to develop a unified concept for the video prompt.
+        
+        2. **Define the Video Objective:**
+           - Ensure the video reflects the essence of the LinkedIn post while visually harmonizing with the style and elements of the image prompt.
+           - Aim for a visually compelling 10-second scene with high emotional or thematic resonance.
+        
+        3. **Compose the Video Prompt:**
+           - Use the following structured format to ensure clarity and detail:
+             ```
+             [camera movement]: [establishing scene]. [additional details]. [lighting and style].
+             ```
+           - Ensure every section of the prompt enhances the video's impact:
+             - **Camera Movement:** Specify movements such as dynamic motion, FPV, slow motion, or close-up.
+             - **Scene Description:** Vividly describe the environment, subject(s), and actions, ensuring they align with the LinkedIn post’s core message and the image’s visual tone.
+             - **Lighting and Style:** Choose lighting styles (e.g., backlit, lens flare, diffused) and aesthetics (e.g., cinematic, moody, glitchcore) to complement the scene and reinforce the intended mood.
+        
+        4. **Leverage Keyword Options:**
+           - Select and integrate relevant keywords from the following categories to enrich the prompt:
+             - **Camera Styles:** Low angle, high angle, overhead, FPV, handheld, wide angle, close-up, macro cinematography, over-the-shoulder, tracking, establishing wide, 50mm lens, SnorriCam, realistic documentary, camcorder.
+             - **Lighting Styles:** Diffused lighting, silhouette, lens flare, backlit, side-lit, [color] gel lighting, Venetian lighting.
+             - **Movement Speeds:** Dynamic motion, slow motion, fast motion, timelapse.
+             - **Movement Types:** Grows, emerges, explodes, ascends, undulates, warps, transforms, ripples, shatters, unfolds, vortex.
+             - **Style and Aesthetic:** Moody, cinematic, iridescent, home video VHS, glitchcore.
+             - **Text Styles:** Bold, graffiti, neon, varsity, embroidery.
+        
+        5. **Iterative Refinement:**
+           - Ensure repeated or emphasized concepts reinforce key themes from both inputs.
+           - Adjust camera movements, lighting, or aesthetic choices to refine adherence to the envisioned output.
+        
+        6. **Final Verification:**
+           - Review the prompt for clarity, cohesiveness, and creativity.
+           - Confirm all critical elements and keywords are present to achieve the intended cinematic effect.
+        
+        ---
+        
+        #### **Example Output:**
+        
+        **Inputs:**  
+        - Post: <content>"Breaking barriers in the tech industry, we celebrate resilience and innovation."</content>  
+        - Image Prompt: <image_prompt>A silhouette of a person standing on a glowing circuit board with a starry background.</image_prompt>  
+        
+        **Generated Video Prompt:**  
+        "Dynamic FPV shot: The camera glides low over a glowing circuit board, revealing a silhouetted figure standing tall amidst a backdrop of sparkling stars. The figure's outline pulses with an iridescent glow, symbolizing energy and resilience. Lighting: Backlit with lens flare accents, cinematic tones. Style: Iridescent and futuristic."
+        
+        ---
+        
+        ### Your Final Steps: 
+        - Take a deep breath and work on this problem step-by-step.
+        - Do not surround your response in quotes or added any additional system text. 
+        - Do not share your thoughts nor show your work. 
+        - Do not need to say "Create" Just start describing it.
+        - Your response must be less than 512 characters toal including white spaces and punctuation.
+        - Only respond with one final response without the prefix "Generated Video Prompt:".
+
+        """
+    }
+
+    # User prompt to be sent with each API call
+    user_message = {
+        "role": "user",
+        "content": content
+    }
+
+    # Call the API with the system and user prompt only (no memory of past prompts)
+    response = client.chat.completions.create(
+        model="gpt-4o-mini",  # Specify the model you want to use
+        messages=[system_prompt, user_message],  # System prompt + current user prompt
+        temperature=round(random.uniform(0.5, 0.7), 2),  # Encourage creative but logical outputs
+        top_p=round(random.uniform(0.8, 0.9), 2),  # Prioritize high-probability tokens
+        frequency_penalty=round(random.uniform(0.6, 0.8), 2),  # Discourage repetition
+        presence_penalty=round(random.uniform(0.5, 0.7), 2),  # Encourage exploration of new ideas
+
+        # max_tokens=150  # Set token limit as required
+        # response_format={"type": "json_object"},
+    )
+
+    # Extract and return the model's response
+    content = response.choices[0].message.content.strip()
+    return content
+
+
+def create_runway_video(image_path: str, prompt: str):
+    """Create a video using RunwayML"""
+
+    runway_client = RunwayML()
+
+    # encode image to base64
+    with open(image_path, "rb") as f:
+        base64_image = base64.b64encode(f.read()).decode("utf-8")
+
+    # Create a new image-to-video task using the "gen3a_turbo" model
+    task = runway_client.image_to_video.create(
+        model='gen3a_turbo',
+        # Point this at your own image file
+        prompt_image=f"data:image/png;base64,{base64_image}",
+        prompt_text=prompt,
+    )
+    task_id = task.id
+
+    # Poll the task until it's complete
+    time.sleep(10)  # Wait for a second before polling
+    task = runway_client.tasks.retrieve(task_id)
+    while task.status not in ['SUCCEEDED', 'FAILED']:
+        time.sleep(10)  # Wait for ten seconds before polling
+        task = runway_client.tasks.retrieve(task_id)
+
+    # Get the url from the TaskRetrieveResponse
+    if task.status == 'SUCCEEDED':
+        video_url = task.output[0]
+    else:
+        video_url = None
+
+    return video_url

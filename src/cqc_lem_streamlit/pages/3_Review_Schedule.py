@@ -5,10 +5,13 @@ import requests
 import streamlit as st
 from st_aggrid import AgGrid, GridOptionsBuilder, DataReturnMode, GridUpdateMode
 
-from cqc_lem.api.main import PostStatus
+from cqc_lem.utilities.db import PostStatus
 from cqc_lem.run_content_plan import auto_create_weekly_content
 from cqc_lem.utilities.env_constants import API_BASE_URL, LINKEDIN_PREVIEW_URL
 from cqc_lem.utilities.jaeger_tracer_helper import get_jaeger_tracer
+
+# Change layout to wide
+st.set_page_config(layout="wide")
 
 # Initialize the session state
 if "email" not in st.session_state:
@@ -30,6 +33,10 @@ st.title("Review and Edit Scheduled Posts")
 email = st.text_input("Enter your email address")
 
 tracer = get_jaeger_tracer("streamlit", __name__)
+
+
+def console_update():
+    print("Updating the console")
 
 with tracer.start_as_current_span("review_schedule"):
 
@@ -64,8 +71,13 @@ with tracer.start_as_current_span("review_schedule"):
 
         posts = st.session_state.posts
 
+        # Get the columns from the post indexes
+        columns = posts[0].keys()
+
         # Convert posts to a DataFrame
-        df = pd.DataFrame(posts, columns=["post_id", "content", "scheduled_time", "post_type", "status"])
+        df = pd.DataFrame(posts, columns=columns
+        #["post_id", "content", "video_url", "scheduled_time", "post_type", "status"]
+                          )
 
         # Configure the editable grid
         gb = GridOptionsBuilder.from_dataframe(df)
@@ -94,6 +106,8 @@ with tracer.start_as_current_span("review_schedule"):
         grid_options = gb.build()
         grid_options['rowHeight'] = 100  # Adjust the height as needed
 
+        #grid_options['onRowDataUpdated'] = console_update
+
         # Display the editable grid
         grid_response = AgGrid(
             df,
@@ -109,6 +123,8 @@ with tracer.start_as_current_span("review_schedule"):
 
         # Get the selected cell
         selected_row = grid_response['selected_data']
+
+
 
         # st.write("Selected Data:")
         # st.write(selected_row)
@@ -137,15 +153,17 @@ with tracer.start_as_current_span("review_schedule"):
                     continue
 
                 index_str = str(int(index) + 1)
-                post_data = {
-                    # "content": row["content"].replace('\n', '<br>'),  # Convert new lines to \n
-                    # "content": row["content"].replace('\n', '\\n'),  # Convert new lines to \n
-                    "content": row["content"],
-                    "scheduled_datetime": row["scheduled_time"],
-                    "post_type": row["post_type"],
-                    "status": row["status"],
-                    "email": email
-                }
+
+                # Convert the row to a dict using the row indexes
+                post_data = row.to_dict()
+                #post_data["email"] = email  # Add the email to the dictionary
+                post_data["scheduled_datetime"] =  row["scheduled_time"] # Add the scheduled datetime
+                # Remove scheduled_time from post_data
+                post_data.pop("scheduled_time")
+
+                #st.success(f"Post Data: {post_data}")
+
+
                 # Add the post_id to the request query
                 response = requests.post(f"{UPDATE_POST_URL}?post_id={post_id}", json=post_data)
                 if response.status_code == 200:

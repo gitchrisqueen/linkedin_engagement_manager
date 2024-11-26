@@ -92,7 +92,7 @@ def get_my_profile(driver, wait, user_email: str, user_password: str) -> LinkedI
         time.sleep(2)
         profile_url = driver.current_url  # Get the updated url
 
-        profile_data = get_linkedin_profile_from_url(driver, wait, profile_url)
+        profile_data = get_linkedin_profile_from_url(driver, wait, profile_url, True)
 
         if profile_data:
 
@@ -118,7 +118,7 @@ def get_my_profile(driver, wait, user_email: str, user_password: str) -> LinkedI
     return profile
 
 
-def get_linkedin_profile_from_url(driver, wait, profile_url):
+def get_linkedin_profile_from_url(driver, wait, profile_url, is_main_user = False):
     # Get the profile from the DB if it exists
     profile_json = get_linked_in_profile_by_url(profile_url)
 
@@ -139,7 +139,12 @@ def get_linkedin_profile_from_url(driver, wait, profile_url):
         if company_element:
             companyName = getText(company_element)
 
-        profile_data = returnProfileInfo(driver, profile_url, companyName)
+        profile_data = returnProfileInfo(driver, profile_url, companyName, is_main_user)
+
+        # Use AI to determine industry of the profile
+
+
+
 
         if profile_data:
             profile = LinkedInProfile(**profile_data)

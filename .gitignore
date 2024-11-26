@@ -168,13 +168,13 @@ tmp/*
 logs/*
 *selenium_profiles/
 selenium/
-assets/*
+src/cqc_lem/assets/*
 src/cqc_lem/utilities/generated_designs/*
 
 
 # exception to the exclude folder rules
 !logs/.gitkeep
-!assets/.gitkeep
+!src/cqc_lem/assets/.gitkeep
 !src/cqc_lem/utilities/generated_designs/.gitkeep
 
 
