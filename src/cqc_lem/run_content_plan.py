@@ -21,7 +21,7 @@ from cqc_lem.utilities.db import get_post_type_counts, insert_planned_post, upda
     get_user_blog_url, get_user_sitemap_url, get_active_user_ids, get_planned_posts_for_next_week, PostStatus, \
     update_db_post_video_url, update_db_post_status
 from cqc_lem.utilities.env_constants import API_BASE_URL
-from cqc_lem.utilities.linked_in_helper import get_my_profile
+from cqc_lem.utilities.linkedin.helper import get_my_profile
 from cqc_lem.utilities.logger import myprint
 from cqc_lem.utilities.selenium_util import get_driver_wait_pair, quit_gracefully
 from cqc_lem.utilities.utils import get_best_posting_time, create_folder_if_not_exists, save_video_url_to_dir
@@ -471,7 +471,7 @@ def generate_website_content_post(sitemap_url, linked_user_profile, stage: str):
 def fetch_content(url):
     # Set up headers to simulate a browser request
     headers = {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/92.0.4515.159 Safari/537.36',
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.6723.91 Safari/537.36',
         'Accept-Language': 'en-US,en;q=0.9',
         'Accept-Encoding': 'gzip, deflate, br',
         'Connection': 'keep-alive'

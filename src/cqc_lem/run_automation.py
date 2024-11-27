@@ -16,14 +16,14 @@ from selenium.webdriver.remote.webdriver import WebDriver
 from selenium.webdriver.remote.webelement import WebElement
 from selenium.webdriver.support import expected_conditions as EC
 
-from cqc_lem.linked_in_profile import LinkedInProfile
+from cqc_lem.utilities.linkedin.profile import LinkedInProfile
 from cqc_lem.my_celery import app as shared_task
 from cqc_lem.utilities.ai.ai_helper import generate_ai_response, get_ai_message_refinement, summarize_recent_activity
 from cqc_lem.utilities.date import convert_viewed_on_to_date
 from cqc_lem.utilities.db import get_user_password_pair_by_id, get_user_id, insert_new_log, LogActionType, \
     LogResultType, has_user_commented_on_post_url, get_post_url_from_log_for_user, get_post_message_from_log_for_user
 from cqc_lem.utilities.env_constants import LI_USER
-from cqc_lem.utilities.linked_in_helper import login_to_linkedin, get_my_profile, get_linkedin_profile_from_url
+from cqc_lem.utilities.linkedin.helper import login_to_linkedin, get_my_profile, get_linkedin_profile_from_url
 from cqc_lem.utilities.logger import myprint
 from cqc_lem.utilities.selenium_util import click_element_wait_retry, \
     get_element_wait_retry, get_elements_as_list_wait_stale, getText, close_tab, get_driver_wait_pair, quit_gracefully, \

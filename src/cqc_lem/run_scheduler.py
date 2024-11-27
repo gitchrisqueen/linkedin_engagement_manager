@@ -1,7 +1,4 @@
-import os
 from datetime import timedelta
-
-from linkedin_api.clients.restli.client import RestliClient
 
 from cqc_lem.my_celery import app as shared_task
 # from celery import shared_task
@@ -9,8 +6,9 @@ from cqc_lem.run_automation import automate_commenting, automate_profile_viewer_
     send_appreciation_dms_for_user, automate_reply_commenting
 from cqc_lem.utilities.date import add_local_tz_to_datetime
 from cqc_lem.utilities.db import get_ready_to_post_posts, get_post_content, \
-    update_db_post_status, get_user_password_pair_by_id, get_user_linked_sub_id, get_user_access_token, \
-    get_active_user_ids, insert_new_log, LogActionType, LogResultType, get_post_video_url
+    update_db_post_status, get_user_password_pair_by_id, get_active_user_ids, insert_new_log, LogActionType, \
+    LogResultType, get_post_video_url
+from cqc_lem.utilities.linkedin.poster import share_on_linkedin
 from cqc_lem.utilities.logger import myprint
 
 
@@ -107,47 +105,15 @@ def post_to_linkedin(user_id: int, post_id: int, **kwargs):
     # Get the post video url
     video_url = get_post_video_url(post_id)
 
-
-
-    restli_client = RestliClient()
-    restli_client.session.hooks["response"].append(lambda r: r.raise_for_status())
-
-    linked_sub_id = get_user_linked_sub_id(user_id)
-
-    access_token = get_user_access_token(user_id)
-
+    # Add the query param content_type to the url
     if video_url:
-        myprint(f"Video URL: {video_url}")
-        # Send a POST request to the assets API, with the action query parameter to registerUpload.
+        video_url += "&content_type=attachment"
+    myprint(f"Adding to Post | Video URL: {video_url}")
 
+    urn = share_on_linkedin(user_id, content, video_url)
 
-        # A successful response will contain an uploadUrl and asset that you will need to save for the next steps.
-
-        # Using the uploadUrl returned from Step 1, upload your image or video to LinkedIn. To upload your image or video, send a POST request to the uploadUrl with your image or video included as a binary file. The example below uses cURL to upload an image file.
-
-    posts_create_response = restli_client.create(
-        resource_path="/posts",
-        entity={
-            "author": f"urn:li:person:{linked_sub_id}",
-            "lifecycleState": "PUBLISHED",
-            "visibility": "PUBLIC",
-            "commentary": content,
-            "distribution": {
-                "feedDistribution": "MAIN_FEED",
-                "targetEntities": [],
-                "thirdPartyDistributionChannels": [],
-            },
-        },
-        version_string=os.getenv("LI_API_VERSION"),
-        access_token=access_token,
-    )
-
-    myprint("Post Create Response from api call")
-    for key, value in posts_create_response.__dict__.items():
-        myprint(f"{key}: {value}")
-
-    if posts_create_response.entity_id:
-        post_url = f"https://www.linkedin.com/feed/update/{posts_create_response.entity_id}/"
+    if urn:
+        post_url = f"https://www.linkedin.com/feed/update/{urn}/"
         myprint(f"Successfully created post using /posts API endpoint: {post_url}")
 
         # Update DB with status=posted
@@ -159,14 +125,12 @@ def post_to_linkedin(user_id: int, post_id: int, **kwargs):
             'post_id': post_id,
             'loop_for_duration': 60 * 30
         }
-        automate_reply_commenting.apply_async(kwargs=base_kwargs)
-
+        # TODO: uncomment (THIS is NEEDED) automate_reply_commenting.apply_async(kwargs=base_kwargs)
 
         # Update DB with status=success in the logs table and the post url
         insert_new_log(user_id=user_id, action_type=LogActionType.POST, result=LogResultType.SUCCESS, post_id=post_id,
                        post_url=post_url,
-                       message="Successfully created post using /posts API endpoint. Results: " + str(
-                           posts_create_response))
+                       message=f"Successfully created post using /posts API endpoint.")
 
         return f"Post successfully created"
 
@@ -174,89 +138,7 @@ def post_to_linkedin(user_id: int, post_id: int, **kwargs):
         myprint(f"Failed to create post using /posts API endpoint")
         # Update DB with status=failed in the logs table
         insert_new_log(user_id=user_id, action_type=LogActionType.POST, result=LogResultType.FAILURE, post_id=post_id,
-                       message="Failed to create post using /posts API endpoint. Result: " + str(posts_create_response))
-
-        return f"Failed to create post using /posts API endpoint"
-
-
-def post_to_linkedin_dev(user_id: int, post_id: int, **kwargs):
-    """Posts to LinkedIn using the LinkedIn API - https://learn.microsoft.com/en-us/linkedin/consumer/integrations/self-serve/share-on-linkedin#creating-a-share-on-linkedin"""
-
-    # Login and publish post to LinkedIn
-    user_email, user_password = get_user_password_pair_by_id(user_id)
-    myprint(f"Posting to LinkedIn as user: {user_email}")
-
-    # Get the post content
-    content = get_post_content(post_id)
-    myprint(f"Posting to LinkedIn: {content}")
-
-    # Get the post video url
-    video_url = get_post_video_url(post_id)
-
-    restli_client = RestliClient()
-    restli_client.session.hooks["response"].append(lambda r: r.raise_for_status())
-
-    linked_sub_id = get_user_linked_sub_id(user_id)
-
-    access_token = get_user_access_token(user_id)
-
-    if video_url:
-        myprint(f"Video URL: {video_url}")
-        # Send a POST request to the assets API, with the action query parameter to registerUpload.
-
-        # A successful response will contain an uploadUrl and asset that you will need to save for the next steps.
-
-        # Using the uploadUrl returned from Step 1, upload your image or video to LinkedIn. To upload your image or video, send a POST request to the uploadUrl with your image or video included as a binary file. The example below uses cURL to upload an image file.
-
-    posts_create_response = restli_client.create(
-        resource_path="/posts",
-        entity={
-            "author": f"urn:li:person:{linked_sub_id}",
-            "lifecycleState": "PUBLISHED",
-            "visibility": "PUBLIC",
-            "commentary": content,
-            "distribution": {
-                "feedDistribution": "MAIN_FEED",
-                "targetEntities": [],
-                "thirdPartyDistributionChannels": [],
-            },
-        },
-        version_string=os.getenv("LI_API_VERSION"),
-        access_token=access_token,
-    )
-
-    myprint("Post Create Response from api call")
-    for key, value in posts_create_response.__dict__.items():
-        myprint(f"{key}: {value}")
-
-    if posts_create_response.entity_id:
-        post_url = f"https://www.linkedin.com/feed/update/{posts_create_response.entity_id}/"
-        myprint(f"Successfully created post using /posts API endpoint: {post_url}")
-
-        # Update DB with status=posted
-        update_db_post_status(post_id, 'posted')
-
-        # Schedule Answer comments for 30 minutes now that this has been posted
-        base_kwargs = {
-            'user_id': user_id,
-            'post_id': post_id,
-            'loop_for_duration': 60 * 30
-        }
-        automate_reply_commenting.apply_async(kwargs=base_kwargs)
-
-        # Update DB with status=success in the logs table and the post url
-        insert_new_log(user_id=user_id, action_type=LogActionType.POST, result=LogResultType.SUCCESS, post_id=post_id,
-                       post_url=post_url,
-                       message="Successfully created post using /posts API endpoint. Results: " + str(
-                           posts_create_response))
-
-        return f"Post successfully created"
-
-    else:
-        myprint(f"Failed to create post using /posts API endpoint")
-        # Update DB with status=failed in the logs table
-        insert_new_log(user_id=user_id, action_type=LogActionType.POST, result=LogResultType.FAILURE, post_id=post_id,
-                       message="Failed to create post using /posts API endpoint. Result: " + str(posts_create_response))
+                       message="Failed to create post using /posts API endpoint.")
 
         return f"Failed to create post using /posts API endpoint"
 

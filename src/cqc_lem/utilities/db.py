@@ -5,7 +5,7 @@ from enum import StrEnum
 import mysql.connector
 from dotenv import load_dotenv
 
-from cqc_lem.linked_in_profile import LinkedInProfile
+from cqc_lem.utilities.linkedin.profile import LinkedInProfile
 from cqc_lem.utilities.logger import myprint
 from cqc_lem.utilities.utils import get_top_level_domain
 

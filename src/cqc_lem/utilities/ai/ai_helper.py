@@ -1,9 +1,7 @@
 import base64
 import os
 import random
-import shutil
 import time
-import uuid
 
 import openai
 import replicate
@@ -13,7 +11,7 @@ from huggingface_hub import login
 from runwayml import RunwayML
 
 from cqc_lem import assets_dir
-from cqc_lem.linked_in_profile import LinkedInProfile
+from cqc_lem.utilities.linkedin.profile import LinkedInProfile
 from cqc_lem.utilities.ai.client import client
 from cqc_lem.utilities.ai.tools import search_recent_news
 from cqc_lem.utilities.logger import myprint

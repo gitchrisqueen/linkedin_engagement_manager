@@ -1,9 +1,9 @@
-from cqc_lem.linked_in_profile import LinkedInProfile
+from cqc_lem.utilities.linkedin.profile import LinkedInProfile
 from cqc_lem.run_automation import accept_connection_request, send_private_dm, automate_reply_commenting
 from cqc_lem.utilities.env_constants import LI_USER, LI_PASSWORD
-from cqc_lem.utilities.linked_in_helper import login_to_linkedin
-from cqc_lem.utilities.linked_in_scrapper import returnProfileInfo
-from cqc_lem.utilities.selenium_util import create_driver, get_driver_wait_pair
+from cqc_lem.utilities.linkedin.helper import login_to_linkedin
+from cqc_lem.utilities.linkedin.scrapper import returnProfileInfo
+from cqc_lem.utilities.selenium_util import get_driver_wait_pair
 
 
 def test_accept_invites():

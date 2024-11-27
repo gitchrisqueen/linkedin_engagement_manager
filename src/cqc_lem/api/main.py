@@ -1,12 +1,13 @@
 import os
 import time
 from datetime import datetime
+from typing import BinaryIO, Union
 from typing import Optional, Any
 
-from fastapi import FastAPI
-from fastapi import HTTPException
+from fastapi import FastAPI, HTTPException, Request, status
 from fastapi.responses import FileResponse
 from fastapi.responses import RedirectResponse
+from fastapi.responses import StreamingResponse
 from linkedin_api.clients.auth.client import AuthClient
 from linkedin_api.clients.restli.client import RestliClient
 from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
@@ -113,7 +114,8 @@ def get_posts(email: str) -> ResponseModel:
         raise HTTPException(status_code=404, detail="No posts found for the given email")
 
     # Convert posts to a list of dictionaries
-    posts_list = [{"post_id": post["id"], "content": post["content"], "video_url": post["video_url"], "scheduled_time": post["scheduled_time"],
+    posts_list = [{"post_id": post["id"], "content": post["content"], "video_url": post["video_url"],
+                   "scheduled_time": post["scheduled_time"],
                    "post_type": post["post_type"], "status": post['status']} for post in posts]
 
     return ResponseModel(status_code=200, detail=posts_list)
@@ -135,8 +137,8 @@ def update_post(post_id: int, post: PostRequest) -> ResponseModel:
         raise HTTPException(status_code=405, detail="Post could not be updated")
 
 
-@app.get("/auth/linkedin/callback")
-def linkedin_callback(code: str, state: str = None):
+@app.get("/auth/linkedin/callback", response_model=None)
+def linkedin_callback(code: str, state: str = None) -> Union[ResponseModel, RedirectResponse]:
     """ Handle LinkedIn OAuth callback and retrieve user details"""
 
     # Verify the state parame matches the state from teh environment variable
@@ -185,11 +187,14 @@ def linkedin_callback(code: str, state: str = None):
             url=f"https://{streamlit_url}")  # TODO: Figure out better redirect. Should we just close the window
 
 
-@app.get("/assets", responses={
+@app.get("/assets", response_model=None, responses={
     200: {"description": "Asset returned successfully"},
+    206: {"description": "Asset returned successfully via stream"},
     **{k: v for k, v in error_responses.items() if k in [400, 404]}
-})
-def get_assets(file_name: str) -> FileResponse:
+}
+         )
+def get_assets(file_name: str, content_type: Optional[str] = None,
+               request: Optional[Any] = None) -> Union[ResponseModel, FileResponse, StreamingResponse]:
     """Endpoint to get video asset by file name."""
     if not file_name:
         raise HTTPException(status_code=400, detail="A File Name is required")
@@ -198,6 +203,8 @@ def get_assets(file_name: str) -> FileResponse:
     file_path = os.path.join(assets_dir, file_name)
 
     print(f"File Path: {file_path}")
+
+    print(f"Content Type: {content_type}")
 
     if not os.path.exists(file_path):
         raise HTTPException(status_code=404, detail="File not found")
@@ -208,4 +215,78 @@ def get_assets(file_name: str) -> FileResponse:
     # Get the mime type for the file
     mim_type = get_file_mime_type(file_extension)
 
-    return FileResponse(status_code=200, path=file_path, media_type=mim_type)
+    if request:
+        return range_requests_response(
+            request, file_path=file_path, content_type=mim_type
+        )
+    else:
+        return FileResponse(status_code=200, path=file_path, media_type=mim_type, content_disposition_type=content_type)
+
+
+def send_bytes_range_requests(
+        file_obj: BinaryIO, start: int, end: int, chunk_size: int = 10_000
+):
+    """Send a file in chunks using Range Requests specification RFC7233
+
+    `start` and `end` parameters are inclusive due to specification
+    """
+    with file_obj as f:
+        f.seek(start)
+        while (pos := f.tell()) <= end:
+            read_size = min(chunk_size, end + 1 - pos)
+            yield f.read(read_size)
+
+
+def _get_range_header(range_header: str, file_size: int) -> tuple[int, int]:
+    def _invalid_range():
+        return HTTPException(
+            status.HTTP_416_REQUESTED_RANGE_NOT_SATISFIABLE,
+            detail=f"Invalid request range (Range:{range_header!r})",
+        )
+
+    try:
+        h = range_header.replace("bytes=", "").split("-")
+        start = int(h[0]) if h[0] != "" else 0
+        end = int(h[1]) if h[1] != "" else file_size - 1
+    except ValueError:
+        raise _invalid_range()
+
+    if start > end or start < 0 or end > file_size - 1:
+        raise _invalid_range()
+    return start, end
+
+
+def range_requests_response(
+        request: Request, file_path: str, content_type: str
+)->StreamingResponse:
+    """Returns StreamingResponse using Range Requests of a given file"""
+
+    file_size = os.stat(file_path).st_size
+    range_header = request.headers.get("range")
+
+    headers = {
+        "content-type": content_type,
+        "accept-ranges": "bytes",
+        "content-encoding": "identity",
+        "content-length": str(file_size),
+        "access-control-expose-headers": (
+            "content-type, accept-ranges, content-length, "
+            "content-range, content-encoding"
+        ),
+    }
+    start = 0
+    end = file_size - 1
+    status_code = status.HTTP_200_OK
+
+    if range_header is not None:
+        start, end = _get_range_header(range_header, file_size)
+        size = end - start + 1
+        headers["content-length"] = str(size)
+        headers["content-range"] = f"bytes {start}-{end}/{file_size}"
+        status_code = status.HTTP_206_PARTIAL_CONTENT
+
+    return StreamingResponse(
+        send_bytes_range_requests(open(file_path, mode="rb"), start, end),
+        headers=headers,
+        status_code=status_code,
+    )

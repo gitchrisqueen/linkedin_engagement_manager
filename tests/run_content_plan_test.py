@@ -5,12 +5,10 @@ import shutil
 from cqc_lem import assets_dir
 from cqc_lem.run_content_plan import create_content, auto_generate_content, auto_create_weekly_content
 from cqc_lem.run_scheduler import post_to_linkedin
-from cqc_lem.utilities.ai.ai_helper import get_industries_of_profile_from_ai, get_industry_trend_from_ai, \
-    get_industry_trend_analysis_based_on_user_profile, get_thought_leadership_post_from_ai
-from cqc_lem.utilities.ai.tools import search_recent_news
+from cqc_lem.utilities.ai.ai_helper import get_industry_trend_analysis_based_on_user_profile, get_thought_leadership_post_from_ai
 from cqc_lem.utilities.db import get_user_password_pair_by_id
 from cqc_lem.utilities.env_constants import API_BASE_URL
-from cqc_lem.utilities.linked_in_helper import get_my_profile
+from cqc_lem.utilities.linkedin.helper import get_my_profile
 from cqc_lem.utilities.logger import myprint
 from cqc_lem.utilities.selenium_util import clear_sessions, get_driver_wait_pair
 from cqc_lem.utilities.utils import create_folder_if_not_exists, save_video_url_to_dir
@@ -66,7 +64,8 @@ def test_content_plan_and_create():
     auto_create_weekly_content()
 
 def test_post_to_linkedin():
-    post_to_linkedin(60,1)
+    clear_sessions()
+    post_to_linkedin(60,11)
 
 
 def test_industry_of_user():
@@ -126,10 +125,10 @@ if __name__ == "__main__":
 
     #test_move_files()
 
-    test_create_content()
+    #test_create_content()
 
     #test_content_plan_and_create()
-    #test_post_to_linkedin()
+    test_post_to_linkedin()
 
     #test_industry_of_user()
 

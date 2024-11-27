@@ -4,7 +4,7 @@ from datetime import datetime, timedelta
 from cqc_lem.utilities.db import add_user, get_user_password_pair_by_id, get_ready_to_post_posts, \
     remove_linked_in_profile_by_email
 from cqc_lem.utilities.env_constants import LI_USER, LI_PASSWORD
-from cqc_lem.utilities.linked_in_helper import login_to_linkedin, get_my_profile
+from cqc_lem.utilities.linkedin.helper import login_to_linkedin, get_my_profile
 from cqc_lem.utilities.selenium_util import get_docker_driver, clear_sessions, get_driver_wait_pair
 
 

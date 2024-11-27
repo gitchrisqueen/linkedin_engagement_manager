@@ -1,14 +1,14 @@
 import json
 import time
 
-from cqc_lem.linked_in_profile import LinkedInProfile
+from cqc_lem.utilities.linkedin.profile import LinkedInProfile
 from cqc_lem.run_automation import engage_with_profile_viewer, comment_on_post, invite_to_connect, check_commented, \
     send_private_dm, navigate_to_feed
 from cqc_lem.utilities.ai.ai_helper import generate_ai_response, get_ai_description_of_profile, \
     get_ai_message_refinement, summarize_recent_activity
 from cqc_lem.utilities.date import convert_viewed_on_to_date
 from cqc_lem.utilities.env_constants import LI_USER, LI_PASSWORD
-from cqc_lem.utilities.linked_in_helper import login_to_linkedin, get_linkedin_profile_from_url, get_my_profile
+from cqc_lem.utilities.linkedin.helper import login_to_linkedin, get_linkedin_profile_from_url, get_my_profile
 from cqc_lem.utilities.logger import myprint
 from cqc_lem.utilities.selenium_util import create_driver, get_driver_wait, clear_sessions, get_driver_wait_pair
 

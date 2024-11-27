@@ -5,11 +5,11 @@ from selenium.webdriver.remote.webdriver import WebDriver
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.support.wait import WebDriverWait
 
-from cqc_lem.linked_in_profile import LinkedInProfile
+from cqc_lem.utilities.linkedin.profile import LinkedInProfile
 from cqc_lem.utilities.ai.ai_helper import get_industries_of_profile_from_ai
 from cqc_lem.utilities.db import get_cookies, store_cookies, get_linked_in_profile_by_email, add_linkedin_profile, \
     get_linked_in_profile_by_url
-from cqc_lem.utilities.linked_in_scrapper import returnProfileInfo
+from cqc_lem.utilities.linkedin.scrapper import returnProfileInfo
 from cqc_lem.utilities.logger import myprint
 from cqc_lem.utilities.selenium_util import load_cookies, click_element_wait_retry, get_element_wait_retry, getText
 
