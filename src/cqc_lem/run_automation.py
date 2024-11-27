@@ -9,7 +9,7 @@ from typing import List
 from urllib.parse import urlparse
 
 from dotenv import load_dotenv
-from selenium.common import NoSuchElementException, TimeoutException
+from selenium.common import NoSuchElementException
 from selenium.webdriver import ActionChains
 from selenium.webdriver.common.by import By
 from selenium.webdriver.remote.webdriver import WebDriver
@@ -26,7 +26,8 @@ from cqc_lem.utilities.env_constants import LI_USER
 from cqc_lem.utilities.linked_in_helper import login_to_linkedin, get_my_profile, get_linkedin_profile_from_url
 from cqc_lem.utilities.logger import myprint
 from cqc_lem.utilities.selenium_util import click_element_wait_retry, \
-    get_element_wait_retry, get_elements_as_list_wait_stale, getText, close_tab, get_driver_wait_pair, quit_gracefully
+    get_element_wait_retry, get_elements_as_list_wait_stale, getText, close_tab, get_driver_wait_pair, quit_gracefully, \
+    wait_for_ajax
 from cqc_lem.utilities.utils import debug_function
 
 # Load .env file
@@ -68,22 +69,27 @@ def navigate_to_feed(driver, wait):
     if "feed" not in driver.current_url:
         # Navigate to LinkedIn home feed
         driver.get("https://www.linkedin.com/feed/")
-        time.sleep(5)  # Wait for the feed to load
+        wait_for_ajax(driver)
 
-    # Find and click the "Sort by" dropdown
-    click_element_wait_retry(driver, wait, '//button/hr',
-                             "Clicking Sort By Dropdown", use_action_chain=True)
-
-    time.sleep(1)
-
-    # Select "Recent" from the dropdown
     try:
-        click_element_wait_retry(driver, wait, '//div[contains(@class,"artdeco-dropdown")]/ul/li[2]',
-                                 "Selecting Recent Option", max_try=1, use_action_chain=True)
+        # Find and click the "Sort by" dropdown
+        click_element_wait_retry(driver, wait, '//button/hr',
+                                 "Clicking Sort By Dropdown", use_action_chain=True)
 
+        # time.sleep(1)
+        wait_for_ajax(driver)
+
+        # Select "Recent" from the dropdown
+        click_element_wait_retry(driver, wait, '//div[contains(@class,"artdeco-dropdown")]/ul/li[2]',
+                                 "Selecting Recent Option", max_try=0, use_action_chain=True)
+
+        wait_for_ajax(driver)
         time.sleep(3)  # Wait for the page to refresh with recent posts
-    except TimeoutException as te:
-        myprint("Timeout Exception: " + str(te))
+
+        myprint("Feed Sorted By Recent Items First")
+
+    except Exception as e:
+        myprint("Error During Feed Sort |  Exception: " + str(e))
 
     # are_you_satisfied()
 
@@ -176,6 +182,9 @@ def comment_on_post(user_id: int, post_link: str, comment_text: str):
 
     login_to_linkedin(driver, wait, user_email, user_password)
 
+    # Create an instance of ActionChains
+    actions = ActionChains(driver)
+
     if post_link != driver.current_url:
         # Switch to post url
         driver.get(post_link)
@@ -184,6 +193,9 @@ def comment_on_post(user_id: int, post_link: str, comment_text: str):
     comment_box = click_element_wait_retry(driver, wait,
                                            '//div[contains(@class, "comments-comment-texteditor")]//div[@role="textbox"]',
                                            "Finding the Comment Input Area", use_action_chain=True)
+
+    # Move viewport to the comment_box
+    actions.scroll_to_element(comment_box).perform()
 
     # clear the contents of the comment_box
     comment_box.clear()
@@ -222,43 +234,54 @@ def comment_on_post(user_id: int, post_link: str, comment_text: str):
                                               '//button[contains(@aria-label, "Like") and contains(@class,"artdeco-button--4")]',
                                               "Finding Main Like Button")
 
-    # Create an instance of ActionChains
-    actions = ActionChains(driver)
+    button_label_options = ['Like', 'Celebrate', 'Insightful', 'Support',
+                            # 'Love', 'Funny' # TODO: Not sure if these are universal for all post
+                            ]
+
+    # TODO: Use AI to get a preferences
+    button_to_click_key = random.choice(button_label_options)
 
     max_retries = 3
     for attempt in range(max_retries):
-        # Hover over the main like button
-        actions.move_to_element(main_like_button).perform()
 
         # Wait for new elements to appear (adjust time as needed)
-        time.sleep(.5)
+        time.sleep(5)  # This is needed for it to become visible
         try:
-            choices = []
-            like_button = get_element_wait_retry(driver, wait, '//button[contains(@aria-label, "Like")]',
-                                                 "Finding Like Button", element_always_expected=False, max_try=1)
-            if like_button:
-                choices.append(like_button)
-            celebrate_button = get_element_wait_retry(driver, wait, '//button[contains(@aria-label, "Celebrate")]',
-                                                      "Finding Celebrate Button", element_always_expected=False,
-                                                      max_try=1)
-            if celebrate_button:
-                choices.append(celebrate_button)
-            insightful_button = get_element_wait_retry(driver, wait,
-                                                       '//button[contains(@aria-label, "Insightful")]',
-                                                       "Finding Insightful Button", element_always_expected=False,
-                                                       max_try=1)
-            if insightful_button:
-                choices.append(insightful_button)
-            button_to_click = random.choice(choices)
-            button_to_click.click()
+
+            choice_dict = {}
+
+            # For each key in the button_path_dict, get the element and add it to the choices list
+            for button_label in button_label_options:
+                button = get_element_wait_retry(driver, wait,
+                                                f"//span[contains(@class,'menu')]//button[contains(@aria-label, '{button_label}')]",
+                                                f"Finding {button_label} Button",
+                                                element_always_expected=False, max_try=1)
+                if button:
+                    choice_dict[button_label] = button
+
+            # Get the choice dict keys as list
+            choices = list(choice_dict.keys())
+
+            # Randomly chose one of the available button options
+            button_to_click_key = random.choice(choices)
+            myprint(f"Clicking {button_to_click_key} Post Reaction")
+            button_to_click = choice_dict[button_to_click_key]
+            # Move to that button and click it
+            # Hover over the main like button
+            actions.scroll_to_element(main_like_button).move_to_element(main_like_button).move_to_element(
+                button_to_click).click().perform()
+            wait_for_ajax(driver)
+            time.sleep(2)
             myprint(f"Added Post Reaction")
             method_result += f" | Added Post Reaction"
             break  # Exit loop if click is successful
         except Exception as e:
             if attempt < max_retries - 1:
+                myprint(f"Removing {button_to_click_key} from choice options since it failed")
+                button_label_options.remove(button_to_click_key)
                 time.sleep(1)  # Wait a bit before retrying
             else:
-                myprint(f"Failed to click Post Reaction: {e}")
+                myprint(f"Failed to click {button_to_click_key} Post Reaction: {e}")
                 method_result += f" | Added Post Reaction | Error: {e}"
 
     quit_gracefully(driver)  # Close the driver
@@ -623,7 +646,7 @@ def generate_and_post_comment(driver, wait, post_link, my_profile: LinkedInProfi
     #                         parent_element=post['element'], max_try=0, element_always_expected=False)
 
     # Simulate reading the post
-    read_time = simulate_reading_time(content)
+    read_time = simulate_reading_time(content) / 2
     myprint(f"Simulated Reading... for {read_time} seconds")
     time.sleep(read_time)
 
@@ -857,7 +880,10 @@ def engage_with_profile_viewer(user_id: int, viewer_url, viewer_name):
 
                 # TODO: Send DM - offer something of value—whether it's insights, resources, or potential collaboration opportunities.
                 # TODO: Generate something of value to offer
-                message = "Hi, I noticed we're connected on LinkedIn and wanted to reach out. I'm currently working on a project that I think you might find interesting. Would you be open to a quick chat to discuss it further?"
+
+                # Get the first name from the view_name by splitting on space
+                first_name = viewer_name.split(" ").pop()
+                message = f"Hi {first_name}, I noticed we're connected on LinkedIn and wanted to reach out. I'm currently working on a project that I think you might find interesting. Would you be open to a quick chat to discuss it further?"
 
                 # Send actual DM
                 kwargs = {'user_id': get_user_id(my_profile.email),
@@ -872,7 +898,7 @@ def engage_with_profile_viewer(user_id: int, viewer_url, viewer_name):
                                             })
         else:
             # myprint(f"We Are {profile.connection} Connections")
-            # If not connected send them a connection request
+            # If not 1st connections, send them a connection request
             # Mention something specific about their profile or company to show genuine interest and that you've done your research
             recent_activity_summary = summarize_recent_activity(profile, my_profile)
             response = profile.generate_personalized_message(recent_activity_message=recent_activity_summary,
@@ -894,6 +920,8 @@ def engage_with_profile_viewer(user_id: int, viewer_url, viewer_name):
                                           })
     else:
         myprint(f"Failed to get profile data for {viewer_name}")
+
+    quit_gracefully(driver)
 
 
 @shared_task.task(rate_limit='2/m')
@@ -950,7 +978,7 @@ def send_private_dm(user_id: int, profile_url: str, message: str):
         # Clear the message box
         message_box.clear()
 
-       # Create javascript to inject the message
+        # Create javascript to inject the message
         escaped_message = json.dumps(message)
         code = f"""
         var xpath = "//div[contains(@class,'contenteditable')]";
@@ -982,7 +1010,6 @@ def send_private_dm(user_id: int, profile_url: str, message: str):
     except Exception as e:
         myprint(f"Failed to send DM: {str(e)}")
         final_result += f"Failed. Error: {str(e)}"
-
 
     quit_gracefully(driver)  # Close the driver
 

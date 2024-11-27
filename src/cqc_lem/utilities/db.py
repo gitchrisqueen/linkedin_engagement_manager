@@ -470,8 +470,12 @@ def get_linked_in_profile_by_url(profile_url: str, updated_less_than_days_ago: i
     connection = get_db_connection()
     cursor = connection.cursor()
 
-    cursor.execute("SELECT data FROM profiles WHERE profile_url = %s AND updated_at > NOW() - INTERVAL %s DAY",
-                   (profile_url, updated_less_than_days_ago))
+    profile_url_without_end_slash = profile_url.rstrip('/')
+    profile_url_with_end_slash = profile_url_without_end_slash + '/'
+
+
+    cursor.execute("SELECT data FROM profiles WHERE (profile_url = %s or profile_url = %s) AND updated_at > NOW() - INTERVAL %s DAY",
+                   (profile_url_with_end_slash, profile_url_without_end_slash , updated_less_than_days_ago))
     profile_data = cursor.fetchone()
 
     cursor.close()

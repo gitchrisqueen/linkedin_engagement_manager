@@ -6,6 +6,7 @@ from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.support.wait import WebDriverWait
 
 from cqc_lem.linked_in_profile import LinkedInProfile
+from cqc_lem.utilities.ai.ai_helper import get_industries_of_profile_from_ai
 from cqc_lem.utilities.db import get_cookies, store_cookies, get_linked_in_profile_by_email, add_linkedin_profile, \
     get_linked_in_profile_by_url
 from cqc_lem.utilities.linked_in_scrapper import returnProfileInfo
@@ -118,7 +119,7 @@ def get_my_profile(driver, wait, user_email: str, user_password: str) -> LinkedI
     return profile
 
 
-def get_linkedin_profile_from_url(driver, wait, profile_url, is_main_user = False):
+def get_linkedin_profile_from_url(driver, wait, profile_url, is_main_user = False, force_save = False):
     # Get the profile from the DB if it exists
     profile_json = get_linked_in_profile_by_url(profile_url)
 
@@ -130,24 +131,36 @@ def get_linkedin_profile_from_url(driver, wait, profile_url, is_main_user = Fals
         if profile_url != driver.current_url:
             # Open the profile URL
             driver.get(profile_url)
+            time.sleep(2)
+
+            # Check if current url changes (redirects)
+            if profile_url != driver.current_url:
+
+                # Use the current url as the profile url
+                profile_url = driver.current_url
+
+                # Get the profile using the new url
+                return get_linkedin_profile_from_url(driver, wait, profile_url, is_main_user)
+
+
 
         # Get the company name
         company_element = get_element_wait_retry(driver, wait, '//button[contains(@aria-label,"Current company")]',
                                                  "Finding Company Name", element_always_expected=False)
 
-        companyName = None
+        company_name = None
         if company_element:
-            companyName = getText(company_element)
+            company_name = getText(company_element)
 
-        profile_data = returnProfileInfo(driver, profile_url, companyName, is_main_user)
-
-        # Use AI to determine industry of the profile
-
-
+        profile_data = returnProfileInfo(driver, profile_url, company_name, is_main_user)
 
 
         if profile_data:
             profile = LinkedInProfile(**profile_data)
+            # Use AI to determine industry of the profile
+            industry = get_industries_of_profile_from_ai(profile, 1)
+            profile.industry = industry
+
             # Save the profile to the DB
             if add_linkedin_profile(profile):
                 myprint(f"Profile saved to DB: {profile.full_name}")

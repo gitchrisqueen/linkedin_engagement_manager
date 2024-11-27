@@ -1,15 +1,16 @@
 import json
+import time
 
 from cqc_lem.linked_in_profile import LinkedInProfile
 from cqc_lem.run_automation import engage_with_profile_viewer, comment_on_post, invite_to_connect, check_commented, \
-    send_private_dm
+    send_private_dm, navigate_to_feed
 from cqc_lem.utilities.ai.ai_helper import generate_ai_response, get_ai_description_of_profile, \
     get_ai_message_refinement, summarize_recent_activity
 from cqc_lem.utilities.date import convert_viewed_on_to_date
 from cqc_lem.utilities.env_constants import LI_USER, LI_PASSWORD
 from cqc_lem.utilities.linked_in_helper import login_to_linkedin, get_linkedin_profile_from_url, get_my_profile
 from cqc_lem.utilities.logger import myprint
-from cqc_lem.utilities.selenium_util import create_driver, get_driver_wait, clear_sessions
+from cqc_lem.utilities.selenium_util import create_driver, get_driver_wait, clear_sessions, get_driver_wait_pair
 
 
 def test_ai_responses():
@@ -71,8 +72,7 @@ def test_linked_in_profile():
 
 
 def test_get_linkedin_profile_from_url():
-    driver = create_driver()
-    wait = get_driver_wait(driver)
+    driver, wait = get_driver_wait_pair(session_name='Test Get Linkedin Profile From Url')
 
     login_to_linkedin(driver, wait, LI_USER, LI_PASSWORD)
 
@@ -108,12 +108,11 @@ def test_send_dm():
     name_2 = "Bryon McClure"
     engage_with_profile_viewer(driver, wait, my_profile, profile_url_2, name_2)
 
-    # driver.quit()
+    driver.quit()
 
 
 def test_describe_profile():
-    driver = create_driver()
-    wait = get_driver_wait(driver)
+    driver, wait = get_driver_wait_pair(session_name='Test Deescribe Provile')
 
     login_to_linkedin(driver, wait, LI_USER, LI_PASSWORD)
 
@@ -132,9 +131,12 @@ def test_describe_profile():
     driver.quit()
 
 
-def test_describe_summarize_interesting_activity():
-    driver = create_driver()
-    wait = get_driver_wait(driver)
+def test_summarize_interesting_recent_activity_and_response():
+    # Clear all sessions
+    print("clearing Sessions")
+    clear_sessions()
+
+    driver, wait = get_driver_wait_pair(session_name='Test Summarize Recent Activity and Response')
 
     login_to_linkedin(driver, wait, LI_USER, LI_PASSWORD)
 
@@ -149,8 +151,17 @@ def test_describe_summarize_interesting_activity():
         profile_2_data = get_linkedin_profile_from_url(driver, wait, profile_2_url)
         if profile_2_data:
             second_profile = LinkedInProfile(**profile_2_data)
-            description = summarize_recent_activity(second_profile, main_profile)
-            myprint(description)
+            recent_activity_summary = summarize_recent_activity(second_profile, main_profile)
+
+            myprint(f"Recent Activity of {second_profile.full_name} | Summary: {recent_activity_summary}")
+
+            response = second_profile.generate_personalized_message(recent_activity_message=recent_activity_summary,
+                                                                    from_name=main_profile.full_name)
+            myprint(f"Original Response: {response}")
+            refined_response = get_ai_message_refinement(response)
+            myprint(f"Refined Response: {refined_response}")
+
+
         else:
             myprint("Failed to get second profile data")
 
@@ -161,29 +172,29 @@ def test_describe_summarize_interesting_activity():
 
 
 def test_post_comment():
-    driver = create_driver()
-    wait = get_driver_wait(driver)
+    clear_sessions()
+    user_id = 60
+    post_url = "https://www.linkedin.com/posts/christopherqueen_ai-changemanagement-teamleadership-activity-7244329778621685761-D2dD?utm_source=share&utm_medium=member_desktop"
+    comment = "This was a good read!"
+
+    comment_on_post(user_id, post_url, comment)
+
+def test_navigate_to_feed():
+    clear_sessions()
+
+    driver, wait = get_driver_wait_pair(session_name='Test Navigate to Feed')
 
     login_to_linkedin(driver, wait, LI_USER, LI_PASSWORD)
 
-    # Navigate to post
-    driver.get(
-        "https://www.linkedin.com/posts/christopherqueen_accounting-ai-automation-activity-7250701723214708737-0Cmg?utm_source=share&utm_medium=member_desktop")
-    # driver.get("https://www.linkedin.com/posts/agacgfm_take-advantage-of-your-membership-and-join-activity-7249146500310528000-gUkv?utm_source=share&utm_medium=member_desktop")
+    navigate_to_feed(driver,wait)
 
-    comment = """We're currently running a test to see how much traction we can get on this post. It's an experiment to measure engagement and visibility, so every interaction counts! Whether you're scrolling by or taking a moment to read through, feel free to drop a comment, like, or even share it if you find it interesting. The goal here is to explore how LinkedIn’s algorithms respond to posts like this, and whether we can reach a broader audience by simply encouraging more activity.
+    time.sleep(60*2)
 
-    Also, we’re curious to see if there's a notable difference in reach based on engagement in the early stages of a post's lifecycle, so if you're seeing this, a quick interaction would be greatly appreciated!
-    
-    In the meantime, we’ll keep monitoring the performance metrics and adjust our approach based on what we learn. If you have any tips or insights on how to boost engagement, we’d love to hear them! Thanks for being part of our little experiment—let's see where this goes!"""
-
-    comment_on_post(driver, wait, comment)
+    driver.quit()
 
 
 def test_invite_to_connect():
-    driver = create_driver()
-    wait = get_driver_wait(driver)
-
+    driver, wait = get_driver_wait_pair(session_name='Test Invite to Connect')
     login_to_linkedin(driver, wait, LI_USER, LI_PASSWORD)
 
     invite_list = ["https://www.linkedin.com/in/eric-partaker-5560b92/",
@@ -208,8 +219,12 @@ def test_invite_to_connect():
         # Clear message after first invite
         message = None
 
+    driver.quit()
 
-def test_already_commented(driver, wait):
+
+def test_already_commented():
+    driver, wait = get_driver_wait_pair(session_name='Test Already Commented')
+
     login_to_linkedin(driver, wait, LI_USER, LI_PASSWORD)
 
     post_links = [
@@ -226,14 +241,25 @@ def test_already_commented(driver, wait):
         else:
             myprint("Not commented on this post yet. Proceeding...")
 
+    driver.quit()
+
+
 def test_send_private_dm():
     user_id = 60
-    profile_url = "https://www.linkedin.com/in/alexwang8613818430998/"
-    name= "Alex"
-    message = f"Hi {name}, I appreciate you connecting with me on LinkedIn. I look forward to learning more about you and your work."
+    profile_url = "https://www.linkedin.com/in/ACoAAEqRdkkBBWMJa0xx9KcdGGywNixIfHeba9A"
+    name = ""
+    message = f"Hi {name}, I noticed we're connected on LinkedIn and wanted to reach out. I'm currently working on a project that I think you might find interesting. Would you be open to a quick chat to discuss it further?"
     clear_sessions()
 
     send_private_dm(user_id, profile_url, message)
+
+
+def test_engage_with_profile_viewer():
+    clear_sessions()
+    user_id = 60
+    profile_url = "https://www.linkedin.com/in/ACoAAAhxNBwBxKLTu4LeFsTLvsC4vxe8hbPQ8zQ"
+    name = "Badsha Dash"
+    engage_with_profile_viewer(user_id, profile_url, name)
 
 
 if __name__ == "__main__":
@@ -243,11 +269,10 @@ if __name__ == "__main__":
     # test_get_linkedin_profile_from_url()
     # test_send_dm()
     # test_describe_profile()
-    # test_describe_summarize_interesting_activity()
+    # test_summarize_interesting_recent_activity_and_response()
     # test_post_comment()
-    test_send_private_dm()
+    # test_send_private_dm()
+    # test_engage_with_profile_viewer()
+    test_navigate_to_feed()
 
-    pass
-
-
-
+pass

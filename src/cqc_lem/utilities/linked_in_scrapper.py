@@ -1,17 +1,17 @@
 import copy
 import random
 import re
-import time
 from typing import List
 
 from bs4 import BeautifulSoup, PageElement
 from selenium import webdriver
+from selenium.webdriver.common.by import By
 
 from cqc_lem.utilities.date import convert_datetime_to_start_of_day
 from cqc_lem.utilities.date import convert_viewed_on_to_date
 from cqc_lem.utilities.date import get_linkedin_datetime_from_text
 from cqc_lem.utilities.selenium_util import click_element_wait_retry, get_driver_wait, get_elements_as_list_wait_stale, \
-    getText
+    getText, wait_for_ajax
 
 start_identifier_map = {
     "education": 19,
@@ -32,83 +32,6 @@ start_identifier_map = {
     "recent_activity_text": 87
 
 }
-
-
-# Return all profiles urls of M&A employees of a certain company
-def getProfileURLs(driver: webdriver, company_name):
-    time.sleep(1)
-    driver.get("https://www.linkedin.com/company/" + company_name + "/people/?keywords=M%26A%2CMergers%2CAcquisitions")
-    time.sleep(3)
-    driver.execute_script("window.scrollTo(0, document.body.scrollHeight);")
-    time.sleep(1)
-    driver.execute_script("window.scrollTo(0, document.body.scrollHeight);")
-    driver.execute_script("window.scrollTo(0, document.body.scrollHeight);")
-    source = BeautifulSoup(driver.page_source)
-
-    visibleEmployeesList = []
-    visibleEmployees = source.find_all('a', class_='app-aware-link')
-    for profile in visibleEmployees:
-        if profile.get('href').split('/')[3] == 'in':
-            visibleEmployeesList.append(profile.get('href'))
-
-    invisibleEmployeeList = []
-    invisibleEmployees = source.find_all('div',
-                                         class_='artdeco-entity-lockup artdeco-entity-lockup--stacked-center artdeco-entity-lockup--size-7 ember-view')
-    for invisibleguy in invisibleEmployees:
-        title = invisibleguy.findNext('div', class_='lt-line-clamp lt-line-clamp--multi-line ember-view').contents[
-            0].strip('\n').strip('  ')
-        invisibleEmployeeList.append(title)
-
-        # A profile can either be visible or invisible
-        profilepiclink = ""
-        visibleProfilepiclink = invisibleguy.find('img', class_='lazy-image ember-view')
-        invisibleProfilepicLink = invisibleguy.find('img', class_='lazy-image ghost-person ember-view')
-        if visibleProfilepiclink == None:
-            profilepiclink = invisibleProfilepicLink.get('src')
-        else:
-            profilepiclink = visibleProfilepiclink.get('src')
-
-        if profilepiclink not in invisibleEmployees:
-            invisibleEmployeeList.append(profilepiclink)
-    return (visibleEmployeesList[5:], invisibleEmployeeList)
-
-
-# parses a type 2 job row
-def parseType2Jobs(alltext):
-    print('Job Type 2 Found')
-    jobgroups = []
-    company = alltext[16][:len(alltext[16]) // 2]
-    totalDurationAtCompany = alltext[20][:len(alltext[20]) // 2]
-
-    # get rest of the jobs in the same nested list
-    groups = []
-    count = 0
-    index = 0
-    for a in alltext:
-        if a == '' or a == ' ':
-            count += 1
-        else:
-            groups.append((count, index))
-            count = 0
-        index += 1
-
-    numJobsInJoblist = [g for g in groups if g[0] == 21 or g[0] == 22 or g[0] == 25 or g[0] == 26]
-    for i in numJobsInJoblist:
-        # full time/part time case
-        if 'time' in alltext[i[1] + 5][:len(alltext[i[1] + 5]) // 2].lower().split('-'):
-            jobgroups.append((alltext[i[1]][:len(alltext[i[1]]) // 2], alltext[i[1] + 8][:len(alltext[i[1] + 8]) // 2]))
-        else:
-            jobgroups.append((alltext[i[1]][:len(alltext[i[1]]) // 2], alltext[i[1] + 4][:len(alltext[i[1] + 4]) // 2]))
-    return ('type2job', company, 'no title', totalDurationAtCompany, jobgroups)
-
-
-# parses a type 1 job row
-def parseType1Job(alltext):
-    print('Job Type 1 Found')
-    jobtitle = alltext[16][:len(alltext[16]) // 2]
-    company = alltext[20][:len(alltext[20]) // 2]
-    duration = alltext[23][:len(alltext[23]) // 2]
-    return ('type1job', company, jobtitle, duration)
 
 
 def source_as_row(s: PageElement) -> List[str]:
@@ -147,18 +70,19 @@ def get_page_source(driver, url, scroll_times=0):
     if url != driver.current_url:
         # Open the profile URL
         driver.get(url)
-        time.sleep(2)
+        wait_for_ajax(driver)
 
     # Force bottom page scroll twice
     for _ in range(scroll_times):
         driver.execute_script("window.scrollTo(0, document.body.scrollHeight);")
-        time.sleep(2)
+        wait_for_ajax(driver)
+        # time.sleep(2)
 
     return BeautifulSoup(driver.page_source, "html.parser")
 
 
 # returns LinkedIn profile information
-def returnProfileInfo(driver: webdriver, profile_url, company_name=None, is_main_user = False):
+def returnProfileInfo(driver: webdriver, profile_url, company_name=None, is_main_user=False):
     url = profile_url
     source = get_page_source(driver, url, 0)
     profile = {}
@@ -192,6 +116,8 @@ def returnProfileInfo(driver: webdriver, profile_url, company_name=None, is_main
         ('certifications', lambda: get_profile_certifications(driver, profile_url)),
         ('skills', lambda: get_profile_skills(driver, profile_url)),
         ('recent_activities', lambda: get_profile_recent_activity(driver, profile_url)),
+        # TODO: Get the awards
+        # TODO: Get Interest (top voices, companies, groups, newsletters
     ]
 
     # Add mutual_connections function if not is_main_user
@@ -206,11 +132,7 @@ def returnProfileInfo(driver: webdriver, profile_url, company_name=None, is_main
         try:
             profile[key] = func()
         except Exception as e:
-            print("Error getting ", key, " | ", e)
-
-    # TODO: Get the industry - This may not be publicly visible
-    # TODO: Get the awards
-    # TODO: Get Interest (top voices, companies, groups, newsletters
+            print(f"Error getting: {key} | Exception: {e}")
 
     # print_header("Profile")
     # print(profile)
@@ -228,9 +150,6 @@ def returnProfileInfo(driver: webdriver, profile_url, company_name=None, is_main
         except Exception as e:
             print("Error getting ", key, " | ", e)
 
-    # TODO: Get the industry - This may not be publicly visible
-    # TODO: Get the awards
-    # TODO: Get Interest (top voices, companies, groups, newsletters
 
     # print_header("Profile")
     # print(profile)
@@ -239,11 +158,16 @@ def returnProfileInfo(driver: webdriver, profile_url, company_name=None, is_main
     return profile
 
 
-def get_mutual_connections(driver, employeeLink):
-    if employeeLink != driver.current_url:
+def go_to_base_employee_link(driver, employee_link):
+    if employee_link != driver.current_url:
         # Open the profile URL
-        driver.get(employeeLink)
-        time.sleep(2)
+        driver.get(employee_link)
+        wait_for_ajax(driver)
+        # time.sleep(2)
+
+
+def get_mutual_connections(driver, employee_link):
+    go_to_base_employee_link(driver, employee_link)
 
     wait = get_driver_wait(driver)
 
@@ -252,17 +176,16 @@ def get_mutual_connections(driver, employeeLink):
 
     # Get the text of the element that contains the connection's name
     mutual_connections = get_elements_as_list_wait_stale(wait,
-                                                         "//div[contains(@class,'linked-area')]//span[contains(@class,'title')]//a//span//span[1]",
-                                                         "Getting Mutual Conneciton Names")
+                                                         "//div[contains(@class,'linked-area')]//span//a//span//span[1]",
+                                                         "Getting Mutual Connection Names")
     # Get the text from the elements
     mutual_connections = [getText(mc) for mc in mutual_connections]
 
     return mutual_connections
 
 
-def get_profile_education(driver, employeeLink):
-    url = employeeLink
-    source = get_page_source(driver, url)
+def get_profile_education(driver, employee_link):
+    source = get_page_source(driver, employee_link)
     profile_education = []
     education = source.find_all('li')
     # print_header("Education")
@@ -283,8 +206,12 @@ def get_profile_education(driver, employeeLink):
     return profile_education
 
 
-def get_profile_recent_activity(driver, employeeLink):
-    url = employeeLink + '/recent-activity/all/'
+def get_profile_recent_activity(driver, employee_link):
+    go_to_base_employee_link(driver, employee_link)
+    url = driver.current_url.rstrip('/') + '/recent-activity/all/'
+    driver.get(url)
+    wait_for_ajax(driver)
+
     source = get_page_source(driver, url, 2)
     # activities = source.find_all('li')
     # Find all the links that have 'activity' in the url
@@ -306,41 +233,20 @@ def get_profile_recent_activity(driver, employeeLink):
                          'posted': convert_datetime_to_start_of_day(convert_viewed_on_to_date(date + " ago"))} for
                         text, link, date in zip(found_text, found_links, found_dates)]
 
-    # print("Recent Activity Links", profile_activity)
+    # print(f"Profile URL: {employee_link} | Recent Activity Links {profile_activity}")
 
     return profile_activity
 
-    """for a in activities:
-        row = source_as_row(a)
-        si = get_start_identifier(row)
-        # Print the start identifier and the first 20 characters of the row from the start identifier
-        # print("Start Index: " + str(si), " | ", row[si][:40])
-        print("Start Index: " + str(si), " | ", str(row))
-        rai = start_identifier_map['recent_activity_text']
-        if si == start_identifier_map['recent_activity_number'] and rai < len(row) and row[rai]:
-            activity = row[rai]
-            profile_activity.append(activity)
 
-    print("Profile Activity", profile_activity)
+def get_profile_experiences(driver, employee_link):
+    # TODO: Fix this method
 
-
-
-    # combine the profile activity and the found links into a mapped dict list
-    profile_activity = [{'text': activity, 'link': link} for activity, link in zip(profile_activity, found_links)]
-
-    print("Recent Activity Links", profile_activity)
-
-    exit(0)
-
-    return profile_activity"""
-
-
-def get_profile_experiences(driver, employeeLink):
-    url = employeeLink + '/details/experience/'
+    go_to_base_employee_link(driver, employee_link)  # Link may need to redirect so we do this first
+    url = driver.current_url.rstrip('/') + '/details/experience/'
     driver.get(url)
-    time.sleep(2)
+    wait_for_ajax(driver)
+
     source = BeautifulSoup(driver.page_source, "html.parser")
-    time.sleep(1)
     exp = source.find_all('li')
     profile_experiences = []
     empty_position = {"title": "No title", 'details': [], 'skills': []}
@@ -486,8 +392,13 @@ def get_profile_experiences(driver, employeeLink):
     return profile_experiences
 
 
-def get_profile_certifications(driver, employeeLink):
-    url = employeeLink + '/details/certifications/'
+def get_profile_certifications(driver, employee_link):
+    go_to_base_employee_link(driver, employee_link)  # May need to redirect first
+
+    url = driver.current_url.rstrip('/') + '/details/certifications/'
+    driver.get(url)
+    wait_for_ajax(driver)
+
     source = get_page_source(driver, url, 2)
     profile_certifications = []
     certs = source.find_all('li')
@@ -543,41 +454,48 @@ def get_profile_certifications(driver, employeeLink):
     return profile_certifications
 
 
-def get_profile_skills(driver, employeeLink):
+def get_profile_skills(driver, employee_link):
+    go_to_base_employee_link(driver, employee_link)  # May need to redirect first
+
     # Skills
-    url = employeeLink + '/details/skills/'
-    source = get_page_source(driver, url, 5)
+    url = driver.current_url.rstrip('/') + '/details/skills/'
+    driver.get(url)
+    wait_for_ajax(driver)
+
+    wait = get_driver_wait(driver)
+
     profile_skills = []
-    skills = source.find_all('li')
-    # print_header("Skills")
-    # skills_search_word_frequency = {}
-    for s in skills:
-        row = source_as_row(s)
-        si = get_start_identifier(row)
-        # print("Start Index: " + str(si), " | ", str(row))
 
-        # Below is for debugging
-        # skills_search_word_frequency = record_search_word_frequency(row, si, ['endorsements'], skills_search_word_frequency)
+    skills = get_elements_as_list_wait_stale(wait, "//a[contains(@data-field,'skill')]", "Getting Skills")
 
-        if si == start_identifier_map['skills']:
-            skill = row[si][:len(row[si]) // 2]
-            profile_skills.append({"name": skill})
-        elif si == start_identifier_map['endorsements']:
-            # Find endorsements
-            endorsements = row[si][:len(row[si]) // 2]
-            # print("Endorsements: ", endorsements)
-            # extract only the number from the endorsements text
-            endorsement_numbers = re.findall(r'\d+', endorsements)
-            if endorsement_numbers:
-                endorsements = int(endorsement_numbers[0])
-                # Get the last skill if profile_skills is not empty
-                if profile_skills:
-                    profile_skills[-1]['endorsements'] = endorsements
+    # Get the text from all the skills
+    for each_skill in skills:
+        skill_name = getText(each_skill)
+        # Remove all new lines from the skill name
+        skill_name = skill_name.replace('\n', '')
+        # Remove leading and trailing spaces
+        skill_name = skill_name.strip()
 
-    # Below is for debugging
-    # print_header("Search Word Frequency")
-    # print(skills_search_word_frequency)
-    # Above is for debugging
+        # Split the skill name in half because LI has 2 text elements in the one we find
+        skill_name = skill_name[:len(skill_name) // 2]
+
+        skill_dict = {"name": skill_name}
+
+        try:
+            # Use the parent element to find the child element looking for endorsement
+            endorsement_element = wait.until(
+                lambda d: each_skill.find_element(By.XPATH, ".//ancestor::li//span[contains(text(),'endorsement')][1]"),
+                'Finding Endorsement Text')
+        except Exception:
+            # No endorsement element found
+            endorsement_element = None
+
+        if endorsement_element:
+            endorse_text = getText(endorsement_element)
+            #print(f"Endorsement Text: {endorse_text}")
+            skill_dict["endorsements"] = int(re.search(r'\d+', endorse_text).group())
+
+        profile_skills.append(skill_dict)
 
     return profile_skills
 
