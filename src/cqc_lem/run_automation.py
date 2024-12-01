@@ -16,7 +16,6 @@ from selenium.webdriver.remote.webdriver import WebDriver
 from selenium.webdriver.remote.webelement import WebElement
 from selenium.webdriver.support import expected_conditions as EC
 
-from cqc_lem.utilities.linkedin.profile import LinkedInProfile
 from cqc_lem.my_celery import app as shared_task
 from cqc_lem.utilities.ai.ai_helper import generate_ai_response, get_ai_message_refinement, summarize_recent_activity
 from cqc_lem.utilities.date import convert_viewed_on_to_date
@@ -24,6 +23,7 @@ from cqc_lem.utilities.db import get_user_password_pair_by_id, get_user_id, inse
     LogResultType, has_user_commented_on_post_url, get_post_url_from_log_for_user, get_post_message_from_log_for_user
 from cqc_lem.utilities.env_constants import LI_USER
 from cqc_lem.utilities.linkedin.helper import login_to_linkedin, get_my_profile, get_linkedin_profile_from_url
+from cqc_lem.utilities.linkedin.profile import LinkedInProfile
 from cqc_lem.utilities.logger import myprint
 from cqc_lem.utilities.selenium_util import click_element_wait_retry, \
     get_element_wait_retry, get_elements_as_list_wait_stale, getText, close_tab, get_driver_wait_pair, quit_gracefully, \
@@ -536,21 +536,27 @@ def accept_connection_request(user_id: int):
     # Navigate to the invitations manager page
     driver.get("https://www.linkedin.com/mynetwork/invitation-manager/")
 
-    # Get all the invitation use the href and text (invitee name) to send a DM
-    invitations = get_elements_as_list_wait_stale(wait,
-                                                  "(//div[contains(@class,'invitation-card__container')]//div[contains(@class,'details')]//a)[2]",
-                                                  "Finding Invitation Names and Urls")
+    try:
 
-    # For each invitation store the url and name to a dict using url as the key
-    invitation_data = {invitation.get_attribute('href'): getText(invitation) for invitation in invitations}
+        # Get all the invitation use the href and text (invitee name) to send a DM
+        invitations = get_elements_as_list_wait_stale(wait,
+                                                      "(//div[contains(@class,'invitation-card__container')]//div[contains(@class,'details')]//a)[2]",
+                                                      "Finding Invitation Names and Urls")
 
-    # Find and click all the accept buttons
-    accept_buttons = get_elements_as_list_wait_stale(wait, '//button[contains(@aria-label,"Accept")]',
-                                                     "Finding Accept Buttons")
+        # For each invitation store the url and name to a dict using url as the key
+        invitation_data = {invitation.get_attribute('href'): getText(invitation) for invitation in invitations}
 
-    for accept_button in accept_buttons:
-        accept_button.click()
-        time.sleep(2)  # Wait for 2 seconds
+        # Find and click all the accept buttons
+        accept_buttons = get_elements_as_list_wait_stale(wait, '//button[contains(@aria-label,"Accept")]',
+                                                         "Finding Accept Buttons")
+
+        for accept_button in accept_buttons:
+            accept_button.click()
+            time.sleep(2)  # Wait for 2 seconds
+
+    except Exception as e:
+        myprint(f"Error while accepting connection requests: {e}")
+        invitation_data = {}
 
     # Return the invitations list
     return invitation_data
@@ -578,11 +584,11 @@ def send_appreciation_dms_for_user(user_id: int, loop_for_duration=None):
             message = f"Hi {name}, I appreciate you connecting with me on LinkedIn. I look forward to learning more about you and your work."
             send_private_dm.apply_async(kwargs={"user_id": user_id, "profile_url": profile_url, "message": message})
 
-        # After Receiving a Recommendation:
+        # TODO: After Receiving a Recommendation:
 
-        # After an Interview:
+        # TODO: After an Interview:
 
-        # For a Successful Collaboration:
+        # TODO: For a Successful Collaboration:
 
         # General Appreciation:
         # "Hi [Name], I really appreciate your insights on [topic]. Your perspective helped me see things differently, and I'm grateful for the opportunity to learn from you."

@@ -578,7 +578,7 @@ def get_last_planned_post_date_for_user(user_id: int):
     cursor = connection.cursor()
 
     cursor.execute(
-        "SELECT MAX(scheduled_time) AS last_planned_date FROM posts WHERE user_id = %s AND status = 'planning'",
+        "SELECT MAX(scheduled_time) AS last_planned_date FROM posts WHERE user_id = %s AND status != 'rejected'",
         (user_id,))
     last_planned_date = cursor.fetchone()
 

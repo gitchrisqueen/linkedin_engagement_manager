@@ -1,3 +1,4 @@
+import calendar
 import json
 import os
 import random
@@ -33,11 +34,11 @@ def auto_generate_content():
     active_users = get_active_user_ids()
     # For each user generate content for the next 30 days
     for user_id in active_users:
-        generate_content_for_user.apply_async(kwargs={"user_id": user_id})
+        plan_content_for_user.apply_async(kwargs={"user_id": user_id})
 
 
 @shared_task.task(rate_limit='2/m')
-def generate_content_for_user(user_id: int):
+def plan_content_for_user(user_id: int):
     """
     Generate and plan content for the next 30 days based on current content representation in the database.
     Ensures a balanced distribution of post types (carousel, text, video) and buyer journey stages.
@@ -59,31 +60,28 @@ def generate_content_for_user(user_id: int):
     # Based on the percentages, calculate how many posts of each type are needed to balance the content
 
     # Determine how many days are in this month
-    days_in_month = datetime.now().replace(day=1).replace(month=datetime.now().month + 1,
-                                                          day=1) - datetime.now().replace(day=1)
-    days_in_month = days_in_month.days
-
-    # myprint(f"Days in Month: {days_in_month}")
+    now = datetime.now()
+    days_in_month = calendar.monthrange(now.year, now.month)[1]
+    myprint(f"Days in Month: {days_in_month}")
 
     # Determine the start date as the day after the last scheduled post in planning status
     last_planned_date = get_last_planned_post_date_for_user(user_id)
 
     # myprint(f"Last Planned Date: {last_planned_date}")
 
-    if last_planned_date:
+    # Use the last planned date if it exists and it is after today
+    if last_planned_date and last_planned_date.date() > datetime.now().date():
         start_date = last_planned_date + timedelta(days=1)  # Start with the next day
     else:
         start_date = datetime.now() + timedelta(days=1)  # Start with the next day
-
-    # myprint(f"Start Date: {start_date}")
+    myprint(f"Content Plan | Start Date: {start_date}")
 
     # Determine how many days are left in this month
-    days_left_in_month = days_in_month - start_date.day + 1  # dont cont today
+    days_left_in_month = days_in_month - start_date.day
 
-    # myprint(f"Days Left in Month after Start Date: {days_left_in_month}")
+    myprint(f"Days Left in Month after Start Date: {days_left_in_month}")
 
-    # 4. Create content for each post type and buyer journey stage
-    # Example logic: randomly select a post type and buyer journey stage for each post
+    # Need on more post than days left in month
     target_posts = days_left_in_month + 1  # Total posts till the end of the month
 
     # myprint(f"Target Posts: {target_posts}")
@@ -119,7 +117,7 @@ def generate_content_for_user(user_id: int):
     # myprint(f"Final Needed Posts: {needed_posts}")
     # myprint(f"Final Percentages: {percentages}")
 
-    # 3. Plan content across the buyer journey stages
+    # 3. Plan content across the buyer journey stages | logic: randomly select a post type and buyer journey stage for each post
     # Define buyer journey stages: Awareness, Consideration, Decision
     journey_stages = ["awareness", "consideration", "decision"]
     daily_plan = []
@@ -135,7 +133,7 @@ def generate_content_for_user(user_id: int):
     # Shuffle the post types to ensure a random order
     random.shuffle(post_types)
 
-    # Generate content evenly across buyer journey stages and post types
+    # Generate content plan evenly across buyer journey stages and post types
     for day in range(target_posts):  # Plan for end of this month
         # Choose a post type from the shuffled list
         post_type = post_types.pop()
@@ -143,8 +141,8 @@ def generate_content_for_user(user_id: int):
         # Choose a buyer journey stage in a round-robin fashion
         stage = journey_stages[day % len(journey_stages)]
 
-        # Call the helper function to create content for this post type and buyer journey stage
-        create_content(user_id, post_type, stage)
+        #TODO: Delete below |  Call the helper function to create content for this post type and buyer journey stage
+        #create_content(user_id, post_type, stage)
 
         # Add this post to the daily plan
         post_date = start_date + timedelta(days=day)

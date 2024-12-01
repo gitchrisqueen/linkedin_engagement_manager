@@ -106,6 +106,7 @@ services:
     depends_on:
       - redis
       - mysql
+      - selenium_hub
 
   flower:
     image:  ${DOCKER_IMAGE_NAME}

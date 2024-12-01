@@ -15,7 +15,7 @@ from cqc_lem.utilities.utils import get_file_extension_from_filepath
 
 # Define annotations for constrained strings
 ReadyStatus = Annotated[str, StringConstraints(pattern=r'^(READY)$')]
-ShareMediaCategory = Annotated[str, StringConstraints(pattern=r'^(NONE|ARTICLE|IMAGE)$')]
+ShareMediaCategory = Annotated[str, StringConstraints(pattern=r'^(NONE|ARTICLE|IMAGE|VIDEO)$')]
 NonEmptyString = Annotated[str, StringConstraints(min_length=1)]
 
 
@@ -86,7 +86,11 @@ def upload_media(access_token, owner_sub_id: str, media_path, media_type: str = 
 
     upload_url = upload_response.json()['value']['uploadMechanism'][
         'com.linkedin.digitalmedia.uploading.MediaUploadHttpRequest']['uploadUrl']
+    returned_headers = upload_response.json()['value']['uploadMechanism'][
+        'com.linkedin.digitalmedia.uploading.MediaUploadHttpRequest']['headers']
     asset = upload_response.json()['value']['asset']
+    mediaArtifact = upload_response.json()['value']['mediaArtifact']
+    myprint(f"Asset: {asset} | Upload URL: {upload_url} | Headers: {returned_headers} | Media Artifact: {mediaArtifact}")
 
     # Upload the media file
     upload_response = requests.put(upload_url, headers=headers, data=media_content)
@@ -140,8 +144,10 @@ def share_on_linkedin(user_id: int, content: str,
                                  media_path,
                                  media_type)  # Assuming upload_media returns the URN of the uploaded media
         myprint(f"Media Uploaded to LinkedIn: {media_urn}")
-        if media_type.lower() in ['video','image' ]:
+        if media_type.lower() in ['image' ]:
             share_media_category = 'IMAGE'
+        elif media_type.lower() in ['video' ]:
+            share_media_category = 'VIDEO'
         elif media_type.lower() == 'article':
             share_media_category = 'ARTICLE'
         else:
