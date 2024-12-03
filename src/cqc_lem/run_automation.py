@@ -1,5 +1,4 @@
 import inspect
-import json
 import random
 import sys
 import threading
@@ -21,7 +20,8 @@ from cqc_lem.my_celery import app as shared_task
 from cqc_lem.utilities.ai.ai_helper import generate_ai_response, get_ai_message_refinement, summarize_recent_activity
 from cqc_lem.utilities.date import convert_viewed_on_to_date
 from cqc_lem.utilities.db import get_user_password_pair_by_id, get_user_id, insert_new_log, LogActionType, \
-    LogResultType, has_user_commented_on_post_url, get_post_url_from_log_for_user, get_post_message_from_log_for_user
+    LogResultType, has_user_commented_on_post_url, get_post_url_from_log_for_user, get_post_message_from_log_for_user, \
+    has_engaged_url_with_x_days
 from cqc_lem.utilities.env_constants import LI_USER
 from cqc_lem.utilities.linkedin.helper import login_to_linkedin, get_my_profile, get_linkedin_profile_from_url
 from cqc_lem.utilities.linkedin.profile import LinkedInProfile
@@ -153,22 +153,60 @@ def simulate_writing_time(content):
     writing_time = char_count / 5
     return round(writing_time)
 
+def emoji_to_ue_string(emoji):
+    """Converts an emoji to its equivalent escaped sequence."""
+    return emoji.encode('unicode_escape').decode('ascii')
+
 
 def simulate_typing(driver: WebDriver, editable_element: WebElement, text):
     # Simulate typing the comment
     myprint("Typing Text...")
+    type_speed_reducer = .5
+
+    # Focus on Element
+    actions = ActionChains(driver).move_to_element(editable_element).click()
+
+    # Keep Track of characters to replace
+    replacement_dict = {}
+
     for char in text:
         try:
             if ord(char) > 0xFFFF:
-                # Use JavaScript to set the value for characters outside the BMP
-                driver.execute_script("arguments[0].value += arguments[1];", editable_element, char)
+                # Generate a unique key for the character
+                key = f"|_{len(replacement_dict) + 1}_|"
+                # Record the character to replace later
+                replacement_dict[key] = char
+
+                # Insert the placeholder to replace later with JavaScript
+                actions.send_keys(key)
+
+                # Convert Emoji - THIS DOES NOT WORK
+                #actions.send_keys(emoji_to_ue_string(char))
+
             else:
-                editable_element.send_keys(char)
+                actions.send_keys(char)
+                # editable_element.send_keys(char)
         except Exception as e:
             myprint("Error while sending char(" + char + "): " + str(e))
 
-        type_speed_reducer = .5
-        time.sleep(random.uniform(0.05 * type_speed_reducer, 0.15 * type_speed_reducer))  # Simulate human typing speed
+        type_pause = random.uniform(0.05 * type_speed_reducer, 0.15 * type_speed_reducer)
+        # time.sleep(type_pause)  # Simulate human typing speed
+        actions.pause(type_pause)
+
+    actions.perform()
+
+    script_pre = "arguments[0].value = arguments[0].value.replace(arguments[1],arguments[2]);"
+    if editable_element.tag_name == 'p':
+       script_pre = script_pre.replace(".value", ".innerText")
+
+    for key, char in replacement_dict.items():
+        # Use JavaScript to set the value for characters outside the BMP
+        driver.execute_script(script_pre, editable_element, key, char)
+
+    if len(replacement_dict)>0:
+        # Send an additional space character (so changed register)
+        actions.send_keys(Keys.SPACE).perform()
+
     myprint("Finished Typing!")
 
 
@@ -318,7 +356,7 @@ def check_commented(driver, wait, user_id: int = None, post_url: str = None):
 
 @shared_task.task
 @debug_function
-def automate_commenting(user_id: int, loop_for_duration=None, **kwargs):
+def automate_commenting(user_id: int, loop_for_duration=None, future_forward: int = 60, **kwargs):
     global stop_all_thread
 
     myprint("Starting Automate Commenting Thread...")
@@ -348,10 +386,6 @@ def automate_commenting(user_id: int, loop_for_duration=None, **kwargs):
             if elapsed_time.total_seconds() >= loop_for_duration:
                 myprint("Loop duration reached. Stopping Automate Commenting thread...")
                 break
-        # Else do this (loop_for_duration overrides this break)
-        elif stop_all_thread.is_set():
-            myprint("Stopping Automate Commenting thread...")
-            break
 
         # Switch back to tab
         driver.switch_to.window(current_tab)
@@ -371,6 +405,26 @@ def automate_commenting(user_id: int, loop_for_duration=None, **kwargs):
 
     # Switch back to tab
     driver.switch_to.window(current_tab)
+
+    # Re-schedule the task in the queue for the future
+    if loop_for_duration:
+        elapsed_time = datetime.now() - start_time
+        new_loop_for_duration = round(loop_for_duration - elapsed_time.total_seconds() - future_forward)
+        frame = inspect.currentframe()
+        current_function_name = frame.f_code.co_name
+        args, _, _, values = inspect.getargvalues(frame)
+        kwargs = {arg: values[arg] for arg in args}
+        # myprint(f"{current_function_name} parameters: {kwargs}")
+
+        if new_loop_for_duration < 0:
+            myprint(f"Loop duration reached. Stopping {current_function_name} task...")
+        else:
+            # Change the value of the loop_for_duration parameter
+            kwargs['loop_for_duration'] = new_loop_for_duration
+            # Add our function call back to the task queue
+            myprint(f"Adding {current_function_name} back to queue for {future_forward} seconds in the future...")
+            # automate_reply_commenting.apply_async(kwargs=kwargs, countdown=future_forward)
+            globals()[current_function_name].apply_async(kwargs=kwargs, countdown=future_forward)
 
     quit_gracefully(driver)
 
@@ -472,7 +526,7 @@ def automate_reply_commenting(user_id: int, post_id: int, loop_for_duration=None
                                                             use_action_chain=True,
                                                             parent_element=comment)
 
-                    # Find the text box (should be the element that now has focus
+                    # Find the text box (should be the element that now has focus)
                     text_box = driver.switch_to.active_element
 
                     # Simulate typing the comment in the text box
@@ -488,29 +542,31 @@ def automate_reply_commenting(user_id: int, post_id: int, loop_for_duration=None
 
                     # From this parent element, find the child button element with a span element containing the text "Reply"
                     send_reply_button = click_element_wait_retry(driver, wait, './/button[contains(@class, "submit")]',
-                                                            "Finding Send Reply Button",
-                                                            parent_element=parent_element,
-                                                            max_try=1, use_action_chain=True)
-
+                                                                 "Finding Send Reply Button",
+                                                                 parent_element=parent_element,
+                                                                 max_try=1, use_action_chain=True)
 
                     # Sleep 3 seconds to let the click register
                     time.sleep(3)
 
                     # Update DB with log entry
-                    insert_new_log(user_id=user_id, post_id=post_id, action_type=LogActionType.REPLY, result=LogResultType.SUCCESS,
+                    insert_new_log(user_id=user_id, post_id=post_id, action_type=LogActionType.REPLY,
+                                   result=LogResultType.SUCCESS,
                                    post_url=post_url, message=response)
 
                     # From the parent element, find the like button and click it
-                    like_button = click_element_wait_retry(driver, wait, './/button[contains(@aria-label,"Like") and contains(@class,"react-button__trigger")][1]',
-                                                            "Finding Like Comment Button",
-                                                            parent_element=comment,
-                                                            max_try=1, use_action_chain=True)
+                    like_button = click_element_wait_retry(driver, wait,
+                                                           './/button[contains(@aria-label,"Like") and contains(@class,"react-button__trigger")][1]',
+                                                           "Finding Like Comment Button",
+                                                           parent_element=comment,
+                                                           max_try=1, use_action_chain=True)
 
 
                 except Exception as e:
                     myprint(f"Error while replying to comment: {e}")
                     # Update DB with log entry
-                    insert_new_log(user_id=user_id, post_id=post_id, action_type=LogActionType.REPLY, result=LogResultType.FAILURE,
+                    insert_new_log(user_id=user_id, post_id=post_id, action_type=LogActionType.REPLY,
+                                   result=LogResultType.FAILURE,
                                    post_url=post_url, message=response)
 
 
@@ -527,7 +583,7 @@ def automate_reply_commenting(user_id: int, post_id: int, loop_for_duration=None
         current_function_name = frame.f_code.co_name
         args, _, _, values = inspect.getargvalues(frame)
         kwargs = {arg: values[arg] for arg in args}
-        #myprint(f"{current_function_name} parameters: {kwargs}")
+        # myprint(f"{current_function_name} parameters: {kwargs}")
 
         if new_loop_for_duration < 0:
             myprint(f"Loop duration reached. Stopping {current_function_name} task...")
@@ -582,7 +638,7 @@ def accept_connection_request(user_id: int):
 
 @shared_task.task(rate_limit='2/m')
 @debug_function
-def send_appreciation_dms_for_user(user_id: int, loop_for_duration=None, future_forward:int = 60):
+def send_appreciation_dms_for_user(user_id: int, loop_for_duration=None, future_forward: int = 60):
     user_email, user_password = get_user_password_pair_by_id(user_id)
 
     driver, wait = get_driver_wait_pair(session_name='Automate Appreciation DMs')
@@ -716,7 +772,7 @@ def generate_and_post_comment(driver, wait, post_link, my_profile: LinkedInProfi
 
 @shared_task.task
 @debug_function
-def automate_profile_viewer_engagement(user_id: int, loop_for_duration=None, future_forward:int = 60, **kwargs):
+def automate_profile_viewer_engagement(user_id: int, loop_for_duration=None, future_forward: int = 60, **kwargs):
     global stop_all_thread
 
     user_email, user_password = get_user_password_pair_by_id(user_id)
@@ -808,7 +864,6 @@ def automate_profile_viewer_engagement(user_id: int, loop_for_duration=None, fut
 
     # Get the viewed data from each element and filter by a day ago or specific date
     for viewer_name, viewer_url in viewer_data.items():
-
         # Switch back to tab
         driver.switch_to.window(current_tab)
 
@@ -865,110 +920,113 @@ def automate_profile_viewer_engagement(user_id: int, loop_for_duration=None, fut
 def engage_with_profile_viewer(user_id: int, viewer_url, viewer_name):
     myprint(f"Starting Profile Viewer Engagement")
 
-
     # Check if we already engaged with this viewer today
+    if has_engaged_url_with_x_days(user_id, viewer_url, 1):
+        myprint(f"Already engaged with {viewer_name} today. Skipping...")
+        return
+    else:
 
-    # Log engagement efforts to the log
+        # Log engagement efforts to the log
+        insert_new_log(user_id=user_id, action_type=LogActionType.ENGAGED, result=LogResultType.SUCCESS,
+                       post_url=viewer_url,
+                       message=f"Engaged with {viewer_name}")
 
+        user_email, user_password = get_user_password_pair_by_id(user_id)
 
-    user_email, user_password = get_user_password_pair_by_id(user_id)
+        driver, wait = get_driver_wait_pair(session_name='Profile Viewer Engagement')
 
-    driver, wait = get_driver_wait_pair(session_name='Profile Viewer Engagement')
+        login_to_linkedin(driver, wait, user_email, user_password)
 
+        my_profile = get_my_profile(driver, wait, user_email, user_password)
 
+        myprint(f"Engaging from: {my_profile.full_name} to: {viewer_name}")
 
-    login_to_linkedin(driver, wait, user_email, user_password)
+        if viewer_url != driver.current_url:
+            # Switch to viewer_url
+            driver.get(viewer_url)
 
-    my_profile = get_my_profile(driver, wait, user_email, user_password)
+        profile_data = get_linkedin_profile_from_url(driver, wait, viewer_url)
+        if profile_data:
+            profile = LinkedInProfile(**profile_data)
+            # message = profile.generate_personalized_message()
+            # myprint(message)
 
-    myprint(f"Engaging from: {my_profile.full_name} to: {viewer_name}")
+            if profile.is_1st_connection:
+                myprint("We Are 1st Connections")
+                # engage with their content (
+                recent_activities = profile.recent_activities
 
-    if viewer_url != driver.current_url:
-        # Switch to viewer_url
-        driver.get(viewer_url)
+                myprint(f"Recent Activities Count: {len(recent_activities)}")
 
-    profile_data = get_linkedin_profile_from_url(driver, wait, viewer_url)
-    if profile_data:
-        profile = LinkedInProfile(**profile_data)
-        # message = profile.generate_personalized_message()
-        # myprint(message)
+                # Filter activities by posted date less than a week ago
+                recent_activities = [activity for activity in recent_activities if
+                                     (datetime.now() - activity.posted).days <= 7]
 
-        if profile.is_1st_connection:
-            myprint("We Are 1st Connections")
-            # engage with their content (
-            recent_activities = profile.recent_activities
+                myprint(f"Recent Activities Filtered (1 week) Count: {len(recent_activities)}")
 
-            myprint(f"Recent Activities Count: {len(recent_activities)}")
+                # DONT: Shuffle the activities (they are already in order of latest to oldest)
+                # random.shuffle(recent_activities)
+                able_to_comment = False
 
-            # Filter activities by posted date less than a week ago
-            recent_activities = [activity for activity in recent_activities if
-                                 (datetime.now() - activity.posted).days <= 7]
+                # Filter list to activities I haven't commented on
+                for activity in recent_activities:
+                    # Navigate to Link
+                    myprint(f"Navigating To: {activity.link}")
+                    driver.get(str(activity.link))
+                    commented = check_commented(driver, wait)
+                    if not commented:
+                        # Leave comment on that activity
+                        able_to_comment = generate_and_post_comment(driver, wait, str(activity.link), my_profile)
+                        if able_to_comment:
+                            break  # Only comment/interact with one
 
-            myprint(f"Recent Activities Filtered (1 week) Count: {len(recent_activities)}")
+                if not able_to_comment:
+                    myprint("No activities, unable to or already left comment")
 
-            # DONT: Shuffle the activities (they are already in order of latest to oldest)
-            # random.shuffle(recent_activities)
-            able_to_comment = False
+                    # TODO: Send DM - offer something of value—whether it's insights, resources, or potential collaboration opportunities.
+                    # TODO: Generate something of value to offer
 
-            # Filter list to activities I haven't commented on
-            for activity in recent_activities:
-                # Navigate to Link
-                myprint(f"Navigating To: {activity.link}")
-                driver.get(str(activity.link))
-                commented = check_commented(driver, wait)
-                if not commented:
-                    # Leave comment on that activity
-                    able_to_comment = generate_and_post_comment(driver, wait, str(activity.link), my_profile)
-                    if able_to_comment:
-                        break  # Only comment/interact with one
+                    # Get the first name from the view_name by splitting on space
+                    first_name = viewer_name.split(" ")[0]
+                    message = f"Hi {first_name}, I noticed we're connected on LinkedIn and wanted to reach out. I'm currently working on a project that I think you might find interesting. Would you be open to a quick chat to discuss it further?"
 
-            if not able_to_comment:
-                myprint("No activities, unable to or already left comment")
+                    # Send actual DM
+                    kwargs = {'user_id': get_user_id(my_profile.email),
+                              'profile_url': str(profile.profile_url),
+                              'message': message}
+                    send_private_dm.apply_async(kwargs=kwargs, retry=True,
+                                                retry_policy={
+                                                    'max_retries': 3,
+                                                    'interval_start': 60,
+                                                    'interval_step': 30
 
-                # TODO: Send DM - offer something of value—whether it's insights, resources, or potential collaboration opportunities.
-                # TODO: Generate something of value to offer
+                                                })
+            else:
+                # myprint(f"We Are {profile.connection} Connections")
+                # If not 1st connections, send them a connection request
+                # Mention something specific about their profile or company to show genuine interest and that you've done your research
+                recent_activity_summary = summarize_recent_activity(profile, my_profile)
+                response = profile.generate_personalized_message(recent_activity_message=recent_activity_summary,
+                                                                 from_name=my_profile.full_name)
+                myprint(f"Original Response: {response}")
+                refined_response = get_ai_message_refinement(response)
+                myprint(f"Refined Response: {refined_response}")
 
-                # Get the first name from the view_name by splitting on space
-                first_name = viewer_name.split(" ")[0]
-                message = f"Hi {first_name}, I noticed we're connected on LinkedIn and wanted to reach out. I'm currently working on a project that I think you might find interesting. Would you be open to a quick chat to discuss it further?"
-
-                # Send actual DM
+                # Send connection request with this message
                 kwargs = {'user_id': get_user_id(my_profile.email),
                           'profile_url': str(profile.profile_url),
-                          'message': message}
-                send_private_dm.apply_async(kwargs=kwargs, retry=True,
-                                            retry_policy={
-                                                'max_retries': 3,
-                                                'interval_start': 60,
-                                                'interval_step': 30
+                          'message': refined_response}
+                invite_to_connect.apply_async(kwargs=kwargs, retry=True,
+                                              retry_policy={
+                                                  'max_retries': 3,
+                                                  'interval_start': 60,
+                                                  'interval_step': 30
 
-                                            })
+                                              })
         else:
-            # myprint(f"We Are {profile.connection} Connections")
-            # If not 1st connections, send them a connection request
-            # Mention something specific about their profile or company to show genuine interest and that you've done your research
-            recent_activity_summary = summarize_recent_activity(profile, my_profile)
-            response = profile.generate_personalized_message(recent_activity_message=recent_activity_summary,
-                                                             from_name=my_profile.full_name)
-            myprint(f"Original Response: {response}")
-            refined_response = get_ai_message_refinement(response)
-            myprint(f"Refined Response: {refined_response}")
+            myprint(f"Failed to get profile data for {viewer_name}")
 
-            # Send connection request with this message
-            kwargs = {'user_id': get_user_id(my_profile.email),
-                      'profile_url': str(profile.profile_url),
-                      'message': refined_response}
-            invite_to_connect.apply_async(kwargs=kwargs, retry=True,
-                                          retry_policy={
-                                              'max_retries': 3,
-                                              'interval_start': 60,
-                                              'interval_step': 30
-
-                                          })
-    else:
-        myprint(f"Failed to get profile data for {viewer_name}")
-
-    quit_gracefully(driver)
+        quit_gracefully(driver)
 
 
 @shared_task.task(rate_limit='2/m')
@@ -993,57 +1051,26 @@ def send_private_dm(user_id: int, profile_url: str, message: str):
 
     try:
 
-        # Click the message anywhere button
-        message_anywhere_button = click_element_wait_retry(driver, wait,
-                                                           "//a[contains(@class,'message-anywhere-button')]",
-                                                           'Finding Message Anywhere Button', max_try=0,
-                                                           use_action_chain=True, element_always_expected=False)
+        # Click on message button
+        click_element_wait_retry(driver, wait, '//main//button[contains(@aria-label,"Message")]',
+                                 "Finding Message Button", max_try=1, use_action_chain=True)
 
-        if message_anywhere_button is None:
-            myprint("Message anywhere button not found")
+        # Find the message box
+        message_box = get_element_wait_retry(driver, wait, '//div[contains(@class,"contenteditable")]//p',
+                                             'Finding Message Box', max_try=1, )
 
-            # TODO: Figure out why this path doesnt work (Send button doesnt enable: Can/Should we force it)
+        # Select All (Must be done this way. Clear command does not work)
+        message_box.send_keys(Keys.CONTROL + "a")
+        # Delete what is selected
+        message_box.send_keys(Keys.DELETE)
 
-            # Click on message button
-            click_element_wait_retry(driver, wait, '//main//button[contains(@aria-label,"Message")]',
-                                     "Finding Message Button", max_try=1, use_action_chain=True)
+        # Find the message box (again)
+        # message_box = driver.switch_to.active_element
+        message_box = get_element_wait_retry(driver, wait, '//div[contains(@class,"contenteditable")]//p',
+                                             'Finding Message Box', max_try=1, )
 
-            # Find the message box (should be the element that now has focus)
-            # message_box = driver.switch_to.active_element
-            message_box = click_element_wait_retry(driver, wait, '//div[contains(@class,"contenteditable")]',
-                                                   'Finding Message Box', max_try=1, use_action_chain=True)
-
-        else:
-            myprint("Clicked the Message anywhere button")
-            # message_box = driver.switch_to.active_element
-            message_box = click_element_wait_retry(driver, wait, '//div[contains(@class,"contenteditable")]',
-                                                   'Finding Message Box', max_try=1, use_action_chain=True)
-
-        # Send focus to message_box
-        # ActionChains(driver).move_to_element(message_box).click().perform()
-
-        # Clear the message box
-        message_box.clear()
-
-        # Create javascript to inject the message
-        escaped_message = json.dumps(message)
-        code = f"""
-        var xpath = "//div[contains(@class,'contenteditable')]";
-        var result = document.evaluate(xpath, document, null, XPathResult.FIRST_ORDERED_NODE_TYPE, null);
-        var div = result.singleNodeValue;
-        
-        if (div) {{
-            var element = document.createElement('p');
-            var text = document.createTextNode('{escaped_message}');
-            element.appendChild(text);
-            div.appendChild(element);
-        }}
-        """
-
-        myprint(f"Executing Code: {code}")
-
-        # Add the message to the message box div
-        driver.execute_script(code)
+        # Type the message into the box
+        simulate_typing(driver, message_box, message)
 
         # Sleep so send button can become active
         time.sleep(2)
@@ -1057,16 +1084,16 @@ def send_private_dm(user_id: int, profile_url: str, message: str):
         final_result += " Sent Successfully"
 
     except Exception as e:
-        myprint(f"Failed to send DM: {str(e)}")
         final_result += f"Failed. Error: {str(e)}"
-
-    quit_gracefully(driver)  # Close the driver
 
     # Update DB logs with DM Sent
     insert_new_log(user_id=user_id, action_type=LogActionType.DM,
                    result=LogResultType.SUCCESS if dm_sent else LogResultType.FAILURE,
                    post_url=profile_url, message=message)
 
+    quit_gracefully(driver)  # Close the driver
+
+    myprint(f"{final_result}")
     return final_result
 
 

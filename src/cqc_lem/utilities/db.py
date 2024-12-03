@@ -52,6 +52,7 @@ class LogActionType(StrEnum):
     DM = 'dm'
     REPLY = 'reply'
     POST = 'post'
+    ENGAGED = 'engaged'
 
 
 # ENum for log result options
@@ -696,3 +697,17 @@ def get_post_message_from_log_for_user(user_id: int, post_id: int):
     connection.close()
 
     return message
+
+def has_engaged_url_with_x_days(user_id: int, post_url: str, days: int):
+    connection = get_db_connection()
+    cursor = connection.cursor()
+
+    cursor.execute(
+        "SELECT COUNT(*) FROM logs WHERE user_id = %s AND post_url = %s AND action_type = %s AND result = %s AND created_at > NOW() - INTERVAL %s DAY",
+        (user_id, post_url, LogActionType.ENGAGED.value, LogResultType.SUCCESS.value, days))
+    count = cursor.fetchone()[0]
+
+    cursor.close()
+    connection.close()
+
+    return count > 0

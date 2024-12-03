@@ -4,7 +4,7 @@ import time
 from datetime import datetime
 
 from cqc_lem.run_automation import engage_with_profile_viewer, comment_on_post, invite_to_connect, check_commented, \
-    navigate_to_feed, automate_reply_commenting
+    navigate_to_feed, automate_reply_commenting, send_private_dm
 from cqc_lem.utilities.ai.ai_helper import generate_ai_response, get_ai_description_of_profile, \
     get_ai_message_refinement, summarize_recent_activity
 from cqc_lem.utilities.date import convert_viewed_on_to_date
@@ -251,11 +251,11 @@ def test_send_private_dm():
     user_id = 60
     profile_url = "https://www.linkedin.com/in/shivenarora"
     name = "Shiven"
-    message = f"Hi {name}, I noticed we're connected on LinkedIn and wanted to reach out. I'm currently working on a project that I think you might find interesting. Would you be open to a quick chat to discuss it further?"
+    message = f"Hi {name} 😃, I noticed we're connected on LinkedIn and wanted to reach out. I'm currently working on a project that I think you might find interesting. Would you be open to a quick chat to discuss it further?"
 
     print(f"""Sending message: {message}""")
     # Backslash or escape single quotes
-    message = message.replace("'", "\'")
+    # message = message.replace("'", "\'")
     # Escape double quotes
     # message = message.replace('"', '\\"')
     # Escape backslashes
@@ -274,10 +274,10 @@ def test_send_private_dm():
     # message = json.dumps(message)
 
     # escaped_message = json.dumps(message)
-    print(f"""Sending message (escaped): {message}""")
+    #print(f"""Sending message (escaped): {message}""")
 
-    # clear_sessions()
-    # send_private_dm(user_id, profile_url, message)
+    clear_sessions()
+    send_private_dm(user_id, profile_url, message)
 
 
 def test_engage_with_profile_viewer():
@@ -340,10 +340,10 @@ if __name__ == "__main__":
     # test_describe_profile()
     # test_summarize_interesting_recent_activity_and_response()
     # test_post_comment()
-    test_auto_reply()
+    # test_auto_reply()
 
     # TODO: Finish fixing this VVV
-    # test_send_private_dm()
+    test_send_private_dm()
 
     # test_engage_with_profile_viewer()
     # test_navigate_to_feed()
