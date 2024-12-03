@@ -152,6 +152,8 @@ def share_on_linkedin(user_id: int, content: str,
             share_media_category = 'ARTICLE'
         else:
             share_media_category = 'NONE'
+        myprint(f"Set share_media_category: {share_media_category}")
+
         media_objects = [
             ShareMedia(
                 status="READY",
@@ -208,8 +210,8 @@ def share_on_linkedin(user_id: int, content: str,
 
 if __name__ == '__main__':
     # Example usage
-    media_path = '/app/src/cqc_lem/assets/videos/runwayml/0bcc2063-aa61-4ee5-b672-49f2d4614373.mp4'
-    #media_path = 'https://cqc-lem-api.ngrok-free.dev/assets?file_name=videos/runwayml/71b68785-2b7e-48c6-aadd-822014a18b1d.mp4'
+    #media_path = '/app/src/cqc_lem/assets/videos/runwayml/0bcc2063-aa61-4ee5-b672-49f2d4614373.mp4' # This one worked
+    media_path = 'https://cqc-lem-api.ngrok-free.dev/assets?file_name=videos/runwayml/71b68785-2b7e-48c6-aadd-822014a18b1d.mp4'
     user_id = 60
     content = "Video Post"
     share_result = share_on_linkedin(user_id, content, media_path)

@@ -248,13 +248,13 @@ def insert_planned_post(user_id: int, scheduled_time, post_type: PostType, buyer
     return success
 
 
-def update_db_post(content: str, video_url: str, scheduled_time: str, post_type: PostType, post_id: int, status: PostStatus) -> bool:
+def update_db_post(content: str, video_url: str, scheduled_time: str, post_type: PostType, post_id: int, post_status: PostStatus) -> bool:
     connection = get_db_connection()
     cursor = connection.cursor()
 
     cursor.execute(
         "UPDATE posts SET content = %s, video_url = %s, scheduled_time =%s, post_type = %s, status = %s WHERE id = %s",
-        (content, video_url, scheduled_time, post_type.value, status.value, post_id)
+        (content, video_url, scheduled_time, post_type.value, post_status.value, post_id)
     )
 
     connection.commit()
@@ -299,12 +299,12 @@ def update_db_post_video_url(post_id: int, video_url: str) -> bool:
     return success
 
 
-def update_db_post_status(post_id: int, status: PostStatus) -> bool:
+def update_db_post_status(post_id: int, post_status: PostStatus) -> bool:
     connection = get_db_connection()
     cursor = connection.cursor()
 
-    # TODO: Why Enum doesnt work inside this function (have to conver to string first but why) ????
-    status_str = status.value
+    # TODO: Why Enum doesnt work inside this function (have to convert to string first but why) ????
+    status_str = post_status.value
 
     cursor.execute(
         """UPDATE posts SET status = %s WHERE id = %s""",

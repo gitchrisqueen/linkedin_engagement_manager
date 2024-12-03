@@ -34,21 +34,23 @@ app.conf.update(
         # },
         'check-scheduled-posts': {
             'task': 'cqc_lem.run_scheduler.auto_check_scheduled_posts',
-            'schedule': timedelta(minutes=10),  # Run every 10 minutes
+            'schedule': timedelta(minutes=10)  # Run every 10 minutes
         },
         'send-appreciation-dms': {
-            'task': 'cqc_lem.run_scheduler.automate_appreciate_dms',
-            'schedule': crontab(hour='8', minute='0'),  # Run every day at 8:00 AM
+            'task': 'cqc_lem.run_scheduler.auto_appreciate_dms',
+            'schedule': crontab(hour='8', minute='0')  # Run every day at 8:00 AM
         },
-        # TODO: Generate Content Plan on the 1st of the month at 1:00 AM
         'generate-content-plan': {
             'task': 'cqc_lem.run_content_plan.auto_generate_content',
-            'schedule': crontab(hour='14', minute='20', day_of_month='1'),
+            'schedule': crontab(hour='1', minute='0', day_of_month='1')  # Run on the 1st of every month at 1:00 AM
         },
-        # Create weekly content from plan on Saturdays at 1:00 AM
         'create-content-from-plan': {
             'task': 'cqc_lem.run_content_plan.auto_create_weekly_content',
-            'schedule': crontab(hour='1', minute='0', day_of_week='sat'),
+            'schedule': crontab(hour='1', minute='0', day_of_week='sat') # Run on Saturdays at 1:00 AM
+        },
+        'clen-up-stale-invites': {
+            'task': 'cqc_lem.run_scheduler.auto_clean_stale_invites',
+            'schedule': crontab(hour='2', minute='0',)  # Run every day at 2:00 AM
         }
 
     }

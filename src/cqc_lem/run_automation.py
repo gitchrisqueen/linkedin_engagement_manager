@@ -1031,6 +1031,21 @@ def engage_with_profile_viewer(user_id: int, viewer_url, viewer_name):
 
 @shared_task.task(rate_limit='2/m')
 @debug_function
+def clean_stale_invites(user_id: int):
+    """Cleans up stale invites"""
+
+    # TODO": Implement this method and
+    #user_email, user_password = get_user_password_pair_by_id(user_id)
+
+    #driver, wait = get_driver_wait_pair(session_name='Private DM')
+
+    #login_to_linkedin(driver, wait, user_email, user_password)
+
+    pass
+
+
+@shared_task.task(rate_limit='2/m')
+@debug_function
 def send_private_dm(user_id: int, profile_url: str, message: str):
     """ Send dm message to a profile. Must be a 1st connection"""
 

@@ -3,11 +3,11 @@ from datetime import timedelta
 from cqc_lem.my_celery import app as shared_task
 # from celery import shared_task
 from cqc_lem.run_automation import automate_commenting, automate_profile_viewer_engagement, \
-    send_appreciation_dms_for_user, automate_reply_commenting
+    send_appreciation_dms_for_user, automate_reply_commenting, clean_stale_invites
 from cqc_lem.utilities.date import add_local_tz_to_datetime
 from cqc_lem.utilities.db import get_ready_to_post_posts, get_post_content, \
     update_db_post_status, get_user_password_pair_by_id, get_active_user_ids, insert_new_log, LogActionType, \
-    LogResultType, get_post_video_url
+    LogResultType, get_post_video_url, PostStatus
 from cqc_lem.utilities.linkedin.poster import share_on_linkedin
 from cqc_lem.utilities.logger import myprint
 
@@ -66,7 +66,7 @@ def auto_check_scheduled_posts():
 
 
 @shared_task.task
-def automate_appreciate_dms():
+def auto_appreciate_dms():
     # For each user schedule appreciate DMS
     users = get_active_user_ids()
 
@@ -87,7 +87,7 @@ def automate_appreciate_dms():
     if len(users) == 0:
         return f"No Active Users"
     else:
-        return f"Started Process for {len(users)} user(s)"
+        return f"Started Appreciate DM Process for {len(users)} user(s)"
 
 
 @shared_task.task(rate_limit='2/m')
@@ -107,8 +107,7 @@ def post_to_linkedin(user_id: int, post_id: int, **kwargs):
 
     # Add the query param content_type to the url
     if video_url:
-        video_url += "&content_type=attachment"
-    myprint(f"Adding to Post | Video URL: {video_url}")
+        myprint(f"Adding to Post | Video URL: {video_url}")
 
     urn = share_on_linkedin(user_id, content, video_url)
 
@@ -117,7 +116,7 @@ def post_to_linkedin(user_id: int, post_id: int, **kwargs):
         myprint(f"Successfully created post using /posts API endpoint: {post_url}")
 
         # Update DB with status=posted
-        update_db_post_status(post_id, 'posted')
+        update_db_post_status(post_id, PostStatus.POSTED)
 
         # Schedule Answer comments for 30 minutes now that this has been posted
         base_kwargs = {
@@ -141,6 +140,29 @@ def post_to_linkedin(user_id: int, post_id: int, **kwargs):
                        message="Failed to create post using /posts API endpoint.")
 
         return f"Failed to create post using /posts API endpoint"
+
+@shared_task.task
+def auto_clean_stale_invites():
+    """Cleans up stale invites for each active user"""
+
+    # Get all active users and loop through them
+    users = get_active_user_ids()
+
+    for user_id in users:
+        # Clean up stale invites for this user
+        kwargs={'user_id': user_id}
+        clean_stale_invites.apply_async(kwargs=kwargs, retry=True,
+                                                   retry_policy={
+                                                       'max_retries': 3,
+                                                       'interval_start': 60,
+                                                       'interval_step': 30
+                                                   })
+    if len(users) == 0:
+        return f"No Active Users"
+    else:
+        return f"Started Process for {len(users)} user(s)"
+
+
 
 
 if __name__ == "__main__":
