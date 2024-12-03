@@ -1,3 +1,4 @@
+import inspect
 import json
 import random
 import sys
@@ -10,7 +11,7 @@ from urllib.parse import urlparse
 
 from dotenv import load_dotenv
 from selenium.common import NoSuchElementException
-from selenium.webdriver import ActionChains
+from selenium.webdriver import ActionChains, Keys
 from selenium.webdriver.common.by import By
 from selenium.webdriver.remote.webdriver import WebDriver
 from selenium.webdriver.remote.webelement import WebElement
@@ -222,7 +223,8 @@ def comment_on_post(user_id: int, post_link: str, comment_text: str):
 
     except NoSuchElementException:
         # If the post button is not found, send a return key to post the comment
-        comment_box.send_keys('\n')
+        # comment_box.send_keys('\n')
+        comment_box.send_keys(Keys.ENTER)
         # Update database with record of comment to this post
         insert_new_log(user_id=user_id, action_type=LogActionType.COMMENT, result=LogResultType.FAILURE,
                        post_url=post_link, message=comment_text)
@@ -375,7 +377,7 @@ def automate_commenting(user_id: int, loop_for_duration=None, **kwargs):
 
 @shared_task.task
 @debug_function
-def automate_reply_commenting(user_id: int, post_id: int, loop_for_duration=None, **kwargs):
+def automate_reply_commenting(user_id: int, post_id: int, loop_for_duration=None, future_forward=60, **kwargs):
     """Reply to recent comments left on the post recently posted"""
 
     user_email, user_password = get_user_password_pair_by_id(user_id)
@@ -389,137 +391,153 @@ def automate_reply_commenting(user_id: int, post_id: int, loop_for_duration=None
 
     start_time = datetime.now()
 
-    while True:
+    myprint(f"Replying to Comments of Post ID:{post_id} ...")
 
-        myprint(f"Replying to Comments of Post ID:{post_id} ...")
+    # Use the user id and the post id to get the post_url from the database
+    post_url = get_post_url_from_log_for_user(user_id, post_id)
 
-        # Use the user id and the post id to get the post_url from the database
-        post_url = get_post_url_from_log_for_user(user_id, post_id)
+    # Get the message content of the post
+    post_message = get_post_message_from_log_for_user(user_id, post_id)
 
-        # Get the message content of the post
-        post_message = get_post_message_from_log_for_user(user_id, post_id)
+    if post_url:
+        # Navigate to the Post
+        if driver.current_url != post_url:
+            driver.get(post_url)
 
-        if post_url:
-            # Navigate to the Post
-            if driver.current_url != post_url:
-                driver.get(post_url)
-
-            # If load more comments button exists click it until its gone
-            while True:
-                load_more_comments_button = click_element_wait_retry(driver, wait,
-                                                                     '//button[contains(@class,"load-more-comments")]',
-                                                                     "Finding Load More Comments Button",
-                                                                     use_action_chain=True,
-                                                                     max_try=0,
-                                                                     element_always_expected=False)
-                if load_more_comments_button:
-                    myprint("Loading More Comments....")
-                    time.sleep(2)
-                else:
-                    break
-
-            try:
-
-                # Get all the comments
-                comments = get_elements_as_list_wait_stale(wait,
-                                                           "//div[contains(@class,'comments-comment-list__container')]/article[contains(@class,'comments-comment-entity')]",
-                                                           "Finding Comments")
-            except Exception as e:
-                myprint(f"Error while finding comments: {e}")
-                comments = []
-
-            # Print how many comments found
-            myprint(f"Comments Found: {len(comments)}")
-
-            # Get the unique_url_name after "in/" and before / or end or profile url
-            path = urlparse(str(my_profile.profile_url)).path
-            unique_url_name = path.split("/")[2] if len(path.split("/")) > 2 else None
-            # myprint(f"Unique URL Name: {unique_url_name}")
-
-            # For each comment element see if we have already replied; if so skip it
-            for comment in comments:
-                # Get the comment text
-                comment_text = getText(comment.find_element(By.XPATH,
-                                                            './/span[contains(@class,"comments-comment-item__main-content")][1]'))
-
-                # Search the comment element using xpath for a child span that contains the text "Author"
-                author_element = get_element_wait_retry(driver, wait,
-                                                        f'.//a[contains(@href,"{unique_url_name}") and contains(@aria-label,"View")]',
-                                                        "Finding Author Element", element_always_expected=False,
-                                                        max_try=0,
-                                                        parent_element=comment)
-
-                if len(comment_text) > 75:
-                    short_comment_text = comment_text[:75]
-                else:
-                    short_comment_text = comment_text
-                if author_element:
-                    myprint(f"We already replied to this comment: {short_comment_text}...")
-                    continue
-                else:
-                    myprint(f"Responding to this comment: {short_comment_text}...")
-
-                    # Use the context of the post, and the comment to generate a response
-                    response = generate_ai_response(post_message, my_profile, post_comment=comment_text)
-                    myprint(f"AI Generated Response to Comment: {response}")
-
-                    try:
-
-                        # Find and click the Reply Button
-                        reply_button = click_element_wait_retry(driver, wait,
-                                                                './/button[contains(@class,"reply")][1]',
-                                                                "Finding Reply Button",
-                                                                use_action_chain=True,
-                                                                parent_element=comment)
-
-                        # Find the text box (should be the element that now has focus
-                        text_box = driver.switch_to.active_element
-
-                        # Simulate typing the comment in the text box
-                        simulate_typing(driver, text_box, response)
-
-                        # Sleep so post button shows up
-                        time.sleep(2)
-
-                        # Click the send button
-                        # Find the parent element of the current text_box element where the parent element is a div with a class containing "comments-comment-texteditor"
-                        parent_element = text_box.find_element(By.XPATH,
-                                                               './ancestor::form')
-
-                        # From this parent element, find the child button element with a span element containing the text "Reply"
-                        reply_button = click_element_wait_retry(driver, wait, './/button[contains(@class, "submit")]',
-                                                                "Finding Send Reply Button",
-                                                                parent_element=parent_element,
-                                                                max_try=1, use_action_chain=True)
-
-                        # Sleep 3 seconds to let the click register
-                        time.sleep(3)
-
-                        # Update DB with log entry
-                        insert_new_log(user_id=user_id, action_type=LogActionType.REPLY, result=LogResultType.SUCCESS,
-                                       post_url=post_url, message=response)
-
-                    except Exception as e:
-                        myprint(f"Error while replying to comment: {e}")
-                        # Update DB with log entry
-                        insert_new_log(user_id=user_id, action_type=LogActionType.REPLY, result=LogResultType.FAILURE,
-                                       post_url=post_url, message=response)
-
-
-
-        else:
-            myprint("Could not find successful post for this user and post_id. Sleeping...")
-            time.sleep(60)  # Sleep for 60 seconds
-
-        if loop_for_duration:
-            elapsed_time = datetime.now() - start_time
-            if elapsed_time.total_seconds() >= loop_for_duration:
-                myprint("Loop duration reached. Stopping Automate Reply Commenting thread...")
+        # If load more comments button exists click it until its gone
+        while True:
+            load_more_comments_button = click_element_wait_retry(driver, wait,
+                                                                 '//button[contains(@class,"load-more-comments")]',
+                                                                 "Finding Load More Comments Button",
+                                                                 use_action_chain=True,
+                                                                 max_try=0,
+                                                                 element_always_expected=False)
+            if load_more_comments_button:
+                myprint("Loading More Comments....")
+                time.sleep(2)
+            else:
                 break
-        else:
-            break
 
-        time.sleep(15)  # Sleep for 15 seconds
+        try:
+
+            # Get all the comments
+            comments = get_elements_as_list_wait_stale(wait,
+                                                       "//div[contains(@class,'comments-comment-list__container')]/article[contains(@class,'comments-comment-entity')]",
+                                                       "Finding Comments")
+        except Exception as e:
+            myprint(f"Error while finding comments: {e}")
+            comments = []
+
+        # Print how many comments found
+        myprint(f"Comments Found: {len(comments)}")
+
+        # Get the unique_url_name after "in/" and before / or end or profile url
+        path = urlparse(str(my_profile.profile_url)).path
+        unique_url_name = path.split("/")[2] if len(path.split("/")) > 2 else None
+        # myprint(f"Unique URL Name: {unique_url_name}")
+
+        # For each comment element see if we have already replied; if so skip it
+        for comment in comments:
+            # Get the comment text
+            comment_text = getText(comment.find_element(By.XPATH,
+                                                        './/span[contains(@class,"comments-comment-item__main-content")][1]'))
+
+            # Search the comment element using xpath for a child span that contains the text "Author"
+            author_element = get_element_wait_retry(driver, wait,
+                                                    f'.//a[contains(@href,"{unique_url_name}") and contains(@aria-label,"View")]',
+                                                    "Finding Author Element", element_always_expected=False,
+                                                    max_try=0,
+                                                    parent_element=comment)
+
+            if len(comment_text) > 75:
+                short_comment_text = comment_text[:75]
+            else:
+                short_comment_text = comment_text
+            if author_element:
+                myprint(f"We already replied to this comment: {short_comment_text}...")
+                continue
+            else:
+                myprint(f"Responding to this comment: {short_comment_text}...")
+
+                # Use the context of the post, and the comment to generate a response
+                response = generate_ai_response(post_message, my_profile, post_comment=comment_text)
+                myprint(f"AI Generated Response to Comment: {response}")
+
+                try:
+
+                    # Find and click the Reply Button
+                    reply_button = click_element_wait_retry(driver, wait,
+                                                            './/button[contains(@class,"reply")][1]',
+                                                            "Finding Reply Button",
+                                                            use_action_chain=True,
+                                                            parent_element=comment)
+
+                    # Find the text box (should be the element that now has focus
+                    text_box = driver.switch_to.active_element
+
+                    # Simulate typing the comment in the text box
+                    simulate_typing(driver, text_box, response)
+
+                    # Sleep so post button shows up
+                    time.sleep(2)
+
+                    # Click the send button
+                    # Find the parent element of the current text_box element where the parent element is a div with a class containing "comments-comment-texteditor"
+                    parent_element = text_box.find_element(By.XPATH,
+                                                           './ancestor::form')
+
+                    # From this parent element, find the child button element with a span element containing the text "Reply"
+                    send_reply_button = click_element_wait_retry(driver, wait, './/button[contains(@class, "submit")]',
+                                                            "Finding Send Reply Button",
+                                                            parent_element=parent_element,
+                                                            max_try=1, use_action_chain=True)
+
+
+                    # Sleep 3 seconds to let the click register
+                    time.sleep(3)
+
+                    # Update DB with log entry
+                    insert_new_log(user_id=user_id, post_id=post_id, action_type=LogActionType.REPLY, result=LogResultType.SUCCESS,
+                                   post_url=post_url, message=response)
+
+                    # From the parent element, find the like button and click it
+                    like_button = click_element_wait_retry(driver, wait, './/button[contains(@aria-label,"Like") and contains(@class,"react-button__trigger")][1]',
+                                                            "Finding Like Comment Button",
+                                                            parent_element=comment,
+                                                            max_try=1, use_action_chain=True)
+
+
+                except Exception as e:
+                    myprint(f"Error while replying to comment: {e}")
+                    # Update DB with log entry
+                    insert_new_log(user_id=user_id, post_id=post_id, action_type=LogActionType.REPLY, result=LogResultType.FAILURE,
+                                   post_url=post_url, message=response)
+
+
+
+    else:
+        myprint("Could not find successful post for this user and post_id. Sleeping...")
+        time.sleep(60)  # Sleep for 60 seconds
+
+    # Re-schedule the task in the queue for the future
+    if loop_for_duration:
+        elapsed_time = datetime.now() - start_time
+        new_loop_for_duration = round(loop_for_duration - elapsed_time.total_seconds() - future_forward)
+        frame = inspect.currentframe()
+        current_function_name = frame.f_code.co_name
+        args, _, _, values = inspect.getargvalues(frame)
+        kwargs = {arg: values[arg] for arg in args}
+        #myprint(f"{current_function_name} parameters: {kwargs}")
+
+        if new_loop_for_duration < 0:
+            myprint(f"Loop duration reached. Stopping {current_function_name} task...")
+        else:
+            # Change the value of the loop_for_duration parameter
+            kwargs['loop_for_duration'] = new_loop_for_duration
+            # Add our function call back to the task queue
+            myprint(f"Adding {current_function_name} back to queue for {future_forward} seconds in the future...")
+            # automate_reply_commenting.apply_async(kwargs=kwargs, countdown=future_forward)
+            globals()[current_function_name].apply_async(kwargs=kwargs, countdown=future_forward)
 
     quit_gracefully(driver)
 
@@ -564,7 +582,7 @@ def accept_connection_request(user_id: int):
 
 @shared_task.task(rate_limit='2/m')
 @debug_function
-def send_appreciation_dms_for_user(user_id: int, loop_for_duration=None):
+def send_appreciation_dms_for_user(user_id: int, loop_for_duration=None, future_forward:int = 60):
     user_email, user_password = get_user_password_pair_by_id(user_id)
 
     driver, wait = get_driver_wait_pair(session_name='Automate Appreciation DMs')
@@ -573,39 +591,47 @@ def send_appreciation_dms_for_user(user_id: int, loop_for_duration=None):
 
     start_time = datetime.now()
 
-    while True:
+    myprint("Sending Appreciations here...")
 
-        myprint("Sending Appreciations here...")
+    # After Accepting a Connection Request:
+    invitations_accepted = accept_connection_request(user_id)
+    # Send a private DM for each invitation
+    for profile_url, name in invitations_accepted.items():
+        message = f"Hi {name}, I appreciate you connecting with me on LinkedIn. I look forward to learning more about you and your work."
+        send_private_dm.apply_async(kwargs={"user_id": user_id, "profile_url": profile_url, "message": message})
 
-        # After Accepting a Connection Request:
-        invitations_accepted = accept_connection_request(user_id)
-        # Send a private DM for each invitation
-        for profile_url, name in invitations_accepted.items():
-            message = f"Hi {name}, I appreciate you connecting with me on LinkedIn. I look forward to learning more about you and your work."
-            send_private_dm.apply_async(kwargs={"user_id": user_id, "profile_url": profile_url, "message": message})
+    # TODO: After Receiving a Recommendation:
 
-        # TODO: After Receiving a Recommendation:
+    # TODO: After an Interview:
 
-        # TODO: After an Interview:
+    # TODO: For a Successful Collaboration:
 
-        # TODO: For a Successful Collaboration:
+    # General Appreciation:
+    # "Hi [Name], I really appreciate your insights on [topic]. Your perspective helped me see things differently, and I'm grateful for the opportunity to learn from you."
 
-        # General Appreciation:
-        # "Hi [Name], I really appreciate your insights on [topic]. Your perspective helped me see things differently, and I'm grateful for the opportunity to learn from you."
+    # profile_url = '' # TODO: Update
+    # message = '' # TODO: Update
+    # TODO: Use this line #send_private_dm.apply_async(kwargs={"user_id": user_id, "profile_url": profile_url, "message": message})
 
-        # profile_url = '' # TODO: Update
-        # message = '' # TODO: Update
-        # TODO: Use this line #send_private_dm.apply_async(kwargs={"user_id": user_id, "profile_url": profile_url, "message": message})
+    # Re-schedule the task in the queue for the future
+    if loop_for_duration:
+        elapsed_time = datetime.now() - start_time
+        new_loop_for_duration = round(loop_for_duration - elapsed_time.total_seconds() - future_forward)
+        frame = inspect.currentframe()
+        current_function_name = frame.f_code.co_name
+        args, _, _, values = inspect.getargvalues(frame)
+        kwargs = {arg: values[arg] for arg in args}
+        # myprint(f"{current_function_name} parameters: {kwargs}")
 
-        if loop_for_duration:
-            elapsed_time = datetime.now() - start_time
-            if elapsed_time.total_seconds() >= loop_for_duration:
-                myprint("Loop duration reached. Stopping Automate Appreciations thread...")
-                break
+        if new_loop_for_duration < 0:
+            myprint(f"Loop duration reached. Stopping {current_function_name} task...")
         else:
-            break
-
-        time.sleep(10)  # Sleep for 10 seconds
+            # Change the value of the loop_for_duration parameter
+            kwargs['loop_for_duration'] = new_loop_for_duration
+            # Add our function call back to the task queue
+            myprint(f"Adding {current_function_name} back to queue for {future_forward} seconds in the future...")
+            # automate_reply_commenting.apply_async(kwargs=kwargs, countdown=future_forward)
+            globals()[current_function_name].apply_async(kwargs=kwargs, countdown=future_forward)
 
     quit_gracefully(driver)
 
@@ -690,7 +716,7 @@ def generate_and_post_comment(driver, wait, post_link, my_profile: LinkedInProfi
 
 @shared_task.task
 @debug_function
-def automate_profile_viewer_engagement(user_id: int, loop_for_duration=None, **kwargs):
+def automate_profile_viewer_engagement(user_id: int, loop_for_duration=None, future_forward:int = 60, **kwargs):
     global stop_all_thread
 
     user_email, user_password = get_user_password_pair_by_id(user_id)
@@ -710,9 +736,7 @@ def automate_profile_viewer_engagement(user_id: int, loop_for_duration=None, **k
 
     viewed_on_xpath = './/div[contains(@class,"artdeco-entity-lockup__caption ember-view")]'
 
-    continue_process = True
-
-    while continue_process:  # Keep looping until we find a viewed on date out of range
+    while True:  # Keep looping until we find a viewed on date out of range
         # Get Each Viewer within the last day (or time of dm run via database log)
         viewer_elements = get_elements_as_list_wait_stale(wait,
                                                           '//ul[@aria-label="List of Entities"]//a[contains(@href,"linkedin.com/in") and not(contains(@aria-label,"Update"))]',
@@ -785,17 +809,6 @@ def automate_profile_viewer_engagement(user_id: int, loop_for_duration=None, **k
     # Get the viewed data from each element and filter by a day ago or specific date
     for viewer_name, viewer_url in viewer_data.items():
 
-        if loop_for_duration:
-            elapsed_time = datetime.now() - start_time
-            if elapsed_time.total_seconds() >= loop_for_duration:
-                myprint("Loop duration reached. Stopping Automate Commenting thread...")
-                continue_process = False
-                break
-        elif stop_all_thread.is_set():
-            myprint("Stopping Automate Profile Viewers DMs thread...")
-            continue_process = False
-            break
-
         # Switch back to tab
         driver.switch_to.window(current_tab)
 
@@ -824,17 +837,45 @@ def automate_profile_viewer_engagement(user_id: int, loop_for_duration=None, **k
         # Close tab when done
         close_tab(driver)
 
+    # Re-schedule the task in the queue for the future
+    if loop_for_duration:
+        elapsed_time = datetime.now() - start_time
+        new_loop_for_duration = round(loop_for_duration - elapsed_time.total_seconds() - future_forward)
+        frame = inspect.currentframe()
+        current_function_name = frame.f_code.co_name
+        args, _, _, values = inspect.getargvalues(frame)
+        kwargs = {arg: values[arg] for arg in args}
+        # myprint(f"{current_function_name} parameters: {kwargs}")
+
+        if new_loop_for_duration < 0:
+            myprint(f"Loop duration reached. Stopping {current_function_name} task...")
+        else:
+            # Change the value of the loop_for_duration parameter
+            kwargs['loop_for_duration'] = new_loop_for_duration
+            # Add our function call back to the task queue
+            myprint(f"Adding {current_function_name} back to queue for {future_forward} seconds in the future...")
+            # automate_reply_commenting.apply_async(kwargs=kwargs, countdown=future_forward)
+            globals()[current_function_name].apply_async(kwargs=kwargs, countdown=future_forward)
+
     quit_gracefully(driver)
 
 
 @shared_task.task(rate_limit='2/m')
 @debug_function
 def engage_with_profile_viewer(user_id: int, viewer_url, viewer_name):
+    myprint(f"Starting Profile Viewer Engagement")
+
+
+    # Check if we already engaged with this viewer today
+
+    # Log engagement efforts to the log
+
+
     user_email, user_password = get_user_password_pair_by_id(user_id)
 
     driver, wait = get_driver_wait_pair(session_name='Profile Viewer Engagement')
 
-    myprint(f"Starting Profile Viewer Engagement")
+
 
     login_to_linkedin(driver, wait, user_email, user_password)
 
@@ -888,7 +929,7 @@ def engage_with_profile_viewer(user_id: int, viewer_url, viewer_name):
                 # TODO: Generate something of value to offer
 
                 # Get the first name from the view_name by splitting on space
-                first_name = viewer_name.split(" ").pop()
+                first_name = viewer_name.split(" ")[0]
                 message = f"Hi {first_name}, I noticed we're connected on LinkedIn and wanted to reach out. I'm currently working on a project that I think you might find interesting. Would you be open to a quick chat to discuss it further?"
 
                 # Send actual DM
@@ -998,6 +1039,8 @@ def send_private_dm(user_id: int, profile_url: str, message: str):
             div.appendChild(element);
         }}
         """
+
+        myprint(f"Executing Code: {code}")
 
         # Add the message to the message box div
         driver.execute_script(code)
@@ -1203,5 +1246,6 @@ if __name__ == "__main__":
     # test_invite_to_connect()
     # exit(0)
 
-    start_process()
-    myprint("Process finished")
+    # start_process()
+    # myprint("Process finished")
+    pass

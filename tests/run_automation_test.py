@@ -1,14 +1,16 @@
+import inspect
 import json
 import time
+from datetime import datetime
 
-from cqc_lem.utilities.linkedin.profile import LinkedInProfile
 from cqc_lem.run_automation import engage_with_profile_viewer, comment_on_post, invite_to_connect, check_commented, \
-    send_private_dm, navigate_to_feed
+    navigate_to_feed, automate_reply_commenting
 from cqc_lem.utilities.ai.ai_helper import generate_ai_response, get_ai_description_of_profile, \
     get_ai_message_refinement, summarize_recent_activity
 from cqc_lem.utilities.date import convert_viewed_on_to_date
 from cqc_lem.utilities.env_constants import LI_USER, LI_PASSWORD
 from cqc_lem.utilities.linkedin.helper import login_to_linkedin, get_linkedin_profile_from_url, get_my_profile
+from cqc_lem.utilities.linkedin.profile import LinkedInProfile
 from cqc_lem.utilities.logger import myprint
 from cqc_lem.utilities.selenium_util import create_driver, get_driver_wait, clear_sessions, get_driver_wait_pair
 
@@ -179,6 +181,7 @@ def test_post_comment():
 
     comment_on_post(user_id, post_url, comment)
 
+
 def test_navigate_to_feed():
     clear_sessions()
 
@@ -186,9 +189,9 @@ def test_navigate_to_feed():
 
     login_to_linkedin(driver, wait, LI_USER, LI_PASSWORD)
 
-    navigate_to_feed(driver,wait)
+    navigate_to_feed(driver, wait)
 
-    time.sleep(60*2)
+    time.sleep(60 * 2)
 
     driver.quit()
 
@@ -246,12 +249,35 @@ def test_already_commented():
 
 def test_send_private_dm():
     user_id = 60
-    profile_url = "https://www.linkedin.com/in/ACoAAEqRdkkBBWMJa0xx9KcdGGywNixIfHeba9A"
-    name = ""
+    profile_url = "https://www.linkedin.com/in/shivenarora"
+    name = "Shiven"
     message = f"Hi {name}, I noticed we're connected on LinkedIn and wanted to reach out. I'm currently working on a project that I think you might find interesting. Would you be open to a quick chat to discuss it further?"
-    clear_sessions()
 
-    send_private_dm(user_id, profile_url, message)
+    print(f"""Sending message: {message}""")
+    # Backslash or escape single quotes
+    message = message.replace("'", "\'")
+    # Escape double quotes
+    # message = message.replace('"', '\\"')
+    # Escape backslashes
+    # message = message.replace('\\', '\\\\')
+    # Escape newlines
+    # message = message.replace('\n', '\\n')
+    # Escape tabs
+    # message = message.replace('\t', '\\t')
+    # Escape carriage returns
+    # message = message.replace('\r', '\\r')
+    # Escape unicode characters
+    # message = message.encode('unicode_escape').decode('utf-8')
+    # Escape HTML entities
+    # message = html.escape(message)
+    # Escape JSON special characters
+    # message = json.dumps(message)
+
+    # escaped_message = json.dumps(message)
+    print(f"""Sending message (escaped): {message}""")
+
+    # clear_sessions()
+    # send_private_dm(user_id, profile_url, message)
 
 
 def test_engage_with_profile_viewer():
@@ -260,6 +286,49 @@ def test_engage_with_profile_viewer():
     profile_url = "https://www.linkedin.com/in/ACoAAAhxNBwBxKLTu4LeFsTLvsC4vxe8hbPQ8zQ"
     name = "Badsha Dash"
     engage_with_profile_viewer(user_id, profile_url, name)
+
+
+def test_auto_reply():
+    user_id = 60
+    post_id = 11
+
+    # Schedule Answer comments for 30 minutes now that this has been posted
+    base_kwargs = {
+        'user_id': user_id,
+        'post_id': post_id,
+        'loop_for_duration': 60 * 30
+    }
+    automate_reply_commenting.apply_async(kwargs=base_kwargs)
+
+
+def test_loop_for_duration_function_calls(user_id=60, post_id=0, loop_for_duration=None, future_forward=60):
+    start_time = datetime.now()
+    time.sleep(3)
+
+    if loop_for_duration:
+        elapsed_time = datetime.now() - start_time
+        myprint(f"Elapsed Time: {elapsed_time.total_seconds()}")
+        new_loop_for_duration = loop_for_duration - elapsed_time.total_seconds() - future_forward
+        frame = inspect.currentframe()
+        current_function_name = frame.f_code.co_name
+        args, _, _, values = inspect.getargvalues(frame)
+        kwargs = {arg: values[arg] for arg in args}
+        myprint(f"{current_function_name} parameters: {kwargs}")
+
+        if new_loop_for_duration < 0:
+            myprint(f"Loop duration reached. Stopping {current_function_name} task...")
+        else:
+            # Change the value of the loop_for_duration parameter
+            kwargs['loop_for_duration'] = new_loop_for_duration
+            myprint(f"Updated parameters: {kwargs}")
+
+            # Add our function call back to thh task queue
+            # automate_reply_commenting.apply_async(kwargs=kwargs, countdown=future_forward)
+
+            myprint(f"Calling {current_function_name} again by name")
+
+            # Call the function again by name
+            globals()[current_function_name](**kwargs)
 
 
 if __name__ == "__main__":
@@ -271,8 +340,13 @@ if __name__ == "__main__":
     # test_describe_profile()
     # test_summarize_interesting_recent_activity_and_response()
     # test_post_comment()
-    # test_send_private_dm()
-    # test_engage_with_profile_viewer()
-    test_navigate_to_feed()
+    test_auto_reply()
 
-pass
+    # TODO: Finish fixing this VVV
+    # test_send_private_dm()
+
+    # test_engage_with_profile_viewer()
+    # test_navigate_to_feed()
+    # test_loop_for_duration_function_calls(loop_for_duration=10, future_forward=2)
+
+    pass

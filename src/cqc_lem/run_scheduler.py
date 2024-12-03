@@ -125,7 +125,7 @@ def post_to_linkedin(user_id: int, post_id: int, **kwargs):
             'post_id': post_id,
             'loop_for_duration': 60 * 30
         }
-        # TODO: uncomment (THIS is NEEDED) automate_reply_commenting.apply_async(kwargs=base_kwargs)
+        automate_reply_commenting.apply_async(kwargs=base_kwargs)
 
         # Update DB with status=success in the logs table and the post url
         insert_new_log(user_id=user_id, action_type=LogActionType.POST, result=LogResultType.SUCCESS, post_id=post_id,

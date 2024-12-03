@@ -32,18 +32,18 @@ def get_db_connection():
 
 
 class PostType(StrEnum):
-    TEXT = "text"
-    CAROUSEL = "carousel"
-    VIDEO = "video"
+    TEXT = 'text'
+    CAROUSEL = 'carousel'
+    VIDEO = 'video'
 
 
 class PostStatus(StrEnum):
-    PLANNING = "planning"
-    PENDING = "pending"
-    APPROVED = "approved"
-    REJECTED = "rejected"
-    SCHEDULED = "scheduled"
-    POSTED = "posted"
+    PLANNING = 'planning'
+    PENDING = 'pending'
+    APPROVED = 'approved'
+    REJECTED = 'rejected'
+    SCHEDULED = 'scheduled'
+    POSTED = 'posted'
 
 
 # Enum for log actions types
@@ -209,7 +209,7 @@ def get_user_id(email: str):
     return user_id['id'] if user_id else None
 
 
-def insert_post(email, content, scheduled_time, post_type) -> bool:
+def insert_post(email: str, content: str, scheduled_time, post_type: PostType) -> bool:
     user_id = get_user_id(email)
 
     if not user_id:
@@ -222,7 +222,7 @@ def insert_post(email, content, scheduled_time, post_type) -> bool:
     cursor.execute("""
         INSERT INTO posts (content, scheduled_time, post_type, user_id)
         VALUES (%s, %s, %s, %s)
-    """, (content, scheduled_time, post_type, user_id))
+    """, (content, scheduled_time, post_type.value, user_id))
 
     connection.commit()
     success = cursor.rowcount == 1
@@ -238,7 +238,7 @@ def insert_planned_post(user_id: int, scheduled_time, post_type: PostType, buyer
     cursor.execute("""
         INSERT INTO posts (scheduled_time, post_type, user_id, buyer_stage, status, content)
         VALUES (%s, %s, %s, %s, %s, %s)
-    """, (scheduled_time, post_type, user_id, buyer_stage, PostStatus.PLANNING, 'TBD'))
+    """, (scheduled_time, post_type.value, user_id, buyer_stage, PostStatus.PLANNING.value, 'TBD'))
 
     connection.commit()
     success = cursor.rowcount == 1
@@ -253,7 +253,7 @@ def update_db_post(content: str, video_url: str, scheduled_time: str, post_type:
 
     cursor.execute(
         "UPDATE posts SET content = %s, video_url = %s, scheduled_time =%s, post_type = %s, status = %s WHERE id = %s",
-        (content, video_url, scheduled_time, post_type, status, post_id)
+        (content, video_url, scheduled_time, post_type.value, status.value, post_id)
     )
 
     connection.commit()
@@ -298,15 +298,16 @@ def update_db_post_video_url(post_id: int, video_url: str) -> bool:
     return success
 
 
-def update_db_post_status(post_id: int, status: str) -> bool:
+def update_db_post_status(post_id: int, status: PostStatus) -> bool:
     connection = get_db_connection()
     cursor = connection.cursor()
 
-    # TODO: Why Enum doesnt work inside this functioin ????
+    # TODO: Why Enum doesnt work inside this function (have to conver to string first but why) ????
+    status_str = status.value
 
     cursor.execute(
-        "UPDATE posts SET status = %s WHERE id = %s",
-        (status, post_id)
+        """UPDATE posts SET status = %s WHERE id = %s""",
+        (status_str, post_id)
     )
 
     connection.commit()
@@ -639,7 +640,7 @@ def insert_new_log(user_id: int, action_type: LogActionType, result: LogResultTy
     cursor.execute("""
         INSERT INTO logs (user_id, action_type, post_id, post_url, message, result)
         VALUES (%s, %s, %s, %s, %s, %s)
-    """, (user_id, action_type, post_id, post_url, message, result))
+    """, (user_id, action_type.value, post_id, post_url, message, result.value))
 
     connection.commit()
     success = cursor.rowcount == 1
@@ -654,7 +655,7 @@ def has_user_commented_on_post_url(user_id: int, post_url: str):
 
     cursor.execute(
         "SELECT COUNT(*) FROM logs WHERE user_id = %s AND post_url = %s AND action_type = %s AND result = %s",
-        (user_id, post_url, LogActionType.COMMENT, LogResultType.SUCCESS))
+        (user_id, post_url, LogActionType.COMMENT.value, LogResultType.SUCCESS.value))
     count = cursor.fetchone()[0]
 
     cursor.close()
@@ -671,7 +672,7 @@ def get_post_url_from_log_for_user(user_id: int, post_id: int):
         WHERE user_id = %s AND post_id = %s AND action_type = %s AND result = %s  
         ORDER BY created_at DESC 
         LIMIT 1""",
-                   (user_id, post_id, LogActionType.POST, LogResultType.SUCCESS))
+                   (user_id, post_id, LogActionType.POST.value, LogResultType.SUCCESS.value))
     post_url = cursor.fetchone()[0]
 
     cursor.close()
@@ -688,7 +689,7 @@ def get_post_message_from_log_for_user(user_id: int, post_id: int):
         WHERE user_id = %s AND post_id = %s AND action_type = %s AND result = %s
         ORDER BY created_at DESC 
         LIMIT 1""",
-                   (user_id, post_id, LogActionType.POST, LogResultType.SUCCESS))
+                   (user_id, post_id, LogActionType.POST.value, LogResultType.SUCCESS.value))
     message = cursor.fetchone()[0]
 
     cursor.close()

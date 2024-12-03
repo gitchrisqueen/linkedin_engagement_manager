@@ -278,7 +278,7 @@ def get_industries_of_profile_from_ai(linked_in_profile: LinkedInProfile, indust
 
 
 def get_ai_message_refinement(original_message: str, character_limit: int = 300):
-    character_limit_string = f"\nThe refined message needs to be less than or equal to {character_limit} characters including white spaces.\n\n " if character_limit > 0 else ""
+    character_limit_string = f"\nThe refined message needs to be less than or equal to {character_limit} characters including white spaces and punctuations. You may use symbols, abbreviations, and other and short-hand\n\n " if character_limit > 0 else ""
 
     prompt = f"""Please review and refine the following message. {character_limit_string} Message: {original_message}
             """
@@ -293,7 +293,8 @@ def get_ai_message_refinement(original_message: str, character_limit: int = 300)
         "content": f"""Act like a professional editor with expertise in communication for business professionals, particularly on platforms like LinkedIn. 
             You have helped clients refine and streamline their messaging for more than 15 years, ensuring clarity, professionalism, and engagement.
     
-            Your task is to review a provided message. The goal is to ensure the message makes sense, reads smoothly, and presents key information in a clear, concise, and professional manner. Additionally, modify any titles, phrases, or sections that seem overly long, awkward, or redundant. 
+            Your task is to review a provided message. The goal is to ensure the message makes sense, reads smoothly, and presents key information in a clear, concise, and professional manner. 
+            Additionally, modify any titles, phrases, or sections that seem overly long, awkward, or redundant. 
             Your revisions should maintain the original intent while improving readability and impact.
             
             The review process includes:

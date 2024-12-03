@@ -118,6 +118,7 @@ def test_move_files():
     shutil.move(video_file_path, video_file_dest)
 
 
+
 if __name__ == "__main__":
     # Clear selenium sessions
     #clear_sessions()

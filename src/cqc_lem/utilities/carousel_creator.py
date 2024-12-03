@@ -1073,7 +1073,7 @@ def test_create_case_study_ppt():
         }
     }
 
-    # PPT Name with tiemstamp suffix
+    # PPT Name with timestamp suffix
     ppt_name = f"Case_Study_Carousel_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
     my_ppt = create_ppt(ppt_name, CaseStudyCarousel(**carousel_data))
     print(f"Presentation created: {my_ppt}")
