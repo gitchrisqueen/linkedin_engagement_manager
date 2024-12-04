@@ -236,14 +236,14 @@ def create_driver(headless: bool = HEADLESS_BROWSER, create_copy: bool = False, 
 
 def click_element_wait_retry(driver: WebDriver, wait: WebDriverWait, find_by_value: str, wait_text: str,
                              find_by: str = By.XPATH,
-                             max_try: int = MAX_WAIT_RETRY,
+                             max_retry: int = MAX_WAIT_RETRY,
                              parent_element: WebElement = None,
                              use_action_chain=False,
                              element_always_expected=True) -> WebElement:
     # element = False
     try:
         # Wait for element
-        element = get_element_wait_retry(driver, wait, find_by_value, wait_text, find_by, max_try, parent_element,
+        element = get_element_wait_retry(driver, wait, find_by_value, wait_text, find_by, max_retry, parent_element,
                                          element_always_expected)
 
         if element:
@@ -259,11 +259,11 @@ def click_element_wait_retry(driver: WebDriver, wait: WebDriverWait, find_by_val
                 raise ElementNotInteractableException("Element not found or interactable")
 
     except ElementNotInteractableException as se:
-        if max_try > 1:
+        if max_retry > 1:
             myprint(wait_text + " | Not Interactable | .....retrying")
             time.sleep(5)  # wait 5 seconds
             driver.implicitly_wait(5)  # wait on driver 5 seconds
-            element = click_element_wait_retry(driver, wait, find_by_value, wait_text, find_by, max_try - 1,
+            element = click_element_wait_retry(driver, wait, find_by_value, wait_text, find_by, max_retry - 1,
                                                parent_element)
         else:
 

@@ -4,6 +4,7 @@ import re
 from typing import List
 
 from bs4 import BeautifulSoup, PageElement
+from openai import max_retries
 from selenium import webdriver
 from selenium.webdriver.common.by import By
 
@@ -172,12 +173,12 @@ def get_mutual_connections(driver, employee_link):
     wait = get_driver_wait(driver)
 
     # click the link for mutual connections
-    click_element_wait_retry(driver, wait, "//a[contains(@href,'facetNetwork')]", "Finding Mutual Connections Link")
+    click_element_wait_retry(driver, wait, "//a[contains(@href,'facetNetwork')]", "Finding Mutual Connections Link", max_retry=0)
 
     # Get the text of the element that contains the connection's name
     mutual_connections = get_elements_as_list_wait_stale(wait,
                                                          "//div[contains(@class,'linked-area')]//span//a//span//span[1]",
-                                                         "Getting Mutual Connection Names")
+                                                         "Getting Mutual Connection Names", max_retry=0)
     # Get the text from the elements
     mutual_connections = [getText(mc) for mc in mutual_connections]
 
@@ -466,7 +467,7 @@ def get_profile_skills(driver, employee_link):
 
     profile_skills = []
 
-    skills = get_elements_as_list_wait_stale(wait, "//a[contains(@data-field,'skill')]", "Getting Skills")
+    skills = get_elements_as_list_wait_stale(wait, "//a[contains(@data-field,'skill')]", "Getting Skills", max_retry=0)
 
     # Get the text from all the skills
     for each_skill in skills:

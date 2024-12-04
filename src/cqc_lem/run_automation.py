@@ -83,7 +83,7 @@ def navigate_to_feed(driver, wait):
 
         # Select "Recent" from the dropdown
         click_element_wait_retry(driver, wait, '//div[contains(@class,"artdeco-dropdown")]/ul/li[2]',
-                                 "Selecting Recent Option", max_try=0, use_action_chain=True)
+                                 "Selecting Recent Option", max_retry=0, use_action_chain=True)
 
         wait_for_ajax(driver)
         time.sleep(3)  # Wait for the page to refresh with recent posts
@@ -251,7 +251,7 @@ def comment_on_post(user_id: int, post_link: str, comment_text: str):
     try:
         # Find and click the post button
         click_element_wait_retry(driver, wait, '//button[contains(@class, "comments-comment-box__submit-button--cr")]',
-                                 "Clicking Post Button", max_try=1, use_action_chain=True)
+                                 "Clicking Post Button", max_retry=1, use_action_chain=True)
 
         myprint(f"Added Post via Post Button")
         method_result = f"Added Post via Post Button"
@@ -452,7 +452,7 @@ def automate_reply_commenting(user_id: int, post_id: int, loop_for_duration=None
                                                                  '//button[contains(@class,"load-more-comments")]',
                                                                  "Finding Load More Comments Button",
                                                                  use_action_chain=True,
-                                                                 max_try=0,
+                                                                 max_retry=0,
                                                                  element_always_expected=False)
             if load_more_comments_button:
                 myprint("Loading More Comments....")
@@ -532,7 +532,7 @@ def automate_reply_commenting(user_id: int, post_id: int, loop_for_duration=None
                     send_reply_button = click_element_wait_retry(driver, wait, './/button[contains(@class, "submit")]',
                                                                  "Finding Send Reply Button",
                                                                  parent_element=parent_element,
-                                                                 max_try=1, use_action_chain=True)
+                                                                 max_retry=1, use_action_chain=True)
 
                     # Sleep 3 seconds to let the click register
                     time.sleep(3)
@@ -547,7 +547,7 @@ def automate_reply_commenting(user_id: int, post_id: int, loop_for_duration=None
                                                            './/button[contains(@aria-label,"Like") and contains(@class,"react-button__trigger")][1]',
                                                            "Finding Like Comment Button",
                                                            parent_element=comment,
-                                                           max_try=1, use_action_chain=True)
+                                                           max_retry=1, use_action_chain=True)
 
 
                 except Exception as e:
@@ -1044,7 +1044,7 @@ def send_private_dm(user_id: int, profile_url: str, message: str):
 
         # Click on message button
         click_element_wait_retry(driver, wait, '//main//button[contains(@aria-label,"Message")]',
-                                 "Finding Message Button", max_try=1, use_action_chain=True)
+                                 "Finding Message Button", max_retry=1, use_action_chain=True)
 
         # Find the message box
         message_box = get_element_wait_retry(driver, wait, '//div[contains(@class,"contenteditable")]//p',
@@ -1068,7 +1068,7 @@ def send_private_dm(user_id: int, profile_url: str, message: str):
 
         # Click the send button
         click_element_wait_retry(driver, wait, "//button[contains(@class,'msg-form__send-button')]",
-                                 "Finding Send Button", max_try=1, use_action_chain=True)
+                                 "Finding Send Button", max_retry=1, use_action_chain=True)
 
         dm_sent = True
 
@@ -1106,7 +1106,7 @@ def invite_to_connect(user_id: int, profile_url: str, message: str = None):
     # Locate the connect button
     try:
         click_element_wait_retry(driver, wait, '//main//button[contains(@aria-label, "Invite ")]',
-                                 "Finding Connect Button", max_try=1, use_action_chain=True)
+                                 "Finding Connect Button", max_retry=1, use_action_chain=True)
 
         myprint("Found Connect Button and clicked it")
 
@@ -1117,7 +1117,7 @@ def invite_to_connect(user_id: int, profile_url: str, message: str = None):
             # Click the last more button
             click_element_wait_retry(driver, wait,
                                      '//main//button[contains(@aria-label,"More actions")]',
-                                     "Finding More Button", max_try=1, use_action_chain=True)
+                                     "Finding More Button", max_retry=1, use_action_chain=True)
 
             # driver.find_elements(By.XPATH, '//main//button[contains(@aria-label,"More actions")]')[-1].click()
 
@@ -1125,7 +1125,7 @@ def invite_to_connect(user_id: int, profile_url: str, message: str = None):
 
             # Click the last connect button
             click_element_wait_retry(driver, wait, '//main//div[contains(@aria-label,"connect")]',
-                                     "Finding Connect Button", max_try=2, use_action_chain=True)
+                                     "Finding Connect Button", max_retry=2, use_action_chain=True)
 
             # driver.find_elements(By.XPATH, '//div[contains(@aria-label,"connect")]')[-1].click()
 
