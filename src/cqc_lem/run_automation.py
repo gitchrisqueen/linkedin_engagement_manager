@@ -211,7 +211,7 @@ def simulate_typing(driver: WebDriver, editable_element: WebElement, text):
     myprint("Finished Typing!")
 
 
-@shared_task.task(rate_limit='2/m')
+@shared_task.task(bind=True, acks_late=True, reject_on_worker_lost=True, rate_limit='20/h')
 @debug_function
 def comment_on_post(user_id: int, post_link: str, comment_text: str):
     """Post a comment to the given post link"""
@@ -624,7 +624,7 @@ def accept_connection_request(user_id: int):
     return invitation_data
 
 
-@shared_task.task(rate_limit='2/m')
+@shared_task.task(bind=True, acks_late=True, reject_on_worker_lost=True, rate_limit='20/h')
 @debug_function
 def send_appreciation_dms_for_user(user_id: int, loop_for_duration=None, future_forward: int = 60):
     user_email, user_password = get_user_password_pair_by_id(user_id)
@@ -897,7 +897,7 @@ def automate_profile_viewer_engagement(user_id: int, loop_for_duration=None, fut
     quit_gracefully(driver)
 
 
-@shared_task.task(rate_limit='2/m')
+@shared_task.task(bind=True, acks_late=True, reject_on_worker_lost=True, rate_limit='2/m')
 @debug_function
 def engage_with_profile_viewer(user_id: int, viewer_url, viewer_name):
     myprint(f"Starting Profile Viewer Engagement")
@@ -1005,7 +1005,7 @@ def engage_with_profile_viewer(user_id: int, viewer_url, viewer_name):
         quit_gracefully(driver)
 
 
-@shared_task.task(rate_limit='2/m')
+@shared_task.task(bind=True, acks_late=True, reject_on_worker_lost=True, rate_limit='2/m')
 @debug_function
 def clean_stale_invites(user_id: int):
     """Cleans up stale invites"""
@@ -1020,7 +1020,7 @@ def clean_stale_invites(user_id: int):
     pass
 
 
-@shared_task.task(rate_limit='2/m')
+@shared_task.task(bind=True, acks_late=True, reject_on_worker_lost=True, rate_limit='2/m')
 @debug_function
 def send_private_dm(user_id: int, profile_url: str, message: str):
     """ Send dm message to a profile. Must be a 1st connection"""
@@ -1088,7 +1088,7 @@ def send_private_dm(user_id: int, profile_url: str, message: str):
     return final_result
 
 
-@shared_task.task(rate_limit='2/m')
+@shared_task.task(bind=True, acks_late=True, reject_on_worker_lost=True, rate_limit='1/m')
 @debug_function
 def invite_to_connect(user_id: int, profile_url: str, message: str = None):
     user_email, user_password = get_user_password_pair_by_id(user_id)
@@ -1246,7 +1246,7 @@ def final_method(drivers: List[WebDriver]):
     sys.exit(0)
 
 
-@shared_task.task(rate_limit='2/m')
+@shared_task.task(bind=True, acks_late=True, reject_on_worker_lost=True, rate_limit='1/m')
 @debug_function
 def get_current_profile(user_id:int, session_name:str = "Get Current Profile")->Tuple[WebDriver, WebDriverWait, str, LinkedInProfile]:
     """Update the profile of the user"""

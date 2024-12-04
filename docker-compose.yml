@@ -197,7 +197,9 @@ services:
       - SE_OTEL_EXPORTER_ENDPOINT=http://${JAEGER_AGENT_HOST}:${JAEGER_SPANS_GRPC_PORT}
       - SE_VNC_NO_PASSWORD=true
       - SE_NODE_MAX_SESSIONS=4 # This should not be more than the available CPUS
-      - SE_NODE_OVERRIDE_MAX_SESSIONS=true # To allow the override of the max sessions
+      - SE_NODE_OVERRIDE_MAX_SESSIONS=false # To allow the override of the max sessions
+      #- SE_DRAIN_AFTER_SESSION_COUNT=0 # Drain the Node after N sessions (a value higher than zero enables the feature)
+      #- SE_NODE_SESSION_TIMEOUT=1200 # 20 minutes - Max time before session is terminated
       #- SE_START_XVFB=false # This will kill selenium/standalone-chrome:latest
     ports:
       - "5555:5555"
@@ -216,7 +218,7 @@ services:
       - SE_OTEL_EXPORTER_ENDPOINT=http://${JAEGER_AGENT_HOST}:${JAEGER_SPANS_GRPC_PORT}
       - SE_VNC_NO_PASSWORD=1
       - SE_ENABLE_BROWSER_LEFTOVERS_CLEANUP=true # Cleanup browser leftovers
-      - SE_BROWSER_LEFTOVERS_INTERVAL_SECS=1800 # 30 Minutes
+      - SE_BROWSER_LEFTOVERS_INTERVAL_SECS=600 # 10 Minutes
       - SE_BROWSER_LEFTOVERS_TEMPFILES_DAYS=14 # 14 Days
     ports:
       - "4442:4442"

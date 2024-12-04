@@ -23,6 +23,11 @@ app.config_from_object(celeryconfig)
 # tasks files some other way if we prefer.
 app.autodiscover_tasks(['cqc_lem'])
 
+# Gets the max between all the parameters of timeout in the tasks
+max_timeout = 60*5  # This value must be bigger than the maximum soft timeout set for a task to prevent an infinity loop
+app.conf.broker_transport_options = {'visibility_timeout': max_timeout + 60}  # 60 seconds of margin
+
+
 # Celery configuration
 app.conf.update(
     result_expires=3600,
@@ -59,6 +64,17 @@ app.conf.update(
 
     }
 )
+
+@worker_process_init.connect(weak=False)
+def restore_all_unacknowledged_messages(*args, **kwargs):
+    """
+    Restores all the unacknowledged messages in the queue.
+    Taken from https://gist.github.com/mlavin/6671079
+    """
+    conn = app.connection(transport_options={'visibility_timeout': 0})
+    qos = conn.channel().qos
+    qos.restore_visible()
+    myprint('Unacknowledged messages restored')
 
 
 @worker_process_init.connect(weak=False)
