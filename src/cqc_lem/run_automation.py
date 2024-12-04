@@ -5,7 +5,7 @@ import threading
 import time
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
-from typing import List
+from typing import List, Tuple
 from urllib.parse import urlparse
 
 from dotenv import load_dotenv
@@ -15,6 +15,7 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.remote.webdriver import WebDriver
 from selenium.webdriver.remote.webelement import WebElement
 from selenium.webdriver.support import expected_conditions as EC
+from selenium.webdriver.support.wait import WebDriverWait
 
 from cqc_lem.my_celery import app as shared_task
 from cqc_lem.utilities.ai.ai_helper import generate_ai_response, get_ai_message_refinement, summarize_recent_activity
@@ -361,13 +362,7 @@ def automate_commenting(user_id: int, loop_for_duration=None, future_forward: in
 
     myprint("Starting Automate Commenting Thread...")
 
-    driver, wait = get_driver_wait_pair(session_name='Automate Commenting')
-
-    user_email, user_password = get_user_password_pair_by_id(user_id)
-
-    login_to_linkedin(driver, wait, user_email, user_password)
-
-    my_profile = get_my_profile(driver, wait, user_email, user_password)
+    driver, wait, user_email, my_profile = get_current_profile(user_id,"Automate Commenting")
 
     navigate_to_feed(driver, wait)
 
@@ -434,14 +429,7 @@ def automate_commenting(user_id: int, loop_for_duration=None, future_forward: in
 def automate_reply_commenting(user_id: int, post_id: int, loop_for_duration=None, future_forward=60, **kwargs):
     """Reply to recent comments left on the post recently posted"""
 
-    user_email, user_password = get_user_password_pair_by_id(user_id)
-
-    driver, wait = get_driver_wait_pair(session_name='Reply to Comments')
-
-    login_to_linkedin(driver, wait, user_email, user_password)
-
-    # Get My Profile for later use
-    my_profile = get_my_profile(driver, wait, user_email, user_password)
+    driver, wait, user_email, my_profile = get_current_profile(user_id, "Reply to Comments")
 
     start_time = datetime.now()
 
@@ -775,15 +763,9 @@ def generate_and_post_comment(driver, wait, post_link, my_profile: LinkedInProfi
 def automate_profile_viewer_engagement(user_id: int, loop_for_duration=None, future_forward: int = 60, **kwargs):
     global stop_all_thread
 
-    user_email, user_password = get_user_password_pair_by_id(user_id)
-
-    driver, wait = get_driver_wait_pair(session_name='Profile Viewer DMs')
-
     myprint(f"Starting Profile Viewer DMs")
 
-    login_to_linkedin(driver, wait, user_email, user_password)
-
-    my_profile = get_my_profile(driver, wait, user_email, user_password)
+    driver, wait, user_email, my_profile = get_current_profile(user_id, "Profile Viewer DMs")
 
     # Navigate to profile view page
     driver.get("https://www.linkedin.com/analytics/profile-views/")
@@ -931,13 +913,7 @@ def engage_with_profile_viewer(user_id: int, viewer_url, viewer_name):
                        post_url=viewer_url,
                        message=f"Engaged with {viewer_name}")
 
-        user_email, user_password = get_user_password_pair_by_id(user_id)
-
-        driver, wait = get_driver_wait_pair(session_name='Profile Viewer Engagement')
-
-        login_to_linkedin(driver, wait, user_email, user_password)
-
-        my_profile = get_my_profile(driver, wait, user_email, user_password)
+        driver, wait, user_email, my_profile = get_current_profile(user_id, "Profile Viewer Engagement")
 
         myprint(f"Engaging from: {my_profile.full_name} to: {viewer_name}")
 
@@ -1269,6 +1245,23 @@ def final_method(drivers: List[WebDriver]):
     myprint("All drivers stopped. Program has exited.")
     sys.exit(0)
 
+
+@shared_task.task(rate_limit='2/m')
+@debug_function
+def get_current_profile(user_id:int, session_name:str = "Get Current Profile")->Tuple[WebDriver, WebDriverWait, str, LinkedInProfile]:
+    """Update the profile of the user"""
+
+    myprint(f"Getting Updated Profile")
+
+    user_email, user_password = get_user_password_pair_by_id(user_id)
+
+    driver, wait = get_driver_wait_pair(session_name=session_name)
+
+    login_to_linkedin(driver, wait, user_email, user_password)
+
+    my_profile = get_my_profile(driver, wait, user_email, user_password)
+
+    return driver, wait, user_email, my_profile
 
 if __name__ == "__main__":
     # Create the driver

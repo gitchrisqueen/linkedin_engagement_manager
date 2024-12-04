@@ -34,7 +34,7 @@ app.conf.update(
         # },
         'check-scheduled-posts': {
             'task': 'cqc_lem.run_scheduler.auto_check_scheduled_posts',
-            'schedule': timedelta(minutes=10)  # Run every 10 minutes
+            'schedule': timedelta(minutes=5)  # Run every 5 minutes
         },
         'send-appreciation-dms': {
             'task': 'cqc_lem.run_scheduler.auto_appreciate_dms',
@@ -48,9 +48,13 @@ app.conf.update(
             'task': 'cqc_lem.run_content_plan.auto_create_weekly_content',
             'schedule': crontab(hour='1', minute='0', day_of_week='sat') # Run on Saturdays at 1:00 AM
         },
-        'clen-up-stale-invites': {
+        'clean-up-stale-invites': {
             'task': 'cqc_lem.run_scheduler.auto_clean_stale_invites',
             'schedule': crontab(hour='2', minute='0',)  # Run every day at 2:00 AM
+        },
+        'clen-up-stale-profiles': {
+            'task': 'cqc_lem.run_scheduler.auto_clean_stale_profiles',
+            'schedule': crontab(hour='3', minute='0',)  # Run every day at 3:00 AM
         }
 
     }

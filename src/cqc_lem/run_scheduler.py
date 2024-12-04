@@ -3,7 +3,7 @@ from datetime import timedelta
 from cqc_lem.my_celery import app as shared_task
 # from celery import shared_task
 from cqc_lem.run_automation import automate_commenting, automate_profile_viewer_engagement, \
-    send_appreciation_dms_for_user, automate_reply_commenting, clean_stale_invites
+    send_appreciation_dms_for_user, automate_reply_commenting, clean_stale_invites, get_current_profile
 from cqc_lem.utilities.date import add_local_tz_to_datetime
 from cqc_lem.utilities.db import get_ready_to_post_posts, get_post_content, \
     update_db_post_status, get_user_password_pair_by_id, get_active_user_ids, insert_new_log, LogActionType, \
@@ -57,7 +57,7 @@ def auto_check_scheduled_posts():
                                      )
 
         # Update the DB with post status = scheduled so it won't get processed again
-        update_db_post_status(post_id, 'scheduled')
+        update_db_post_status(post_id, PostStatus.SCHEDULED)
 
     if len(posts) == 0:
         return f"No Post to Schedule"
@@ -141,6 +141,7 @@ def post_to_linkedin(user_id: int, post_id: int, **kwargs):
 
         return f"Failed to create post using /posts API endpoint"
 
+
 @shared_task.task
 def auto_clean_stale_invites():
     """Cleans up stale invites for each active user"""
@@ -150,19 +151,39 @@ def auto_clean_stale_invites():
 
     for user_id in users:
         # Clean up stale invites for this user
-        kwargs={'user_id': user_id}
+        kwargs = {'user_id': user_id}
         clean_stale_invites.apply_async(kwargs=kwargs, retry=True,
-                                                   retry_policy={
-                                                       'max_retries': 3,
-                                                       'interval_start': 60,
-                                                       'interval_step': 30
-                                                   })
+                                        retry_policy={
+                                            'max_retries': 3,
+                                            'interval_start': 60,
+                                            'interval_step': 30
+                                        })
     if len(users) == 0:
         return f"No Active Users"
     else:
         return f"Started Process for {len(users)} user(s)"
 
 
+@shared_task.task
+def auto_clean_stale_profiles():
+    """Cleans up stale profiles for each active user"""
+
+    # Get all active users and loop through them
+    users = get_active_user_ids()
+
+    for user_id in users:
+        # Clean up stale profiles for this user
+        get_current_profile.apply_async(kwargs={'user_id': user_id}, retry=True,
+                                        retry_policy={
+                                            'max_retries': 3,
+                                            'interval_start': 60,
+                                            'interval_step': 30
+                                        })
+
+    if len(users) == 0:
+        return f"No Active Users"
+    else:
+        return f"Started Process for {len(users)} user(s)"
 
 
 if __name__ == "__main__":
