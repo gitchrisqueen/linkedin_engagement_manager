@@ -9,6 +9,7 @@ from typing import List, Tuple
 from urllib.parse import urlparse
 
 from celery.contrib.abortable import AbortableTask
+from celery_once import QueueOnce
 from dotenv import load_dotenv
 from selenium.common import NoSuchElementException, JavascriptException
 from selenium.webdriver import ActionChains, Keys
@@ -233,7 +234,7 @@ def simulate_typing(driver: WebDriver, editable_element: WebElement, text):
     myprint("Finished Typing!")
 
 
-@shared_task.task(bind=True, base=AbortableTask, acks_late=True, reject_on_worker_lost=True, rate_limit='20/h')
+@shared_task.task(bind=True, base=QueueOnce, once={'graceful': True, 'keys': ['user_id','post_link']}, acks_late=True, reject_on_worker_lost=True, rate_limit='20/h')
 @debug_function
 def comment_on_post(self, user_id: int, post_link: str, comment_text: str):
     """Post a comment to the given post link"""
@@ -383,9 +384,9 @@ def check_commented(driver, wait, user_id: int = None, post_url: str = None):
     return already_commented
 
 
-@shared_task.task
+@shared_task.task(base=QueueOnce, once={'graceful': True })
 @debug_function
-def automate_commenting(user_id: int, loop_for_duration=None, future_forward: int = 60, **kwargs):
+def automate_commenting(user_id: int, loop_for_duration=None, future_forward: int = 60):
     global stop_all_thread
 
     myprint("Starting Automate Commenting Thread...")
@@ -452,7 +453,7 @@ def automate_commenting(user_id: int, loop_for_duration=None, future_forward: in
     quit_gracefully(driver)
 
 
-@shared_task.task
+@shared_task.task(base=QueueOnce, once={'graceful': True })
 @debug_function
 def automate_reply_commenting(user_id: int, post_id: int, loop_for_duration=None, future_forward=60, **kwargs):
     """Reply to recent comments left on the post recently posted"""
@@ -589,7 +590,7 @@ def automate_reply_commenting(user_id: int, post_id: int, loop_for_duration=None
 
     else:
         myprint("Could not find successful post for this user and post_id. Sleeping...")
-        time.sleep(60)  # Sleep for 60 seconds
+
 
     # Re-schedule the task in the queue for the future
     if loop_for_duration:
@@ -652,7 +653,7 @@ def accept_connection_request(user_id: int):
     return invitation_data
 
 
-@shared_task.task(bind=True, base=AbortableTask, acks_late=True, reject_on_worker_lost=True, rate_limit='20/h')
+@shared_task.task(bind=True, base=QueueOnce, once={'graceful': True},  acks_late=True, reject_on_worker_lost=True, rate_limit='20/h')
 @debug_function
 def send_appreciation_dms_for_user(self, user_id: int, loop_for_duration=None, future_forward: int = 60):
     user_email, user_password = get_user_password_pair_by_id(user_id)
@@ -671,12 +672,6 @@ def send_appreciation_dms_for_user(self, user_id: int, loop_for_duration=None, f
     invitations_accepted = accept_connection_request(user_id)
     # Send a private DM for each invitation
     for profile_url, name in invitations_accepted.items():
-        if self.is_aborted():
-            # respect aborted state, and terminate gracefully.
-            myprint('Send Appreciation Task aborted')
-            result = "Task Aborted"
-            break
-
         message = f"Hi {name}, I appreciate you connecting with me on LinkedIn. I look forward to learning more about you and your work."
         send_private_dm.apply_async(kwargs={"user_id": user_id, "profile_url": profile_url, "message": message})
 
@@ -694,7 +689,7 @@ def send_appreciation_dms_for_user(self, user_id: int, loop_for_duration=None, f
     # TODO: Use this line #send_private_dm.apply_async(kwargs={"user_id": user_id, "profile_url": profile_url, "message": message})
 
     # Re-schedule the task in the queue for the future
-    if loop_for_duration and not self.is_aborted():
+    if loop_for_duration:
         elapsed_time = datetime.now() - start_time
         new_loop_for_duration = round(loop_for_duration - elapsed_time.total_seconds() - future_forward)
         frame = inspect.currentframe()
@@ -794,9 +789,9 @@ def generate_and_post_comment(driver, wait, post_link, my_profile: LinkedInProfi
     return True
 
 
-@shared_task.task
+@shared_task.task(bind=True, base=QueueOnce, once={'graceful': True})
 @debug_function
-def automate_profile_viewer_engagement(user_id: int, loop_for_duration=None, future_forward: int = 60, **kwargs):
+def automate_profile_viewer_engagement(self, user_id: int, loop_for_duration=None, future_forward: int = 60, **kwargs):
     global stop_all_thread
 
     myprint(f"Starting Profile Viewer DMs")
@@ -933,7 +928,7 @@ def automate_profile_viewer_engagement(user_id: int, loop_for_duration=None, fut
     quit_gracefully(driver)
 
 
-@shared_task.task(bind=True, base=AbortableTask, acks_late=True, reject_on_worker_lost=True, rate_limit='2/m')
+@shared_task.task(bind=True, base=QueueOnce, once={'graceful': True, 'keys':['user_id','viewer_url']}, acks_late=True, reject_on_worker_lost=True, rate_limit='2/m')
 @debug_function
 def engage_with_profile_viewer(self, user_id: int, viewer_url, viewer_name):
     myprint(f"Starting Profile Viewer Engagement")
@@ -1042,10 +1037,10 @@ def engage_with_profile_viewer(self, user_id: int, viewer_url, viewer_name):
         quit_gracefully(driver)
 
 
-@shared_task.task(bind=True, base=AbortableTask, acks_late=True, reject_on_worker_lost=True, rate_limit='2/m')
+@shared_task.task(bind=True,base=QueueOnce, once={'graceful': True}, acks_late=True, reject_on_worker_lost=True, rate_limit='2/m')
 @debug_function
 def clean_stale_invites(self, user_id: int):
-    """Cleans up stale invites"""
+    """Cleans up stale invites that the user has sent"""
 
     # TODO": Implement this method and
     # user_email, user_password = get_user_password_pair_by_id(user_id)
@@ -1057,7 +1052,7 @@ def clean_stale_invites(self, user_id: int):
     pass
 
 
-@shared_task.task(bind=True, base=AbortableTask, acks_late=True, reject_on_worker_lost=True, rate_limit='2/m')
+@shared_task.task(bind=True, base=QueueOnce, once={'graceful': True}, acks_late=True, reject_on_worker_lost=True, rate_limit='2/m')
 @debug_function
 def send_private_dm(self, user_id: int, profile_url: str, message: str):
     """ Send dm message to a profile. Must be a 1st connection"""
@@ -1125,7 +1120,7 @@ def send_private_dm(self, user_id: int, profile_url: str, message: str):
     return final_result
 
 
-@shared_task.task(bind=True, base=AbortableTask, acks_late=True, reject_on_worker_lost=True, rate_limit='1/m')
+@shared_task.task(bind=True,base=QueueOnce, once={'graceful': True, 'keys': ['user_id','profile_url']},acks_late=True, reject_on_worker_lost=True, rate_limit='1/m')
 @debug_function
 def invite_to_connect(self, user_id: int, profile_url: str, message: str = None):
     user_email, user_password = get_user_password_pair_by_id(user_id)
@@ -1283,7 +1278,7 @@ def final_method(drivers: List[WebDriver]):
     sys.exit(0)
 
 
-@shared_task.task(bind=True, base=AbortableTask, acks_late=True, reject_on_worker_lost=True, rate_limit='1/m')
+@shared_task.task(bind=True, base=QueueOnce, once={'graceful': True}, acks_late=True, reject_on_worker_lost=True, rate_limit='1/m')
 def update_stale_profile(self, user_id: int):
     myprint(f"Updating Stale Profile. User ID: {user_id}")
     driver, wait, user_email, my_profile = get_current_profile(user_id=user_id, session_name="Update Stale Profile")
@@ -1332,8 +1327,8 @@ if __name__ == "__main__":
     pass
 
 
-@shared_task.task(acks_late=True, reject_on_worker_lost=True, rate_limit='2/m')
-def post_to_linkedin(user_id: int, post_id: int, **kwargs):
+@shared_task.task(bind=True, base=QueueOnce, once={'graceful': True}, acks_late=True, reject_on_worker_lost=True, rate_limit='2/m')
+def post_to_linkedin(self, user_id: int, post_id: int):
     """Posts to LinkedIn using the LinkedIn API - https://learn.microsoft.com/en-us/linkedin/consumer/integrations/self-serve/share-on-linkedin#creating-a-share-on-linkedin"""
 
     # Login and publish post to LinkedIn

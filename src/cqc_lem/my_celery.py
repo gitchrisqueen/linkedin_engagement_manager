@@ -6,6 +6,7 @@ from celery.signals import worker_process_init
 from opentelemetry.instrumentation.celery import CeleryInstrumentor
 
 from cqc_lem import celeryconfig
+from cqc_lem.celeryconfig import broker_url
 from cqc_lem.utilities.jaeger_tracer_helper import get_jaeger_tracer
 from cqc_lem.utilities.logger import myprint
 
@@ -26,6 +27,15 @@ app.autodiscover_tasks(['cqc_lem'])
 # Gets the max between all the parameters of timeout in the tasks
 max_timeout = 60*5  # This value must be bigger than the maximum soft timeout set for a task to prevent an infinity loop
 app.conf.broker_transport_options = {'visibility_timeout': max_timeout + 60}  # 60 seconds of margin
+
+# Setup Celery Once for task that should only be queued once per parameters sent
+app.conf.ONCE = {
+  'backend': 'celery_once.backends.Redis',
+  'settings': {
+    'url': broker_url,
+    'default_timeout': 60 * 60
+  }
+}
 
 
 # Celery configuration

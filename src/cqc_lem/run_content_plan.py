@@ -3,6 +3,7 @@ import json
 import os
 import random
 from datetime import datetime, timedelta
+from urllib.parse import urlparse
 from xml.etree import ElementTree
 
 import requests
@@ -436,9 +437,11 @@ def generate_website_content_post(sitemap_url, linked_user_profile, stage: str):
 
     # 1. Fetch and parse the sitemap XML
     page_urls = fetch_sitemap_urls(sitemap_url)
+    myprint(f"Founds {len(page_urls)} URLs from sitemap {sitemap_url}")
 
     # 2. Filter URLs that are likely to contain shareable content
     relevant_urls = filter_relevant_urls(page_urls)
+    myprint(f"Found {len(relevant_urls)} relevant URLs in the sitemap.")
 
     # 3. Randomly select a URL to gather content from
     if relevant_urls:
@@ -534,17 +537,34 @@ def fetch_sitemap_urls(sitemap_url):
 
         # Check if the sitemap contains sub-sitemaps or URLs
         sitemap_elements = tree.findall('.//ns:sitemap/ns:loc', namespaces)
-        url_elements = tree.findall('.//ns:url/ns:loc', namespaces)
+        url_elements = tree.findall('.//ns:url', namespaces)
 
         # Process URLs if present
         if url_elements:
-            urls.extend([element.text for element in url_elements])
+            url_lastmod_pairs = []
+            for url_element in url_elements:
+                loc = url_element.find('ns:loc', namespaces).text
+                lastmod = url_element.find('ns:lastmod', namespaces)
+                if lastmod is not None:
+                    lastmod = lastmod.text
+                else:
+                    lastmod = '1985-03-13'  # Default to a very old date if lastmod is not present
+                url_lastmod_pairs.append((loc, lastmod))
 
-        # Process sub-sitemaps recursively if present
+            # Sort URLs by last modified time in descending order
+            url_lastmod_pairs.sort(key=lambda x: x[1], reverse=True)
+            urls = [url for url, lastmod in url_lastmod_pairs]
+
+
+        # Process sub-sitemaps recursively if present (except for certain sitemap URLs)
+        skip_if_contains_text = ['sitemap-misc.xml','post_tag-sitemap.xml','category-sitemap.xml','page-sitemap.xml']
         if sitemap_elements:
             for sitemap in sitemap_elements:
                 sub_sitemap_url = sitemap.text
-                print(f"Fetching sub-sitemap: {sub_sitemap_url}")
+                if any(text in sub_sitemap_url for text in skip_if_contains_text):
+                    myprint(f"Skipping sub-sitemap: {sub_sitemap_url}")
+                    continue
+                myprint(f"Fetching sub-sitemap: {sub_sitemap_url}")
                 urls.extend(fetch_sitemap_urls(sub_sitemap_url))  # Recursive call
 
     except requests.RequestException as e:
@@ -555,12 +575,19 @@ def fetch_sitemap_urls(sitemap_url):
     return urls
 
 
-def filter_relevant_urls(urls):
+def filter_relevant_urls(urls: list[str], by_blog_post_check=True, max_list_size=10):
     """
-    Filter the URLs to keep only those that are likely to contain shareable content.
+    Filter the URLs to keep only those that are likely to be a blog post or contain shareable content.
     """
     keywords = ["blog", "case-study", "testimonial", "service", "news", "about"]
-    relevant_urls = [url for url in urls if any(keyword in url for keyword in keywords)]
+
+    relevant_urls = []
+    for url in urls:
+        if (by_blog_post_check and is_blog_post_combined(url)) or (
+                not by_blog_post_check and any(keyword in url for keyword in keywords)):
+            relevant_urls.append(url)
+            if len(relevant_urls) >= max_list_size:
+                break
 
     return relevant_urls
 
@@ -645,6 +672,39 @@ def auto_create_weekly_content(user_id: int = None):
         myprint(f"Updating post_id: {post_id} Status={PostStatus.PENDING}")
 
         update_db_post_status(post_id, PostStatus.PENDING)
+
+
+def is_blog_post(url):
+    parsed = urlparse(url)
+    path = parsed.path.strip('/')
+
+    # Check if the path contains typical blog indicators
+    if any(segment.isdigit() for segment in path.split('/')) or len(path.split('/')) > 1:
+        return True
+    return False
+
+
+def is_blog_post_by_metadata(url):
+    try:
+        content = fetch_content(url)
+        # myprint(f"Fetched URL: {url}: Content: {content}")
+        soup = BeautifulSoup(content, 'html.parser')
+
+        # Look for common blog-related tags
+        # if soup.find('article') or soup.find('meta', {'name': 'author'}):
+        if soup.find('meta', {'name': 'author'}):
+            return True
+    except Exception as e:
+        myprint(f"Error fetching URL: {e}")
+    return False
+
+
+def is_blog_post_combined(url):
+    if is_blog_post(url):
+        return True
+    if is_blog_post_by_metadata(url):
+        return True
+    return False
 
 
 if __name__ == '__main__':

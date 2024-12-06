@@ -3,7 +3,8 @@ import random
 import shutil
 
 from cqc_lem import assets_dir
-from cqc_lem.run_content_plan import create_content, auto_generate_content, auto_create_weekly_content
+from cqc_lem.run_content_plan import create_content, auto_generate_content, auto_create_weekly_content, \
+    get_main_blog_url_content, fetch_sitemap_urls, filter_relevant_urls, is_blog_post, is_blog_post_by_metadata
 from cqc_lem.run_automation import post_to_linkedin
 from cqc_lem.utilities.ai.ai_helper import get_industry_trend_analysis_based_on_user_profile, get_thought_leadership_post_from_ai
 from cqc_lem.utilities.db import get_user_password_pair_by_id
@@ -118,19 +119,38 @@ def test_move_files():
     shutil.move(video_file_path, video_file_dest)
 
 
+def test_get_main_blog_url_content():
+    """Test getting the main blog url content"""
+    url = "https://www.christopherqueenconsulting.com"
+    post_url, post_content = get_main_blog_url_content(url)
+    print(f"Post URL: {post_url}\n\nPost Content: {post_content}")
+
+
+def test_content_from_sitemap_url():
+    sitemap_url = 'https://christopherqueenconsulting.com/sitemap.xml'
+
+    # 1. Fetch and parse the sitemap XML
+    page_urls = fetch_sitemap_urls(sitemap_url)
+    myprint(f"Founds {len(page_urls)} URLs from sitemap {sitemap_url}")
+
+    # 2. Filter URLs that are likely to contain shareable content
+    relevant_urls = filter_relevant_urls(page_urls)
+    myprint(f"Found {len(relevant_urls)} relevant URLs in the sitemap.")
+    # Display each relevant URL
+    for url in relevant_urls:
+        myprint(f"Relevant URL: {url}")
+
 
 if __name__ == "__main__":
     # Clear selenium sessions
-    #clear_sessions()
-    #test_user_profile_load_from_db()
+    # clear_sessions()
+    # test_user_profile_load_from_db()
+    # test_move_files()
+    # test_create_content()
+    # test_content_plan_and_create()
+    # test_post_to_linkedin()
+    # test_industry_of_user()
+    # test_thought_leadership_post_from_ai()
+    #test_get_main_blog_url_content()
 
-    #test_move_files()
-
-    #test_create_content()
-
-    #test_content_plan_and_create()
-    test_post_to_linkedin()
-
-    #test_industry_of_user()
-
-    #test_thought_leadership_post_from_ai()
+    test_content_from_sitemap_url()

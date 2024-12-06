@@ -370,6 +370,20 @@ zookeeper = ["kazoo (>=1.3.1)"]
 zstd = ["zstandard (==0.22.0)"]
 
 [[package]]
+name = "celery-once"
+version = "3.0.1"
+description = "Allows you to prevent multiple execution and queuing of celery tasks."
+optional = false
+python-versions = "*"
+files = [
+    {file = "celery_once-3.0.1.tar.gz", hash = "sha256:9098730d6a84a91ccd84868c4730a81487fd0ffb7220cb1836d2b928542159d0"},
+]
+
+[package.dependencies]
+celery = "*"
+redis = ">=2.10.2"
+
+[[package]]
 name = "certifi"
 version = "2024.8.30"
 description = "Python package for providing Mozilla's CA Bundle."
@@ -5189,4 +5203,4 @@ testing = ["coverage[toml]", "zope.event", "zope.testing"]
 [metadata]
 lock-version = "2.0"
 python-versions = ">=3.12,<4.0"
-content-hash = "fc7005b9da48cea02fa9d08884267f3be0187da5925e003a16320279aa33b569"
+content-hash = "96307a61341b0220fb9e3f3bd6f0a255f4e3bafda5db6739c5cf8eb8a98c96bb"

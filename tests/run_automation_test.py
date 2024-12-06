@@ -3,8 +3,10 @@ import json
 import time
 from datetime import datetime
 
+from celery_once import AlreadyQueued
+
 from cqc_lem.run_automation import engage_with_profile_viewer, comment_on_post, invite_to_connect, check_commented, \
-    navigate_to_feed, automate_reply_commenting, send_private_dm
+    navigate_to_feed, automate_reply_commenting, send_private_dm, update_stale_profile
 from cqc_lem.run_scheduler import auto_clean_stale_profiles
 from cqc_lem.utilities.ai.ai_helper import generate_ai_response, get_ai_description_of_profile, \
     get_ai_message_refinement, summarize_recent_activity
@@ -335,6 +337,25 @@ def test_auto_clean_stale_profiles():
     clear_sessions()
     auto_clean_stale_profiles()
 
+def test_blocking_celery_calls():
+    clear_sessions()
+    user_id = 60
+    # Call it the next function 3 times
+    for _ in range(3):
+        # See if it gets blocked by Celery Once
+        myprint(f"Calling update_stale_profile for user_id: {user_id}")
+        try:
+            automate_reply_commenting.apply_async(kwargs={'user_id': user_id, 'post_id': 40, 'loop_for_duration': 60 * 5},
+                                             retry=True,
+                                             retry_policy={
+                                                 'max_retries': 3,
+                                                 'interval_start': 60,
+                                                 'interval_step': 30
+                                             })
+        except AlreadyQueued as e:
+            myprint(f"AlreadyQueued Exception: {e}")
+
+
 
 if __name__ == "__main__":
     # test_ai_responses()
@@ -352,6 +373,7 @@ if __name__ == "__main__":
     # test_engage_with_profile_viewer()
     # test_navigate_to_feed()
     # test_loop_for_duration_function_calls(loop_for_duration=10, future_forward=2)
-    test_auto_clean_stale_profiles()
+    # test_auto_clean_stale_profiles()
+    test_blocking_celery_calls()
 
     pass
