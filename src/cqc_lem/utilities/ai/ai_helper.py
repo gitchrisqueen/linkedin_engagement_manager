@@ -674,13 +674,15 @@ def get_industry_news_post_from_ai(linked_user_profile: LinkedInProfile, buyer_s
     """
        Generate a post sharing industry news based on the LinkedIn user's profile and the intended buyer stage, along with the user's commentary.
     """
-    # Find trending topics or news in the user's industry and craft a commentary around it
-    # Example content: "With recent changes in [industry], we’re seeing a shift toward..."
+
+    trends = get_industry_trend_analysis_based_on_user_profile(linked_user_profile)
+    industry = trends.get("industry", "Technology")
+    analysis = trends.get("analysis", "")
 
     # Use json to output to string
     linked_in_profile_json = linked_user_profile.model_dump_json()
 
-    prompt = f"""Please create a post sharing recent industry news based on my LinkedIn Profile information provided below. 
+    prompt = f"""Please create a post sharing recent {industry} industry news based on my LinkedIn Profile information provided below. 
     Tailor the post to readers in the {buyer_stage} of their journey and include my own commentary to add perspective.
             
     # Buyer Stages to Consider:
@@ -692,6 +694,9 @@ def get_industry_news_post_from_ai(linked_user_profile: LinkedInProfile, buyer_s
 
     # Add the Linked JSON profile to end of prompt
     prompt += f"\n ### LinkedIn Profile: {linked_in_profile_json}"
+
+    # Add the industry trend analysis to the prompt
+    prompt += f"\n ### Current {industry} Trends: <analysis>{analysis}</analysis>"
 
     prompt += f"""\n\n
     --- 
@@ -853,7 +858,9 @@ def get_personal_story_post_from_ai(linked_user_profile: LinkedInProfile, stage:
     linked_in_profile_json = linked_user_profile.model_dump_json()
 
     prompt = f"""Please create a story-based post for me, reflecting on a personal or professional milestone, achievement, or challenge, using the information from my LinkedIn Profile provided below. 
-    Tailor the story to connect with readers in the {stage} stage of their journey.
+    Tailor the story to connect with readers in the {stage} buyer stage of their journey. 
+    Do not repeat content that I have already shared in my recent activity. 
+    Do your best to relate the story to the current industry trends if possible.
     
     # Buyer Stages to Consider:
     - Awareness: Share a story that introduces me as a thoughtful leader, highlighting a key career insight or turning point.
@@ -864,6 +871,13 @@ def get_personal_story_post_from_ai(linked_user_profile: LinkedInProfile, stage:
 
     # Add the Linked JSON profile to end of prompt
     prompt += f"\n ### LinkedIn Profile: {linked_in_profile_json}"
+
+    trends = get_industry_trend_analysis_based_on_user_profile(linked_user_profile)
+    industry = trends.get("industry", "Technology")
+    analysis = trends.get("analysis", "")
+
+    # Add the industry trend analysis to the prompt
+    prompt += f"\n ### Current {industry} Trends: <analysis>{analysis}</analysis>"
 
     prompt += f"""\n\n
         --- 
@@ -949,8 +963,8 @@ def generate_engagement_prompt_post(linked_user_profile: LinkedInProfile, stage:
     # Use json to output to string
     linked_in_profile_json = linked_user_profile.model_dump_json()
 
-    prompt = f"""Please generate a question or prompt to encourage engagement from my followers based on the information in my LinkedIn Profile below. 
-    Tailor the question to resonate with readers in the {stage} of their journey.
+    prompt = f"""Please generate a question or prompt to encourage engagement from my followers based on the information in my LinkedIn Profile below and related it to current industry trends. 
+    Tailor the question to resonate with readers in the {stage} buyer stage of their journey.
 
     # Buyer Stages to Consider:
     - Awareness: Ask a thought-provoking question to spark curiosity about industry challenges or trends.
@@ -961,6 +975,13 @@ def generate_engagement_prompt_post(linked_user_profile: LinkedInProfile, stage:
 
     # Add the Linked JSON profile to end of prompt
     prompt += f"\n ### LinkedIn Profile: {linked_in_profile_json}"
+
+    trends = get_industry_trend_analysis_based_on_user_profile(linked_user_profile)
+    industry = trends.get("industry", "Technology")
+    analysis = trends.get("analysis", "")
+
+    # Add the industry trend analysis to the prompt
+    prompt += f"\n ### Current {industry} Trends: <analysis>{analysis}</analysis>"
 
     prompt += f"""\n\n
             --- 
@@ -1045,7 +1066,7 @@ def get_blog_summary_post_from_ai(blog_post_url: str, blog_post_content: str, li
     linked_in_profile_json = linked_user_profile.model_dump_json()
 
     prompt = f"""Please generate a LinkedIn-friendly summary post for the blog article provided below. 
-    Tailor the post to appeal to readers in the {stage} of their journey, using my LinkedIn profile details to make the summary relevant to my role and industry.
+    Tailor the post to appeal to readers in the {stage} buyer stage of their journey, using my LinkedIn profile details to make the summary relevant to my role and industry.
 
     """
 
@@ -1144,7 +1165,7 @@ def get_website_content_post_from_ai(content: str, url: str, linked_user_profile
     linked_in_profile_json = linked_user_profile.model_dump_json()
 
     prompt = f"""Please generate a LinkedIn-friendly summary post for the website content provided below. 
-        Tailor the post to appeal to readers in the {stage} of their journey, using my LinkedIn profile details to make the summary relevant to my role and industry.
+        Tailor the post to appeal to readers in the {stage} buyer stage of their journey, using my LinkedIn profile details to make the summary relevant to my role and industry.
 
                """
 
