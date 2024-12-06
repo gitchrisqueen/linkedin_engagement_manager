@@ -1,14 +1,15 @@
-from datetime import timedelta
+import os
+import shutil
+from datetime import timedelta, datetime
 
+from cqc_lem import assets_dir
 from cqc_lem.my_celery import app as shared_task
 # from celery import shared_task
 from cqc_lem.run_automation import automate_commenting, automate_profile_viewer_engagement, \
-    send_appreciation_dms_for_user, automate_reply_commenting, clean_stale_invites, get_current_profile
+    send_appreciation_dms_for_user, clean_stale_invites, update_stale_profile, post_to_linkedin
 from cqc_lem.utilities.date import add_local_tz_to_datetime
-from cqc_lem.utilities.db import get_ready_to_post_posts, get_post_content, \
-    update_db_post_status, get_user_password_pair_by_id, get_active_user_ids, insert_new_log, LogActionType, \
-    LogResultType, get_post_video_url, PostStatus
-from cqc_lem.utilities.linkedin.poster import share_on_linkedin
+from cqc_lem.utilities.db import get_ready_to_post_posts, update_db_post_status, get_active_user_ids, PostStatus
+from cqc_lem.utilities.env_constants import SELENIUM_KEEP_VIDEOS_X_DAYS
 from cqc_lem.utilities.logger import myprint
 
 
@@ -43,6 +44,9 @@ def auto_check_scheduled_posts():
         base_kwargs['loop_for_duration'] = 60 * 10
         automate_profile_viewer_engagement.apply_async(kwargs=base_kwargs, eta=scheduled_time - timedelta(minutes=10))
 
+        # Update the DB with post status = scheduled so it won't get processed again
+        update_db_post_status(post_id, PostStatus.SCHEDULED)
+
         # Schedule the post to be posted
         post_kwargs = {'user_id': user_id, 'post_id': post_id}
         post_to_linkedin.apply_async(kwargs=post_kwargs,
@@ -56,8 +60,7 @@ def auto_check_scheduled_posts():
                                      }
                                      )
 
-        # Update the DB with post status = scheduled so it won't get processed again
-        update_db_post_status(post_id, PostStatus.SCHEDULED)
+
 
     if len(posts) == 0:
         return f"No Post to Schedule"
@@ -90,58 +93,6 @@ def auto_appreciate_dms():
         return f"Started Appreciate DM Process for {len(users)} user(s)"
 
 
-@shared_task.task(rate_limit='2/m')
-def post_to_linkedin(user_id: int, post_id: int, **kwargs):
-    """Posts to LinkedIn using the LinkedIn API - https://learn.microsoft.com/en-us/linkedin/consumer/integrations/self-serve/share-on-linkedin#creating-a-share-on-linkedin"""
-
-    # Login and publish post to LinkedIn
-    user_email, user_password = get_user_password_pair_by_id(user_id)
-    myprint(f"Posting to LinkedIn as user: {user_email}")
-
-    # Get the post content
-    content = get_post_content(post_id)
-    myprint(f"Posting to LinkedIn: {content}")
-
-    # Get the post video url
-    video_url = get_post_video_url(post_id)
-
-    # Add the query param content_type to the url
-    if video_url:
-        myprint(f"Adding to Post | Video URL: {video_url}")
-
-    urn = share_on_linkedin(user_id, content, video_url)
-
-    if urn:
-        post_url = f"https://www.linkedin.com/feed/update/{urn}/"
-        myprint(f"Successfully created post using /posts API endpoint: {post_url}")
-
-        # Update DB with status=posted
-        update_db_post_status(post_id, PostStatus.POSTED)
-
-        # Schedule Answer comments for 30 minutes now that this has been posted
-        base_kwargs = {
-            'user_id': user_id,
-            'post_id': post_id,
-            'loop_for_duration': 60 * 30
-        }
-        automate_reply_commenting.apply_async(kwargs=base_kwargs)
-
-        # Update DB with status=success in the logs table and the post url
-        insert_new_log(user_id=user_id, action_type=LogActionType.POST, result=LogResultType.SUCCESS, post_id=post_id,
-                       post_url=post_url,
-                       message=f"Successfully created post using /posts API endpoint.")
-
-        return f"Post successfully created"
-
-    else:
-        myprint(f"Failed to create post using /posts API endpoint")
-        # Update DB with status=failed in the logs table
-        insert_new_log(user_id=user_id, action_type=LogActionType.POST, result=LogResultType.FAILURE, post_id=post_id,
-                       message="Failed to create post using /posts API endpoint.")
-
-        return f"Failed to create post using /posts API endpoint"
-
-
 @shared_task.task
 def auto_clean_stale_invites():
     """Cleans up stale invites for each active user"""
@@ -172,8 +123,12 @@ def auto_clean_stale_profiles():
     users = get_active_user_ids()
 
     for user_id in users:
+        myprint(f"Cleaning Stale Profiles for user: {user_id}")
+
         # Clean up stale profiles for this user
-        get_current_profile.apply_async(kwargs={'user_id': user_id}, retry=True,
+        #update_stale_profile(user_id)
+        update_stale_profile.apply_async(kwargs={'user_id': user_id},
+                                        retry=True,
                                         retry_policy={
                                             'max_retries': 3,
                                             'interval_start': 60,
@@ -184,6 +139,25 @@ def auto_clean_stale_profiles():
         return f"No Active Users"
     else:
         return f"Started Process for {len(users)} user(s)"
+
+@shared_task.task
+def auto_clean_old_videos():
+    """Cleans up old videos in the selenium folder"""
+
+    days_to_keep = SELENIUM_KEEP_VIDEOS_X_DAYS
+    myprint(f"Cleaning old videos older than {days_to_keep} days")
+    expiration_date = datetime.now() - timedelta(days=days_to_keep)
+    selenium_folder = os.path.join(assets_dir, 'selenium')
+    delete_count = 0
+    # Get all the folders in the selenium folder
+    for folder in os.listdir(selenium_folder):
+        folder_path = os.path.join(selenium_folder, folder)
+        if os.path.isdir(folder_path) and datetime.fromtimestamp(os.path.getmtime(folder_path)) < expiration_date:
+            myprint(f"Deleting folder: {folder_path}")
+            shutil.rmtree(folder_path)
+            delete_count += 1
+    return f"Deleted {delete_count} folders"
+
 
 
 if __name__ == "__main__":

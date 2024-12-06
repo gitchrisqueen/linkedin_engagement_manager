@@ -8,8 +8,9 @@ from datetime import datetime
 from typing import List, Tuple
 from urllib.parse import urlparse
 
+from celery.contrib.abortable import AbortableTask
 from dotenv import load_dotenv
-from selenium.common import NoSuchElementException
+from selenium.common import NoSuchElementException, JavascriptException
 from selenium.webdriver import ActionChains, Keys
 from selenium.webdriver.common.by import By
 from selenium.webdriver.remote.webdriver import WebDriver
@@ -22,9 +23,10 @@ from cqc_lem.utilities.ai.ai_helper import generate_ai_response, get_ai_message_
 from cqc_lem.utilities.date import convert_viewed_on_to_date
 from cqc_lem.utilities.db import get_user_password_pair_by_id, get_user_id, insert_new_log, LogActionType, \
     LogResultType, has_user_commented_on_post_url, get_post_url_from_log_for_user, get_post_message_from_log_for_user, \
-    has_engaged_url_with_x_days
+    has_engaged_url_with_x_days, get_post_content, get_post_video_url, update_db_post_status, PostStatus
 from cqc_lem.utilities.env_constants import LI_USER
 from cqc_lem.utilities.linkedin.helper import login_to_linkedin, get_my_profile, get_linkedin_profile_from_url
+from cqc_lem.utilities.linkedin.poster import share_on_linkedin
 from cqc_lem.utilities.linkedin.profile import LinkedInProfile
 from cqc_lem.utilities.logger import myprint
 from cqc_lem.utilities.selenium_util import click_element_wait_retry, \
@@ -154,9 +156,17 @@ def simulate_writing_time(content):
     writing_time = char_count / 5
     return round(writing_time)
 
+
 def emoji_to_ue_string(emoji):
     """Converts an emoji to its equivalent escaped sequence."""
     return emoji.encode('unicode_escape').decode('ascii')
+
+
+def clear_text_from_element(element: WebElement):
+    # Select All
+    element.send_keys(Keys.CONTROL + "a")
+    # Delete what is selected
+    element.send_keys(Keys.DELETE)
 
 
 def simulate_typing(driver: WebDriver, editable_element: WebElement, text):
@@ -182,7 +192,7 @@ def simulate_typing(driver: WebDriver, editable_element: WebElement, text):
                 actions.send_keys(key)
 
                 # Convert Emoji - THIS DOES NOT WORK
-                #actions.send_keys(emoji_to_ue_string(char))
+                # actions.send_keys(emoji_to_ue_string(char))
 
             else:
                 actions.send_keys(char)
@@ -198,23 +208,40 @@ def simulate_typing(driver: WebDriver, editable_element: WebElement, text):
 
     script_pre = "arguments[0].value = arguments[0].value.replace(arguments[1],arguments[2]);"
     if editable_element.tag_name == 'p':
-       script_pre = script_pre.replace(".value", ".innerText")
+        script_pre = script_pre.replace(".value", ".innerText")
 
     for key, char in replacement_dict.items():
-        # Use JavaScript to set the value for characters outside the BMP
-        driver.execute_script(script_pre, editable_element, key, char)
+        try:
+            # Use JavaScript to set the value for characters outside the BMP
+            driver.execute_script(script_pre, editable_element, key, char)
+        except JavascriptException as e:
+            myprint("Error while replacing char(" + key + "): " + str(e))
+            # Get the current test
+            current_text = getText(editable_element)
+            # Remove the key from the text
+            current_text = current_text.replace(key, '')
+            # Clear all the text
+            clear_text_from_element(editable_element)
+            # Enter the new text without the char
+            actions.send_keys(current_text).perform()
 
-    if len(replacement_dict)>0:
+
+    if len(replacement_dict) > 0:
         # Send an additional space character (so changed register)
         actions.send_keys(Keys.SPACE).perform()
 
     myprint("Finished Typing!")
 
 
-@shared_task.task(bind=True, acks_late=True, reject_on_worker_lost=True, rate_limit='20/h')
+@shared_task.task(bind=True, base=AbortableTask, acks_late=True, reject_on_worker_lost=True, rate_limit='20/h')
 @debug_function
-def comment_on_post(user_id: int, post_link: str, comment_text: str):
+def comment_on_post(self, user_id: int, post_link: str, comment_text: str):
     """Post a comment to the given post link"""
+
+    # Check the database logs to make sure user hasn't already commented on this post
+    if has_user_commented_on_post_url(user_id, post_link):
+        myprint("User has already commented on this post. Skipping...")
+        return "User has already commented on this post. Skipping..."
 
     driver, wait = get_driver_wait_pair(session_name='Post Comment')
 
@@ -333,9 +360,10 @@ def comment_on_post(user_id: int, post_link: str, comment_text: str):
 def check_commented(driver, wait, user_id: int = None, post_url: str = None):
     """See if the current open url we've already posted on"""
     already_commented = False
-    post_link = driver.current_url
 
-    # Check if we have already commented on this post
+    if post_url != driver.current_url:
+        # Switch to post url
+        driver.get(post_url)
 
     # Check against Database (in logs table)
     if user_id and post_url:
@@ -362,7 +390,7 @@ def automate_commenting(user_id: int, loop_for_duration=None, future_forward: in
 
     myprint("Starting Automate Commenting Thread...")
 
-    driver, wait, user_email, my_profile = get_current_profile(user_id,"Automate Commenting")
+    driver, wait, user_email, my_profile = get_current_profile(user_id=user_id, session_name="Automate Commenting")
 
     navigate_to_feed(driver, wait)
 
@@ -429,7 +457,7 @@ def automate_commenting(user_id: int, loop_for_duration=None, future_forward: in
 def automate_reply_commenting(user_id: int, post_id: int, loop_for_duration=None, future_forward=60, **kwargs):
     """Reply to recent comments left on the post recently posted"""
 
-    driver, wait, user_email, my_profile = get_current_profile(user_id, "Reply to Comments")
+    driver, wait, user_email, my_profile = get_current_profile(user_id=user_id, session_name="Reply to Comments")
 
     start_time = datetime.now()
 
@@ -624,9 +652,9 @@ def accept_connection_request(user_id: int):
     return invitation_data
 
 
-@shared_task.task(bind=True, acks_late=True, reject_on_worker_lost=True, rate_limit='20/h')
+@shared_task.task(bind=True, base=AbortableTask, acks_late=True, reject_on_worker_lost=True, rate_limit='20/h')
 @debug_function
-def send_appreciation_dms_for_user(user_id: int, loop_for_duration=None, future_forward: int = 60):
+def send_appreciation_dms_for_user(self, user_id: int, loop_for_duration=None, future_forward: int = 60):
     user_email, user_password = get_user_password_pair_by_id(user_id)
 
     driver, wait = get_driver_wait_pair(session_name='Automate Appreciation DMs')
@@ -637,10 +665,18 @@ def send_appreciation_dms_for_user(user_id: int, loop_for_duration=None, future_
 
     myprint("Sending Appreciations here...")
 
+    result = "Appreciation DMs Sent"
+
     # After Accepting a Connection Request:
     invitations_accepted = accept_connection_request(user_id)
     # Send a private DM for each invitation
     for profile_url, name in invitations_accepted.items():
+        if self.is_aborted():
+            # respect aborted state, and terminate gracefully.
+            myprint('Send Appreciation Task aborted')
+            result = "Task Aborted"
+            break
+
         message = f"Hi {name}, I appreciate you connecting with me on LinkedIn. I look forward to learning more about you and your work."
         send_private_dm.apply_async(kwargs={"user_id": user_id, "profile_url": profile_url, "message": message})
 
@@ -658,7 +694,7 @@ def send_appreciation_dms_for_user(user_id: int, loop_for_duration=None, future_
     # TODO: Use this line #send_private_dm.apply_async(kwargs={"user_id": user_id, "profile_url": profile_url, "message": message})
 
     # Re-schedule the task in the queue for the future
-    if loop_for_duration:
+    if loop_for_duration and not self.is_aborted():
         elapsed_time = datetime.now() - start_time
         new_loop_for_duration = round(loop_for_duration - elapsed_time.total_seconds() - future_forward)
         frame = inspect.currentframe()
@@ -679,7 +715,7 @@ def send_appreciation_dms_for_user(user_id: int, loop_for_duration=None, future_
 
     quit_gracefully(driver)
 
-    return "Appreciation DMs Sent"
+    return result
 
 
 def generate_and_post_comment(driver, wait, post_link, my_profile: LinkedInProfile) -> bool:
@@ -765,7 +801,7 @@ def automate_profile_viewer_engagement(user_id: int, loop_for_duration=None, fut
 
     myprint(f"Starting Profile Viewer DMs")
 
-    driver, wait, user_email, my_profile = get_current_profile(user_id, "Profile Viewer DMs")
+    driver, wait, user_email, my_profile = get_current_profile(user_id=user_id, session_name="Profile Viewer DMs")
 
     # Navigate to profile view page
     driver.get("https://www.linkedin.com/analytics/profile-views/")
@@ -897,9 +933,9 @@ def automate_profile_viewer_engagement(user_id: int, loop_for_duration=None, fut
     quit_gracefully(driver)
 
 
-@shared_task.task(bind=True, acks_late=True, reject_on_worker_lost=True, rate_limit='2/m')
+@shared_task.task(bind=True, base=AbortableTask, acks_late=True, reject_on_worker_lost=True, rate_limit='2/m')
 @debug_function
-def engage_with_profile_viewer(user_id: int, viewer_url, viewer_name):
+def engage_with_profile_viewer(self, user_id: int, viewer_url, viewer_name):
     myprint(f"Starting Profile Viewer Engagement")
 
     # Check if we already engaged with this viewer today
@@ -913,7 +949,8 @@ def engage_with_profile_viewer(user_id: int, viewer_url, viewer_name):
                        post_url=viewer_url,
                        message=f"Engaged with {viewer_name}")
 
-        driver, wait, user_email, my_profile = get_current_profile(user_id, "Profile Viewer Engagement")
+        driver, wait, user_email, my_profile = get_current_profile(user_id=user_id,
+                                                                   session_name="Profile Viewer Engagement")
 
         myprint(f"Engaging from: {my_profile.full_name} to: {viewer_name}")
 
@@ -1005,24 +1042,24 @@ def engage_with_profile_viewer(user_id: int, viewer_url, viewer_name):
         quit_gracefully(driver)
 
 
-@shared_task.task(bind=True, acks_late=True, reject_on_worker_lost=True, rate_limit='2/m')
+@shared_task.task(bind=True, base=AbortableTask, acks_late=True, reject_on_worker_lost=True, rate_limit='2/m')
 @debug_function
-def clean_stale_invites(user_id: int):
+def clean_stale_invites(self, user_id: int):
     """Cleans up stale invites"""
 
     # TODO": Implement this method and
-    #user_email, user_password = get_user_password_pair_by_id(user_id)
+    # user_email, user_password = get_user_password_pair_by_id(user_id)
 
-    #driver, wait = get_driver_wait_pair(session_name='Private DM')
+    # driver, wait = get_driver_wait_pair(session_name='Private DM')
 
-    #login_to_linkedin(driver, wait, user_email, user_password)
+    # login_to_linkedin(driver, wait, user_email, user_password)
 
     pass
 
 
-@shared_task.task(bind=True, acks_late=True, reject_on_worker_lost=True, rate_limit='2/m')
+@shared_task.task(bind=True, base=AbortableTask, acks_late=True, reject_on_worker_lost=True, rate_limit='2/m')
 @debug_function
-def send_private_dm(user_id: int, profile_url: str, message: str):
+def send_private_dm(self, user_id: int, profile_url: str, message: str):
     """ Send dm message to a profile. Must be a 1st connection"""
 
     user_email, user_password = get_user_password_pair_by_id(user_id)
@@ -1088,9 +1125,9 @@ def send_private_dm(user_id: int, profile_url: str, message: str):
     return final_result
 
 
-@shared_task.task(bind=True, acks_late=True, reject_on_worker_lost=True, rate_limit='1/m')
+@shared_task.task(bind=True, base=AbortableTask, acks_late=True, reject_on_worker_lost=True, rate_limit='1/m')
 @debug_function
-def invite_to_connect(user_id: int, profile_url: str, message: str = None):
+def invite_to_connect(self, user_id: int, profile_url: str, message: str = None):
     user_email, user_password = get_user_password_pair_by_id(user_id)
 
     driver, wait = get_driver_wait_pair(session_name='Invite to Connect')
@@ -1246,9 +1283,17 @@ def final_method(drivers: List[WebDriver]):
     sys.exit(0)
 
 
-@shared_task.task(bind=True, acks_late=True, reject_on_worker_lost=True, rate_limit='1/m')
-@debug_function
-def get_current_profile(user_id:int, session_name:str = "Get Current Profile")->Tuple[WebDriver, WebDriverWait, str, LinkedInProfile]:
+@shared_task.task(bind=True, base=AbortableTask, acks_late=True, reject_on_worker_lost=True, rate_limit='1/m')
+def update_stale_profile(self, user_id: int):
+    myprint(f"Updating Stale Profile. User ID: {user_id}")
+    driver, wait, user_email, my_profile = get_current_profile(user_id=user_id, session_name="Update Stale Profile")
+    quit_gracefully(driver)
+    return "Profile Updated Successfully"
+
+
+
+def get_current_profile(user_id: int, session_name: str = "Get Current Profile") -> Tuple[
+    WebDriver, WebDriverWait, str, LinkedInProfile]:
     """Update the profile of the user"""
 
     myprint(f"Getting Updated Profile")
@@ -1262,6 +1307,7 @@ def get_current_profile(user_id:int, session_name:str = "Get Current Profile")->
     my_profile = get_my_profile(driver, wait, user_email, user_password)
 
     return driver, wait, user_email, my_profile
+
 
 if __name__ == "__main__":
     # Create the driver
@@ -1284,3 +1330,55 @@ if __name__ == "__main__":
     # start_process()
     # myprint("Process finished")
     pass
+
+
+@shared_task.task(acks_late=True, reject_on_worker_lost=True, rate_limit='2/m')
+def post_to_linkedin(user_id: int, post_id: int, **kwargs):
+    """Posts to LinkedIn using the LinkedIn API - https://learn.microsoft.com/en-us/linkedin/consumer/integrations/self-serve/share-on-linkedin#creating-a-share-on-linkedin"""
+
+    # Login and publish post to LinkedIn
+    user_email, user_password = get_user_password_pair_by_id(user_id)
+    myprint(f"Posting to LinkedIn as user: {user_email}")
+
+    # Get the post content
+    content = get_post_content(post_id)
+    myprint(f"Posting to LinkedIn: {content}")
+
+    # Get the post video url
+    video_url = get_post_video_url(post_id)
+
+    # Add the query param content_type to the url
+    if video_url:
+        myprint(f"Adding to Post | Video URL: {video_url}")
+
+    urn = share_on_linkedin(user_id, content, video_url)
+
+    if urn:
+        post_url = f"https://www.linkedin.com/feed/update/{urn}/"
+        myprint(f"Successfully created post using /posts API endpoint: {post_url}")
+
+        # Update DB with status=posted
+        update_db_post_status(post_id, PostStatus.POSTED)
+
+        # Schedule Answer comments for 30 minutes now that this has been posted
+        base_kwargs = {
+            'user_id': user_id,
+            'post_id': post_id,
+            'loop_for_duration': 60 * 30
+        }
+        automate_reply_commenting.apply_async(kwargs=base_kwargs)
+
+        # Update DB with status=success in the logs table and the post url
+        insert_new_log(user_id=user_id, action_type=LogActionType.POST, result=LogResultType.SUCCESS, post_id=post_id,
+                       post_url=post_url,
+                       message=f"Successfully created post using /posts API endpoint.")
+
+        return f"Post successfully created"
+
+    else:
+        myprint(f"Failed to create post using /posts API endpoint")
+        # Update DB with status=failed in the logs table
+        insert_new_log(user_id=user_id, action_type=LogActionType.POST, result=LogResultType.FAILURE, post_id=post_id,
+                       message="Failed to create post using /posts API endpoint.")
+
+        return f"Failed to create post using /posts API endpoint"

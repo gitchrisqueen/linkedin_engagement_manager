@@ -4,7 +4,7 @@ import shutil
 
 from cqc_lem import assets_dir
 from cqc_lem.run_content_plan import create_content, auto_generate_content, auto_create_weekly_content
-from cqc_lem.run_scheduler import post_to_linkedin
+from cqc_lem.run_automation import post_to_linkedin
 from cqc_lem.utilities.ai.ai_helper import get_industry_trend_analysis_based_on_user_profile, get_thought_leadership_post_from_ai
 from cqc_lem.utilities.db import get_user_password_pair_by_id
 from cqc_lem.utilities.env_constants import API_BASE_URL

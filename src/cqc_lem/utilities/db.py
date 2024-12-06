@@ -304,7 +304,11 @@ def update_db_post_status(post_id: int, post_status: PostStatus) -> bool:
     cursor = connection.cursor()
 
     # TODO: Why Enum doesnt work inside this function (have to convert to string first but why) ????
-    status_str = post_status.value
+    status_str = "posted"
+    try:
+        status_str = post_status.value
+    except Exception:
+        myprint(f"Error converting post_status to string: {post_status}")
 
     cursor.execute(
         """UPDATE posts SET status = %s WHERE id = %s""",

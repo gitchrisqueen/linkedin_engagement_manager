@@ -60,7 +60,12 @@ app.conf.update(
         'clen-up-stale-profiles': {
             'task': 'cqc_lem.run_scheduler.auto_clean_stale_profiles',
             'schedule': crontab(hour='3', minute='0',)  # Run every day at 3:00 AM
+        },
+        'clen-up-old_videos': {
+            'task': 'cqc_lem.run_scheduler.auto_clean_old_videos',
+            'schedule': crontab(hour='4', minute='0', )  # Run every day at 4:00 AM
         }
+
 
     }
 )

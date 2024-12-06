@@ -5,6 +5,7 @@ from datetime import datetime
 
 from cqc_lem.run_automation import engage_with_profile_viewer, comment_on_post, invite_to_connect, check_commented, \
     navigate_to_feed, automate_reply_commenting, send_private_dm
+from cqc_lem.run_scheduler import auto_clean_stale_profiles
 from cqc_lem.utilities.ai.ai_helper import generate_ai_response, get_ai_description_of_profile, \
     get_ai_message_refinement, summarize_recent_activity
 from cqc_lem.utilities.date import convert_viewed_on_to_date
@@ -330,6 +331,10 @@ def test_loop_for_duration_function_calls(user_id=60, post_id=0, loop_for_durati
             # Call the function again by name
             globals()[current_function_name](**kwargs)
 
+def test_auto_clean_stale_profiles():
+    clear_sessions()
+    auto_clean_stale_profiles()
+
 
 if __name__ == "__main__":
     # test_ai_responses()
@@ -342,11 +347,11 @@ if __name__ == "__main__":
     # test_post_comment()
     # test_auto_reply()
 
-    # TODO: Finish fixing this VVV
-    test_send_private_dm()
+    #test_send_private_dm()
 
     # test_engage_with_profile_viewer()
     # test_navigate_to_feed()
     # test_loop_for_duration_function_calls(loop_for_duration=10, future_forward=2)
+    test_auto_clean_stale_profiles()
 
     pass
