@@ -3,6 +3,7 @@ import json
 import os
 import random
 from datetime import datetime, timedelta
+from typing import Tuple
 from urllib.parse import urlparse
 from xml.etree import ElementTree
 
@@ -319,9 +320,17 @@ def get_main_blog_url_content(blog_url):
     # Check if the blog is a WordPress site by trying the REST API
     wp_api_url = f"{blog_url.rstrip('/')}/wp-json/wp/v2/posts"
 
+    session, headers = get_session_for_response()
+
+    recent_posts = None
+
     try:
-        response = requests.get(wp_api_url, timeout=5)
-        response.raise_for_status()  # Check if the request was successful
+        # Make the request
+        response = session.get(wp_api_url, headers=headers, timeout=10)
+
+        # Raise an exception for HTTP errors
+        response.raise_for_status()
+
         if response.status_code == 200:
             # Use WordPress API to get recent posts
             recent_posts = response.json()
@@ -330,8 +339,19 @@ def get_main_blog_url_content(blog_url):
             # If the API is not available, fall back to web scraping
             myprint("Non-WordPress blog detected or API unavailable. Fetching posts via web scraping...")
             recent_posts = scrape_recent_posts(blog_url)
-    except requests.RequestException:
-        myprint("Error fetching blog posts via API. Falling back to web scraping...")
+
+    except requests.exceptions.HTTPError as http_err:
+        myprint(f"HTTP error occurred: {http_err}")
+        myprint("Falling back to web scraping...")
+        # In case of any request failure, fall back to web scraping
+        recent_posts = scrape_recent_posts(blog_url)
+    except requests.exceptions.ConnectionError as conn_err:
+        myprint(f"Connection error occurred: {conn_err}")
+    except requests.exceptions.Timeout as timeout_err:
+        myprint(f"Timeout error occurred: {timeout_err}")
+    except requests.exceptions.RequestException as req_err:
+        myprint(f"Some other request error occurred: {req_err}")
+        myprint("Falling back to web scraping...")
         # In case of any request failure, fall back to web scraping
         recent_posts = scrape_recent_posts(blog_url)
 
@@ -385,9 +405,14 @@ def scrape_recent_posts(blog_url):
             title_element = article.find("a", href=True)
             if title_element:
                 post_url = title_element["href"]
-                post_content = title_element.get_text(strip=True)
 
-                myprint(f"Found post content: {post_content}")
+                # if post_url is a relative URL, convert it to an absolute URL
+                if not post_url.startswith("http"):
+                    post_url = urlparse(blog_url).scheme + "://" + urlparse(blog_url).hostname + post_url
+
+
+                #post_content = title_element.get_text(strip=True)
+                post_content = fetch_content(post_url)
                 recent_posts.append({
                     "link": post_url,
                     "content": post_content
@@ -397,6 +422,8 @@ def scrape_recent_posts(blog_url):
 
     if len(recent_posts) == 0:
         myprint(f"No recent posts found on the blog page: {blog_url}")
+    else:
+        myprint(f"Found {len(recent_posts)} post(s) from: {blog_url}")
 
     return recent_posts
 
@@ -467,9 +494,7 @@ def generate_website_content_post(sitemap_url, linked_user_profile, stage: str):
         myprint("No relevant URLs found in the sitemap.")
         return None
 
-
-# Function to make a request and return parsed HTML content
-def fetch_content(url):
+def get_session_for_response() -> Tuple[requests.Session, dict]:
     # Set up headers to simulate a browser request
     headers = {
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.6723.91 Safari/537.36',
@@ -491,6 +516,12 @@ def fetch_content(url):
     session = requests.Session()
     session.mount("https://", adapter)
     session.mount("http://", adapter)
+
+    return session, headers
+
+# Function to make a request and return parsed HTML content
+def fetch_content(url):
+    session, headers = get_session_for_response()
 
     content = None
 
@@ -657,7 +688,7 @@ def auto_create_weekly_content(user_id: int = None):
             # Get the file name from the video file path
             video_file_name = os.path.basename(video_file_path)
 
-            # The video url is our api prefix + 'assets/videos' +  video_file_name
+            # The video url is our api prefix + 'assets?file=videos/runwayml' +  video_file_name
             api_video_url = f"{API_BASE_URL}/assets?file_name=videos/runwayml/{video_file_name}"
             myprint(f"Video URL: {api_video_url}")
 

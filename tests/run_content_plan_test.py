@@ -4,9 +4,11 @@ import shutil
 
 from cqc_lem import assets_dir
 from cqc_lem.run_content_plan import create_content, auto_generate_content, auto_create_weekly_content, \
-    get_main_blog_url_content, fetch_sitemap_urls, filter_relevant_urls, is_blog_post, is_blog_post_by_metadata
+    get_main_blog_url_content, fetch_sitemap_urls, filter_relevant_urls, is_blog_post, is_blog_post_by_metadata, \
+    scrape_recent_posts, is_blog_post_combined
 from cqc_lem.run_automation import post_to_linkedin
-from cqc_lem.utilities.ai.ai_helper import get_industry_trend_analysis_based_on_user_profile, get_thought_leadership_post_from_ai
+from cqc_lem.utilities.ai.ai_helper import get_industry_trend_analysis_based_on_user_profile, \
+    get_thought_leadership_post_from_ai, get_flux_image_prompt_from_ai
 from cqc_lem.utilities.db import get_user_password_pair_by_id
 from cqc_lem.utilities.env_constants import API_BASE_URL
 from cqc_lem.utilities.linkedin.helper import get_my_profile
@@ -140,6 +142,92 @@ def test_content_from_sitemap_url():
     for url in relevant_urls:
         myprint(f"Relevant URL: {url}")
 
+def test_blog_content_by_platform():
+    blogs_by_platform = {
+        "Medium": [
+            "https://forge.medium.com",
+            "https://uxdesign.cc",
+            "https://towardsdatascience.com"
+        ],
+        "Ghost": [
+            "https://thebrowser.com",
+            "https://blog.cloudflare.com",
+            "https://quillette.com"
+        ],
+        "Squarespace": [
+            "https://sproutedkitchen.com",
+            "https://mynameisyeh.com",
+            "https://thegoodtrade.com"
+        ],
+        "Wix": [
+            "https://zionadventurephotog.com",
+            "https://bellaandbloom.com",
+            "https://mombosslife.com"
+        ],
+        "Jekyll (GitHub Pages)": [
+            "https://developmentseed.org/blog",
+            "https://zachholman.com",
+            "https://perfectionkills.com"
+        ],
+        "Tumblr": [
+            "https://thisisnthappiness.tumblr.com",
+            "https://weandthecolor.tumblr.com",
+            "https://eatsleepdraw.tumblr.com"
+        ]
+    }
+
+    # Go through each platform and get the blog content of each link
+    for platform, blog_links in blogs_by_platform.items():
+        myprint(f"Platform: {platform}")
+        for blog_link in blog_links:
+            post_url, post_content = get_main_blog_url_content(blog_link)
+            is_blog_post = False
+            did_get_content = False
+            if post_url:
+                is_blog_post = is_blog_post_combined(post_url)
+            else:
+                post_url = "N/A"
+            if post_content:
+                did_get_content = post_content and len(post_content) > 0
+            myprint(f"\tBlog Link: {blog_link} | Blog Post URL: {post_url}| Is Blog: {is_blog_post}| Blog Content Gathered: {did_get_content}")
+
+
+def test_get_flux_image_prompt_from_ai():
+    post_content = """
+    Are we truly ready for AI to transform our businesses?
+
+    Many organizations still see it as just a tool.
+    
+    But what if we viewed AI as a strategic partner?
+    
+    The journey from awareness to implementation can be daunting. 
+    
+    Many fear the unknown and hesitate to integrate AI. 
+    
+    Here’s where collaboration and transparency come into play. 
+    
+    🔹 Identify your core pain points. 
+    
+    🔹 Customize solutions tailored to your needs.
+    
+    🔹 Ensure seamless integration with existing systems.
+    
+    🔹 Foster a culture of continuous learning.
+    
+    How is your organization navigating these challenges? 
+    
+    Let’s share insights that empower our journeys together!
+    
+    I’d love to hear your thoughts below!  
+    
+    #AI #DigitalTransformation #BusinessGrowth #Innovation #MachineLearning #AIImplementation #Consulting #Leadership #TechTrends #FutureOfWork
+        """
+
+    image_prompt = get_flux_image_prompt_from_ai(post_content)
+
+    myprint(f"Image Prompt: {image_prompt}")
+
+
 
 if __name__ == "__main__":
     # Clear selenium sessions
@@ -151,6 +239,9 @@ if __name__ == "__main__":
     # test_post_to_linkedin()
     # test_industry_of_user()
     # test_thought_leadership_post_from_ai()
-    #test_get_main_blog_url_content()
+    # test_content_from_sitemap_url()
+    # test_get_main_blog_url_content()
+    # test_blog_content_by_platform()
+    test_get_flux_image_prompt_from_ai()
 
-    test_content_from_sitemap_url()
+

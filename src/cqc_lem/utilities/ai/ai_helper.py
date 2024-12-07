@@ -347,20 +347,20 @@ def get_video_content_from_ai(linked_user_profile: LinkedInProfile, buyer_stage:
     linked_in_profile_json = linked_user_profile.model_dump_json()
 
     prompts = [f"""Create a short, high-impact video script tailored for LinkedIn to introduce and build awareness about the expertise or unique value of the profile represented by the following LinkedIn Profile. 
-                This video should appeal to users in the {buyer_stage} stage, aiming to quickly capture attention with a clear, memorable introduction. 
+                This video should appeal to users in the {buyer_stage} buyer stage, aiming to quickly capture attention with a clear, memorable introduction. 
                 Use a 1:1 aspect ratio and keep the length to 30 seconds. 
                 Make the tone approachable and professional, with the visual style matching any brand cues present in the profile data. 
                 End with a subtle call to action that encourages viewers to explore further.
                 
                 """,
-               f"""Generate a 45-second LinkedIn explainer video script highlighting the unique strengths and offerings of the following LinkedIn Profile for an audience in the {buyer_stage} stage.
+               f"""Generate a 45-second LinkedIn explainer video script highlighting the unique strengths and offerings of the following LinkedIn Profile for an audience in the {buyer_stage} buyer stage.
                The script should present three key features or advantages that demonstrate why this profile or brand stands out as a valuable solution. 
                Use a 16:9 aspect ratio with a clean, professional design, and ensure pacing is steady enough to allow viewers to grasp each point. 
                Conclude with a call to action, inviting viewers to connect, learn more, or engage further on LinkedIn.
                 
                 """,
 
-               f"""Design a compelling video script for LinkedIn that solidifies the following LinkedIn Profile as the top choice for viewers in the {buyer_stage} stage. 
+               f"""Design a compelling video script for LinkedIn that solidifies the following LinkedIn Profile as the top choice for viewers in the {buyer_stage} buyer stage. 
                Focus on driving conversions by presenting clear reasons why this profile or brand is a trustworthy choice, with emphasis on relevant accomplishments, client testimonials, or standout capabilities. 
                The video should run for about 60 seconds in a 16:9 format, with a polished, confidence-inspiring visual style. 
                End with a strong call to action encouraging immediate engagement, such as scheduling a demo or visiting the profile’s website.
@@ -532,7 +532,7 @@ def get_thought_leadership_post_from_ai(linked_user_profile: LinkedInProfile, bu
         Uses the user's profile (e.g., job title, industry) and intended buyer_stage to form an insightful post.
     """
 
-    trends = get_industry_trend_analysis_based_on_user_profile(linked_user_profile)
+    trends = get_industry_trend_analysis_based_on_user_profile(linked_user_profile, limit_to=10)
     industry = trends.get("industry", "Technology")
     analysis = trends.get("analysis", "")
 
@@ -544,7 +544,7 @@ def get_thought_leadership_post_from_ai(linked_user_profile: LinkedInProfile, bu
 
     prompt = f"""Please create a thought leadership post for me based on my LinkedIn Profile information and the current trends in the {industry} industry.
 
-        Craft the post to appeal to readers who are currently in the {buyer_stage} of their journey.
+        Craft the post to appeal to readers who are currently in the {buyer_stage} buyer stage of their journey.
         
         # Buyer Stages:
         - Awareness: Introduce key industry challenges and trends that my expertise addresses.
@@ -642,9 +642,9 @@ def get_thought_leadership_post_from_ai(linked_user_profile: LinkedInProfile, bu
     return content
 
 
-def get_industry_trend_analysis_based_on_user_profile(linked_in_profile: LinkedInProfile):
+def get_industry_trend_analysis_based_on_user_profile(linked_in_profile: LinkedInProfile, limit_to = None, randomize = True):
     my_industries = get_industries_of_profile_from_ai(linked_in_profile, 3)
-    print(f"Likely Industries: {my_industries}")
+    myprint(f"Likely Industries: {my_industries}")
 
     # Convert the industries into a list by splitting on comma
     my_industries_list = my_industries.split(', ')
@@ -652,14 +652,24 @@ def get_industry_trend_analysis_based_on_user_profile(linked_in_profile: LinkedI
     # Get one of the industries by random choice
     industry = random.choice(my_industries_list)
 
-    print(f"Chosen Industry: {industry}")
+    myprint(f"Chosen Industry: {industry}")
 
     # Get Google News articles about that industry
-    articles_dict = search_recent_news(industry, 10)
+    articles_dict = search_recent_news(industry, 7)
 
     articles = articles_dict.get('articles', [])
 
-    print(f"Articles: {articles}")
+    myprint(f"Articles Found: {len(articles)}")
+
+    if randomize:
+        random.shuffle(articles)
+        myprint(f"Articles Shuffled")
+
+    if limit_to and len(articles) > limit_to:
+        articles = articles[:limit_to]
+        myprint(f"Limited to {limit_to} articles")
+
+    myprint(f"Articles: {articles}")
 
     # Get the trend analysis of the industry
     trend_analysis = get_industry_trend_from_ai(industry, articles)
@@ -675,7 +685,7 @@ def get_industry_news_post_from_ai(linked_user_profile: LinkedInProfile, buyer_s
        Generate a post sharing industry news based on the LinkedIn user's profile and the intended buyer stage, along with the user's commentary.
     """
 
-    trends = get_industry_trend_analysis_based_on_user_profile(linked_user_profile)
+    trends = get_industry_trend_analysis_based_on_user_profile(linked_user_profile, limit_to=3)
     industry = trends.get("industry", "Technology")
     analysis = trends.get("analysis", "")
 
@@ -683,7 +693,7 @@ def get_industry_news_post_from_ai(linked_user_profile: LinkedInProfile, buyer_s
     linked_in_profile_json = linked_user_profile.model_dump_json()
 
     prompt = f"""Please create a post sharing recent {industry} industry news based on my LinkedIn Profile information provided below. 
-    Tailor the post to readers in the {buyer_stage} of their journey and include my own commentary to add perspective.
+    Tailor the post to readers in the {buyer_stage} buyer stage of their journey and include my own commentary to add perspective.
             
     # Buyer Stages to Consider:
     - Awareness: Introduce the news topic with broad insights on its relevance to the industry.
@@ -872,7 +882,7 @@ def get_personal_story_post_from_ai(linked_user_profile: LinkedInProfile, stage:
     # Add the Linked JSON profile to end of prompt
     prompt += f"\n ### LinkedIn Profile: {linked_in_profile_json}"
 
-    trends = get_industry_trend_analysis_based_on_user_profile(linked_user_profile)
+    trends = get_industry_trend_analysis_based_on_user_profile(linked_user_profile, limit_to=5)
     industry = trends.get("industry", "Technology")
     analysis = trends.get("analysis", "")
 
@@ -1407,9 +1417,13 @@ def get_flux_image_prompt_from_ai(post_content: str):
        Generate a Flux.1 image prompt from the provided post content
        """
 
-    prompt = f"""Please generate an image prompt based on the following:
+    prompt = f"""Here’s a LinkedIn post: <post_content>{post_content}</post_content>.
 
-    Post: <content>{post_content}</content>
+    Analyze the post and, based on its themes, select a focal point or core message to emphasize. 
+    Decide on a tone or style that creatively aligns with the post but think outside the box—incorporate unexpected interpretations, moods, or styles that give the visual concept a fresh and imaginative twist.
+    
+    Your response should include a single, detailed paragraph describing the image scene, style, and mood in a way that feels unique and specific to this post. 
+    Each response to similar posts should offer a different perspective, approach, or creative take.
 
     """
 
@@ -1418,47 +1432,39 @@ def get_flux_image_prompt_from_ai(post_content: str):
     # System prompt to be included in every request
     system_prompt = {
         "role": "system",
-        "content": f"""Act as a professional visual content creator specializing in crafting prompts for FLUX.1, an advanced AI image generation model. 
-        Your task is to analyze the provided post and construct a highly detailed prompt that includes all necessary elements (subject, style, composition, lighting, color palette, mood, technical details, and additional elements). 
-        Use natural language and reference artistic styles or techniques as needed.
+        "content": f"""Act as a **world-class visual content creator and prompt engineer specializing in unique AI-generated imagery**. 
+        Your task is to craft highly imaginative and detailed image descriptions that translate the essence of a LinkedIn post into extraordinary visuals. 
+        The goal is to create visually distinct, outside-the-box concepts, ensuring variety and originality in every image prompt.  
 
-        ### Step-by-Step Instructions:
+        ### Step-by-Step Instructions:  
         
         1. **Analyze the Post:**
-           - Identify the main subject of the post.
-           - Extract the tone, key themes, and emotional undercurrents.
-           - Pinpoint any implied or explicit visual metaphors or concepts.
+           - Identify the **core message** or theme of the post, capturing both explicit content and implied meanings.
+           - Recognize the **tone**, **emotion**, and **key metaphors** conveyed in the post.  
+           - Extract **unconventional angles or perspectives** to spark originality.  
         
-        2. **Design the Scene:**
-           - **Subject:** Define the primary focus of the image based on the post's message.
-           - **Style:** Choose an artistic approach or visual aesthetic (e.g., photorealistic, abstract, or inspired by a specific artist or movement).
-           - **Composition:** Describe the arrangement of elements in the image, ensuring balance and visual interest.
-           - **Lighting:** Specify the type, intensity, and quality of lighting (e.g., "soft morning light" or "dramatic spotlight").
-           - **Color Palette:** Suggest a dominant color scheme to enhance mood and alignment with the post's tone.
-           - **Mood/Atmosphere:** Capture the emotional tone or ambiance (e.g., celebratory, serene, motivational).
-           - **Technical Details:** Provide details about perspective or camera settings (e.g., "shot from a low angle" or "wide lens").
+        2. **Innovate the Scene:**
+           - **Core Concept:** Pinpoint the central idea or subject that visually represents the post.
+           - **Unexpected Creativity:** Go beyond obvious interpretations; add surreal, abstract, or symbolic elements to make the image unique.
+           - **Style:** Choose a visual style, referencing artistic techniques, movements, or imaginative aesthetics (e.g., steampunk fusion, futuristic minimalism, or ethereal dreamscapes).  
+           - **Composition:** Detail a balanced or intentionally dynamic arrangement, suggesting unique perspectives or camera angles.  
+           - **Lighting:** Specify unique or experimental lighting (e.g., "luminous glow with starlight accents" or "moody fog with ethereal blue undertones").  
+           - **Color Palette:** Recommend a striking or harmonious color scheme that amplifies the post’s mood and theme.
+           - **Mood/Atmosphere:** Reflect the emotional resonance or underlying energy, infusing elements that evoke the intended response.
+           - **Technical Elements:** Suggest additional visual or technical features that make the image exceptional (e.g., "wide lens for expansive depth" or "macro perspective on intricate details").  
         
-        3. **Incorporate Supporting Details:**
-           - Include additional background elements or context relevant to the post's message (e.g., "a city skyline in the distance").
+        3. **Incorporate Symbolism and Details:**
+           - Add unexpected metaphors, symbols, or creative background elements to enhance the narrative (e.g., "a phoenix rising in a city of glass" or "a vast tree with digital leaves representing ideas").  
         
-        4. **Construct the FLUX.1 Prompt:**
-           - Combine all elements into a cohesive, descriptive sentence.
-           - Review the Design the Scene elements and make sure your prompt incorporates each in your generated response.
-           - The final prompt response should be one very detailed paragraph. No new lines between sentences.
+        4. **Generate the Prompt:**
+           - Combine all elements into a single, fluid, detailed paragraph with vibrant, evocative language.
+           - **Avoid repetition, generic phrasing, or predictable descriptions.**
+           - Ensure every prompt is designed to inspire unique, high-quality visuals.  
+        
+        ### Output Format:  
+        - One paragraph, richly descriptive, without prefixes or additional instructions.  
+        - No system text, introductions, or explanations—just the prompt.
    
-        
-        ### Output Format:
-        - **FLUX.1 Prompt:** A structured, natural-language prompt that captures all essential elements.
-          
-        ---
-
-       ### Your Final Steps: 
-        - Take a deep breath and work on this problem step-by-step.
-        - Do not surround your response in quotes or added any additional system text. 
-        - Do not share your thoughts nor show your work. 
-        - Do not need to say "Create an image" Just start describing it.
-        - Only respond with one final response without the prefix "FLUX.1 Prompt:".
-
         """
     }
 
@@ -1472,7 +1478,7 @@ def get_flux_image_prompt_from_ai(post_content: str):
     response = client.chat.completions.create(
         model="gpt-4o-mini",  # Specify the model you want to use
         messages=[system_prompt, user_message],  # System prompt + current user prompt
-        temperature=round(random.uniform(0.4, 0.6), 2),
+        temperature=round(random.uniform(0.7, 1), 2),
         # Ensure logical and structured prompts but allow some creativity for Flux1 descriptions. Slightly tighter control avoids over-creativity that might make outputs unfocused.
 
         # Focuses on high-probability tokens while leaving room for variation in descriptions.
@@ -1542,7 +1548,7 @@ def get_flux_image_via_replicate(prompt: str, ref: str = "black-forest-labs/flux
             "num_outputs": 1,
             "aspect_ratio": "1:1",
             "output_format": "webp",
-            "output_quality": 80,
+            "output_quality": 100,
             "prompt_strength": 0.8,
             "num_inference_steps": 28
         }
