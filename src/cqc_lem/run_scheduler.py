@@ -34,18 +34,9 @@ def auto_check_scheduled_posts():
 
         myprint(f"Ready to Post ID: {post_id}")
 
-        base_kwargs = {'user_id': user_id}
-
-        # Start the pre-post commenting task now (loop for 15 minutes)
-        base_kwargs['loop_for_duration'] = 60 * 15
-        automate_commenting.apply_async(kwargs=base_kwargs, eta=scheduled_time - timedelta(minutes=15))
-
-        # Schedule the pre-post profile viewer dm task 10 minutes before scheduled post (loop for 10 minutes)
-        base_kwargs['loop_for_duration'] = 60 * 10
-        automate_profile_viewer_engagement.apply_async(kwargs=base_kwargs, eta=scheduled_time - timedelta(minutes=10))
-
         # Update the DB with post status = scheduled so it won't get processed again
         update_db_post_status(post_id, PostStatus.SCHEDULED)
+        myprint(f"Post ID: {post_id} Scheduled for: {scheduled_time}")
 
         # Schedule the post to be posted
         post_kwargs = {'user_id': user_id, 'post_id': post_id}
@@ -59,6 +50,18 @@ def auto_check_scheduled_posts():
 
                                      }
                                      )
+
+        base_kwargs = {'user_id': user_id}
+
+        # Start the pre-post commenting task 15 minutes before scheduled post (loop for 15 minutes)
+        base_kwargs['loop_for_duration'] = 60 * 15
+        automate_commenting.apply_async(kwargs=base_kwargs, eta=scheduled_time - timedelta(minutes=15))
+
+        # Schedule the pre-post profile viewer dm task 10 minutes before scheduled post (loop for 10 minutes)
+        base_kwargs['loop_for_duration'] = 60 * 10
+        automate_profile_viewer_engagement.apply_async(kwargs=base_kwargs, eta=scheduled_time - timedelta(minutes=10))
+
+
 
 
 

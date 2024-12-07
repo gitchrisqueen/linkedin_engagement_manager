@@ -1,0 +1,2 @@
+# Exclude everything in the src/cqc_lem/assets folder
+src/cqc_lem/assets/*
