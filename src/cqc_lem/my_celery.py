@@ -25,7 +25,7 @@ app.config_from_object(celeryconfig)
 app.autodiscover_tasks(['cqc_lem'])
 
 # Gets the max between all the parameters of timeout in the tasks
-max_timeout = 60*5  # This value must be bigger than the maximum soft timeout set for a task to prevent an infinity loop
+max_timeout = 60*30  # This value must be bigger than the maximum soft timeout set for a task to prevent an infinity loop
 app.conf.broker_transport_options = {'visibility_timeout': max_timeout + 60}  # 60 seconds of margin
 
 # Setup Celery Once for task that should only be queued once per parameters sent

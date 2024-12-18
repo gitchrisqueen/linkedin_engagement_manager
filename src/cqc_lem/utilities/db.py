@@ -61,6 +61,8 @@ class LogResultType(StrEnum):
     FAILURE = 'failure'
 
 
+#TODO: Make sure there are try/final blocks on all DB query calls
+
 def store_cookies(user_email: str, cookies: list[dict]):
     connection = get_db_connection()
     cursor = connection.cursor()
@@ -220,15 +222,21 @@ def insert_post(email: str, content: str, scheduled_time, post_type: PostType) -
     connection = get_db_connection()
     cursor = connection.cursor()
 
-    cursor.execute("""
-        INSERT INTO posts (content, scheduled_time, post_type, user_id)
-        VALUES (%s, %s, %s, %s)
-    """, (content, scheduled_time, post_type.value, user_id))
+    try:
+        cursor.execute("""
+            INSERT INTO posts (content, scheduled_time, post_type, user_id)
+            VALUES (%s, %s, %s, %s)
+        """, (content, scheduled_time, post_type.value, user_id))
 
-    connection.commit()
-    success = cursor.rowcount == 1
-    cursor.close()
-    connection.close()
+        connection.commit()
+        success = cursor.rowcount == 1
+    except Exception as e:
+        success = False
+        print(f"Count not insert post. An error occurred: {e}")
+    finally:
+        cursor.close()
+        connection.close()
+
     return success
 
 
@@ -236,31 +244,42 @@ def insert_planned_post(user_id: int, scheduled_time, post_type: PostType, buyer
     connection = get_db_connection()
     cursor = connection.cursor()
 
-    cursor.execute("""
-        INSERT INTO posts (scheduled_time, post_type, user_id, buyer_stage, status, content)
-        VALUES (%s, %s, %s, %s, %s, %s)
-    """, (scheduled_time, post_type.value, user_id, buyer_stage, PostStatus.PLANNING.value, 'TBD'))
+    try:
+        cursor.execute("""
+            INSERT INTO posts (scheduled_time, post_type, user_id, buyer_stage, status, content)
+            VALUES (%s, %s, %s, %s, %s, %s)
+        """, (scheduled_time, post_type.value, user_id, buyer_stage, PostStatus.PLANNING.value, 'TBD'))
 
-    connection.commit()
-    success = cursor.rowcount == 1
-    cursor.close()
-    connection.close()
+        connection.commit()
+        success = cursor.rowcount == 1
+    except Exception as e:
+        success = False
+        print(f"Count not insert planned post. An error occurred: {e}")
+    finally:
+        cursor.close()
+        connection.close()
     return success
 
 
-def update_db_post(content: str, video_url: str, scheduled_time: str, post_type: PostType, post_id: int, post_status: PostStatus) -> bool:
+def update_db_post(content: str, video_url: str, scheduled_time: str, post_type: PostType, post_id: int,
+                   post_status: PostStatus) -> bool:
     connection = get_db_connection()
     cursor = connection.cursor()
 
-    cursor.execute(
-        "UPDATE posts SET content = %s, video_url = %s, scheduled_time =%s, post_type = %s, status = %s WHERE id = %s",
-        (content, video_url, scheduled_time, post_type.value, post_status.value, post_id)
-    )
+    try:
+        cursor.execute(
+            "UPDATE posts SET content = %s, video_url = %s, scheduled_time =%s, post_type = %s, status = %s WHERE id = %s",
+            (content, video_url, scheduled_time, post_type.value, post_status.value, post_id)
+        )
 
-    connection.commit()
-    success = cursor.rowcount == 1
-    cursor.close()
-    connection.close()
+        connection.commit()
+        success = cursor.rowcount == 1
+    except Exception as e:
+        success = False
+        print(f"Count not update post. An error occurred: {e}")
+    finally:
+        cursor.close()
+        connection.close()
 
     return success
 
@@ -269,15 +288,20 @@ def update_db_post_content(post_id: int, content: str) -> bool:
     connection = get_db_connection()
     cursor = connection.cursor()
 
-    cursor.execute(
-        "UPDATE posts SET content = %s WHERE id = %s",
-        (content, post_id)
-    )
+    try:
+        cursor.execute(
+            "UPDATE posts SET content = %s WHERE id = %s",
+            (content, post_id)
+        )
 
-    connection.commit()
-    success = cursor.rowcount == 1
-    cursor.close()
-    connection.close()
+        connection.commit()
+        success = cursor.rowcount == 1
+    except Exception as e:
+        success = False
+        print(f"Count not update post content. An error occurred: {e}")
+    finally:
+        cursor.close()
+        connection.close()
 
     return success
 
@@ -286,15 +310,20 @@ def update_db_post_video_url(post_id: int, video_url: str) -> bool:
     connection = get_db_connection()
     cursor = connection.cursor()
 
-    cursor.execute(
-        "UPDATE posts SET video_url = %s WHERE id = %s",
-        (video_url, post_id)
-    )
+    try:
+        cursor.execute(
+            "UPDATE posts SET video_url = %s WHERE id = %s",
+            (video_url, post_id)
+        )
 
-    connection.commit()
-    success = cursor.rowcount == 1
-    cursor.close()
-    connection.close()
+        connection.commit()
+        success = cursor.rowcount == 1
+    except Exception as e:
+        success = False
+        print(f"Count not update post video url. An error occurred: {e}")
+    finally:
+        cursor.close()
+        connection.close()
 
     return success
 
@@ -310,15 +339,20 @@ def update_db_post_status(post_id: int, post_status: PostStatus) -> bool:
     except Exception:
         myprint(f"Error converting post_status to string: {post_status}")
 
-    cursor.execute(
-        """UPDATE posts SET status = %s WHERE id = %s""",
-        (status_str, post_id)
-    )
+    try:
+        cursor.execute(
+            """UPDATE posts SET status = %s WHERE id = %s""",
+            (status_str, post_id)
+        )
 
-    connection.commit()
-    success = cursor.rowcount == 1
-    cursor.close()
-    connection.close()
+        connection.commit()
+        success = cursor.rowcount == 1
+    except Exception as e:
+        success = False
+        print(f"Count not update post status. An error occurred: {e}")
+    finally:
+        cursor.close()
+        connection.close()
 
     return success
 
@@ -412,6 +446,8 @@ def get_ready_to_post_posts(pre_post_time: datetime = None) -> list:
             """,
         (yesterday, pre_post_time,))
     posts = cursor.fetchall()
+    cursor.close()
+    conn.close()
 
     # Print the id's ready to post
     myprint(f"Posts ready to post: {[post[0] for post in posts]}")
@@ -450,21 +486,21 @@ def get_user_password_pairs():
 def add_linkedin_profile(profile: LinkedInProfile):
     connection = get_db_connection()
     cursor = connection.cursor()
-    cursor.execute("""
-        INSERT INTO profiles (profile_url, email, data) 
-        VALUES (%s, %s, %s)
-        ON DUPLICATE KEY UPDATE
-                profile_url = VALUES(profile_url),
-                email = VALUES(email),
-                data = VALUES(data)
-        """,
-                   (str(profile.profile_url), profile.email, profile.model_dump_json()))
-
     try:
+        cursor.execute("""
+            INSERT INTO profiles (profile_url, email, data) 
+            VALUES (%s, %s, %s)
+            ON DUPLICATE KEY UPDATE
+                    profile_url = VALUES(profile_url),
+                    email = VALUES(email),
+                    data = VALUES(data)
+            """,
+                       (str(profile.profile_url), profile.email, profile.model_dump_json()))
+
         connection.commit()
         success = True
     except mysql.connector.Error as err:
-        myprint(f"DB Error: {err}")
+        myprint(f"Could not add linkedin profile | Error: {err}")
         success = False
     finally:
         cursor.close()
@@ -479,13 +515,17 @@ def get_linked_in_profile_by_url(profile_url: str, updated_less_than_days_ago: i
     profile_url_without_end_slash = profile_url.rstrip('/')
     profile_url_with_end_slash = profile_url_without_end_slash + '/'
 
-
-    cursor.execute("SELECT data FROM profiles WHERE (profile_url = %s or profile_url = %s) AND updated_at > NOW() - INTERVAL %s DAY",
-                   (profile_url_with_end_slash, profile_url_without_end_slash , updated_less_than_days_ago))
-    profile_data = cursor.fetchone()
-
-    cursor.close()
-    connection.close()
+    try:
+        cursor.execute(
+            "SELECT data FROM profiles WHERE (profile_url = %s or profile_url = %s) AND updated_at > NOW() - INTERVAL %s DAY",
+            (profile_url_with_end_slash, profile_url_without_end_slash, updated_less_than_days_ago))
+        profile_data = cursor.fetchone()
+    except mysql.connector.Error as err:
+        profile_data = None
+        myprint(f"Could not get linkedin profile by url | Error: {err}")
+    finally:
+        cursor.close()
+        connection.close()
 
     return profile_data
 
@@ -494,12 +534,16 @@ def get_linked_in_profile_by_email(profile_email: str, updated_less_than_days_ag
     connection = get_db_connection()
     cursor = connection.cursor()
 
-    cursor.execute("SELECT data FROM profiles WHERE email = %s AND updated_at > NOW() - INTERVAL %s DAY",
-                   (profile_email, updated_less_than_days_ago))
-    profile_data = cursor.fetchone()
-
-    cursor.close()
-    connection.close()
+    try:
+        cursor.execute("SELECT data FROM profiles WHERE email = %s AND updated_at > NOW() - INTERVAL %s DAY",
+                       (profile_email, updated_less_than_days_ago))
+        profile_data = cursor.fetchone()
+    except mysql.connector.Error as err:
+        myprint(f"Could not get linkedin profile data by email | Error: {err}")
+        profile_data = None
+    finally:
+        cursor.close()
+        connection.close()
 
     return profile_data
 
@@ -508,22 +552,34 @@ def remove_linked_in_profile_by_url(profile_url: str):
     connection = get_db_connection()
     cursor = connection.cursor()
 
-    cursor.execute("DELETE FROM profiles WHERE profile_url = %s", (profile_url,))
-    connection.commit()
-
-    cursor.close()
-    connection.close()
+    try:
+        cursor.execute("DELETE FROM profiles WHERE profile_url = %s", (profile_url,))
+        connection.commit()
+        success = True
+    except mysql.connector.Error as err:
+        myprint(f"Could not remove linkedin profile by url | Error: {err}")
+        success = False
+    finally:
+        cursor.close()
+        connection.close()
+    return success
 
 
 def remove_linked_in_profile_by_email(profile_email: str):
     connection = get_db_connection()
     cursor = connection.cursor()
 
-    cursor.execute("DELETE FROM profiles WHERE email = %s", (profile_email,))
-    connection.commit()
-
-    cursor.close()
-    connection.close()
+    try:
+        cursor.execute("DELETE FROM profiles WHERE email = %s", (profile_email,))
+        connection.commit()
+        success = True
+    except mysql.connector.Error as err:
+        myprint(f"Could not remove linkedin profile by url | Error: {err}")
+        success = False
+    finally:
+        cursor.close()
+        connection.close()
+    return success
 
 
 def get_post_type_counts(user_id: int):
@@ -531,11 +587,15 @@ def get_post_type_counts(user_id: int):
     connection = get_db_connection()
     cursor = connection.cursor(dictionary=True)
 
-    cursor.execute("SELECT post_type, COUNT(*) AS count FROM posts WHERE user_id = %s GROUP BY post_type", (user_id,))
-    post_counts = {row['post_type']: row['count'] for row in cursor.fetchall()}
-
-    cursor.close()
-    connection.close()
+    try:
+        cursor.execute("SELECT post_type, COUNT(*) AS count FROM posts WHERE user_id = %s GROUP BY post_type", (user_id,))
+        post_counts = {row['post_type']: row['count'] for row in cursor.fetchall()}
+    except mysql.connector.Error as err:
+        myprint(f"Could not get post type counts | Error: {err}")
+        post_counts = 0
+    finally:
+        cursor.close()
+        connection.close()
 
     return post_counts
 
@@ -549,12 +609,16 @@ def get_planned_posts_for_current_week(user_id: int = None):
     if user_id:
         where_clause = f"AND user_id = {user_id}"
 
-    cursor.execute(
-        f"SELECT user_id, id, post_type, buyer_stage FROM posts WHERE status = 'planning' {where_clause} AND WEEK(scheduled_time) = WEEK(NOW())")
-    planned_content = cursor.fetchall()
-
-    cursor.close()
-    connection.close()
+    try:
+        cursor.execute(
+            f"SELECT user_id, id, post_type, buyer_stage FROM posts WHERE status = 'planning' {where_clause} AND WEEK(scheduled_time) = WEEK(NOW())")
+        planned_content = cursor.fetchall()
+    except mysql.connector.Error as err:
+        myprint(f"Could not get planned post for current week | Error: {err}")
+        planned_content = None
+    finally:
+        cursor.close()
+        connection.close()
 
     return planned_content
 
@@ -568,12 +632,17 @@ def get_planned_posts_for_next_week(user_id: int = None):
     if user_id:
         where_clause = f"AND user_id = {user_id}"
 
-    cursor.execute(
-        f"SELECT user_id, id, post_type, buyer_stage FROM posts WHERE status = 'planning' {where_clause} AND WEEK(scheduled_time) = WEEK(NOW()) +1")
-    planned_content = cursor.fetchall()
+    try:
+        cursor.execute(
+            f"SELECT user_id, id, post_type, buyer_stage FROM posts WHERE status = 'planning' {where_clause} AND WEEK(scheduled_time) = WEEK(NOW()) +1")
+        planned_content = cursor.fetchall()
+    except mysql.connector.Error as err:
+        myprint(f"Could not get planned post for next week | Error: {err}")
+        planned_content = None
+    finally:
+        cursor.close()
+        connection.close()
 
-    cursor.close()
-    connection.close()
 
     return planned_content
 
@@ -583,13 +652,17 @@ def get_last_planned_post_date_for_user(user_id: int):
     connection = get_db_connection()
     cursor = connection.cursor()
 
-    cursor.execute(
-        "SELECT MAX(scheduled_time) AS last_planned_date FROM posts WHERE user_id = %s AND status != 'rejected'",
-        (user_id,))
-    last_planned_date = cursor.fetchone()
-
-    cursor.close()
-    connection.close()
+    try:
+        cursor.execute(
+            "SELECT MAX(scheduled_time) AS last_planned_date FROM posts WHERE user_id = %s AND status != 'rejected'",
+            (user_id,))
+        last_planned_date = cursor.fetchone()
+    except mysql.connector.Error as err:
+        myprint(f"Could not get last planned post date for user | Error: {err}")
+        last_planned_date = None
+    finally:
+        cursor.close()
+        connection.close()
 
     return last_planned_date[0] if last_planned_date else None
 
@@ -599,11 +672,15 @@ def get_user_blog_url(user_id: int):
     connection = get_db_connection()
     cursor = connection.cursor()
 
-    cursor.execute("SELECT blog_url FROM users WHERE id = %s", (user_id,))
-    blog_url = cursor.fetchone()
-
-    cursor.close()
-    connection.close()
+    try:
+        cursor.execute("SELECT blog_url FROM users WHERE id = %s", (user_id,))
+        blog_url = cursor.fetchone()
+    except mysql.connector.Error as err:
+        myprint(f"Could not get user blog url | Error: {err}")
+        blog_url = None
+    finally:
+        cursor.close()
+        connection.close()
 
     return blog_url[0] if blog_url else None
 
@@ -613,11 +690,15 @@ def get_user_sitemap_url(user_id: int):
     connection = get_db_connection()
     cursor = connection.cursor()
 
-    cursor.execute("SELECT sitemap_url FROM users WHERE id = %s", (user_id,))
-    sitemap_url = cursor.fetchone()
-
-    cursor.close()
-    connection.close()
+    try:
+        cursor.execute("SELECT sitemap_url FROM users WHERE id = %s", (user_id,))
+        sitemap_url = cursor.fetchone()
+    except mysql.connector.Error as err:
+        myprint(f"Could not get user sitemap url | Error: {err}")
+        sitemap_url = None
+    finally:
+        cursor.close()
+        connection.close()
 
     return sitemap_url[0] if sitemap_url else None
 
@@ -627,12 +708,16 @@ def get_active_user_ids():
     connection = get_db_connection()
     cursor = connection.cursor()
 
-    # cursor.execute("SELECT id FROM users WHERE active = 1") # TODO:  Update this when you have a way to see who is active (timestamp of login or paid ???)
-    cursor.execute("SELECT id FROM users ")
-    active_user_ids = [row[0] for row in cursor.fetchall()]
-
-    cursor.close()
-    connection.close()
+    try:
+        # cursor.execute("SELECT id FROM users WHERE active = 1") # TODO:  Update this when you have a way to see who is active (timestamp of login or paid ???)
+        cursor.execute("SELECT id FROM users ")
+        active_user_ids = [row[0] for row in cursor.fetchall()]
+    except mysql.connector.Error as err:
+        myprint(f"Could not get active user ids | Error: {err}")
+        active_user_ids = None
+    finally:
+        cursor.close()
+        connection.close()
 
     return active_user_ids
 
@@ -642,15 +727,21 @@ def insert_new_log(user_id: int, action_type: LogActionType, result: LogResultTy
     connection = get_db_connection()
     cursor = connection.cursor()
 
-    cursor.execute("""
-        INSERT INTO logs (user_id, action_type, post_id, post_url, message, result)
-        VALUES (%s, %s, %s, %s, %s, %s)
-    """, (user_id, action_type.value, post_id, post_url, message, result.value))
+    try:
+        cursor.execute("""
+            INSERT INTO logs (user_id, action_type, post_id, post_url, message, result)
+            VALUES (%s, %s, %s, %s, %s, %s)
+        """, (user_id, action_type.value, post_id, post_url, message, result.value))
 
-    connection.commit()
-    success = cursor.rowcount == 1
-    cursor.close()
-    connection.close()
+        connection.commit()
+        success = cursor.rowcount == 1
+    except mysql.connector.Error as err:
+        myprint(f"Could not insert new log | Error: {err}")
+        success = False
+    finally:
+        cursor.close()
+        connection.close()
+
     return success
 
 
@@ -658,13 +749,17 @@ def has_user_commented_on_post_url(user_id: int, post_url: str):
     connection = get_db_connection()
     cursor = connection.cursor()
 
-    cursor.execute(
-        "SELECT COUNT(*) FROM logs WHERE user_id = %s AND post_url = %s AND action_type = %s AND result = %s",
-        (user_id, post_url, LogActionType.COMMENT.value, LogResultType.SUCCESS.value))
-    count = cursor.fetchone()[0]
-
-    cursor.close()
-    connection.close()
+    try:
+        cursor.execute(
+            "SELECT COUNT(*) FROM logs WHERE user_id = %s AND post_url = %s AND action_type = %s AND result = %s",
+            (user_id, post_url, LogActionType.COMMENT.value, LogResultType.SUCCESS.value))
+        count = cursor.fetchone()[0]
+    except mysql.connector.Error as err:
+        myprint(f"Could not determine if user commented on post url | Error: {err}")
+        count = 0
+    finally:
+        cursor.close()
+        connection.close()
 
     return count > 0
 
@@ -673,15 +768,19 @@ def get_post_url_from_log_for_user(user_id: int, post_id: int):
     connection = get_db_connection()
     cursor = connection.cursor()
 
-    cursor.execute("""SELECT post_url FROM logs 
-        WHERE user_id = %s AND post_id = %s AND action_type = %s AND result = %s  
-        ORDER BY created_at DESC 
-        LIMIT 1""",
-                   (user_id, post_id, LogActionType.POST.value, LogResultType.SUCCESS.value))
-    post_url = cursor.fetchone()[0]
-
-    cursor.close()
-    connection.close()
+    try:
+        cursor.execute("""SELECT post_url FROM logs 
+            WHERE user_id = %s AND post_id = %s AND action_type = %s AND result = %s  
+            ORDER BY created_at DESC 
+            LIMIT 1""",
+                       (user_id, post_id, LogActionType.POST.value, LogResultType.SUCCESS.value))
+        post_url = cursor.fetchone()[0]
+    except mysql.connector.Error as err:
+        myprint(f"Could not get post url from log for user | Error: {err}")
+        post_url = None
+    finally:
+        cursor.close()
+        connection.close()
 
     return post_url
 
@@ -690,28 +789,37 @@ def get_post_message_from_log_for_user(user_id: int, post_id: int):
     connection = get_db_connection()
     cursor = connection.cursor()
 
-    cursor.execute("""SELECT message FROM logs 
-        WHERE user_id = %s AND post_id = %s AND action_type = %s AND result = %s
-        ORDER BY created_at DESC 
-        LIMIT 1""",
-                   (user_id, post_id, LogActionType.POST.value, LogResultType.SUCCESS.value))
-    message = cursor.fetchone()[0]
-
-    cursor.close()
-    connection.close()
+    try:
+        cursor.execute("""SELECT message FROM logs 
+            WHERE user_id = %s AND post_id = %s AND action_type = %s AND result = %s
+            ORDER BY created_at DESC 
+            LIMIT 1""",
+                       (user_id, post_id, LogActionType.POST.value, LogResultType.SUCCESS.value))
+        message = cursor.fetchone()[0]
+    except mysql.connector.Error as err:
+        myprint(f"Could not get post message from log for user | Error: {err}")
+        message = None
+    finally:
+        cursor.close()
+        connection.close()
 
     return message
+
 
 def has_engaged_url_with_x_days(user_id: int, post_url: str, days: int):
     connection = get_db_connection()
     cursor = connection.cursor()
 
-    cursor.execute(
-        "SELECT COUNT(*) FROM logs WHERE user_id = %s AND post_url = %s AND action_type = %s AND result = %s AND created_at > NOW() - INTERVAL %s DAY",
-        (user_id, post_url, LogActionType.ENGAGED.value, LogResultType.SUCCESS.value, days))
-    count = cursor.fetchone()[0]
-
-    cursor.close()
-    connection.close()
+    try:
+        cursor.execute(
+            "SELECT COUNT(*) FROM logs WHERE user_id = %s AND post_url = %s AND action_type = %s AND result = %s AND created_at > NOW() - INTERVAL %s DAY",
+            (user_id, post_url, LogActionType.ENGAGED.value, LogResultType.SUCCESS.value, days))
+        count = cursor.fetchone()[0]
+    except mysql.connector.Error as err:
+        myprint(f"Could not determine if user engaged with url with x days | Error: {err}")
+        count = 0
+    finally:
+        cursor.close()
+        connection.close()
 
     return count > 0

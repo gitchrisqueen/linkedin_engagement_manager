@@ -42,19 +42,11 @@ def auto_check_scheduled_posts():
         post_kwargs = {'user_id': user_id, 'post_id': post_id}
         post_to_linkedin.apply_async(kwargs=post_kwargs,
                                      eta=scheduled_time,
-                                     retry=True,
-                                     retry_policy={
-                                         'max_retries': 3,
-                                         'interval_start': 60,
-                                         'interval_step': 30
-
-                                     }
                                      )
 
-        base_kwargs = {'user_id': user_id}
+        base_kwargs = {'user_id': user_id, 'loop_for_duration': 60 * 15}
 
         # Start the pre-post commenting task 15 minutes before scheduled post (loop for 15 minutes)
-        base_kwargs['loop_for_duration'] = 60 * 15
         automate_commenting.apply_async(kwargs=base_kwargs, eta=scheduled_time - timedelta(minutes=15))
 
         # Schedule the pre-post profile viewer dm task 10 minutes before scheduled post (loop for 10 minutes)

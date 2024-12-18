@@ -32,7 +32,6 @@ from cqc_lem.utilities.logger import myprint
 from cqc_lem.utilities.selenium_util import click_element_wait_retry, \
     get_element_wait_retry, get_elements_as_list_wait_stale, getText, close_tab, get_driver_wait_pair, quit_gracefully, \
     wait_for_ajax
-from cqc_lem.utilities.utils import debug_function
 
 # Load .env file
 load_dotenv()
@@ -234,7 +233,6 @@ def simulate_typing(driver: WebDriver, editable_element: WebElement, text):
 
 @shared_task.task(bind=True, base=QueueOnce, once={'graceful': True, 'keys': ['user_id', 'post_link']}, acks_late=True,
                   reject_on_worker_lost=True, rate_limit='2/m')
-@debug_function
 def comment_on_post(self, user_id: int, post_link: str, comment_text: str):
     """Post a comment to the given post link"""
 
@@ -383,8 +381,7 @@ def check_commented(driver, wait, user_id: int = None, post_url: str = None):
     return already_commented
 
 
-@shared_task.task(bint=True, base=QueueOnce, once={'graceful': True})
-@debug_function
+@shared_task.task(bind=True, base=QueueOnce, once={'graceful': True})
 def automate_commenting(self, user_id: int, loop_for_duration: int = None, future_forward: int = 60):
     global stop_all_thread
 
@@ -446,6 +443,9 @@ def automate_commenting(self, user_id: int, loop_for_duration: int = None, futur
             kwargs['loop_for_duration'] = new_loop_for_duration
             # Add our function call back to the task queue
             myprint(f"Adding {current_function_name} back to queue for {future_forward} seconds in the future...")
+            # Remove 'self' from kwargs if it exists
+            if 'self' in kwargs:
+                del kwargs['self']
             # Call self again in the future
             globals()[current_function_name].apply_async(kwargs=kwargs, countdown=future_forward)
 
@@ -453,7 +453,6 @@ def automate_commenting(self, user_id: int, loop_for_duration: int = None, futur
 
 
 @shared_task.task(bind=True, base=QueueOnce, once={'graceful': True})
-@debug_function
 def automate_reply_commenting(self, user_id: int, post_id: int, loop_for_duration: int = None, future_forward=60):
     """Reply to recent comments left on the post recently posted"""
 
@@ -607,6 +606,10 @@ def automate_reply_commenting(self, user_id: int, post_id: int, loop_for_duratio
             kwargs['loop_for_duration'] = new_loop_for_duration
             # Add our function call back to the task queue
             myprint(f"Adding {current_function_name} back to queue for {future_forward} seconds in the future...")
+            # Remove 'self' from kwargs if it exists
+            if 'self' in kwargs:
+                del kwargs['self']
+
             # Call self again in the future
             globals()[current_function_name].apply_async(kwargs=kwargs, countdown=future_forward)
 
@@ -653,7 +656,6 @@ def accept_connection_request(user_id: int):
 
 @shared_task.task(bind=True, base=QueueOnce, once={'graceful': True}, acks_late=True, reject_on_worker_lost=True,
                   rate_limit='2/m')
-@debug_function
 def send_appreciation_dms_for_user(self, user_id: int, loop_for_duration: int = None, future_forward: int = 60):
     user_email, user_password = get_user_password_pair_by_id(user_id)
 
@@ -704,6 +706,9 @@ def send_appreciation_dms_for_user(self, user_id: int, loop_for_duration: int = 
             kwargs['loop_for_duration'] = new_loop_for_duration
             # Add our function call back to the task queue
             myprint(f"Adding {current_function_name} back to queue for {future_forward} seconds in the future...")
+            # Remove 'self' from kwargs if it exists
+            if 'self' in kwargs:
+                del kwargs['self']
             # Call self again in the future
             globals()[current_function_name].apply_async(kwargs=kwargs, countdown=future_forward)
 
@@ -777,11 +782,7 @@ def generate_and_post_comment(driver, wait, post_link, my_profile: LinkedInProfi
     kwargs = {'user_id': get_user_id(my_profile.email),
               'post_link': post_link,
               'comment_text': comment_text}
-    comment_on_post.apply_async(kwargs=kwargs, retry=True, retry_policy={
-        'max_retries': 3,
-        'interval_start': 60,
-        'interval_step': 30
-    })
+    comment_on_post.apply_async(kwargs=kwargs)
 
     myprint("Comment Posted")
 
@@ -789,7 +790,6 @@ def generate_and_post_comment(driver, wait, post_link, my_profile: LinkedInProfi
 
 
 @shared_task.task(bind=True, base=QueueOnce, once={'graceful': True})
-@debug_function
 def automate_profile_viewer_engagement(self, user_id: int, loop_for_duration: int = None, future_forward: int = 60):
     global stop_all_thread
 
@@ -893,13 +893,7 @@ def automate_profile_viewer_engagement(self, user_id: int, loop_for_duration: in
         kwargs = {'user_id': get_user_id(my_profile.email),
                   'viewer_url': viewer_url,
                   'viewer_name': viewer_name}
-        engage_with_profile_viewer.apply_async(kwargs=kwargs, retry=True,
-                                               retry_policy={
-                                                   'max_retries': 3,
-                                                   'interval_start': 60,
-                                                   'interval_step': 30
-
-                                               })
+        engage_with_profile_viewer.apply_async(kwargs=kwargs)
 
         # Close tab when done
         close_tab(driver)
@@ -921,6 +915,10 @@ def automate_profile_viewer_engagement(self, user_id: int, loop_for_duration: in
             kwargs['loop_for_duration'] = new_loop_for_duration
             # Add our function call back to the task queue
             myprint(f"Adding {current_function_name} back to queue for {future_forward} seconds in the future...")
+            # Remove 'self' from kwargs if it exists
+            if 'self' in kwargs:
+                del kwargs['self']
+
             # Call self again in the future
             globals()[current_function_name].apply_async(kwargs=kwargs, countdown=future_forward)
 
@@ -929,7 +927,6 @@ def automate_profile_viewer_engagement(self, user_id: int, loop_for_duration: in
 
 @shared_task.task(bind=True, base=QueueOnce, once={'graceful': True, 'keys': ['user_id', 'viewer_url']}, acks_late=True,
                   reject_on_worker_lost=True, rate_limit='2/m')
-@debug_function
 def engage_with_profile_viewer(self, user_id: int, viewer_url, viewer_name):
     myprint(f"Starting Profile Viewer Engagement")
 
@@ -978,13 +975,15 @@ def engage_with_profile_viewer(self, user_id: int, viewer_url, viewer_name):
 
                 # Filter list to activities I haven't commented on
                 for activity in recent_activities:
+                    link = str(activity.link)
+
                     # Navigate to Link
-                    myprint(f"Navigating To: {activity.link}")
-                    driver.get(str(activity.link))
-                    commented = check_commented(driver, wait)
+                    myprint(f"Navigating To: {link}")
+                    driver.get(link)
+                    commented = check_commented(driver, link)
                     if not commented:
                         # Leave comment on that activity
-                        able_to_comment = generate_and_post_comment(driver, wait, str(activity.link), my_profile)
+                        able_to_comment = generate_and_post_comment(driver, wait, link, my_profile)
                         if able_to_comment:
                             break  # Only comment/interact with one
 
@@ -1002,13 +1001,7 @@ def engage_with_profile_viewer(self, user_id: int, viewer_url, viewer_name):
                     kwargs = {'user_id': get_user_id(my_profile.email),
                               'profile_url': str(profile.profile_url),
                               'message': message}
-                    send_private_dm.apply_async(kwargs=kwargs, retry=True,
-                                                retry_policy={
-                                                    'max_retries': 3,
-                                                    'interval_start': 60,
-                                                    'interval_step': 30
-
-                                                })
+                    send_private_dm.apply_async(kwargs=kwargs)
             else:
                 # myprint(f"We Are {profile.connection} Connections")
                 # If not 1st connections, send them a connection request
@@ -1024,13 +1017,7 @@ def engage_with_profile_viewer(self, user_id: int, viewer_url, viewer_name):
                 kwargs = {'user_id': get_user_id(my_profile.email),
                           'profile_url': str(profile.profile_url),
                           'message': refined_response}
-                invite_to_connect.apply_async(kwargs=kwargs, retry=True,
-                                              retry_policy={
-                                                  'max_retries': 3,
-                                                  'interval_start': 60,
-                                                  'interval_step': 30
-
-                                              })
+                invite_to_connect.apply_async(kwargs=kwargs)
         else:
             myprint(f"Failed to get profile data for {viewer_name}")
 
@@ -1039,7 +1026,6 @@ def engage_with_profile_viewer(self, user_id: int, viewer_url, viewer_name):
 
 @shared_task.task(bind=True, base=QueueOnce, once={'graceful': True}, acks_late=True, reject_on_worker_lost=True,
                   rate_limit='2/m')
-@debug_function
 def clean_stale_invites(self, user_id: int):
     """Cleans up stale invites that the user has sent"""
 
@@ -1055,7 +1041,6 @@ def clean_stale_invites(self, user_id: int):
 
 @shared_task.task(bind=True, base=QueueOnce, once={'graceful': True}, acks_late=True, reject_on_worker_lost=True,
                   rate_limit='2/m')
-@debug_function
 def send_private_dm(self, user_id: int, profile_url: str, message: str):
     """ Send dm message to a profile. Must be a 1st connection"""
 
@@ -1124,7 +1109,6 @@ def send_private_dm(self, user_id: int, profile_url: str, message: str):
 
 @shared_task.task(bind=True, base=QueueOnce, once={'graceful': True, 'keys': ['user_id', 'profile_url']},
                   acks_late=True, reject_on_worker_lost=True, rate_limit='1/m')
-@debug_function
 def invite_to_connect(self, user_id: int, profile_url: str, message: str = None):
     user_email, user_password = get_user_password_pair_by_id(user_id)
 
@@ -1160,7 +1144,7 @@ def invite_to_connect(self, user_id: int, profile_url: str, message: str = None)
 
             # Click the last connect button
             click_element_wait_retry(driver, wait, '//main//div[contains(@aria-label,"connect")]',
-                                     "Finding Connect Button", max_retry=2, use_action_chain=True)
+                                     "Finding Connect Button", max_retry=1, use_action_chain=True)
 
             # driver.find_elements(By.XPATH, '//div[contains(@aria-label,"connect")]')[-1].click()
 
@@ -1233,44 +1217,8 @@ def invite_to_connect(self, user_id: int, profile_url: str, message: str = None)
 
 
 def start_process():
-    global time_remaining_seconds
-
-    # Set Timer for 3 minutes
-    time_remaining_seconds = 60 * 15
-
-    drivers_needed = 3
-
-    # build as many drivers as there are threads, so each thread gets own driver
-    # drivers_with_waits = [get_driver_wait_pair() for _ in range(drivers_needed)]
-    # all_drivers = [driver for driver, _ in drivers_with_waits]
-
-    # def signal_handler(sig, frame):
-
-    # Get list of all drivers from drivers_with_waits
-
-    # final_method(all_drivers)
-
-    # Register the signal handler for SIGINT
-    # signal.signal(signal.SIGINT, signal_handler)
-
-    # Register the final_method to be called on exit
-    # atexit.register(final_method, all_drivers)
-
-    # Create the countdown timer in a separate thread
-    with ThreadPoolExecutor(max_workers=max(4, drivers_needed)) as executor:
-        executor.submit(countdown_timer, time_remaining_seconds)
-        # Get a driver/wait set
-        # driver, wait = drivers_with_waits.pop(0)
-        executor.submit(automate_commenting, kwargs={'user_id': get_user_id(LI_USER)})
-        # Get another driver/wait set
-        # driver2, wait2 = drivers_with_waits.pop(0)
-        executor.submit(automate_profile_viewer_engagement,
-                        kwargs={'user_id': get_user_id(
-                            LI_USER)})
-
-    myprint("Time is up. Closing the browser")
-
-    # final_method(all_drivers)
+    # TOO: Get reid of this method
+    pass
 
 
 def final_method(drivers: List[WebDriver]):
@@ -1330,7 +1278,7 @@ if __name__ == "__main__":
     pass
 
 
-@shared_task.task(bind=True, base=QueueOnce, once={'graceful': True}, acks_late=True, reject_on_worker_lost=True,
+@shared_task.task(bind=True, base=QueueOnce, once={'graceful': True, 'keys': ['user_id', 'post_id']}, acks_late=True, reject_on_worker_lost=True,
                   rate_limit='2/m')
 def post_to_linkedin(self, user_id: int, post_id: int):
     """Posts to LinkedIn using the LinkedIn API - https://learn.microsoft.com/en-us/linkedin/consumer/integrations/self-serve/share-on-linkedin#creating-a-share-on-linkedin"""
