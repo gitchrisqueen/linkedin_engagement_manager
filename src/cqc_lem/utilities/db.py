@@ -4,6 +4,7 @@ from enum import StrEnum
 
 import mysql.connector
 from dotenv import load_dotenv
+from mysql.connector import errorcode
 
 from cqc_lem.utilities.linkedin.profile import LinkedInProfile
 from cqc_lem.utilities.logger import myprint
@@ -23,6 +24,12 @@ MYSQL_DATABASE = os.getenv('MYSQL_DATABASE')
 
 
 def get_db_connection():
+    """Establishes a connection to the MySQL database and returns the connection object.
+
+    Raises:
+        mysql.connector.Error: If there is an error connecting to the database.
+    """
+
     return mysql.connector.connect(
         host=MYSQL_HOST,
         user=MYSQL_USER,
@@ -61,8 +68,6 @@ class LogResultType(StrEnum):
     FAILURE = 'failure'
 
 
-#TODO: Make sure there are try/final blocks on all DB query calls
-
 def store_cookies(user_email: str, cookies: list[dict]):
     connection = get_db_connection()
     cursor = connection.cursor()
@@ -70,27 +75,30 @@ def store_cookies(user_email: str, cookies: list[dict]):
     user_id = get_user_id(user_email)
 
     for cookie in cookies:
-        cursor.execute("""
-            INSERT INTO cookies (name, value, domain, path, expiry, secure, http_only, user_id)
-            VALUES (%s, %s, %s, %s, FROM_UNIXTIME(%s), %s, %s, %s)
-            ON DUPLICATE KEY UPDATE
-                value = VALUES(value),
-                path = VALUES(path),
-                expiry = VALUES(expiry),
-                secure = VALUES(secure),
-                http_only = VALUES(http_only)
-           
-        """, (
+        try:
+            cursor.execute("""
+                INSERT INTO cookies (name, value, domain, path, expiry, secure, http_only, user_id)
+                VALUES (%s, %s, %s, %s, FROM_UNIXTIME(%s), %s, %s, %s)
+                ON DUPLICATE KEY UPDATE
+                    value = VALUES(value),
+                    path = VALUES(path),
+                    expiry = VALUES(expiry),
+                    secure = VALUES(secure),
+                    http_only = VALUES(http_only)
+               
+            """, (
 
-            cookie['name'],
-            cookie['value'],
-            cookie['domain'],
-            cookie['path'],
-            cookie['expiry'] if 'expiry' in cookie else None,
-            cookie['secure'],
-            cookie['httpOnly'],
-            user_id
-        ))
+                cookie['name'],
+                cookie['value'],
+                cookie['domain'],
+                cookie['path'],
+                cookie['expiry'] if 'expiry' in cookie else None,
+                cookie['secure'],
+                cookie['httpOnly'],
+                user_id
+            ))
+        except mysql.connector.Error as err:
+            myprint(f"Could not add cookie to database | Error: {err}")
 
     connection.commit()
     cursor.close()
@@ -104,16 +112,22 @@ def get_cookies(url: str, user_email: str):
     # Extract the top-level domain from the URL
     tld = get_top_level_domain(url)
 
-    cursor.execute("""
-        SELECT c.name, c.value, c.domain, c.path, UNIX_TIMESTAMP(c.expiry) AS expiry, c.secure, c.http_only
-        FROM cookies c
-        JOIN users u ON c.user_id = u.id
-        WHERE c.domain LIKE %s AND u.email = %s
-    """, (f"%{tld}%", user_email))
+    try:
+        cursor.execute("""
+            SELECT c.name, c.value, c.domain, c.path, UNIX_TIMESTAMP(c.expiry) AS expiry, c.secure, c.http_only
+            FROM cookies c
+            JOIN users u ON c.user_id = u.id
+            WHERE c.domain LIKE %s AND u.email = %s
+        """, (f"%{tld}%", user_email))
 
-    cookies = cursor.fetchall()
-    cursor.close()
-    connection.close()
+        cookies = cursor.fetchall()
+    except mysql.connector.Error as err:
+        myprint(f"Could not get cookies from DB | Error: {err}")
+        cookies = None
+    finally:
+        cursor.close()
+        connection.close()
+
     return cookies
 
 
@@ -124,8 +138,8 @@ def add_user(email: str, password: str):
     try:
         cursor.execute("INSERT INTO users (email, password) VALUES (%s, %s)", (email, password))
         connection.commit()
-    except mysql.connector.errors.IntegrityError as e:
-        if e.errno == mysql.connector.errorcode.ER_DUP_ENTRY:
+    except mysql.connector.Error as e:
+        if e.errno == errorcode.ER_DUP_ENTRY:
             print(f"User with email {email} already exists.")
         else:
             print(f"An error occurred: {e}")
@@ -165,8 +179,8 @@ def add_user_with_access_token(email: str, linked_sub_id: str, access_token: str
             access_token, access_token_expires_in, access_token_created_at,
             refresh_token, refresh_token_expires_in, refresh_token_created_at))
         connection.commit()
-    except mysql.connector.errors.IntegrityError as e:
-        if e.errno == mysql.connector.errorcode.ER_DUP_ENTRY:
+    except mysql.connector.Error as e:
+        if e.errno == errorcode.ER_DUP_ENTRY:
             print(f"User with email {email} already exists.")
         else:
             print(f"An error occurred: {e}")
@@ -179,11 +193,17 @@ def get_user_linked_sub_id(user_id: int):
     connection = get_db_connection()
     cursor = connection.cursor(dictionary=True)
 
-    cursor.execute("SELECT linked_sub_id FROM users WHERE id = %s", (user_id,))
+    try:
+        cursor.execute("SELECT linked_sub_id FROM users WHERE id = %s", (user_id,))
 
-    linked_sub_id = cursor.fetchone()
-    cursor.close()
-    connection.close()
+        linked_sub_id = cursor.fetchone()
+    except mysql.connector.Error as err:
+        myprint(f"Could not get user linked sub id | Error: {err}")
+        linked_sub_id = None
+    finally:
+        cursor.close()
+        connection.close()
+
     return linked_sub_id['linked_sub_id'] if linked_sub_id else None
 
 
@@ -191,12 +211,18 @@ def get_user_access_token(user_id: int):
     connection = get_db_connection()
     cursor = connection.cursor(dictionary=True)
 
-    cursor.execute("SELECT access_token FROM users WHERE id = %s", (user_id,))
-    # TODO: Add where clause to only return non-expired tokens ????
+    try:
+        cursor.execute("SELECT access_token FROM users WHERE id = %s", (user_id,))
+        # TODO: Add where clause to only return non-expired tokens ????
 
-    access_token = cursor.fetchone()
-    cursor.close()
-    connection.close()
+        access_token = cursor.fetchone()
+    except mysql.connector.Error as err:
+        myprint(f"Could not get user access token | Error: {err}")
+        access_token = None
+    finally:
+        cursor.close()
+        connection.close()
+
     return access_token['access_token'] if access_token else None
 
 
@@ -204,11 +230,17 @@ def get_user_id(email: str):
     connection = get_db_connection()
     cursor = connection.cursor(dictionary=True)
 
-    cursor.execute("SELECT id FROM users WHERE email = %s", (email,))
+    try:
+        cursor.execute("SELECT id FROM users WHERE email = %s", (email,))
 
-    user_id = cursor.fetchone()
-    cursor.close()
-    connection.close()
+        user_id = cursor.fetchone()
+    except mysql.connector.Error as err:
+        myprint(f"Could not get user id | Error: {err}")
+        user_id = None
+    finally:
+        cursor.close()
+        connection.close()
+
     return user_id['id'] if user_id else None
 
 
@@ -230,7 +262,7 @@ def insert_post(email: str, content: str, scheduled_time, post_type: PostType) -
 
         connection.commit()
         success = cursor.rowcount == 1
-    except Exception as e:
+    except mysql.connector.Error as e:
         success = False
         print(f"Count not insert post. An error occurred: {e}")
     finally:
@@ -252,7 +284,7 @@ def insert_planned_post(user_id: int, scheduled_time, post_type: PostType, buyer
 
         connection.commit()
         success = cursor.rowcount == 1
-    except Exception as e:
+    except mysql.connector.Error as e:
         success = False
         print(f"Count not insert planned post. An error occurred: {e}")
     finally:
@@ -274,7 +306,7 @@ def update_db_post(content: str, video_url: str, scheduled_time: str, post_type:
 
         connection.commit()
         success = cursor.rowcount == 1
-    except Exception as e:
+    except mysql.connector.Error as e:
         success = False
         print(f"Count not update post. An error occurred: {e}")
     finally:
@@ -296,7 +328,7 @@ def update_db_post_content(post_id: int, content: str) -> bool:
 
         connection.commit()
         success = cursor.rowcount == 1
-    except Exception as e:
+    except mysql.connector.Error as e:
         success = False
         print(f"Count not update post content. An error occurred: {e}")
     finally:
@@ -318,7 +350,7 @@ def update_db_post_video_url(post_id: int, video_url: str) -> bool:
 
         connection.commit()
         success = cursor.rowcount == 1
-    except Exception as e:
+    except mysql.connector.Error as e:
         success = False
         print(f"Count not update post video url. An error occurred: {e}")
     finally:
@@ -347,7 +379,7 @@ def update_db_post_status(post_id: int, post_status: PostStatus) -> bool:
 
         connection.commit()
         success = cursor.rowcount == 1
-    except Exception as e:
+    except mysql.connector.Error as e:
         success = False
         print(f"Count not update post status. An error occurred: {e}")
     finally:
@@ -361,13 +393,18 @@ def get_posts(user_id: int):
     connection = get_db_connection()
     cursor = connection.cursor(dictionary=True)
 
-    cursor.execute(
+
+    try:
+        cursor.execute(
         "SELECT id, content, video_url, scheduled_time, post_type, status FROM posts WHERE user_id = %s ORDER BY scheduled_time asc",
         (user_id,))
-
-    posts = cursor.fetchall()
-    cursor.close()
-    connection.close()
+        posts = cursor.fetchall()
+    except mysql.connector.Error as err:
+        myprint(f"Could not get posts for user id: {user_id} | Error: {err}")
+        posts = None
+    finally:
+        cursor.close()
+        connection.close()
 
     return posts
 
@@ -376,13 +413,18 @@ def get_posted_posts(user_id: int):
     connection = get_db_connection()
     cursor = connection.cursor(dictionary=True)
 
-    cursor.execute(
-        "SELECT id, content, scheduled_time, post_type, status FROM posts WHERE user_id = %s AND status = 'posted' ORDER BY scheduled_time asc",
-        (user_id,))
+    try:
+        cursor.execute(
+            "SELECT id, content, scheduled_time, post_type, status FROM posts WHERE user_id = %s AND status = 'posted' ORDER BY scheduled_time asc",
+            (user_id,))
 
-    posts = cursor.fetchall()
-    cursor.close()
-    connection.close()
+        posts = cursor.fetchall()
+    except mysql.connector.Error as err:
+        myprint(f"Could not get posted posts for user id: {user_id} | Error: {err}")
+        posts = None
+    finally:
+        cursor.close()
+        connection.close()
 
     return posts
 
@@ -401,11 +443,16 @@ def get_post_content(post_id: int):
     connection = get_db_connection()
     cursor = connection.cursor(dictionary=True)
 
-    cursor.execute("SELECT content FROM posts WHERE id = %s", (post_id,))
+    try:
+        cursor.execute("SELECT content FROM posts WHERE id = %s", (post_id,))
 
-    post = cursor.fetchone()
-    cursor.close()
-    connection.close()
+        post = cursor.fetchone()
+    except mysql.connector.Error as err:
+        myprint(f"Could not get post content for post id: {post_id} | Error: {err}")
+        post = False
+    finally:
+        cursor.close()
+        connection.close()
 
     return post['content'] if post else None
 
@@ -414,11 +461,16 @@ def get_post_video_url(post_id: int):
     connection = get_db_connection()
     cursor = connection.cursor(dictionary=True)
 
-    cursor.execute("SELECT video_url FROM posts WHERE id = %s", (post_id,))
+    try:
+        cursor.execute("SELECT video_url FROM posts WHERE id = %s", (post_id,))
 
-    post = cursor.fetchone()
-    cursor.close()
-    connection.close()
+        post = cursor.fetchone()
+    except mysql.connector.Error as err:
+        myprint(f"Could not get post video url for post id: {post_id} | Error: {err}")
+        post = False
+    finally:
+        cursor.close()
+        connection.close()
 
     return post['video_url'] if post else None
 
@@ -435,22 +487,27 @@ def get_ready_to_post_posts(pre_post_time: datetime = None) -> list:
 
     myprint(f"Getting post between : {yesterday} and {pre_post_time}")
 
-    conn = get_db_connection()
-    cursor = conn.cursor()
-    # Get posts that have scheduled time between 24 hours ago and the next 20 minutes
-    cursor.execute(
-        """SELECT p.id, p.scheduled_time, p.user_id 
-            FROM posts AS p
-            WHERE status = 'approved' AND scheduled_time BETWEEN %s AND %s 
-            ORDER BY scheduled_time ASC 
-            """,
-        (yesterday, pre_post_time,))
-    posts = cursor.fetchall()
-    cursor.close()
-    conn.close()
+    connection = get_db_connection()
+    cursor = connection.cursor()
 
-    # Print the id's ready to post
-    myprint(f"Posts ready to post: {[post[0] for post in posts]}")
+    try:
+        # Get posts that have scheduled time between 24 hours ago and the next 20 minutes
+        cursor.execute(
+            """SELECT p.id, p.scheduled_time, p.user_id 
+                FROM posts AS p
+                WHERE status = 'approved' AND scheduled_time BETWEEN %s AND %s 
+                ORDER BY scheduled_time ASC 
+                """,
+            (yesterday, pre_post_time,))
+        posts = cursor.fetchall()
+        # Print the id's ready to post
+        myprint(f"Posts ready to post: {[post[0] for post in posts]}")
+    except mysql.connector.Error as err:
+        myprint(f"Could not get ready to post posts| Error: {err}")
+        posts = None
+    finally:
+        cursor.close()
+        connection.close()
 
     return posts
 
@@ -459,11 +516,16 @@ def get_user_password_pair_by_id(user_id: int):
     connection = get_db_connection()
     cursor = connection.cursor(dictionary=True)
 
-    cursor.execute("SELECT email, password FROM users WHERE id = %s", (user_id,))
+    try:
+        cursor.execute("SELECT email, password FROM users WHERE id = %s", (user_id,))
 
-    user_password_pair = cursor.fetchone()
-    cursor.close()
-    connection.close()
+        user_password_pair = cursor.fetchone()
+    except mysql.connector.Error as err:
+        myprint(f"Could not get user password pair for user id: {user_id} | Error: {err}")
+        user_password_pair = None
+    finally:
+        cursor.close()
+        connection.close()
 
     if user_password_pair:
         return user_password_pair['email'], user_password_pair['password']
@@ -471,14 +533,18 @@ def get_user_password_pair_by_id(user_id: int):
         return None, None
 
 
-def get_user_password_pairs():
+def get_active_user_password_pairs():
     connection = get_db_connection()
     cursor = connection.cursor()
 
-    cursor.execute("SELECT email, password FROM users")
-    user_password_pairs = cursor.fetchall()
-    cursor.close()
-    connection.close()
+    user_password_pairs = []
+
+    active_users = get_active_user_ids()
+
+    for user_id in active_users:
+        email, password = get_user_password_pair_by_id(user_id)
+        if email and password:
+            user_password_pairs.append([email, password])
 
     return user_password_pairs
 
@@ -588,7 +654,8 @@ def get_post_type_counts(user_id: int):
     cursor = connection.cursor(dictionary=True)
 
     try:
-        cursor.execute("SELECT post_type, COUNT(*) AS count FROM posts WHERE user_id = %s GROUP BY post_type", (user_id,))
+        cursor.execute("SELECT post_type, COUNT(*) AS count FROM posts WHERE user_id = %s GROUP BY post_type",
+                       (user_id,))
         post_counts = {row['post_type']: row['count'] for row in cursor.fetchall()}
     except mysql.connector.Error as err:
         myprint(f"Could not get post type counts | Error: {err}")
@@ -642,7 +709,6 @@ def get_planned_posts_for_next_week(user_id: int = None):
     finally:
         cursor.close()
         connection.close()
-
 
     return planned_content
 
