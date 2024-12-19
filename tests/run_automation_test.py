@@ -1,16 +1,17 @@
 import inspect
 import json
 import time
-from datetime import datetime
+from datetime import datetime, timedelta
 
 from celery_once import AlreadyQueued
 
 from cqc_lem.run_automation import engage_with_profile_viewer, comment_on_post, invite_to_connect, check_commented, \
-    navigate_to_feed, automate_reply_commenting, send_private_dm, update_stale_profile
+    navigate_to_feed, automate_reply_commenting, send_private_dm, update_stale_profile, post_to_linkedin
 from cqc_lem.run_scheduler import auto_clean_stale_profiles
 from cqc_lem.utilities.ai.ai_helper import generate_ai_response, get_ai_description_of_profile, \
     get_ai_message_refinement, summarize_recent_activity
 from cqc_lem.utilities.date import convert_viewed_on_to_date
+from cqc_lem.utilities.db import update_db_post_status, PostStatus
 from cqc_lem.utilities.env_constants import LI_USER, LI_PASSWORD
 from cqc_lem.utilities.linkedin.helper import login_to_linkedin, get_linkedin_profile_from_url, get_my_profile
 from cqc_lem.utilities.linkedin.profile import LinkedInProfile
@@ -355,7 +356,35 @@ def test_blocking_celery_calls():
         except AlreadyQueued as e:
             myprint(f"AlreadyQueued Exception: {e}")
 
+def test_post_to_linkedin_via_celery_task():
+    user_id = 60
+    post_id = 65
+    scheduled_time = datetime.now() + timedelta(seconds=11)
 
+    myprint(f"Ready to Post ID: {post_id}")
+
+    # Update the DB with post status = scheduled so it won't get processed again
+    update_db_post_status(post_id, PostStatus.SCHEDULED)
+    myprint(f"Post ID: {post_id} Scheduled for: {scheduled_time}")
+
+    # Schedule the post to be posted
+    post_kwargs = {'user_id': user_id, 'post_id': post_id}
+    post_to_linkedin.apply_async(kwargs=post_kwargs,
+                                 eta=scheduled_time,
+                                 )
+
+def test_automate_reply_commenting():
+    clear_sessions()
+
+    user_id = 60
+    post_id = 65
+    scheduled_time = datetime.now() + timedelta(seconds=11)
+    myprint(f"Automating reply commenting for Post ID: {post_id}")
+
+    post_kwargs = {'user_id': user_id, 'post_id': post_id, 'loop_for_duration':(60*3)}
+    automate_reply_commenting.apply_async(kwargs=post_kwargs,
+                                 eta=scheduled_time,
+                                 )
 
 if __name__ == "__main__":
     # test_ai_responses()
@@ -374,6 +403,9 @@ if __name__ == "__main__":
     # test_navigate_to_feed()
     # test_loop_for_duration_function_calls(loop_for_duration=10, future_forward=2)
     # test_auto_clean_stale_profiles()
-    test_blocking_celery_calls()
+    # test_blocking_celery_calls()
+
+    # test_post_to_linkedin_via_celery_task()
+    test_automate_reply_commenting()
 
     pass

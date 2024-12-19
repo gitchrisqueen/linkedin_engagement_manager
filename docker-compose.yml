@@ -14,7 +14,7 @@ services:
     volumes:
       - ./src:/app/src
       # Mount the assets folder
-      - ./src/cqc_lem_assets:/app/src/cqc_lem/assets
+      - ./src/cqc_lem/assets:/app/src/cqc_lem/assets
       # mount test folder
       - ./tests:/app/tests
       # Below used to override the start

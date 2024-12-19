@@ -39,7 +39,7 @@ def auto_generate_content():
         plan_content_for_user.apply_async(kwargs={"user_id": user_id})
 
 
-@shared_task.task(bind=True, acks_late=True, reject_on_worker_lost=True, rate_limit='1/m')
+@shared_task.task(bind=True, reject_on_worker_lost=True, rate_limit='1/m')
 def plan_content_for_user(user_id: int):
     """
     Generate and plan content for the next 30 days based on current content representation in the database.

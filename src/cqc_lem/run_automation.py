@@ -231,7 +231,7 @@ def simulate_typing(driver: WebDriver, editable_element: WebElement, text):
     myprint("Finished Typing!")
 
 
-@shared_task.task(bind=True, base=QueueOnce, once={'graceful': True, 'keys': ['user_id', 'post_link']}, acks_late=True,
+@shared_task.task(bind=True, base=QueueOnce, once={'graceful': True, 'keys': ['user_id', 'post_link']},
                   reject_on_worker_lost=True, rate_limit='2/m')
 def comment_on_post(self, user_id: int, post_link: str, comment_text: str):
     """Post a comment to the given post link"""
@@ -452,7 +452,7 @@ def automate_commenting(self, user_id: int, loop_for_duration: int = None, futur
     quit_gracefully(driver)
 
 
-@shared_task.task(bind=True, base=QueueOnce, once={'graceful': True})
+@shared_task.task(bind=True, base=QueueOnce, once={'graceful': True, 'keys': ['user_id', 'post_id']})
 def automate_reply_commenting(self, user_id: int, post_id: int, loop_for_duration: int = None, future_forward=60):
     """Reply to recent comments left on the post recently posted"""
 
@@ -654,7 +654,7 @@ def accept_connection_request(user_id: int):
     return invitation_data
 
 
-@shared_task.task(bind=True, base=QueueOnce, once={'graceful': True}, acks_late=True, reject_on_worker_lost=True,
+@shared_task.task(bind=True, base=QueueOnce, once={'graceful': True}, reject_on_worker_lost=True,
                   rate_limit='2/m')
 def send_appreciation_dms_for_user(self, user_id: int, loop_for_duration: int = None, future_forward: int = 60):
     user_email, user_password = get_user_password_pair_by_id(user_id)
@@ -925,7 +925,7 @@ def automate_profile_viewer_engagement(self, user_id: int, loop_for_duration: in
     quit_gracefully(driver)
 
 
-@shared_task.task(bind=True, base=QueueOnce, once={'graceful': True, 'keys': ['user_id', 'viewer_url']}, acks_late=True,
+@shared_task.task(bind=True, base=QueueOnce, once={'graceful': True, 'keys': ['user_id', 'viewer_url']},
                   reject_on_worker_lost=True, rate_limit='2/m')
 def engage_with_profile_viewer(self, user_id: int, viewer_url, viewer_name):
     myprint(f"Starting Profile Viewer Engagement")
@@ -1024,7 +1024,7 @@ def engage_with_profile_viewer(self, user_id: int, viewer_url, viewer_name):
         quit_gracefully(driver)
 
 
-@shared_task.task(bind=True, base=QueueOnce, once={'graceful': True}, acks_late=True, reject_on_worker_lost=True,
+@shared_task.task(bind=True, base=QueueOnce, once={'graceful': True}, reject_on_worker_lost=True,
                   rate_limit='2/m')
 def clean_stale_invites(self, user_id: int):
     """Cleans up stale invites that the user has sent"""
@@ -1039,7 +1039,7 @@ def clean_stale_invites(self, user_id: int):
     pass
 
 
-@shared_task.task(bind=True, base=QueueOnce, once={'graceful': True}, acks_late=True, reject_on_worker_lost=True,
+@shared_task.task(bind=True, base=QueueOnce, once={'graceful': True}, reject_on_worker_lost=True,
                   rate_limit='2/m')
 def send_private_dm(self, user_id: int, profile_url: str, message: str):
     """ Send dm message to a profile. Must be a 1st connection"""
@@ -1108,7 +1108,7 @@ def send_private_dm(self, user_id: int, profile_url: str, message: str):
 
 
 @shared_task.task(bind=True, base=QueueOnce, once={'graceful': True, 'keys': ['user_id', 'profile_url']},
-                  acks_late=True, reject_on_worker_lost=True, rate_limit='1/m')
+                   reject_on_worker_lost=True, rate_limit='1/m')
 def invite_to_connect(self, user_id: int, profile_url: str, message: str = None):
     user_email, user_password = get_user_password_pair_by_id(user_id)
 
@@ -1229,7 +1229,7 @@ def final_method(drivers: List[WebDriver]):
     sys.exit(0)
 
 
-@shared_task.task(bind=True, base=QueueOnce, once={'graceful': True}, acks_late=True, reject_on_worker_lost=True,
+@shared_task.task(bind=True, base=QueueOnce, once={'graceful': True}, reject_on_worker_lost=True,
                   rate_limit='1/m')
 def update_stale_profile(self, user_id: int):
     myprint(f"Updating Stale Profile. User ID: {user_id}")
@@ -1278,10 +1278,18 @@ if __name__ == "__main__":
     pass
 
 
-@shared_task.task(bind=True, base=QueueOnce, once={'graceful': True, 'keys': ['user_id', 'post_id']}, acks_late=True, reject_on_worker_lost=True,
+
+
+
+@shared_task.task(bind=True, base=QueueOnce, once={'graceful': True, 'keys': ['user_id', 'post_id']}, reject_on_worker_lost=True,
                   rate_limit='2/m')
 def post_to_linkedin(self, user_id: int, post_id: int):
     """Posts to LinkedIn using the LinkedIn API - https://learn.microsoft.com/en-us/linkedin/consumer/integrations/self-serve/share-on-linkedin#creating-a-share-on-linkedin"""
+
+    # TODO: If this is still running 4 times then add de-duplication logic
+    task_id = f"{self.request.id}-{user_id}-{post_id}"
+    # Mark the task as executed
+    #TaskExecution.objects.create(task_id=task_id)
 
     # Login and publish post to LinkedIn
     user_email, user_password = get_user_password_pair_by_id(user_id)
