@@ -39,7 +39,7 @@ This roadmap outlines the steps to take LinkedIn Engagement Manager (LEM) from s
 | Status | Task Description                                                                                                       |
 |--------|------------------------------------------------------------------------------------------------------------------------|
 | ✅      | Extend the Selenium script to: Comment on posts.                                                           |
-| 🟡      | Extend Selenium to: Send direct messages to profile viewers.                                                           |
+| ✅      | Extend Selenium to: Send direct messages to profile viewers.                                                           |
 | ✅      | Integrate AI content generation modules: Generate simple text for comments and DMs using an AI service (e.g., OpenAI). |
 | ✅     | Store AI-generated content in MySQL for scheduling purposes.                                                           |
 
@@ -58,7 +58,7 @@ This roadmap outlines the steps to take LinkedIn Engagement Manager (LEM) from s
 |--------|-------------------------------------------------------------------------------------------------------------|
 | ✅ | Set up a post scheduler using **Celery** and **Redis** for task queuing.                                    |
 | ✅ | Add **[Flower](https://flower.readthedocs.io/en/latest/)** for monitoring of **Celery** tasks queue.                                                |
-| 🔴 | Implement sentiment analysis on AI-generated content using `VADER` or `TextBlob` to ensure appropriateness. |
+| ✅ | Implement sentiment analysis on AI-generated content using `VADER` or `TextBlob` to ensure appropriateness. |
 | ✅ | Allow posts to be scheduled at specific times, store scheduling info in MySQL.                              |
 
 - **Testing**:
@@ -90,10 +90,10 @@ This roadmap outlines the steps to take LinkedIn Engagement Manager (LEM) from s
 
 | Status | Task Description |
 |--------|------------------|
-| 🔴 | Complete any remaining tasks from the previous days. |
-| 🔴 | Finalize the web dashboard to display scheduled tasks and allow monitoring of engagement activities. |
-| 🔴 | Perform **end-to-end testing**: Full workflow from generating content to posting and engagement. |
-| 🔴 | Write basic documentation for deployment and usage. |
+| ✅ | Complete any remaining tasks from the previous days. |
+| ✅ | Finalize the web dashboard to display scheduled tasks and allow monitoring of engagement activities. |
+| ✅ | Perform **end-to-end testing**: Full workflow from generating content to posting and engagement. |
+| ✅ | Write basic documentation for deployment and usage. |
 
 - **Testing**:
   - Ensure the full system operates correctly: from content generation, scheduling, approval, to posting.

@@ -295,60 +295,65 @@ def comment_on_post(self, user_id: int, post_link: str, comment_text: str):
         myprint(f"Added Post via return key. This might not have worked")
         method_result = f"Added Post via return key. This might not have worked"
 
-    # Get the main like button
-    main_like_button = get_element_wait_retry(driver, wait,
-                                              '//button[contains(@aria-label, "Like") and contains(@class,"artdeco-button--4")]',
-                                              "Finding Main Like Button")
+    try:
 
-    button_label_options = ['Like', 'Celebrate', 'Insightful', 'Support',
-                            # 'Love', 'Funny' # TODO: Not sure if these are universal for all post
-                            ]
+        # Get the main like button
+        main_like_button = get_element_wait_retry(driver, wait,
+                                                  '//button[contains(@aria-label, "Like") and contains(@class,"artdeco-button")]',
+                                                  "Finding Main Like Button")
 
-    # TODO: Use AI to get a preferences
-    button_to_click_key = random.choice(button_label_options)
+        button_label_options = ['Like', 'Celebrate', 'Insightful', 'Support',
+                                # 'Love', 'Funny' # TODO: Not sure if these are universal for all post
+                                ]
 
-    max_retries = 3
-    for attempt in range(max_retries):
+        # TODO: Use AI to get a preferences
+        button_to_click_key = random.choice(button_label_options)
 
-        # Wait for new elements to appear (adjust time as needed)
-        time.sleep(5)  # This is needed for it to become visible
-        try:
+        max_retries = 3
+        for attempt in range(max_retries):
 
-            choice_dict = {}
+            # Wait for new elements to appear (adjust time as needed)
+            time.sleep(5)  # This is needed for it to become visible
+            try:
 
-            # For each key in the button_path_dict, get the element and add it to the choices list
-            for button_label in button_label_options:
-                button = get_element_wait_retry(driver, wait,
-                                                f"//span[contains(@class,'menu')]//button[contains(@aria-label, '{button_label}')]",
-                                                f"Finding {button_label} Button",
-                                                element_always_expected=False, max_try=1)
-                if button:
-                    choice_dict[button_label] = button
+                choice_dict = {}
 
-            # Get the choice dict keys as list
-            choices = list(choice_dict.keys())
+                # For each key in the button_path_dict, get the element and add it to the choices list
+                for button_label in button_label_options:
+                    button = get_element_wait_retry(driver, wait,
+                                                    f"//span[contains(@class,'menu')]//button[contains(@aria-label, '{button_label}')]",
+                                                    f"Finding {button_label} Button",
+                                                    element_always_expected=False, max_try=1)
+                    if button:
+                        choice_dict[button_label] = button
 
-            # Randomly chose one of the available button options
-            button_to_click_key = random.choice(choices)
-            myprint(f"Clicking {button_to_click_key} Post Reaction")
-            button_to_click = choice_dict[button_to_click_key]
-            # Move to that button and click it
-            # Hover over the main like button
-            actions.scroll_to_element(main_like_button).move_to_element(main_like_button).move_to_element(
-                button_to_click).click().perform()
-            wait_for_ajax(driver)
-            time.sleep(2)
-            myprint(f"Added Post Reaction")
-            method_result += f" | Added Post Reaction"
-            break  # Exit loop if click is successful
-        except Exception as e:
-            if attempt < max_retries - 1:
-                myprint(f"Removing {button_to_click_key} from choice options since it failed")
-                button_label_options.remove(button_to_click_key)
-                time.sleep(1)  # Wait a bit before retrying
-            else:
-                myprint(f"Failed to click {button_to_click_key} Post Reaction: {e}")
-                method_result += f" | Added Post Reaction | Error: {e}"
+                # Get the choice dict keys as list
+                choices = list(choice_dict.keys())
+
+                # Randomly chose one of the available button options
+                button_to_click_key = random.choice(choices)
+                myprint(f"Clicking {button_to_click_key} Post Reaction")
+                button_to_click = choice_dict[button_to_click_key]
+                # Move to that button and click it
+                # Hover over the main like button
+                actions.scroll_to_element(main_like_button).move_to_element(main_like_button).move_to_element(
+                    button_to_click).click().perform()
+                wait_for_ajax(driver)
+                time.sleep(2)
+                myprint(f"Added Post Reaction")
+                method_result += f" | Added Post Reaction"
+                break  # Exit loop if click is successful
+            except Exception as e:
+                if attempt < max_retries - 1:
+                    myprint(f"Removing {button_to_click_key} from choice options since it failed")
+                    button_label_options.remove(button_to_click_key)
+                    time.sleep(1)  # Wait a bit before retrying
+                else:
+                    myprint(f"Failed to click {button_to_click_key} Post Reaction: {e}")
+                    method_result += f" | Added Post Reaction | Error: {e}"
+    except Exception as e:
+        myprint(f"Error while clicking post reaction: {e}")
+        method_result += f"Could not add post reaction | Error: {e}"
 
     quit_gracefully(driver)  # Close the driver
 

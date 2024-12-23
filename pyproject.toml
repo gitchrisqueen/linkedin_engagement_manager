@@ -68,7 +68,7 @@ gradio-client = "^1.4.3"
 runwayml = "^2.1.0"
 huggingface-hub = "^0.26.2"
 replicate = "^1.0.4"
-celery-once = "^3.0.1"
+celery-once = {git = "https://github.com/gitchrisqueen/celery-once.git"}
 
 
 
