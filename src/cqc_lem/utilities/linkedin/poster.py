@@ -198,9 +198,9 @@ def share_on_linkedin(user_id: int, content: str,
     )
 
     # For each key in posts_create_response print it out
-    myprint(f"Post Create Response:")
-    for key, value in posts_create_response.entity.items():
-        myprint(f"{key}: {value}")
+    #myprint(f"Post Create Response:")
+    #for key, value in posts_create_response.entity.items():
+    #    myprint(f"{key}: {value}")
 
     urn = posts_create_response.entity_id
     myprint(f"Shared on LinkedIn via API call: https://www.linkedin.com/feed/update/{urn}")

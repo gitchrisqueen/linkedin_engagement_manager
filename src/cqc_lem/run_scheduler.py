@@ -6,7 +6,7 @@ from cqc_lem import assets_dir
 from cqc_lem.my_celery import app as shared_task
 # from celery import shared_task
 from cqc_lem.run_automation import automate_commenting, automate_profile_viewer_engagement, \
-    send_appreciation_dms_for_user, clean_stale_invites, update_stale_profile, post_to_linkedin
+    automate_appreciation_dms_for_user, clean_stale_invites, update_stale_profile, post_to_linkedin
 from cqc_lem.utilities.date import add_local_tz_to_datetime
 from cqc_lem.utilities.db import get_ready_to_post_posts, update_db_post_status, get_active_user_ids, PostStatus
 from cqc_lem.utilities.env_constants import SELENIUM_KEEP_VIDEOS_X_DAYS
@@ -76,8 +76,8 @@ def auto_appreciate_dms():
         }
 
         # No need to worry as this task is rate limited to 2 per minute
-        send_appreciation_dms_for_user.apply_async(kwargs=kwargs, retry=True,
-                                                   retry_policy={
+        automate_appreciation_dms_for_user.apply_async(kwargs=kwargs, retry=True,
+                                                       retry_policy={
                                                        'max_retries': 3,
                                                        'interval_start': 60,
                                                        'interval_step': 30
@@ -151,7 +151,61 @@ def auto_clean_old_videos():
             myprint(f"Deleting folder: {folder_path}")
             shutil.rmtree(folder_path)
             delete_count += 1
-    return f"Deleted {delete_count} folders"
+
+    # Organize the videos by name and timestamp
+    moved_videos = organize_videos_by_name_and_timestamp()
+
+    return f"Deleted {delete_count} folders | Moved {moved_videos} videos"
+
+
+def organize_videos_by_name_and_timestamp():
+    selenium_folder = os.path.join(assets_dir, 'selenium')
+
+    # Keep track of videos moved
+    moved_videos = 0
+
+    # Create a map to store unique names
+    unique_name_map = {}
+
+    # Iterate through each folder in the selenium folder
+    for folder in os.listdir(selenium_folder):
+        # Skip Folders that start with "CQC_LEM"
+        if folder.startswith("CQC_LEM"):
+            continue
+
+        folder_path = os.path.join(selenium_folder, folder)
+        if os.path.isdir(folder_path):
+            # Iterate through each file in the folder
+            for file in os.listdir(folder_path):
+                if file.endswith('.mp4'):
+                    file_path = os.path.join(folder_path, file)
+                    file_name = os.path.splitext(file)[0]
+                    file_timestamp = datetime.fromtimestamp(os.path.getmtime(file_path)).strftime('%Y_%m_%d_%H_%M_%S')
+
+                    # Create a unique name map entry if it doesn't exist
+                    if file_name not in unique_name_map:
+                        unique_name_map[file_name] = []
+
+                    # Add the file path and timestamp to the unique name map
+                    unique_name_map[file_name].append((file_path, file_timestamp))
+
+    # Create folders for each unique name and move the files
+    for name, files in unique_name_map.items():
+        name_folder = os.path.join(selenium_folder, name)
+        os.makedirs(name_folder, exist_ok=True)
+
+        for file_path, file_timestamp in files:
+            new_file_name = f"{file_timestamp}.mp4"
+            new_file_path = os.path.join(name_folder, new_file_name)
+            shutil.move(file_path, new_file_path)
+            print(f"Moved {file_path} to {new_file_path}")
+            # Delete the folder belonging to the file_path
+            parent_folder = os.path.dirname(file_path)
+            shutil.rmtree(parent_folder)
+            print(f"Deleted {parent_folder}")
+            moved_videos += 1
+
+    return moved_videos
 
 
 

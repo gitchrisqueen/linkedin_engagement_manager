@@ -7,7 +7,7 @@ from celery_once import AlreadyQueued
 
 from cqc_lem.run_automation import engage_with_profile_viewer, comment_on_post, invite_to_connect, check_commented, \
     navigate_to_feed, automate_reply_commenting, send_private_dm, update_stale_profile, post_to_linkedin
-from cqc_lem.run_scheduler import auto_clean_stale_profiles
+from cqc_lem.run_scheduler import auto_clean_stale_profiles, organize_videos_by_name_and_timestamp
 from cqc_lem.utilities.ai.ai_helper import generate_ai_response, get_ai_description_of_profile, \
     get_ai_message_refinement, summarize_recent_activity
 from cqc_lem.utilities.date import convert_viewed_on_to_date
@@ -377,7 +377,7 @@ def test_automate_reply_commenting():
     clear_sessions()
 
     user_id = 60
-    post_id = 65
+    post_id = 83
     scheduled_time = datetime.now() + timedelta(seconds=11)
     myprint(f"Automating reply commenting for Post ID: {post_id}")
 
@@ -385,6 +385,9 @@ def test_automate_reply_commenting():
     automate_reply_commenting.apply_async(kwargs=post_kwargs,
                                  eta=scheduled_time,
                                  )
+
+def test_organize_videos_by_name_and_timestamp():
+    organize_videos_by_name_and_timestamp()
 
 if __name__ == "__main__":
     # test_ai_responses()
@@ -407,5 +410,7 @@ if __name__ == "__main__":
 
     # test_post_to_linkedin_via_celery_task()
     test_automate_reply_commenting()
+
+    #test_organize_videos_by_name_and_timestamp()
 
     pass

@@ -278,8 +278,8 @@ def comment_on_post(self, user_id: int, post_link: str, comment_text: str):
         click_element_wait_retry(driver, wait, '//button[contains(@class, "comments-comment-box__submit-button--cr")]',
                                  "Clicking Post Button", max_retry=1, use_action_chain=True)
 
-        myprint(f"Added Post via Post Button")
-        method_result = f"Added Post via Post Button"
+        myprint(f"Added Comment via Post Button")
+        method_result = f"Added Comment via Post Button"
 
         # Update database with record of comment to this post
         insert_new_log(user_id=user_id, action_type=LogActionType.COMMENT, result=LogResultType.SUCCESS,
@@ -292,8 +292,8 @@ def comment_on_post(self, user_id: int, post_link: str, comment_text: str):
         # Update database with record of comment to this post
         insert_new_log(user_id=user_id, action_type=LogActionType.COMMENT, result=LogResultType.FAILURE,
                        post_url=post_link, message=comment_text)
-        myprint(f"Added Post via return key. This might not have worked")
-        method_result = f"Added Post via return key. This might not have worked"
+        myprint(f"Added Comment via return key. This might not have worked")
+        method_result = f"Added Comment via return key. This might not have worked"
 
     try:
 
@@ -364,7 +364,7 @@ def check_commented(driver, wait, user_id: int = None, post_url: str = None):
     """See if the current open url we've already posted on"""
     already_commented = False
 
-    if post_url != driver.current_url:
+    if post_url and post_url != driver.current_url:
         # Switch to post url
         driver.get(post_url)
 
@@ -386,7 +386,7 @@ def check_commented(driver, wait, user_id: int = None, post_url: str = None):
     return already_commented
 
 
-@shared_task.task(bind=True, base=QueueOnce, once={'graceful': True})
+@shared_task.task(bind=True, base=QueueOnce, once={'graceful': True,'unlock_before_run': True, 'keys': ['user_id']})
 def automate_commenting(self, user_id: int, loop_for_duration: int = None, future_forward: int = 60):
     global stop_all_thread
 
@@ -457,8 +457,8 @@ def automate_commenting(self, user_id: int, loop_for_duration: int = None, futur
     quit_gracefully(driver)
 
 
-@shared_task.task(bind=True, base=QueueOnce, once={'graceful': True, 'keys': ['user_id', 'post_id']})
-def automate_reply_commenting(self, user_id: int, post_id: int, loop_for_duration: int = None, future_forward=60):
+@shared_task.task(bind=True, base=QueueOnce, once={'graceful': True, 'unlock_before_run': True, 'keys': ['user_id', 'post_id']})
+def automate_reply_commenting(self, user_id: int, post_id: int, loop_for_duration: int = 60, future_forward=60):
     """Reply to recent comments left on the post recently posted"""
 
     driver, wait, user_email, my_profile = get_current_profile(user_id=user_id, session_name="Reply to Comments")
@@ -497,7 +497,9 @@ def automate_reply_commenting(self, user_id: int, post_id: int, loop_for_duratio
             # Get all the comments
             comments = get_elements_as_list_wait_stale(wait,
                                                        "//div[contains(@class,'comments-comment-list__container')]/article[contains(@class,'comments-comment-entity')]",
-                                                       "Finding Comments")
+                                                       "Finding Comments",
+                                                       max_retry=0,
+                                                       )
         except Exception as e:
             myprint(f"Error while finding comments: {e}")
             comments = []
@@ -659,9 +661,9 @@ def accept_connection_request(user_id: int):
     return invitation_data
 
 
-@shared_task.task(bind=True, base=QueueOnce, once={'graceful': True}, reject_on_worker_lost=True,
+@shared_task.task(bind=True, base=QueueOnce, once={'graceful': True, 'unlock_before_run': True, 'keys':['user_id']}, reject_on_worker_lost=True,
                   rate_limit='2/m')
-def send_appreciation_dms_for_user(self, user_id: int, loop_for_duration: int = None, future_forward: int = 60):
+def automate_appreciation_dms_for_user(self, user_id: int, loop_for_duration: int = None, future_forward: int = 60):
     user_email, user_password = get_user_password_pair_by_id(user_id)
 
     driver, wait = get_driver_wait_pair(session_name='Automate Appreciation DMs')
@@ -794,7 +796,7 @@ def generate_and_post_comment(driver, wait, post_link, my_profile: LinkedInProfi
     return True
 
 
-@shared_task.task(bind=True, base=QueueOnce, once={'graceful': True})
+@shared_task.task(bind=True, base=QueueOnce, once={'graceful': True,'unlock_before_run': True, 'keys':['user_id']})
 def automate_profile_viewer_engagement(self, user_id: int, loop_for_duration: int = None, future_forward: int = 60):
     global stop_all_thread
 
@@ -1286,13 +1288,14 @@ if __name__ == "__main__":
 
 
 
-@shared_task.task(bind=True, base=QueueOnce, once={'graceful': True, 'keys': ['user_id', 'post_id']}, reject_on_worker_lost=True,
+@shared_task.task(bind=True, base=QueueOnce, once={'graceful': True, 'keys': [ 'post_id']}, reject_on_worker_lost=True,
                   rate_limit='2/m')
 def post_to_linkedin(self, user_id: int, post_id: int):
     """Posts to LinkedIn using the LinkedIn API - https://learn.microsoft.com/en-us/linkedin/consumer/integrations/self-serve/share-on-linkedin#creating-a-share-on-linkedin"""
 
     # TODO: If this is still running 4 times then add de-duplication logic
     task_id = f"{self.request.id}-{user_id}-{post_id}"
+    myprint(f"Post To LinkedIn | Task ID: {task_id}")
     # Mark the task as executed
     #TaskExecution.objects.create(task_id=task_id)
 
@@ -1320,7 +1323,7 @@ def post_to_linkedin(self, user_id: int, post_id: int):
         # Update DB with status=posted
         update_db_post_status(post_id, PostStatus.POSTED)
 
-        # Schedule Answer comments for 30 minutes now that this has been posted
+        # Schedule Reply to comments for 30 minutes now that this has been posted
         base_kwargs = {
             'user_id': user_id,
             'post_id': post_id,
