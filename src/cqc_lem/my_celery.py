@@ -25,18 +25,17 @@ app.config_from_object(celeryconfig)
 app.autodiscover_tasks(['cqc_lem'])
 
 # Gets the max between all the parameters of timeout in the tasks
-max_timeout = 60*30  # This value must be bigger than the maximum soft timeout set for a task to prevent an infinity loop
+max_timeout = 60 * 30  # This value must be bigger than the maximum soft timeout set for a task to prevent an infinity loop
 app.conf.broker_transport_options = {'visibility_timeout': max_timeout + 60}  # 60 seconds of margin
 
 # Setup Celery Once for task that should only be queued once per parameters sent
 app.conf.ONCE = {
-  'backend': 'celery_once.backends.Redis',
-  'settings': {
-    'url': broker_url,
-    'default_timeout': 60 * 60
-  }
+    'backend': 'celery_once.backends.Redis',
+    'settings': {
+        'url': broker_url,
+        'default_timeout': 60 * 60
+    }
 }
-
 
 # Celery configuration
 app.conf.update(
@@ -51,34 +50,34 @@ app.conf.update(
             'task': 'cqc_lem.run_scheduler.auto_check_scheduled_posts',
             'schedule': timedelta(minutes=5)  # Run every 5 minutes
         },
-        'send-appreciation-dms': {
-            'task': 'cqc_lem.run_scheduler.auto_appreciate_dms',
-            'schedule': crontab(hour='8', minute='0')  # Run every day at 8:00 AM
-        },
         'generate-content-plan': {
             'task': 'cqc_lem.run_content_plan.auto_generate_content',
-            'schedule': crontab(hour='1', minute='0', day_of_month='1')  # Run on the 1st of every month at 1:00 AM
+            'schedule': crontab(hour='1', minute='0')  # Run every day at 1:00 AM
         },
         'create-content-from-plan': {
             'task': 'cqc_lem.run_content_plan.auto_create_weekly_content',
-            'schedule': crontab(hour='1', minute='0', day_of_week='sat') # Run on Saturdays at 1:00 AM
+            'schedule': crontab(hour='1', minute='30')  # Run every day at 1:30 AM
         },
         'clean-up-stale-invites': {
             'task': 'cqc_lem.run_scheduler.auto_clean_stale_invites',
-            'schedule': crontab(hour='2', minute='0',)  # Run every day at 2:00 AM
+            'schedule': crontab(hour='2', minute='0', )  # Run every day at 2:00 AM
         },
         'clen-up-stale-profiles': {
             'task': 'cqc_lem.run_scheduler.auto_clean_stale_profiles',
-            'schedule': crontab(hour='3', minute='0',)  # Run every day at 3:00 AM
+            'schedule': crontab(hour='3', minute='0', )  # Run every day at 3:00 AM
         },
         'clen-up-old_videos': {
             'task': 'cqc_lem.run_scheduler.auto_clean_old_videos',
             'schedule': crontab(hour='4', minute='0', )  # Run every day at 4:00 AM
+        },
+        'send-appreciation-dms': {
+            'task': 'cqc_lem.run_scheduler.auto_appreciate_dms',
+            'schedule': crontab(hour='8', minute='0')  # Run every day at 8:00 AM
         }
-
 
     }
 )
+
 
 @worker_process_init.connect(weak=False)
 def restore_all_unacknowledged_messages(*args, **kwargs):
