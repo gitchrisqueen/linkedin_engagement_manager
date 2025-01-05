@@ -22,7 +22,7 @@ from cqc_lem.utilities.ai.ai_helper import get_thought_leadership_post_from_ai, 
 from cqc_lem.utilities.db import get_post_type_counts, insert_planned_post, update_db_post_content, \
     get_planned_posts_for_current_week, get_last_planned_post_date_for_user, get_user_password_pair_by_id, \
     get_user_blog_url, get_user_sitemap_url, get_active_user_ids, get_planned_posts_for_next_week, PostStatus, \
-    update_db_post_video_url, update_db_post_status
+    update_db_post_video_url, update_db_post_status, PostType
 from cqc_lem.utilities.env_constants import API_BASE_URL
 from cqc_lem.utilities.linkedin.helper import get_my_profile
 from cqc_lem.utilities.logger import myprint
@@ -40,7 +40,7 @@ def auto_generate_content():
 
 
 @shared_task.task(bind=True, reject_on_worker_lost=True, rate_limit='1/m')
-def plan_content_for_user(user_id: int):
+def plan_content_for_user(self, user_id: int):
     """
     Generate and plan content for the next 30 days based on current content representation in the database.
     Ensures a balanced distribution of post types (carousel, text, video) and buyer journey stages.
@@ -653,7 +653,9 @@ def save_content_plan(user_id: int, daily_plan: list[dict]):
     """Save the planned content schedule to the database."""
     # Insert the 'daily_plan' into a database table for future reference and scheduling
     for plan in daily_plan:
-        insert_planned_post(user_id, plan['scheduled_datetime'], plan['post_type'], plan['stage'])
+        # Convert plan['post_type'] to Post Type object
+        post_type = PostType[plan['post_type'].upper()]
+        insert_planned_post(user_id, plan['scheduled_datetime'], post_type, plan['stage'])
 
 
 @shared_task.task

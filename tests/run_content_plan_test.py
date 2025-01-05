@@ -5,7 +5,7 @@ import shutil
 from cqc_lem import assets_dir
 from cqc_lem.run_content_plan import create_content, auto_generate_content, auto_create_weekly_content, \
     get_main_blog_url_content, fetch_sitemap_urls, filter_relevant_urls, is_blog_post, is_blog_post_by_metadata, \
-    scrape_recent_posts, is_blog_post_combined
+    scrape_recent_posts, is_blog_post_combined, plan_content_for_user
 from cqc_lem.run_automation import post_to_linkedin
 from cqc_lem.utilities.ai.ai_helper import get_industry_trend_analysis_based_on_user_profile, \
     get_thought_leadership_post_from_ai, get_flux_image_prompt_from_ai
@@ -228,6 +228,11 @@ def test_get_flux_image_prompt_from_ai():
     myprint(f"Image Prompt: {image_prompt}")
 
 
+def plan_content_for_user_and_weekly_plan():
+    user_id=60
+    plan_content_for_user(user_id=user_id)
+    auto_create_weekly_content(user_id=user_id)
+
 
 if __name__ == "__main__":
     # Clear selenium sessions
@@ -242,6 +247,8 @@ if __name__ == "__main__":
     # test_content_from_sitemap_url()
     # test_get_main_blog_url_content()
     # test_blog_content_by_platform()
-    test_get_flux_image_prompt_from_ai()
+    #test_get_flux_image_prompt_from_ai()
+
+    plan_content_for_user_and_weekly_plan()
 
 

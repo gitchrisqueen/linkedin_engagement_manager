@@ -73,7 +73,7 @@ def get_page_source(driver, url, scroll_times=0):
         driver.get(url)
         wait_for_ajax(driver)
 
-    # Force bottom page scroll twice
+    # Force bottom page scroll by scroll_times
     for _ in range(scroll_times):
         driver.execute_script("window.scrollTo(0, document.body.scrollHeight);")
         wait_for_ajax(driver)

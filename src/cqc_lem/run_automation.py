@@ -232,7 +232,7 @@ def simulate_typing(driver: WebDriver, editable_element: WebElement, text):
 
 
 @shared_task.task(bind=True, base=QueueOnce, once={'graceful': True, 'keys': ['user_id', 'post_link']},
-                  reject_on_worker_lost=True, rate_limit='2/m')
+                  reject_on_worker_lost=True, rate_limit='4/m')
 def comment_on_post(self, user_id: int, post_link: str, comment_text: str):
     """Post a comment to the given post link"""
 
@@ -1117,6 +1117,8 @@ def send_private_dm(self, user_id: int, profile_url: str, message: str):
 @shared_task.task(bind=True, base=QueueOnce, once={'graceful': True, 'keys': ['user_id', 'profile_url']},
                    reject_on_worker_lost=True, rate_limit='1/m')
 def invite_to_connect(self, user_id: int, profile_url: str, message: str = None):
+    # TODO: Add log entry for successfule and failed invites to connect
+
     user_email, user_password = get_user_password_pair_by_id(user_id)
 
     driver, wait = get_driver_wait_pair(session_name='Invite to Connect')

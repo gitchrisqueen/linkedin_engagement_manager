@@ -2,6 +2,8 @@ import os
 import shutil
 from datetime import timedelta, datetime
 
+from celery_once import QueueOnce
+
 from cqc_lem import assets_dir
 from cqc_lem.my_celery import app as shared_task
 # from celery import shared_task
@@ -20,8 +22,8 @@ def test_error_tracing():
     raise ValueError("This is a test error")
 
 
-@shared_task.task
-def auto_check_scheduled_posts():
+@shared_task.task(bind=True, base=QueueOnce, once={'graceful': True, }, reject_on_worker_lost=True)
+def auto_check_scheduled_posts(self):
     """Checks if there are any posts to publish."""
 
     # Get post that should have run between yesterday and in the next 20 minutes
@@ -53,10 +55,6 @@ def auto_check_scheduled_posts():
         base_kwargs['loop_for_duration'] = 60 * 10
         automate_profile_viewer_engagement.apply_async(kwargs=base_kwargs, eta=scheduled_time - timedelta(minutes=10))
 
-
-
-
-
     if len(posts) == 0:
         return f"No Post to Schedule"
     else:
@@ -78,10 +76,10 @@ def auto_appreciate_dms():
         # No need to worry as this task is rate limited to 2 per minute
         automate_appreciation_dms_for_user.apply_async(kwargs=kwargs, retry=True,
                                                        retry_policy={
-                                                       'max_retries': 3,
-                                                       'interval_start': 60,
-                                                       'interval_step': 30
-                                                   })
+                                                           'max_retries': 3,
+                                                           'interval_start': 60,
+                                                           'interval_step': 30
+                                                       })
     if len(users) == 0:
         return f"No Active Users"
     else:
@@ -121,19 +119,20 @@ def auto_clean_stale_profiles():
         myprint(f"Cleaning Stale Profiles for user: {user_id}")
 
         # Clean up stale profiles for this user
-        #update_stale_profile(user_id)
+        # update_stale_profile(user_id)
         update_stale_profile.apply_async(kwargs={'user_id': user_id},
-                                        retry=True,
-                                        retry_policy={
-                                            'max_retries': 3,
-                                            'interval_start': 60,
-                                            'interval_step': 30
-                                        })
+                                         retry=True,
+                                         retry_policy={
+                                             'max_retries': 3,
+                                             'interval_start': 60,
+                                             'interval_step': 30
+                                         })
 
     if len(users) == 0:
         return f"No Active Users"
     else:
         return f"Started Process for {len(users)} user(s)"
+
 
 @shared_task.task
 def auto_clean_old_videos():
@@ -206,7 +205,6 @@ def organize_videos_by_name_and_timestamp():
             moved_videos += 1
 
     return moved_videos
-
 
 
 if __name__ == "__main__":
