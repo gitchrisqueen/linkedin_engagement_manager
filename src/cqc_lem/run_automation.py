@@ -600,7 +600,7 @@ def automate_reply_commenting(self, user_id: int, post_id: int, loop_for_duratio
     if loop_for_duration:
         elapsed_time = datetime.now() - start_time
 
-        # If the loop for duration is more than 30 minutes in seconds then we need to modify the future forward time to increase by 1 minutes each time
+        # If the loop for duration is more than 30 minutes, increase future forward timeby 5 minutes
         if loop_for_duration > (60*30):
             future_forward += 60*5
         # Cap the future forward time to 1 hour
