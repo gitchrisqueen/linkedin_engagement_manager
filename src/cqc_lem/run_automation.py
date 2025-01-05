@@ -599,6 +599,14 @@ def automate_reply_commenting(self, user_id: int, post_id: int, loop_for_duratio
     # Re-schedule the task in the queue for the future
     if loop_for_duration:
         elapsed_time = datetime.now() - start_time
+
+        # If the loop for duration is more than 30 minutes in seconds then we need to modify the future forward time to increase by 1 minutes each time
+        if loop_for_duration > (60*30):
+            future_forward += 60*5
+        # Cap the future forward time to 1 hour
+        if future_forward > 60*60:
+            future_forward = 60*60
+
         new_loop_for_duration = round(loop_for_duration - elapsed_time.total_seconds() - future_forward)
         frame = inspect.currentframe()
         current_function_name = frame.f_code.co_name
@@ -1325,11 +1333,11 @@ def post_to_linkedin(self, user_id: int, post_id: int):
         # Update DB with status=posted
         update_db_post_status(post_id, PostStatus.POSTED)
 
-        # Schedule Reply to comments for 30 minutes now that this has been posted
+        # Schedule Reply to comments for 24 hours now that this has been posted
         base_kwargs = {
             'user_id': user_id,
             'post_id': post_id,
-            'loop_for_duration': 60 * 30
+            'loop_for_duration': 60 * 60 * 24
         }
         automate_reply_commenting.apply_async(kwargs=base_kwargs)
 
