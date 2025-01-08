@@ -201,7 +201,7 @@ services:
       - SE_NODE_MAX_SESSIONS=4 # This should not be more than the available CPUS
       - SE_NODE_OVERRIDE_MAX_SESSIONS=false # To allow the override of the max sessions
       #- SE_DRAIN_AFTER_SESSION_COUNT=0 # Drain the Node after N sessions (a value higher than zero enables the feature)
-      #- SE_NODE_SESSION_TIMEOUT=1200 # 20 minutes - Max time before session is terminated
+      - SE_NODE_SESSION_TIMEOUT=420 # 7 minutes - Max time before session is terminated
       #- SE_START_XVFB=false # This will kill selenium/standalone-chrome:latest
     ports:
       - "5555:5555"
@@ -252,5 +252,5 @@ services:
 volumes:
   db_data:
   redis_data:
-  chrome_profile:
+  #chrome_profile:
   flower_db:

@@ -70,10 +70,16 @@ app.conf.update(
             'task': 'cqc_lem.run_scheduler.auto_clean_old_videos',
             'schedule': crontab(hour='4', minute='0', )  # Run every day at 4:00 AM
         },
+        'invite_to_company_pages': {
+            'task': 'cqc_lem.run_scheduler.auto_invite_to_company_pages',
+            'schedule': crontab(hour='5', minute='0', day_of_month='1')  # Run on the 1st of the month at 5:00 AM
+        },
         'send-appreciation-dms': {
             'task': 'cqc_lem.run_scheduler.auto_appreciate_dms',
             'schedule': crontab(hour='8', minute='0')  # Run every day at 8:00 AM
         }
+
+
 
     }
 )

@@ -889,3 +889,19 @@ def has_engaged_url_with_x_days(user_id: int, post_url: str, days: int):
         connection.close()
 
     return count > 0
+
+def get_company_linked_in_url_for_user(user_id: int):
+    connection = get_db_connection()
+    cursor = connection.cursor()
+
+    try:
+        cursor.execute("SELECT company_linked_in_url FROM users WHERE id = %s", (user_id,))
+        company_linked_in_url = cursor.fetchone()
+    except mysql.connector.Error as err:
+        myprint(f"Could not get user company linked in url | Error: {err}")
+        company_linked_in_url = None
+    finally:
+        cursor.close()
+        connection.close()
+
+    return company_linked_in_url[0] if company_linked_in_url else None

@@ -8,7 +8,8 @@ from cqc_lem import assets_dir
 from cqc_lem.my_celery import app as shared_task
 # from celery import shared_task
 from cqc_lem.run_automation import automate_commenting, automate_profile_viewer_engagement, \
-    automate_appreciation_dms_for_user, clean_stale_invites, update_stale_profile, post_to_linkedin
+    automate_appreciation_dms_for_user, clean_stale_invites, update_stale_profile, post_to_linkedin, \
+    automate_invites_to_company_page_for_user
 from cqc_lem.utilities.date import add_local_tz_to_datetime
 from cqc_lem.utilities.db import get_ready_to_post_posts, update_db_post_status, get_active_user_ids, PostStatus
 from cqc_lem.utilities.env_constants import SELENIUM_KEEP_VIDEOS_X_DAYS
@@ -132,6 +133,32 @@ def auto_clean_stale_profiles():
         return f"No Active Users"
     else:
         return f"Started Process for {len(users)} user(s)"
+
+
+@shared_task.task
+def auto_invite_to_company_pages():
+    """Start invite process for each active user who has a linked in company page"""
+
+    # Get all active users and loop through them
+    users = get_active_user_ids()
+
+    for user_id in users:
+        myprint(f"Starting Company Page Invites for user: {user_id}")
+
+
+        automate_invites_to_company_page_for_user.apply_async(kwargs={'user_id': user_id},
+                                         retry=True,
+                                         retry_policy={
+                                             'max_retries': 3,
+                                             'interval_start': 60,
+                                             'interval_step': 30
+                                         })
+
+    if len(users) == 0:
+        return f"No Active Users"
+    else:
+        return f"Started Process for {len(users)} user(s)"
+
 
 
 @shared_task.task

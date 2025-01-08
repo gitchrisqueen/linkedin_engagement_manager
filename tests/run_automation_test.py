@@ -6,7 +6,8 @@ from datetime import datetime, timedelta
 from celery_once import AlreadyQueued
 
 from cqc_lem.run_automation import engage_with_profile_viewer, comment_on_post, invite_to_connect, check_commented, \
-    navigate_to_feed, automate_reply_commenting, send_private_dm, update_stale_profile, post_to_linkedin
+    navigate_to_feed, automate_reply_commenting, send_private_dm, post_to_linkedin, \
+    automate_invites_to_company_page_for_user
 from cqc_lem.run_scheduler import auto_clean_stale_profiles, organize_videos_by_name_and_timestamp
 from cqc_lem.utilities.ai.ai_helper import generate_ai_response, get_ai_description_of_profile, \
     get_ai_message_refinement, summarize_recent_activity
@@ -278,7 +279,7 @@ def test_send_private_dm():
     # message = json.dumps(message)
 
     # escaped_message = json.dumps(message)
-    #print(f"""Sending message (escaped): {message}""")
+    # print(f"""Sending message (escaped): {message}""")
 
     clear_sessions()
     send_private_dm(user_id, profile_url, message)
@@ -290,19 +291,6 @@ def test_engage_with_profile_viewer():
     profile_url = "https://www.linkedin.com/in/ACoAAAhxNBwBxKLTu4LeFsTLvsC4vxe8hbPQ8zQ"
     name = "Badsha Dash"
     engage_with_profile_viewer(user_id, profile_url, name)
-
-
-def test_auto_reply():
-    user_id = 60
-    post_id = 11
-
-    # Schedule Answer comments for 30 minutes now that this has been posted
-    base_kwargs = {
-        'user_id': user_id,
-        'post_id': post_id,
-        'loop_for_duration': 60 * 30
-    }
-    automate_reply_commenting.apply_async(kwargs=base_kwargs)
 
 
 def test_loop_for_duration_function_calls(user_id=60, post_id=0, loop_for_duration=None, future_forward=60):
@@ -334,9 +322,11 @@ def test_loop_for_duration_function_calls(user_id=60, post_id=0, loop_for_durati
             # Call the function again by name
             globals()[current_function_name](**kwargs)
 
+
 def test_auto_clean_stale_profiles():
     clear_sessions()
     auto_clean_stale_profiles()
+
 
 def test_blocking_celery_calls():
     clear_sessions()
@@ -346,15 +336,17 @@ def test_blocking_celery_calls():
         # See if it gets blocked by Celery Once
         myprint(f"Calling update_stale_profile for user_id: {user_id}")
         try:
-            automate_reply_commenting.apply_async(kwargs={'user_id': user_id, 'post_id': 40, 'loop_for_duration': 60 * 5},
-                                             retry=True,
-                                             retry_policy={
-                                                 'max_retries': 3,
-                                                 'interval_start': 60,
-                                                 'interval_step': 30
-                                             })
+            automate_reply_commenting.apply_async(
+                kwargs={'user_id': user_id, 'post_id': 40, 'loop_for_duration': 60 * 5},
+                retry=True,
+                retry_policy={
+                    'max_retries': 3,
+                    'interval_start': 60,
+                    'interval_step': 30
+                })
         except AlreadyQueued as e:
             myprint(f"AlreadyQueued Exception: {e}")
+
 
 def test_post_to_linkedin_via_celery_task():
     user_id = 60
@@ -373,21 +365,33 @@ def test_post_to_linkedin_via_celery_task():
                                  eta=scheduled_time,
                                  )
 
+
 def test_automate_reply_commenting():
     clear_sessions()
 
     user_id = 60
-    post_id = 83
+    post_id = 96
     scheduled_time = datetime.now() + timedelta(seconds=11)
     myprint(f"Automating reply commenting for Post ID: {post_id}")
 
-    post_kwargs = {'user_id': user_id, 'post_id': post_id, 'loop_for_duration':(60*3)}
+    post_kwargs = {'user_id': user_id, 'post_id': post_id, 'loop_for_duration': (60 * 60 * 22)}
     automate_reply_commenting.apply_async(kwargs=post_kwargs,
-                                 eta=scheduled_time,
-                                 )
+                                          eta=scheduled_time,
+                                          )
+
 
 def test_organize_videos_by_name_and_timestamp():
     organize_videos_by_name_and_timestamp()
+
+
+def test_automate_invites_to_company_page_for_user():
+    clear_sessions()
+    user_id = 60
+    myprint(f"Automating Company Page Invites for User ID: {user_id}")
+    automate_invites_to_company_page_for_user.apply_async(kwargs={'user_id': user_id},
+                                                          countdown=11
+                                                          )
+
 
 if __name__ == "__main__":
     # test_ai_responses()
@@ -398,9 +402,8 @@ if __name__ == "__main__":
     # test_describe_profile()
     # test_summarize_interesting_recent_activity_and_response()
     # test_post_comment()
-    # test_auto_reply()
 
-    #test_send_private_dm()
+    # test_send_private_dm()
 
     # test_engage_with_profile_viewer()
     # test_navigate_to_feed()
@@ -409,8 +412,10 @@ if __name__ == "__main__":
     # test_blocking_celery_calls()
 
     # test_post_to_linkedin_via_celery_task()
-    test_automate_reply_commenting()
+    # test_automate_reply_commenting()
 
-    #test_organize_videos_by_name_and_timestamp()
+    # test_organize_videos_by_name_and_timestamp()
+
+    test_automate_invites_to_company_page_for_user()
 
     pass

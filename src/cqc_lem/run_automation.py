@@ -23,8 +23,10 @@ from cqc_lem.utilities.ai.ai_helper import generate_ai_response, get_ai_message_
 from cqc_lem.utilities.date import convert_viewed_on_to_date
 from cqc_lem.utilities.db import get_user_password_pair_by_id, get_user_id, insert_new_log, LogActionType, \
     LogResultType, has_user_commented_on_post_url, get_post_url_from_log_for_user, get_post_message_from_log_for_user, \
-    has_engaged_url_with_x_days, get_post_content, get_post_video_url, update_db_post_status, PostStatus
+    has_engaged_url_with_x_days, get_post_content, get_post_video_url, update_db_post_status, PostStatus, \
+    get_company_linked_in_url_for_user
 from cqc_lem.utilities.env_constants import LI_USER
+from cqc_lem.utilities.linkedin.company_page_inviter import automate_invitations
 from cqc_lem.utilities.linkedin.helper import login_to_linkedin, get_my_profile, get_linkedin_profile_from_url
 from cqc_lem.utilities.linkedin.poster import share_on_linkedin
 from cqc_lem.utilities.linkedin.profile import LinkedInProfile
@@ -365,10 +367,11 @@ def check_commented(driver, wait, user_id: int = None, post_url: str = None):
     already_commented = False
 
     if post_url and post_url != driver.current_url:
+        myprint(f"Navigating To: {post_url}")
         # Switch to post url
         driver.get(post_url)
 
-    # Check against Database (in logs table)
+    # 1. Check against Database (in logs table)
     if user_id and post_url:
         already_commented = has_user_commented_on_post_url(user_id, post_url)
 
@@ -392,7 +395,7 @@ def automate_commenting(self, user_id: int, loop_for_duration: int = None, futur
 
     myprint("Starting Automate Commenting Thread...")
 
-    driver, wait, user_email, my_profile = get_current_profile(user_id=user_id, session_name="Automate Commenting")
+    driver, wait, user_email, my_profile = get_current_profile(user_id=user_id, session_name="Commenting")
 
     navigate_to_feed(driver, wait)
 
@@ -617,8 +620,9 @@ def automate_reply_commenting(self, user_id: int, post_id: int, loop_for_duratio
         if new_loop_for_duration < 0:
             myprint(f"Loop duration reached. Stopping {current_function_name} task...")
         else:
-            # Change the value of the loop_for_duration parameter
+            # Change the value of the loop_for_duration and future_forward parameters
             kwargs['loop_for_duration'] = new_loop_for_duration
+            kwargs['future_forward'] = future_forward
             # Add our function call back to the task queue
             myprint(f"Adding {current_function_name} back to queue for {future_forward} seconds in the future...")
             # Remove 'self' from kwargs if it exists
@@ -674,7 +678,7 @@ def accept_connection_request(user_id: int):
 def automate_appreciation_dms_for_user(self, user_id: int, loop_for_duration: int = None, future_forward: int = 60):
     user_email, user_password = get_user_password_pair_by_id(user_id)
 
-    driver, wait = get_driver_wait_pair(session_name='Automate Appreciation DMs')
+    driver, wait = get_driver_wait_pair(session_name='Appreciation DMs')
 
     login_to_linkedin(driver, wait, user_email, user_password)
 
@@ -799,7 +803,7 @@ def generate_and_post_comment(driver, wait, post_link, my_profile: LinkedInProfi
               'comment_text': comment_text}
     comment_on_post.apply_async(kwargs=kwargs)
 
-    myprint("Comment Posted")
+    myprint(f"Comment Posted on: {post_link}")
 
     return True
 
@@ -992,15 +996,10 @@ def engage_with_profile_viewer(self, user_id: int, viewer_url, viewer_name):
                 for activity in recent_activities:
                     link = str(activity.link)
 
-                    # Navigate to Link
-                    myprint(f"Navigating To: {link}")
-                    driver.get(link)
-                    commented = check_commented(driver, link)
-                    if not commented:
-                        # Leave comment on that activity
-                        able_to_comment = generate_and_post_comment(driver, wait, link, my_profile)
-                        if able_to_comment:
-                            break  # Only comment/interact with one
+                    # Leave comment on that activity
+                    able_to_comment = generate_and_post_comment(driver, wait, link, my_profile)
+                    if able_to_comment:
+                        break  # Only comment/interact with one
 
                 if not able_to_comment:
                     myprint("No activities, unable to or already left comment")
@@ -1355,3 +1354,18 @@ def post_to_linkedin(self, user_id: int, post_id: int):
                        message="Failed to create post using /posts API endpoint.")
 
         return f"Failed to create post using /posts API endpoint"
+
+@shared_task.task(bind=True, base=QueueOnce, once={'graceful': False}, reject_on_worker_lost=True,
+                  rate_limit='4/m')
+def automate_invites_to_company_page_for_user(self, user_id: int):
+    """Send invites to the company page for the given user."""
+
+    driver, wait = get_driver_wait_pair(session_name='Company Page Invites')
+
+    invite_count = automate_invitations(driver, wait, user_id)
+
+    quit_gracefully(driver)
+
+    result = f"Invited {invite_count if invite_count else 0} people to the company page."
+    myprint(result)
+    return result

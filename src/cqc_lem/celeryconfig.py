@@ -10,7 +10,7 @@ broker_url = os.getenv('CELERY_BROKER_URL',f'redis://redis:{REDIS_PORT}/0')
 result_backend = os.getenv('CELERY_RESULT_BACKEND',f'redis://redis:{REDIS_PORT}/1')
 
 # The Redis backend visibility timout
-result_backend_transport_options = {'visibility_timeout': (60*30)}  # 30 minutes
+result_backend_transport_options = {'visibility_timeout': (60*60*3)}  # 3 hours
 
 # Backend will try to retry on the event of recoverable exceptions instead of propagating the exception. It will use an exponential backoff sleep time between 2 retries.
 result_backend_always_retry = True
