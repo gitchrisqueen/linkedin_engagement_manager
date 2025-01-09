@@ -35,7 +35,7 @@ jobs:
         uses: azure/container-apps-deploy-action@v2
         with:
           appSourcePath: ${{ github.workspace }}
-          dockerfilePath: ./compose/local/streamlit
+          dockerfilePath: ./compose/local/streamlit/Dockerfile
           registryUrl: docker.io
           registryUsername: ${{ secrets.CQCLEMAZUREAPP_REGISTRY_USERNAME }}
           registryPassword: ${{ secrets.CQCLEMAZUREAPP_REGISTRY_PASSWORD }}
