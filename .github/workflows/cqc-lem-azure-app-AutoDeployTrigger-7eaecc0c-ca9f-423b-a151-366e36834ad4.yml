@@ -41,7 +41,7 @@ jobs:
           registryPassword: ${{ secrets.CQCLEMAZUREAPP_REGISTRY_PASSWORD }}
           containerAppName: cqc-lem-azure-app
           resourceGroup: LEM
-          imageToBuild: frostbyte07/cqc-lem-azure-app:${{ github.sha }}
+          imageToBuild: chrisqueen/cqc-lem:${{ github.sha }}
           _buildArgumentsKey_: |
             _buildArgumentsValues_
 
