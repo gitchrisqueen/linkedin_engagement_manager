@@ -10,7 +10,7 @@ broker_url = os.getenv('CELERY_BROKER_URL',f'redis://redis:{REDIS_PORT}/0')
 result_backend = os.getenv('CELERY_RESULT_BACKEND',f'redis://redis:{REDIS_PORT}/1')
 
 # The Redis backend visibility timout
-result_backend_transport_options = {'visibility_timeout': (60*60*3)}  # 3 hours
+result_backend_transport_options = {'visibility_timeout': (60*60*3)}  # 3 hours (This is important. If scheduled items arent handled they will duplicate by being sent back to the queue)
 
 # Backend will try to retry on the event of recoverable exceptions instead of propagating the exception. It will use an exponential backoff sleep time between 2 retries.
 result_backend_always_retry = True
@@ -39,4 +39,4 @@ worker_concurrency=1
 worker_prefetch_multiplier=1
 
 # The maximum number of tasks a worker can execute before it’s replaced by a new process.
-worker_max_tasks_per_child=2500
+worker_max_tasks_per_child=100

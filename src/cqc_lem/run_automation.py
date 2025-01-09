@@ -434,6 +434,8 @@ def automate_commenting(self, user_id: int, loop_for_duration: int = None, futur
     # Switch back to tab
     driver.switch_to.window(current_tab)
 
+    quit_gracefully(driver)
+
     # Re-schedule the task in the queue for the future
     if loop_for_duration:
         elapsed_time = datetime.now() - start_time
@@ -457,7 +459,7 @@ def automate_commenting(self, user_id: int, loop_for_duration: int = None, futur
             # Call self again in the future
             globals()[current_function_name].apply_async(kwargs=kwargs, countdown=future_forward)
 
-    quit_gracefully(driver)
+
 
 
 @shared_task.task(bind=True, base=QueueOnce, once={'graceful': True, 'unlock_before_run': True, 'keys': ['user_id', 'post_id']})
