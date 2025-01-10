@@ -463,7 +463,7 @@ def automate_commenting(self, user_id: int, loop_for_duration: int = None, futur
 
 
 @shared_task.task(bind=True, base=QueueOnce, once={'graceful': True, 'unlock_before_run': True, 'keys': ['user_id', 'post_id']})
-def automate_reply_commenting(self, user_id: int, post_id: int, loop_for_duration: int = 60, future_forward=60):
+def automate_reply_commenting(self, user_id: int, post_id: int, loop_for_duration: int = 60, future_forward=0):
     """Reply to recent comments left on the post recently posted"""
 
     driver, wait, user_email, my_profile = get_current_profile(user_id=user_id, session_name="Reply to Comments")
@@ -607,12 +607,18 @@ def automate_reply_commenting(self, user_id: int, post_id: int, loop_for_duratio
 
         # If the loop for duration is more than 30 minutes, increase future forward timeby 5 minutes
         if loop_for_duration > (60*30):
-            future_forward += 60*5
-        # Cap the future forward time to 1 hour
-        if future_forward > 60*60:
-            future_forward = 60*60
+            future_forward += 1
 
-        new_loop_for_duration = round(loop_for_duration - elapsed_time.total_seconds() - future_forward)
+        # Future forward is an index. Use it to get the number of seconds to go forward
+        future_forward_times = [0, 60*5, 60*10, 60*15, 60*30, 60*60]
+
+        # Cap the future_forward to the length of the future_forward_times list
+        if future_forward > len(future_forward_times) - 1:
+            future_forward = len(future_forward_times) - 1
+
+        future_forward_time = future_forward_times[future_forward]
+
+        new_loop_for_duration = round(loop_for_duration - elapsed_time.total_seconds() - future_forward_time)
         frame = inspect.currentframe()
         current_function_name = frame.f_code.co_name
         args, _, _, values = inspect.getargvalues(frame)
@@ -626,13 +632,13 @@ def automate_reply_commenting(self, user_id: int, post_id: int, loop_for_duratio
             kwargs['loop_for_duration'] = new_loop_for_duration
             kwargs['future_forward'] = future_forward
             # Add our function call back to the task queue
-            myprint(f"Adding {current_function_name} back to queue for {future_forward} seconds in the future...")
+            myprint(f"Adding {current_function_name} back to queue for {future_forward_time} seconds in the future...")
             # Remove 'self' from kwargs if it exists
             if 'self' in kwargs:
                 del kwargs['self']
 
             # Call self again in the future
-            globals()[current_function_name].apply_async(kwargs=kwargs, countdown=future_forward)
+            globals()[current_function_name].apply_async(kwargs=kwargs, countdown=future_forward_time)
 
     quit_gracefully(driver)
 
@@ -670,6 +676,8 @@ def accept_connection_request(user_id: int):
     except Exception as e:
         myprint(f"Error while accepting connection requests: {e}")
         invitation_data = {}
+
+    quit_gracefully(driver)
 
     # Return the invitations list
     return invitation_data
@@ -1052,6 +1060,8 @@ def clean_stale_invites(self, user_id: int):
 
     # login_to_linkedin(driver, wait, user_email, user_password)
 
+    #quit_gracefully(driver)  # Close the driver
+
     pass
 
 
@@ -1126,7 +1136,7 @@ def send_private_dm(self, user_id: int, profile_url: str, message: str):
 @shared_task.task(bind=True, base=QueueOnce, once={'graceful': True, 'keys': ['user_id', 'profile_url']},
                    reject_on_worker_lost=True, rate_limit='1/m')
 def invite_to_connect(self, user_id: int, profile_url: str, message: str = None):
-    # TODO: Add log entry for successfule and failed invites to connect
+    # TODO: Add log entry for successful and failed invites to connect
 
     user_email, user_password = get_user_password_pair_by_id(user_id)
 
@@ -1334,6 +1344,11 @@ def post_to_linkedin(self, user_id: int, post_id: int):
         # Update DB with status=posted
         update_db_post_status(post_id, PostStatus.POSTED)
 
+        # Update DB with status=success in the logs table and the post url
+        insert_new_log(user_id=user_id, action_type=LogActionType.POST, result=LogResultType.SUCCESS, post_id=post_id,
+                       post_url=post_url,
+                       message=f"Successfully created post using /posts API endpoint.")
+
         # Schedule Reply to comments for 24 hours now that this has been posted
         base_kwargs = {
             'user_id': user_id,
@@ -1341,11 +1356,6 @@ def post_to_linkedin(self, user_id: int, post_id: int):
             'loop_for_duration': 60 * 60 * 24
         }
         automate_reply_commenting.apply_async(kwargs=base_kwargs)
-
-        # Update DB with status=success in the logs table and the post url
-        insert_new_log(user_id=user_id, action_type=LogActionType.POST, result=LogResultType.SUCCESS, post_id=post_id,
-                       post_url=post_url,
-                       message=f"Successfully created post using /posts API endpoint.")
 
         return f"Post successfully created"
 
