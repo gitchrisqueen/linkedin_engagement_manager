@@ -1,18 +1,17 @@
 
 services:
-  azure_web_app:
-    image: ${DOCKER_IMAGE_NAME}:197e005702f80e2e3b329de46b656c4e36963ea9
-    container_name: azure_web_app
-    command: /start
-    environment:
-      - DISPLAY=:99
-    env_file:
-      - azure.env
-    ports:
-      #  - "5000:5000"  # For the web interface
-      - "7070:${API_PORT}"  # For API endpoints
-      - "7501:${STREAMLIT_PORT}"  # For the streamlit app
-
+  #azure_web_app:
+  #  image: ${DOCKER_IMAGE_NAME}:197e005702f80e2e3b329de46b656c4e36963ea9
+  #  container_name: azure_web_app
+  #  command: /start
+  #  environment:
+  #    - DISPLAY=:99
+  #  env_file:
+  #    - azure.env
+  #  ports:
+  #    #  - "5000:5000"  # For the web interface
+  #    - "7070:${API_PORT}"  # For API endpoints
+  #    - "7501:${STREAMLIT_PORT}"  # For the streamlit app
 
 
   web_app:

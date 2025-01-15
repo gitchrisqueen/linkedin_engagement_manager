@@ -10,7 +10,7 @@ import mammoth
 import pandas as pd
 import streamlit as st
 import streamlit_ext as ste
-from docx import Document
+#from docx import Document
 from markdownify import markdownify as md
 from openai import OpenAI
 from streamlit.runtime.uploaded_file_manager import UploadedFile
@@ -314,6 +314,7 @@ def convert_content_to_markdown(content: str) -> str:
     return md(content)
 
 
+"""
 def convert_tables_to_json_in_tmp__file(doc: Document) -> str:
     for table in doc.tables:
         data = [[cell.text for cell in row.cells] for row in table.rows]
@@ -335,7 +336,7 @@ def convert_tables_to_json_in_tmp__file(doc: Document) -> str:
     doc.save(temp_file.name)
 
     return temp_file.name
-
+"""
 
 @st.cache_data
 def read_file(file_path: str, convert_to_markdown: bool = False) -> str:
