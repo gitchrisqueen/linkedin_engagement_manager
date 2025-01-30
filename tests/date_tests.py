@@ -1,7 +1,7 @@
 import datetime
 from datetime import timedelta
 
-from cqc_lem.utilities.date import get_datetime, add_local_tz_to_datetime
+from cqc_lem.utilities import add_local_tz_to_datetime
 from cqc_lem.utilities.db import get_posts
 
 import tzlocal

@@ -1,27 +1,13 @@
 
 services:
-  #azure_web_app:
-  #  image: ${DOCKER_IMAGE_NAME}:197e005702f80e2e3b329de46b656c4e36963ea9
-  #  container_name: azure_web_app
-  #  command: /start
-  #  environment:
-  #    - DISPLAY=:99
-  #  env_file:
-  #    - azure.env
-  #  ports:
-  #    #  - "5000:5000"  # For the web interface
-  #    - "7070:${API_PORT}"  # For API endpoints
-  #    - "7501:${STREAMLIT_PORT}"  # For the streamlit app
-
-
   web_app:
     build:
       context: .
       #context: https://github.com/gitchrisqueen/linkedin_engagement_manager.git
-      dockerfile: ./compose/local/streamlit/Dockerfile
+      dockerfile: ./compose/local/Dockerfile
     image: "${DOCKER_IMAGE_NAME}:latest"
     container_name: web_app
-    command: /start
+    command: /start-streamlit
     depends_on:
       - mysql
       - redis
@@ -32,7 +18,7 @@ services:
       # mount test folder
       - ./tests:/app/tests
       # Below used to override the start
-      - ./compose/local/streamlit/start:/start
+      #- ./compose/local/streamlit/start:/start-streamlit
       # Mount the logs folder
       - ./logs:/app/logs
     environment:
@@ -41,14 +27,31 @@ services:
       - .env
     ports:
       #  - "5000:5000"  # For the web interface
-      - "${API_PORT}:${API_PORT}"  # For API endpoints
       - "${STREAMLIT_PORT}:${STREAMLIT_PORT}"  # For the streamlit app
+
+  api:
+    image: ${DOCKER_IMAGE_NAME}
+    container_name: api
+    command: /start-fastapi
+    #restart: always
+    #volumes:
+      # Below used to override the start
+      #- ./compose/local/fastapi/start:/start-fastapi
+    volumes_from:
+      - web_app
+    env_file:
+      - .env
+    depends_on:
+      - redis
+      - mysql
+    ports:
+      - "${API_PORT}:${API_PORT}"  # For API endpoints
 
 
   redis:
       image: redis:alpine
       container_name: redis
-      restart: always
+      #restart: always
       volumes:
         - redis_data:/data
       ports:
@@ -58,7 +61,7 @@ services:
     image: mysql:8.0
     container_name: ${MYSQL_HOST}
     hostname: ${MYSQL_HOST}
-    restart: always
+    #restart: always
     environment:
       MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
       MYSQL_DATABASE: ${MYSQL_DATABASE}
@@ -95,9 +98,9 @@ services:
         reservations:
           cpus: '2'   # Reserve at least 2 CPUs for this container
     #restart: always
-    volumes:
+    #volumes:
       # Below used to override the start
-      - ./compose/local/celery/worker/start:/start-celeryworker
+      #- ./compose/local/celery/worker/start:/start-celeryworker
     volumes_from:
       - web_app
     env_file:
@@ -112,9 +115,9 @@ services:
     container_name: celery_beat
     command: /start-celerybeat
     #restart: always
-    volumes:
+    #volumes:
       # Below used to override the start
-      - ./compose/local/celery/beat/start:/start-celerybeat
+      #- ./compose/local/celery/beat/start:/start-celerybeat
     volumes_from:
      - web_app
     env_file:
@@ -128,12 +131,12 @@ services:
     image:  ${DOCKER_IMAGE_NAME}
     container_name: celery_flower
     command: /start-flower
-    restart: always
+    #restart: always
     volumes:
       - ./logs:/app/logs
       - flower_db:/data
       # Below used to override the start
-      - ./compose/local/celery/flower/start:/start-flower
+      #- ./compose/local/celery/flower/start:/start-flower
       # Override the flower css with our own (Disabled for now)
       #- ./compose/local/celery/flower/static/css/flower.css:/app/.venv/lib/python3.13/site-packages/flower/static/css/flower.css
       #- ./compose/local/celery/flower/static/css/datatables-1.13.4.min.css:/app/.venv/lib/python3.13/site-packages/flower/static/css/datatables-1.13.4.min.css
@@ -266,5 +269,4 @@ services:
 volumes:
   db_data:
   redis_data:
-  #chrome_profile:
   flower_db:

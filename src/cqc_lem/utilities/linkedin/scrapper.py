@@ -4,7 +4,6 @@ import re
 from typing import List
 
 from bs4 import BeautifulSoup, PageElement
-from openai import max_retries
 from selenium import webdriver
 from selenium.webdriver.common.by import By
 

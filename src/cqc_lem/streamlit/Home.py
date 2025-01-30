@@ -3,8 +3,8 @@ import os
 
 import streamlit as st
 
-from cqc_lem_streamlit.utils import get_custom_css
-from cqc_lem_streamlit.utils import read_file
+from cqc_lem.streamlit.utils import get_custom_css
+from cqc_lem.streamlit.utils import read_file
 
 
 # Initialize session state variables

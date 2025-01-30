@@ -3,7 +3,7 @@ import os
 import streamlit as st
 from linkedin_api.clients.auth.client import AuthClient
 
-from cqc_lem_streamlit.utils import get_file_as_data_image
+from cqc_lem.streamlit.utils import get_file_as_data_image
 
 
 # Function to load user data (replace with actual data loading logic)

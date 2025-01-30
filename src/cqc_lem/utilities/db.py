@@ -1,7 +1,9 @@
+import json
 import os
 from datetime import datetime, timedelta
 from enum import StrEnum
 
+import boto3
 import mysql.connector
 from dotenv import load_dotenv
 from mysql.connector import errorcode
@@ -23,12 +25,41 @@ MYSQL_PASSWORD = os.getenv('MYSQL_PASSWORD')
 MYSQL_DATABASE = os.getenv('MYSQL_DATABASE')
 
 
+def get_secret(secret_name, region_name):
+    """Gets the secret value from AWS Secrets Manager"""
+    session = boto3.session.Session()
+    client = session.client(
+        service_name='secretsmanager',
+        region_name=region_name
+    )
+
+    try:
+        get_secret_value_response = client.get_secret_value(
+            SecretId=secret_name
+        )
+    except Exception as e:
+        raise e
+
+    secret = get_secret_value_response['SecretString']
+    secret_dict = json.loads(secret)
+
+    return secret_dict
+
+
 def get_db_connection():
     """Establishes a connection to the MySQL database and returns the connection object.
 
     Raises:
         mysql.connector.Error: If there is an error connecting to the database.
     """
+
+    global MYSQL_HOST, MYSQL_USER, MYSQL_PASSWORD,MYSQL_DATABASE
+
+    # if MYSQL_USER and MYSQL_PASSWORD are empty try to get it from AWS using get_secret function
+    if not MYSQL_USER or not MYSQL_PASSWORD:
+        secret_dict = get_secret(os.getenv('AWS_SECRET_NAME'), os.getenv('AWS_REGION'))
+        MYSQL_USER = secret_dict['username']
+        MYSQL_PASSWORD = secret_dict['password']
 
     return mysql.connector.connect(
         host=MYSQL_HOST,
@@ -393,11 +424,10 @@ def get_posts(user_id: int):
     connection = get_db_connection()
     cursor = connection.cursor(dictionary=True)
 
-
     try:
         cursor.execute(
-        "SELECT id, content, video_url, scheduled_time, post_type, status FROM posts WHERE user_id = %s ORDER BY scheduled_time asc",
-        (user_id,))
+            "SELECT id, content, video_url, scheduled_time, post_type, status FROM posts WHERE user_id = %s ORDER BY scheduled_time asc",
+            (user_id,))
         posts = cursor.fetchall()
     except mysql.connector.Error as err:
         myprint(f"Could not get posts for user id: {user_id} | Error: {err}")
@@ -889,6 +919,7 @@ def has_engaged_url_with_x_days(user_id: int, post_url: str, days: int):
         connection.close()
 
     return count > 0
+
 
 def get_company_linked_in_url_for_user(user_id: int):
     connection = get_db_connection()

@@ -1,6 +1,6 @@
 import streamlit as st
 import requests
-from datetime import datetime, time
+from datetime import datetime
 
 from cqc_lem.api.main import PostRequest
 from cqc_lem.utilities.jaeger_tracer_helper import get_jaeger_tracer

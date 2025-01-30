@@ -1,0 +1,59 @@
+name: Deploy CDK Stack to AWS
+
+on:
+  push:
+    branches:
+      - main
+env:
+  CDK_VERSION: "2.177.0"
+  AWS_ACCOUNT_ID: ${{ secrets.AWS_ACCOUNT_ID }}
+  AWS_REGION: ${{ secrets.AWS_REGION }}
+  API_KEY: ${{ secrets.API_KEY }}
+  APPLICATION_TAG: ${{ vars.APPLICATION_TAG }}
+  APPLICATION_NAME: "cqc-lem"
+
+permissions:
+  id-token: write # This is required for requesting the JWT
+  contents: read # This is required for actions/checkout
+
+jobs:
+  deploy:
+    name: Build & Deploy
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v2
+        with:
+          python-version: '3.9'
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '22'  # Specify the Node.js version you need
+
+      - name: Install Poetry
+        run: |
+          curl -sSL https://install.python-poetry.org | python3 -
+
+      - name: Install dependencies
+        run: |
+          poetry install
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ASSUME_ROLE_ARN }}
+          role-session-name: github-action-role
+          aws-region: ${{ secrets.AWS_REGION }}
+
+      - name: Bootstrap
+        run: |
+          . _CI/bootstrap.sh
+
+      - name: Deploy
+        run: |
+          . _CI/deploy.sh

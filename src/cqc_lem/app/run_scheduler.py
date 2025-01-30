@@ -5,9 +5,8 @@ from datetime import timedelta, datetime
 from celery_once import QueueOnce
 
 from cqc_lem import assets_dir
-from cqc_lem.my_celery import app as shared_task
-# from celery import shared_task
-from cqc_lem.run_automation import automate_commenting, automate_profile_viewer_engagement, \
+from cqc_lem.app.my_celery import app as shared_task
+from cqc_lem.app.run_automation import automate_commenting, automate_profile_viewer_engagement, \
     automate_appreciation_dms_for_user, clean_stale_invites, update_stale_profile, post_to_linkedin, \
     automate_invites_to_company_page_for_user
 from cqc_lem.utilities.date import add_local_tz_to_datetime

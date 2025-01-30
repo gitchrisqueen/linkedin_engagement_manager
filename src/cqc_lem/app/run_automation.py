@@ -3,7 +3,6 @@ import random
 import sys
 import threading
 import time
-from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
 from typing import List, Tuple
 from urllib.parse import urlparse
@@ -18,14 +17,12 @@ from selenium.webdriver.remote.webelement import WebElement
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.support.wait import WebDriverWait
 
-from cqc_lem.my_celery import app as shared_task
+from cqc_lem.app.my_celery import app as shared_task
 from cqc_lem.utilities.ai.ai_helper import generate_ai_response, get_ai_message_refinement, summarize_recent_activity
 from cqc_lem.utilities.date import convert_viewed_on_to_date
 from cqc_lem.utilities.db import get_user_password_pair_by_id, get_user_id, insert_new_log, LogActionType, \
     LogResultType, has_user_commented_on_post_url, get_post_url_from_log_for_user, get_post_message_from_log_for_user, \
-    has_engaged_url_with_x_days, get_post_content, get_post_video_url, update_db_post_status, PostStatus, \
-    get_company_linked_in_url_for_user
-from cqc_lem.utilities.env_constants import LI_USER
+    has_engaged_url_with_x_days, get_post_content, get_post_video_url, update_db_post_status, PostStatus
 from cqc_lem.utilities.linkedin.company_page_inviter import automate_invitations
 from cqc_lem.utilities.linkedin.helper import login_to_linkedin, get_my_profile, get_linkedin_profile_from_url
 from cqc_lem.utilities.linkedin.poster import share_on_linkedin

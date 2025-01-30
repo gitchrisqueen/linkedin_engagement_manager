@@ -1,7 +1,7 @@
 import re
 import time
 
-from selenium.common import ElementClickInterceptedException, TimeoutException
+from selenium.common import TimeoutException
 from selenium.webdriver import ActionChains
 
 from cqc_lem.utilities.db import get_user_password_pair_by_id, get_company_linked_in_url_for_user

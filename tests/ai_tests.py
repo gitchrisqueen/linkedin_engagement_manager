@@ -1,5 +1,4 @@
-from cqc_lem.utilities.ai.ai_helper import get_dall_e_image_prompt_from_ai, generate_dall_e_image_from_prompt, \
-    get_flux_image_prompt_from_ai, generate_flux1_image_from_prompt, get_runway_ml_video_prompt_from_ai, \
+from cqc_lem.utilities import get_flux_image_prompt_from_ai, generate_flux1_image_from_prompt, get_runway_ml_video_prompt_from_ai, \
     create_runway_video
 
 

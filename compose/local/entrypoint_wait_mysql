@@ -19,8 +19,4 @@ until /wait-for-it ${MYSQL_HOST}:${MYSQL_PORT} --timeout=10 --strict -- echo "My
   fi
 done
 
-# Activate the virtual environment
-# source /.venv/bin/activate
-# poetry shell
-
 exec "$@"

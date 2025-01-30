@@ -13,7 +13,7 @@ from requests.adapters import HTTPAdapter
 from urllib3 import Retry
 
 from cqc_lem import assets_dir
-from cqc_lem.my_celery import app as shared_task
+from cqc_lem.app.my_celery import app as shared_task
 from cqc_lem.utilities.ai.ai_helper import get_blog_summary_post_from_ai, get_website_content_post_from_ai, \
     get_flux_image_prompt_from_ai, generate_flux1_image_from_prompt, get_runway_ml_video_prompt_from_ai, \
     create_runway_video

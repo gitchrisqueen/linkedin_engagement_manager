@@ -6,7 +6,7 @@ import streamlit as st
 from st_aggrid import AgGrid, GridOptionsBuilder, DataReturnMode, GridUpdateMode
 
 from cqc_lem.utilities.db import PostStatus
-from cqc_lem.run_content_plan import auto_create_weekly_content
+from cqc_lem.app.run_content_plan import auto_create_weekly_content
 from cqc_lem.utilities.env_constants import API_BASE_URL, LINKEDIN_PREVIEW_URL
 from cqc_lem.utilities.jaeger_tracer_helper import get_jaeger_tracer
 

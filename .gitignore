@@ -181,3 +181,10 @@ src/cqc_lem/utilities/generated_designs/*
 # Exclude configs that are created dynamically
 ngrok-config.yml
 compose/local/prometheus/prometheus.yml
+
+*.swp
+package-lock.json
+
+# CDK asset staging directory
+.cdk.staging
+cdk.out

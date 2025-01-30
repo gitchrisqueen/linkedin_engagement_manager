@@ -7,13 +7,14 @@ from random import randint
 from typing import Tuple, Any
 
 import mammoth
-import pandas as pd
+from streamlit.runtime.uploaded_file_manager import UploadedFile
+
 import streamlit as st
 import streamlit_ext as ste
 #from docx import Document
 from markdownify import markdownify as md
 from openai import OpenAI
-from streamlit.runtime.uploaded_file_manager import UploadedFile
+#from cqc_lem.streamlit import UploadedFile
 
 from cqc_lem.utilities.mime_type_helper import get_file_mime_type
 

@@ -1,7 +1,7 @@
-from cqc_lem.utilities.linkedin.profile import LinkedInProfile
-from cqc_lem.run_automation import accept_connection_request, send_private_dm, automate_reply_commenting
+from cqc_lem.app.run_automation import accept_connection_request, send_private_dm, automate_reply_commenting
 from cqc_lem.utilities.env_constants import LI_USER, LI_PASSWORD
 from cqc_lem.utilities.linkedin.helper import login_to_linkedin
+from cqc_lem.utilities.linkedin import LinkedInProfile
 from cqc_lem.utilities.linkedin.scrapper import returnProfileInfo
 from cqc_lem.utilities.selenium_util import get_driver_wait_pair
 
@@ -19,6 +19,7 @@ def test_accept_invites():
         message = f"Hi {name}, I appreciate you connecting with me on LinkedIn. I look forward to learning more about you and your work."
         # Print the message and where its going to
         send_private_dm(user_id, profile_url, message)
+
 
 def test_send_dm():
     user_id = 60
@@ -38,12 +39,13 @@ def test_mutual_connections():
     print(f"{profile.full_name} Mutual Connection are: {', '.join(profile.mutual_connections)}")
     driver.quit()
 
+
 def test_automate_reply_commenting():
-    automate_reply_commenting(60,4)
+    automate_reply_commenting(60, 4)
 
 
 if __name__ == "__main__":
-    #test_accept_invites()
-    #test_send_dm()
-    #test_mutual_connections()
+    # test_accept_invites()
+    # test_send_dm()
+    # test_mutual_connections()
     test_automate_reply_commenting()

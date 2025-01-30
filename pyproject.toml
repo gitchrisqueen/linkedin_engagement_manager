@@ -6,8 +6,6 @@ authors = ["gitchrisqueen <christopher.queen@gmail.com>"]
 readme = "README.md"
 packages = [
     { include = "cqc_lem", from = "src" },
-    { include = "cqc_lem_streamlit", from = "src" }
-
 ]
 
 [tool.poetry.dependencies]
@@ -49,7 +47,6 @@ redis = "^5.2.0"
 watchdog = "^5.0.3"
 requests = "^2.32.3"
 tldextract = "^5.1.2"
-imessage-reader = "^0.6.1"
 nltk = "^3.9.1"
 fpdf = "^1.7.2"
 linkedin-api-client = "^0.3.0"
@@ -69,6 +66,12 @@ runwayml = "^2.1.0"
 huggingface-hub = "^0.26.2"
 replicate = "^1.0.4"
 celery-once = {git = "https://github.com/gitchrisqueen/celery-once.git"}
+
+# AWS CDK Libs
+aws-cdk-lib = "^2.177.0"
+constructs = "^10.4.2"
+boto3 = "^1.36.7"
+cdk-ecr-deployment = "^3.1.8"
 
 
 

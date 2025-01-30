@@ -3,18 +3,17 @@ import random
 import shutil
 
 from cqc_lem import assets_dir
-from cqc_lem.run_content_plan import create_content, auto_generate_content, auto_create_weekly_content, \
-    get_main_blog_url_content, fetch_sitemap_urls, filter_relevant_urls, is_blog_post, is_blog_post_by_metadata, \
-    scrape_recent_posts, is_blog_post_combined, plan_content_for_user
-from cqc_lem.run_automation import post_to_linkedin
-from cqc_lem.utilities.ai.ai_helper import get_industry_trend_analysis_based_on_user_profile, \
+from cqc_lem.app.run_automation import post_to_linkedin
+from cqc_lem.app.run_content_plan import create_content, auto_generate_content, auto_create_weekly_content, \
+    get_main_blog_url_content, fetch_sitemap_urls, filter_relevant_urls, is_blog_post_combined, plan_content_for_user
+from cqc_lem.utilities import get_industry_trend_analysis_based_on_user_profile, \
     get_thought_leadership_post_from_ai, get_flux_image_prompt_from_ai
 from cqc_lem.utilities.db import get_user_password_pair_by_id
 from cqc_lem.utilities.env_constants import API_BASE_URL
 from cqc_lem.utilities.linkedin.helper import get_my_profile
 from cqc_lem.utilities.logger import myprint
 from cqc_lem.utilities.selenium_util import clear_sessions, get_driver_wait_pair
-from cqc_lem.utilities.utils import create_folder_if_not_exists, save_video_url_to_dir
+from cqc_lem.utilities import create_folder_if_not_exists, save_video_url_to_dir
 
 
 def test_create_content():
@@ -22,14 +21,14 @@ def test_create_content():
 
     buyers_stages = [
         'awareness',
-        #'consideration',
-        #'decision'
+        # 'consideration',
+        # 'decision'
     ]
 
     post_types = [
-        #'text',
+        # 'text',
         'video',
-        #'carousel'
+        # 'carousel'
     ]
 
     for stage in buyers_stages:
@@ -41,7 +40,7 @@ def test_create_content():
             # Copy the video from url to our assets/video folder and store it to the database for later retrieval via api call
             if video_url:
                 # Define and create assets_dir / videos
-                videos_dir = os.path.join(assets_dir, 'videos','runwayml')
+                videos_dir = os.path.join(assets_dir, 'videos', 'runwayml')
                 create_folder_if_not_exists(videos_dir)
                 video_file_path = save_video_url_to_dir(video_url, videos_dir)
                 myprint(f"Video from url: {video_url} | Saved to: {video_file_path}")
@@ -51,6 +50,7 @@ def test_create_content():
                 # The video url is our api prefix + 'assets/videos' +  video_file_name
                 api_video_url = f"{API_BASE_URL}/assets?file_name=videos/runwayml/{video_file_name}"
                 myprint(f"Video URL: {api_video_url}")
+
 
 def test_user_profile_load_from_db():
     user_email, user_password = get_user_password_pair_by_id(1)
@@ -66,9 +66,10 @@ def test_content_plan_and_create():
     auto_generate_content()
     auto_create_weekly_content()
 
+
 def test_post_to_linkedin():
     clear_sessions()
-    post_to_linkedin(60,11)
+    post_to_linkedin(60, 11)
 
 
 def test_industry_of_user():
@@ -95,12 +96,12 @@ def test_thought_leadership_post_from_ai():
 
     # choose a random stage
     stage = random.choice(buyers_stages)
-    post = get_thought_leadership_post_from_ai(my_profile,stage)
+    post = get_thought_leadership_post_from_ai(my_profile, stage)
     print(f"Buyer Stage: {stage}\n\nPost: {post}")
 
 
 def test_move_files():
-    video_file_path = "/app/src/cqc_lem/assets/result/test/testing.mp4"
+    video_file_path = "/app/src/app/assets/result/test/testing.mp4"
 
     # Move the video file path to the assets/gradio dir
     gradio_dir = os.path.join(assets_dir, "gradio")
@@ -141,6 +142,7 @@ def test_content_from_sitemap_url():
     # Display each relevant URL
     for url in relevant_urls:
         myprint(f"Relevant URL: {url}")
+
 
 def test_blog_content_by_platform():
     blogs_by_platform = {
@@ -189,7 +191,8 @@ def test_blog_content_by_platform():
                 post_url = "N/A"
             if post_content:
                 did_get_content = post_content and len(post_content) > 0
-            myprint(f"\tBlog Link: {blog_link} | Blog Post URL: {post_url}| Is Blog: {is_blog_post}| Blog Content Gathered: {did_get_content}")
+            myprint(
+                f"\tBlog Link: {blog_link} | Blog Post URL: {post_url}| Is Blog: {is_blog_post}| Blog Content Gathered: {did_get_content}")
 
 
 def test_get_flux_image_prompt_from_ai():
@@ -229,7 +232,7 @@ def test_get_flux_image_prompt_from_ai():
 
 
 def plan_content_for_user_and_weekly_plan():
-    user_id=60
+    user_id = 60
     plan_content_for_user(user_id=user_id)
     auto_create_weekly_content(user_id=user_id)
 
@@ -247,8 +250,6 @@ if __name__ == "__main__":
     # test_content_from_sitemap_url()
     # test_get_main_blog_url_content()
     # test_blog_content_by_platform()
-    #test_get_flux_image_prompt_from_ai()
+    # test_get_flux_image_prompt_from_ai()
 
     plan_content_for_user_and_weekly_plan()
-
-

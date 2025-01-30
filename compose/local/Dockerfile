@@ -1,13 +1,10 @@
 FROM python:3.13-slim AS base
-#FROM python:3.13-bullseye AS base
-
-
+#FROM public.ecr.aws/docker/library/python:3.13-slim AS base
 
 ENV PYTHONFAULTHANDLER=1 \
     PYTHONHASHSEED=random \
     PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1
-
 
 # Install dependencies
 RUN apt-get update -y && apt-get install --no-install-suggests --no-install-recommends --yes \
@@ -41,7 +38,7 @@ WORKDIR /app
 FROM base AS builder
 
 # --- Install Poetry ---
-ARG POETRY_VERSION=1.8
+ARG POETRY_VERSION=2.0
 
 ENV POETRY_HOME=/opt/poetry \
     POETRY_NO_INTERACTION=1 \
@@ -60,7 +57,7 @@ ENV PIP_DEFAULT_TIMEOUT=100 \
 RUN pip install "poetry==$POETRY_VERSION" && poetry self add poetry-plugin-export
 
 # Copy the poetry.lock and pyproject.toml
-COPY ../../../pyproject.toml ../../../poetry.lock ./
+COPY ./pyproject.toml ./poetry.lock ./
 
 # Install the dependencies and clear the cache afterwards.
 #   This may save some MBs.
@@ -75,9 +72,9 @@ ENV VIRTUAL_ENV=/app/.venv
 ENV PATH="/app/.venv/bin:$PATH"
 ENV USE_DOCKER_BROWSER=True
 
-# Copy app code
-COPY ../../../src ./src
-COPY ../../../README.md ./
+# Copy app src files
+COPY ./src ./src
+COPY ./README.md ./README.md
 
 # Install our package and clear the cache afterwards.
 #   This may save some MBs.
@@ -86,16 +83,32 @@ RUN poetry install && rm -rf $POETRY_CACHE_DIR
 FROM my_app_code AS final
 
 # Copy and set permissions for entrypoint and other scripts
-COPY ./compose/local/streamlit/entrypoint /entrypoint
-COPY ./compose/local/streamlit/wait-for-it /wait-for-it
-COPY ./compose/local/streamlit/start /start
+COPY ./compose/local/entrypoint /entrypoint
+COPY ./compose/local/wait-for-it /wait-for-it
+COPY ./compose/local/streamlit/start /start-streamlit
+COPY ./compose/local/fastapi/start /start-fastapi
 COPY ./compose/local/celery/worker/start /start-celeryworker
 COPY ./compose/local/celery/beat/start /start-celerybeat
 COPY ./compose/local/celery/flower/start /start-flower
 
-RUN chmod +x /entrypoint /wait-for-it /start /start-celeryworker /start-celerybeat /start-flower
+RUN chmod +x /entrypoint /wait-for-it /start-streamlit /start-fastapi /start-celeryworker /start-celerybeat /start-flower
 
 # Create a logs folder
 RUN mkdir -p /app/logs
+
+
+# Define environment variables from aws builds
+ARG API_BASE_URL_BUILD_ARG
+ENV API_BASE_URL=$API_BASE_URL_BUILD_ARG
+
+# Define default ports if environment variables aren't set
+#ARG STREAMLIT_PORT=8501
+#ARG API_PORT=8000
+#ARG CELERY_FLOWER_PORT=5555
+
+# Expose the ports using variable substitution
+#EXPOSE $STREAMLIT_PORT
+#EXPOSE $API_PORT
+#EXPOSE $CELERY_FLOWER_PORT
 
 ENTRYPOINT ["/entrypoint"]
