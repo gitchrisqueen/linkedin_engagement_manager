@@ -4,8 +4,6 @@ from aws_cdk import (
     aws_servicediscovery as servicediscovery,
     aws_ecs as ecs,
     aws_logs as logs,
-    aws_iam as iam,
-    aws_ecr_assets as ecr_assets,
     aws_elasticloadbalancingv2 as elbv2,
     RemovalPolicy,
     CfnOutput
@@ -16,10 +14,9 @@ from constructs import Construct
 
 class EcsStack(NestedStack):
 
-    def __init__(self, scope: Construct, construct_id: str, vpc: ec2.Vpc,
-                 repository: ecr_assets.DockerImageAsset,
+    def __init__(self, scope: Construct, id: str, vpc: ec2.Vpc,
                  **kwargs) -> None:
-        super().__init__(scope, construct_id, **kwargs)
+        super().__init__(scope, id, **kwargs)
 
         # Creating the ECS Cluster and the cloud map namespace
         self.ecs_cluster = ecs.Cluster(self, "ECSCluster",
@@ -32,30 +29,10 @@ class EcsStack(NestedStack):
 
         # Creating the Cloudwatch log group where ECS Logs will be stored
         self.ECSServiceLogGroup = logs.LogGroup(self, "ECSServiceLogGroup",
-                                           log_group_name=f"{self.ecs_cluster.cluster_name}-service",
-                                           removal_policy=RemovalPolicy.DESTROY,
-                                           retention=logs.RetentionDays.ONE_WEEK,
-                                           )
-
-        # Creating the task and execution IAM roles that the containers will assume to read and write to cloudwatch, Task Execution
-        # Role will read from ECR
-        self.ECSTaskIamRole = iam.Role(self, "ECSTaskIamRole",
-                                       assumed_by=iam.ServicePrincipal("ecs-tasks.amazonaws.com"),
-                                       managed_policies=[
-                                           iam.ManagedPolicy.from_aws_managed_policy_name("CloudWatchFullAccess"),
-                                       ],
-                                       )
-        self.TaskExecutionRole = iam.Role(self, "TaskExecutionRole",
-                                          assumed_by=iam.ServicePrincipal("ecs-tasks.amazonaws.com"),
-                                          managed_policies=[
-                                              iam.ManagedPolicy.from_aws_managed_policy_name(
-                                                  "service-role/AmazonECSTaskExecutionRolePolicy"),
-                                              iam.ManagedPolicy.from_aws_managed_policy_name(
-                                                  "AmazonEC2ContainerRegistryReadOnly"),
-                                              iam.ManagedPolicy.from_aws_managed_policy_name(
-                                                  "CloudWatchLogsFullAccess"),
-                                          ],
-                                          )
+                                                log_group_name=f"{self.ecs_cluster.cluster_name}-service",
+                                                removal_policy=RemovalPolicy.DESTROY,
+                                                retention=logs.RetentionDays.ONE_WEEK,
+                                                )
 
         # ECS Security group, this will allow access from the Load Balancer and allow LAN access so that the
         # ECS containers can talk to each other on ingress ports
@@ -69,13 +46,49 @@ class EcsStack(NestedStack):
         self.ECSSecurityGroup.add_ingress_rule(ec2.Peer.ipv4(vpc.vpc_cidr_block), ec2.Port.tcp(8000),
                                                description="All traffic within VPC", )
 
+        self.ECSSecurityGroup.add_ingress_rule(ec2.Peer.ipv4(vpc.vpc_cidr_block), ec2.Port.tcp(8501),
+                                               description="All traffic within VPC", )
+
+        self.ECSSecurityGroup.add_ingress_rule(ec2.Peer.ipv4(vpc.vpc_cidr_block), ec2.Port.tcp(8555),
+                                               description="All traffic within VPC", )
+
         # Creating a public load balancer
         self.public_lb_sg = ec2.SecurityGroup(self, "PublicLBSG", vpc=vpc, description="Public LB SG",
                                               allow_all_outbound=True)
 
         self.public_lb = elbv2.ApplicationLoadBalancer(self, "FrontendLB", vpc=vpc, internet_facing=True,
-                                                  security_group=self.public_lb_sg,
-                                                  vpc_subnets=ec2.SubnetSelection(subnet_type=ec2.SubnetType.PUBLIC))
+                                                       security_group=self.public_lb_sg,
+                                                       vpc_subnets=ec2.SubnetSelection(
+                                                           subnet_type=ec2.SubnetType.PUBLIC))
+
+
         self.public_lb.set_attribute(key="idle_timeout.timeout_seconds", value="30")
+
+        self.public_lb_sg.add_ingress_rule(peer=ec2.Peer.any_ipv4(), connection=ec2.Port.tcp(80),
+                                           description="Allow HTTP traffic")
+
+        self.web_listener = self.public_lb.add_listener("WebAppListener", port=80,
+                                                        default_action=elbv2.ListenerAction.fixed_response(
+                                                            status_code=200,
+                                                            content_type="text/plain",
+                                                            message_body="OK"))
+
+        self.public_lb_sg.add_ingress_rule(peer=ec2.Peer.any_ipv4(), connection=ec2.Port.tcp(8000),
+                                           description="Allow HTTP traffic")
+        self.api_listener = self.public_lb.add_listener("APIListener", port=8000,
+                                                        protocol=elbv2.ApplicationProtocol.HTTP,
+                                                        default_action=elbv2.ListenerAction.fixed_response(
+                                                            status_code=200,
+                                                            content_type="text/plain",
+                                                            message_body="OK"))
+
+        self.public_lb_sg.add_ingress_rule(peer=ec2.Peer.any_ipv4(), connection=ec2.Port.tcp(8555),
+                                           description="Allow HTTP traffic")
+        self.flower_listener = self.public_lb.add_listener("CeleryFlowerListener", port=8555,
+                                                           protocol=elbv2.ApplicationProtocol.HTTP,
+                                                           default_action=elbv2.ListenerAction.fixed_response(
+                                                               status_code=200,
+                                                               content_type="text/plain",
+                                                               message_body="OK"))
 
         CfnOutput(self, "Load Balancer URL", value=f"http://{self.public_lb.load_balancer_dns_name}")

@@ -31,7 +31,7 @@ class MySQLStack(NestedStack):
                                            ),
                                            # credentials=rds.Credentials.from_generated_secret("admin"),  # Optional - will default to 'admin' username and generated password
                                            database_name="linkedin_manager",
-                                           removal_policy=RemovalPolicy.SNAPSHOT,
+                                           removal_policy=RemovalPolicy.DESTROY,
                                            deletion_protection=False
                                            )
 
@@ -42,7 +42,9 @@ class MySQLStack(NestedStack):
         )
 
         self.db_instance_endpoint_address = db_instance.db_instance_endpoint_address
+        self.myql_secret_name = db_instance.secret.secret_name
 
         # Output resources
         CfnOutput(self, "DBInstanceEndpoint", value=db_instance.db_instance_endpoint_address)
+        CfnOutput(self, "DBSecretName", value=db_instance.secret.secret_name)
         CfnOutput(self, "DBInstanceARN", value=db_instance.instance_arn)

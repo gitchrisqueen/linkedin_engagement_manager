@@ -11,11 +11,11 @@ if [[ -d "aws" ]]; then
 
     echo "Synthesize cqc_lem_aws.."
 
-    npm run cdk synth -- \
+    npm run cdk bootstreap -- \
         --quiet \
-        --context name=${APPLICATION_NAME} \
+        --context name=${AWS_APPLICATION_NAME} \
         --context accountId=${AWS_ACCOUNT_ID} \
         --context region=${AWS_REGION} \
-        --context apiKey=${API_KEY} \
-        --context applicationTag=${APPLICATION_TAG}
+        --context apiKey=${AWS_API_KEY} \
+        --context applicationTag=${AWS_APPLICATION_TAG}
 fi

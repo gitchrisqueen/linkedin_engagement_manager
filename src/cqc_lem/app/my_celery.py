@@ -12,7 +12,7 @@ from cqc_lem.utilities.logger import myprint
 
 # Create default Celery app
 app = Celery(
-    'app',
+    'cqc_lem',
 
 )
 
@@ -22,7 +22,7 @@ app.config_from_object(celeryconfig)
 # When we use the following in Django, it loads all the <appname>.tasks
 # files and registers any tasks it finds in them. We can import the
 # tasks files some other way if we prefer.
-app.autodiscover_tasks(['app'])
+app.autodiscover_tasks(['cqc_lem'])
 
 # Gets the max between all the parameters of timeout in the tasks
 max_timeout = 60 * 30  # This value must be bigger than the maximum soft timeout set for a task to prevent an infinity loop
@@ -43,39 +43,39 @@ app.conf.update(
     beat_schedule={
         # Comment error tracing out
         # 'test-error-tracing': {
-        #    'task': 'app.run_scheduler.test_error_tracing',
+        #    'task': 'cqc_lem.run_scheduler.test_error_tracing',
         #    'schedule': timedelta(minutes=1),  # Run every 1 minutes
         # },
         'check-scheduled-posts': {
-            'task': 'app.run_scheduler.auto_check_scheduled_posts',
+            'task': 'cqc_lem.run_scheduler.auto_check_scheduled_posts',
             'schedule': timedelta(minutes=5)  # Run every 5 minutes
         },
         'generate-content-plan': {
-            'task': 'app.run_content_plan.auto_generate_content',
+            'task': 'cqc_lem.run_content_plan.auto_generate_content',
             'schedule': crontab(hour='1', minute='0')  # Run every day at 1:00 AM
         },
         'create-content-from-plan': {
-            'task': 'app.run_content_plan.auto_create_weekly_content',
+            'task': 'cqc_lem.run_content_plan.auto_create_weekly_content',
             'schedule': crontab(hour='1', minute='30')  # Run every day at 1:30 AM
         },
         'clean-up-stale-invites': {
-            'task': 'app.run_scheduler.auto_clean_stale_invites',
+            'task': 'cqc_lem.run_scheduler.auto_clean_stale_invites',
             'schedule': crontab(hour='2', minute='0', )  # Run every day at 2:00 AM
         },
         'clen-up-stale-profiles': {
-            'task': 'app.run_scheduler.auto_clean_stale_profiles',
+            'task': 'cqc_lem.run_scheduler.auto_clean_stale_profiles',
             'schedule': crontab(hour='3', minute='0', )  # Run every day at 3:00 AM
         },
         'clen-up-old_videos': {
-            'task': 'app.run_scheduler.auto_clean_old_videos',
+            'task': 'cqc_lem.run_scheduler.auto_clean_old_videos',
             'schedule': crontab(hour='4', minute='0', )  # Run every day at 4:00 AM
         },
         'invite_to_company_pages': {
-            'task': 'app.run_scheduler.auto_invite_to_company_pages',
+            'task': 'cqc_lem.run_scheduler.auto_invite_to_company_pages',
             'schedule': crontab(hour='5', minute='0', day_of_month='1')  # Run on the 1st of the month at 5:00 AM
         },
         'send-appreciation-dms': {
-            'task': 'app.run_scheduler.auto_appreciate_dms',
+            'task': 'cqc_lem.run_scheduler.auto_appreciate_dms',
             'schedule': crontab(hour='8', minute='0')  # Run every day at 8:00 AM
         }
 

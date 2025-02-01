@@ -1,14 +1,16 @@
+from datetime import datetime
+
 import cdk_ecr_deployment as ecrdeploy
 from aws_cdk import (
     NestedStack,
     aws_ecr as ecr,
     aws_ecr_assets as ecr_assets,
-    Aws
+    RemovalPolicy
 )
 from aws_cdk.aws_ecr_assets import DockerImageAsset, Platform
 from constructs import Construct
 
-from cqc_lem import compose_dir
+from cqc_lem import build_dir
 
 
 class EcrStack(NestedStack):
@@ -16,14 +18,31 @@ class EcrStack(NestedStack):
     def __init__(self, scope: Construct, id: str, **kwargs, ) -> None:
         super().__init__(scope, id, **kwargs)
 
-        # Creat ecr repository that will host the docker image for our services
-        Repository = ecr.Repository(self, "Repository", repository_name="cqc-lem")
+        # Create ecr repository that will host the docker image for our services
+        repository = ecr.Repository(self, "Repository",
+                                    repository_name="cqc-lem",
+                                    removal_policy=RemovalPolicy.DESTROY,
+                                    empty_on_delete=True)
 
-        docker_dir = compose_dir + '/local/'
+        # Create timestamp to add and create unique asset_name
+        timestamp = (datetime.now()).strftime("%Y%m%d%H%M%S")
+        asset_name = f"cqc-lem-docker-image-{timestamp}"
 
-        # The docker images were built on a M1 Macbook Pro, you may have to rebuild your images
+        # Build the Docker images
         docker_asset = DockerImageAsset(self, "dockerAsset",
-                                        directory=docker_dir,
+                                        asset_name=asset_name,
+                                        directory=build_dir,
+                                        file='./compose/local/Dockerfile',
+                                        exclude=[
+                                            '**/.*/*',
+                                            '**/_CL/**/*',
+                                            # '**/compose/**/*',
+                                            '**/docs/**/*',
+                                            '**/logs/**/*',
+                                            '**/src/cqc_lem/aws/**/*',
+                                            '**/src/cqc_lem/assets/**/*',
+                                            '**/test/**/*',
+                                        ],
                                         build_args={
                                             "API_BASE_URL_BUILD_ARG": "api.cqc-lem.local",
                                             # This argument will be passed to the dockerfile and used as the API_BASE_URL
@@ -38,7 +57,8 @@ class EcrStack(NestedStack):
         ecrdeploy.ECRDeployment(self, "DeployImage",
                                 src=ecrdeploy.DockerImageName(docker_asset.image_uri),
                                 dest=ecrdeploy.DockerImageName(
-                                    f"{Aws.ACCOUNT_ID}.dkr.ecr.{Aws.REGION}.amazonaws.com/cqc-lem:latest")
+                                    f"{repository.repository_uri}:latest"),
+                                memory_limit=2048
                                 )
 
         # Exporting values to be used in other stacks

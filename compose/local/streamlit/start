@@ -18,4 +18,11 @@ STREAMLIT_PORT=${STREAMLIT_PORT:-8501}
 }
 
 # Start Streamlit app
-streamlit run --server.port $STREAMLIT_PORT ./src/cqc_lem/streamlit/Home.py --server.headless true --browser.serverAddress="0.0.0.0" --server.enableCORS false --browser.gatherUsageStats false
+streamlit run \
+  --server.port $STREAMLIT_PORT  \
+  --server.headless true \
+  --browser.serverAddress="0.0.0.0" \
+  --server.enableCORS false \
+  --server.enableXsrfProtection=false \
+  --browser.gatherUsageStats false \
+  ./src/cqc_lem/streamlit/Home.py

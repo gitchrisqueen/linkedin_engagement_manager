@@ -1,3 +1,30 @@
 # Exclude all the following folders and files
-src/cqc_lem/assets/*
-src/cqc_lem/aws/cdk.out/*
+src/cqc_lem/assets/
+src/cqc_lem/aws/
+.venv/
+logs/
+test/
+
+# Compiled Python files
+*.pyc
+__pycache__/
+
+# Environment files
+.env
+
+# IDE settings
+.idea/
+
+# Build artifacts
+dist/
+build/
+*.egg-info/
+
+# Test coverage reports
+htmlcov/
+.coverage
+
+# Temporary files
+*.log
+*.tmp
+*.swp

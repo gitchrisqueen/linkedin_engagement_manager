@@ -3,14 +3,14 @@ from aws_cdk import (
     aws_ecs as ecs,
     aws_iam as iam,
     aws_ssm as ssm,
-    aws_elasticloadbalancingv2 as elbv2,
     aws_ecr_assets as ecr_assets,
-    aws_ec2 as ec2, Stack, Fn, )
+    aws_elasticloadbalancingv2 as elbv2,
+    aws_ec2 as ec2, Stack, )
 from aws_cdk.aws_elasticloadbalancingv2 import ApplicationLoadBalancer
 from constructs import Construct
 
 
-class CeleryFlowerStack(Stack):
+class APIStackOLD(Stack):
 
     def __init__(self, scope: Construct, id: str,
                  vpc: ec2.Vpc,
@@ -20,18 +20,17 @@ class CeleryFlowerStack(Stack):
                  ecs_task_iam_role: iam.Role,
                  task_execution_role: iam.Role,
                  repository_image_asset: ecr_assets.DockerImageAsset,
+                 mysql_host: str,
                  efs_volume_name: str,
                  efs_volume_configuration: ecs.EfsVolumeConfiguration,
                  mount_point: ecs.MountPoint,
-                 queue_url: str,
-                 redis_url: str,
                  **kwargs) -> None:
         super().__init__(scope, id, **kwargs)
 
         # Create a new Fargate Task Definition
         task_definition = ecs.FargateTaskDefinition(
-            self, 'CeleryFlowerFargateTaskDef',
-            family='celery_flower',
+            self, 'APIFargateTaskDef',
+            family='api',
             cpu=256,
             memory_limit_mib=512,
             task_role=task_execution_role,
@@ -45,38 +44,38 @@ class CeleryFlowerStack(Stack):
         )
 
         # Add a new container to the Fargate Task Definition
-        celery_flower_container = task_definition.add_container("CeleryFlowerContainer",
-                                                                container_name="celery_flower",
-                                                                image=ecs.ContainerImage.from_docker_image_asset(
-                                                                    repository_image_asset),
-                                                                command=["/start-flower"],  # Custom command
-                                                                environment={
-                                                                    "CELERY_RESULT_BACKEND": f"{redis_url}/1",
-                                                                    "CELERY_BROKER_URL": queue_url,
-                                                                    "FLOWER_UNAUTHENTICATED_API": "True",
-                                                                    "FLOWER_PERSISTENT": "True",
-                                                                    "FLOWER_SAVE_STATE_INTERVAL": "5000",
-                                                                    "CELERY_FLOWER_PORT": "8555"
-                                                                },
-                                                                port_mappings=[
-                                                                    ecs.PortMapping(
-                                                                        container_port=8555,
-                                                                        host_port=8555,
-                                                                        name="celery_flower",
-                                                                        # Name of the port mapping
-                                                                        # protocol= ecs.Protocol.TCP
-                                                                    )
-                                                                ],
-                                                                #logging=ecs.LogDriver.aws_logs(
-                                                                #    stream_prefix="celery-flower-logs")
-                                                                )
+        api_container = task_definition.add_container("APIContainer",
+                                                      container_name="api",
+                                                      image=ecs.ContainerImage.from_docker_image_asset(
+                                                          repository_image_asset),
+                                                      command=["/start-fastapi"],  # Custom command
+                                                      environment={
+                                                          "MYSQL_HOST": mysql_host,
+                                                          "MYSQL_PORT": "3306",
+                                                          "MYSQL_USER": "user",
+                                                          # TODO: Take this out so it uses AWS Secret
+                                                          "MYSQL_PASSWORD": "password",
+                                                          # TODO: Take this out so it uses AWS Secret
+                                                          "AWS_SECRET_NAME": "admin",
+                                                          # TODO: Put this back so it uses AWS Secret
+                                                          "API_PORT": "8000",
+                                                      },
+                                                      port_mappings=[
+                                                          ecs.PortMapping(
+                                                              container_port=8000,
+                                                              host_port=8000,
+                                                              name="api"  # Name of the port mapping
+                                                          )
+                                                      ],
+                                                      # logging=ecs.LogDriver.aws_logs(stream_prefix="api-logs")
+                                                      )
 
         # Add a new volume to the Fargate Task Definition
-        celery_flower_container.add_mount_points(mount_point)
+        api_container.add_mount_points(mount_point)
 
         # Create a service definitions and port mappings
-        celery_flower_service = ecs.FargateService(
-            self, 'CeleryFlowerService',
+        api_key_service = ecs.FargateService(
+            self, 'APIService',
             cluster=cluster,
             task_definition=task_definition,
             desired_count=1,
@@ -87,15 +86,14 @@ class CeleryFlowerStack(Stack):
             service_connect_configuration=ecs.ServiceConnectProps(
                 namespace=cloud_map_namespace.namespace_name,
                 services=[ecs.ServiceConnectService(
-                    port_mapping_name="celery_flower",  # Logical name for the service
-                    port=8555  # Container port
-
+                    port_mapping_name="api",  # Logical name for the service
+                    port=8000,  # Container port
                 )]),
-            service_name="celery-flower-service")
+            service_name="api-service")
 
         # TODO: Figure out this auto scaling
         # Create a new Auto Scaling Policy for the ECS Service
-        '''scalable_target = celery_flower_service.service.auto_scale_task_count(
+        '''scalable_target = api_key_service.service.auto_scale_task_count(
             min_capacity=1,
             max_capacity=20,
         )
@@ -112,16 +110,16 @@ class CeleryFlowerStack(Stack):
         '''
 
         target_group = elbv2.ApplicationTargetGroup(
-            self, "CeleryFlowerTargetGroup",
-            target_group_name="celery-flower-target-group",
+            self, "WebAppTargetGroup",
+            target_group_name="web-app-target-group",
             vpc=vpc,
-            port=8555,
-            targets=[celery_flower_service],
+            port=8000,
+            targets=[api_key_service],
             target_type=elbv2.TargetType.IP,
             protocol=elbv2.ApplicationProtocol.HTTP,
             health_check=elbv2.HealthCheck(
                 path="/",
-                port="8555",
+                port="8000",
                 interval=Duration.seconds(6),
                 timeout=Duration.seconds(5),
                 healthy_threshold_count=2,
@@ -137,19 +135,18 @@ class CeleryFlowerStack(Stack):
                                                         load_balancer_arn=load_balancer_arn)
 
         security_group_id = ssm.StringParameter.value_from_lookup(self, "/CQC-LEM/LoadBalancerSGID")
-        public_lb_sg = ec2.SecurityGroup.from_security_group_id(self, "WebAppImportedSecurityGroup", security_group_id)
+        public_lb_sg = ec2.SecurityGroup.from_security_group_id(self, "APIImportedSecurityGroup", security_group_id)
 
-        public_lb_sg.add_ingress_rule(peer=ec2.Peer.any_ipv4(), connection=ec2.Port.tcp(8555),
+        public_lb_sg.add_ingress_rule(peer=ec2.Peer.any_ipv4(), connection=ec2.Port.tcp(8000),
                                       description="Allow HTTP traffic")
 
-        listener = public_lb.add_listener("CeleryFlowerListener", port=8555,
-                                          protocol=elbv2.ApplicationProtocol.HTTP,
+        listener = public_lb.add_listener("APIListener", port=8000,
                                           default_action=elbv2.ListenerAction.forward(target_groups=[target_group]))
 
         lb_rule = elbv2.ApplicationListenerRule(
-            self, "CeleryFlowerListenerRule",
+            self, "APIListenerRule",
             listener=listener,
-            priority=3,
+            priority=2,
             action=elbv2.ListenerAction.forward(target_groups=[target_group]),
             conditions=[elbv2.ListenerCondition.path_patterns(["*"])],
         )

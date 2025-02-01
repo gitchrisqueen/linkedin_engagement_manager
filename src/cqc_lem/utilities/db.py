@@ -8,6 +8,7 @@ import mysql.connector
 from dotenv import load_dotenv
 from mysql.connector import errorcode
 
+from cqc_lem.utilities.env_constants import AWS_MYSQL_SECRET_NAME, AWS_REGION
 from cqc_lem.utilities.linkedin.profile import LinkedInProfile
 from cqc_lem.utilities.logger import myprint
 from cqc_lem.utilities.utils import get_top_level_domain
@@ -23,13 +24,14 @@ MYSQL_HOST = os.getenv('MYSQL_HOST')
 MYSQL_USER = os.getenv('MYSQL_USER')
 MYSQL_PASSWORD = os.getenv('MYSQL_PASSWORD')
 MYSQL_DATABASE = os.getenv('MYSQL_DATABASE')
+MYSQL_PORT = os.getenv('MYSQL_PORT')
 
 
 def get_secret(secret_name, region_name):
     """Gets the secret value from AWS Secrets Manager"""
     session = boto3.session.Session()
     client = session.client(
-        service_name='secretsmanager',
+        service_name=AWS_MYSQL_SECRET_NAME,
         region_name=region_name
     )
 
@@ -53,19 +55,23 @@ def get_db_connection():
         mysql.connector.Error: If there is an error connecting to the database.
     """
 
-    global MYSQL_HOST, MYSQL_USER, MYSQL_PASSWORD,MYSQL_DATABASE
+    global MYSQL_HOST, MYSQL_USER, MYSQL_PASSWORD, MYSQL_DATABASE, MYSQL_PORT
 
     # if MYSQL_USER and MYSQL_PASSWORD are empty try to get it from AWS using get_secret function
-    if not MYSQL_USER or not MYSQL_PASSWORD:
-        secret_dict = get_secret(os.getenv('AWS_SECRET_NAME'), os.getenv('AWS_REGION'))
+    if AWS_MYSQL_SECRET_NAME is not None and AWS_REGION is not None:
+        secret_dict = get_secret(AWS_MYSQL_SECRET_NAME, AWS_REGION)
+        MYSQL_HOST = secret_dict['host']
         MYSQL_USER = secret_dict['username']
         MYSQL_PASSWORD = secret_dict['password']
+        MYSQL_DATABASE = secret_dict['dbname']
+        MYSQL_PORT = secret_dict['port']
 
     return mysql.connector.connect(
         host=MYSQL_HOST,
         user=MYSQL_USER,
         password=MYSQL_PASSWORD,
-        database=MYSQL_DATABASE
+        database=MYSQL_DATABASE,
+        port=MYSQL_PORT
     )
 
 

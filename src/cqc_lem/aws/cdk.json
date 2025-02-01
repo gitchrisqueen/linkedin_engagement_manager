@@ -1,8 +1,8 @@
 {
   "app": "poetry run python -m cqc_lem.aws.app",
-  "watch": {
+  "files": {
     "include": [
-      "**"
+      "**/src/cqc_lem/aws/**/*"
     ],
     "exclude": [
       "README.md",
@@ -11,10 +11,17 @@
       "source.bat",
       "**/__init__.py",
       "**/__pycache__",
-      "tests"
+      "**/cdk.out/**/*",
+      "**/tests/**/*"
     ]
   },
   "context": {
+    "deployOrder": [
+      "CQC-LEM",
+      "WebStack",
+      "APIStack"
+
+    ],
     "@aws-cdk/aws-lambda:recognizeLayerVersion": true,
     "@aws-cdk/core:checkSecretUsage": true,
     "@aws-cdk/core:target-partitions": [

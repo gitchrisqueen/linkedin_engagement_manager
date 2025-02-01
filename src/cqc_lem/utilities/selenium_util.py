@@ -20,6 +20,7 @@ from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.support.wait import WebDriverWait
 from webdriver_manager.chrome import ChromeDriverManager
 
+from cqc_lem.utilities.env_constants import *
 from cqc_lem.utilities.logger import myprint
 from cqc_lem.utilities.utils import create_folder_if_not_exists
 
