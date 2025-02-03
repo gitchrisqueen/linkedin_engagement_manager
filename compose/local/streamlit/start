@@ -19,7 +19,7 @@ STREAMLIT_PORT=${STREAMLIT_PORT:-8501}
 
 # Start Streamlit app
 streamlit run \
-  --server.port $STREAMLIT_PORT  \
+  --server.port $STREAMLIT_PORT \
   --server.headless true \
   --browser.serverAddress="0.0.0.0" \
   --server.enableCORS false \

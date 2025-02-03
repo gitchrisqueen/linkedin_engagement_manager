@@ -21,8 +21,11 @@ services:
       #- ./compose/local/streamlit/start:/start-streamlit
       # Mount the logs folder
       - ./logs:/app/logs
+      # Mount the ~/.aws credentials for boto3 inside container
+      #- ~/.aws:/root/.aws:ro
     environment:
       - DISPLAY=:99
+      #- AWS_PROFILE=default
     env_file:
       - .env
     ports:
@@ -39,6 +42,8 @@ services:
       #- ./compose/local/fastapi/start:/start-fastapi
     volumes_from:
       - web_app
+    #environment:
+    #   - AWS_PROFILE=default
     env_file:
       - .env
     depends_on:
@@ -103,6 +108,8 @@ services:
       #- ./compose/local/celery/worker/start:/start-celeryworker
     volumes_from:
       - web_app
+    #environment:
+    #   - AWS_PROFILE=default
     env_file:
       - .env
     depends_on:
@@ -120,6 +127,8 @@ services:
       #- ./compose/local/celery/beat/start:/start-celerybeat
     volumes_from:
      - web_app
+    #environment:
+    #     - AWS_PROFILE=default
     env_file:
       - .env
     depends_on:
@@ -145,6 +154,7 @@ services:
     env_file:
       - .env
     environment:
+      #- AWS_PROFILE=default
       - FLOWER_UNAUTHENTICATED_API=True
       - FLOWER_PERSISTENT=True
       - FLOWER_SAVE_STATE_INTERVAL=5000  # 5s

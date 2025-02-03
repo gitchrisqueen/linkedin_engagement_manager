@@ -133,7 +133,7 @@ print_urls "titles[@]" "urls[@]"
 #fi
 
 # Step Final: Prompt the user if they want to open all the urls
-read -p "Do you want to Open these urls? (y/n): " open_chrome
-if [ "$open_chrome" == "y" ]; then
-    osascript open_urls.scpt
-fi
+#read -p "Do you want to Open these urls? (y/n): " open_chrome
+#if [ "$open_chrome" == "y" ]; then
+#    osascript open_urls.scpt
+#fi

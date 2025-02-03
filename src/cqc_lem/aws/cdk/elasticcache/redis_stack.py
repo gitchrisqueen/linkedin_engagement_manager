@@ -1,20 +1,18 @@
 from aws_cdk import (
     aws_elasticache as elasticache,
-    aws_sqs as sqs,
-    aws_ec2 as ec2, CfnOutput, Stack, )
+    aws_ec2 as ec2, CfnOutput, NestedStack, )
 from constructs import Construct
 
 
-class CeleryQueueStack(Stack):
+class RedisStack(NestedStack):
 
-    def __init__(self, scope: Construct, id: str, vpc: ec2.Vpc,
+    def __init__(self, scope: Construct, id: str,
+                 vpc: ec2.Vpc,
                  **kwargs) -> None:
         super().__init__(scope, id, **kwargs)
 
-        # Create SQS queue
-        queue = sqs.Queue(self, "CeleryQueue")
-
-        self.queue_url = queue.queue_url
+        # Create SQS queue - Doesn't allow celery flower and has other bugs
+        # queue = elasticcache.Queue(self, "CeleryQueue")
 
         # Create a new subnet group for the Redis cluster
         redis_subnet_group = elasticache.CfnSubnetGroup(self, "RedisSubnetGroup",
@@ -36,4 +34,4 @@ class CeleryQueueStack(Stack):
 
         # Output resources
         CfnOutput(self, "RedisEndpointAddress", export_name="RedisEndpointAddress", value=self.redis_url)
-        CfnOutput(self, "CeleryQueueUrl", export_name="CeleryQueueUrl", value=self.queue_url)
+        # CfnOutput(self, "CeleryQueueUrl", export_name="CeleryQueueUrl", value=queue.queue_url)

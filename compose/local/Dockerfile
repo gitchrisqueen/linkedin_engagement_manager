@@ -33,6 +33,7 @@ RUN apt-get update -y && apt-get install --no-install-suggests --no-install-reco
 # Upgrade Pip
 RUN python3 -m pip install --upgrade pip
 
+
 WORKDIR /app
 
 FROM base AS builder
@@ -88,10 +89,12 @@ COPY ./compose/local/wait-for-it /wait-for-it
 COPY ./compose/local/streamlit/start /start-streamlit
 COPY ./compose/local/fastapi/start /start-fastapi
 COPY ./compose/local/celery/worker/start /start-celeryworker
+COPY ./compose/local/celery/worker/start-solo-pool /start-celeryworker-solo
 COPY ./compose/local/celery/beat/start /start-celerybeat
 COPY ./compose/local/celery/flower/start /start-flower
+COPY ./compose/local/celery/flower/start-no-wait /start-flower-no-wait
 
-RUN chmod +x /entrypoint /wait-for-it /start-streamlit /start-fastapi /start-celeryworker /start-celerybeat /start-flower
+RUN chmod +x /entrypoint /wait-for-it /start-streamlit /start-fastapi /start-celeryworker /start-celeryworker-solo /start-celerybeat /start-flower /start-flower-no-wait
 
 # Create a logs folder
 RUN mkdir -p /app/logs

@@ -13,6 +13,7 @@ from cqc_lem.utilities.logger import myprint
 # Create default Celery app
 app = Celery(
     'cqc_lem',
+    broker=broker_url,
 
 )
 
@@ -24,13 +25,10 @@ app.config_from_object(celeryconfig)
 # tasks files some other way if we prefer.
 app.autodiscover_tasks(['cqc_lem'])
 
-# Gets the max between all the parameters of timeout in the tasks
-max_timeout = 60 * 30  # This value must be bigger than the maximum soft timeout set for a task to prevent an infinity loop
-app.conf.broker_transport_options = {'visibility_timeout': max_timeout + 60}  # 60 seconds of margin
-
 # Setup Celery Once for task that should only be queued once per parameters sent
+
 app.conf.ONCE = {
-    'backend': 'celery_once.backends.Redis',
+    'backend': 'celery_once.backends.Redis',  # TODO: What should this be for AWS SQS
     'settings': {
         'url': broker_url,
         'default_timeout': 60 * 60
@@ -43,43 +41,41 @@ app.conf.update(
     beat_schedule={
         # Comment error tracing out
         # 'test-error-tracing': {
-        #    'task': 'cqc_lem.run_scheduler.test_error_tracing',
+        #    'task': 'cqc_lem.app.run_scheduler.test_error_tracing',
         #    'schedule': timedelta(minutes=1),  # Run every 1 minutes
         # },
         'check-scheduled-posts': {
-            'task': 'cqc_lem.run_scheduler.auto_check_scheduled_posts',
+            'task': 'cqc_lem.app.run_scheduler.auto_check_scheduled_posts',
             'schedule': timedelta(minutes=5)  # Run every 5 minutes
         },
         'generate-content-plan': {
-            'task': 'cqc_lem.run_content_plan.auto_generate_content',
+            'task': 'cqc_lem.app.run_content_plan.auto_generate_content',
             'schedule': crontab(hour='1', minute='0')  # Run every day at 1:00 AM
         },
         'create-content-from-plan': {
-            'task': 'cqc_lem.run_content_plan.auto_create_weekly_content',
+            'task': 'cqc_lem.app.run_content_plan.auto_create_weekly_content',
             'schedule': crontab(hour='1', minute='30')  # Run every day at 1:30 AM
         },
         'clean-up-stale-invites': {
-            'task': 'cqc_lem.run_scheduler.auto_clean_stale_invites',
+            'task': 'cqc_lem.app.run_scheduler.auto_clean_stale_invites',
             'schedule': crontab(hour='2', minute='0', )  # Run every day at 2:00 AM
         },
         'clen-up-stale-profiles': {
-            'task': 'cqc_lem.run_scheduler.auto_clean_stale_profiles',
+            'task': 'cqc_lem.app.run_scheduler.auto_clean_stale_profiles',
             'schedule': crontab(hour='3', minute='0', )  # Run every day at 3:00 AM
         },
         'clen-up-old_videos': {
-            'task': 'cqc_lem.run_scheduler.auto_clean_old_videos',
+            'task': 'cqc_lem.app.run_scheduler.auto_clean_old_videos',
             'schedule': crontab(hour='4', minute='0', )  # Run every day at 4:00 AM
         },
         'invite_to_company_pages': {
-            'task': 'cqc_lem.run_scheduler.auto_invite_to_company_pages',
+            'task': 'cqc_lem.app.run_scheduler.auto_invite_to_company_pages',
             'schedule': crontab(hour='5', minute='0', day_of_month='1')  # Run on the 1st of the month at 5:00 AM
         },
         'send-appreciation-dms': {
-            'task': 'cqc_lem.run_scheduler.auto_appreciate_dms',
+            'task': 'cqc_lem.app.run_scheduler.auto_appreciate_dms',
             'schedule': crontab(hour='8', minute='0')  # Run every day at 8:00 AM
         }
-
-
 
     }
 )

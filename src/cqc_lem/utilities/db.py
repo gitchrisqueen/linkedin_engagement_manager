@@ -1,9 +1,7 @@
-import json
 import os
 from datetime import datetime, timedelta
 from enum import StrEnum
 
-import boto3
 import mysql.connector
 from dotenv import load_dotenv
 from mysql.connector import errorcode
@@ -11,7 +9,7 @@ from mysql.connector import errorcode
 from cqc_lem.utilities.env_constants import AWS_MYSQL_SECRET_NAME, AWS_REGION
 from cqc_lem.utilities.linkedin.profile import LinkedInProfile
 from cqc_lem.utilities.logger import myprint
-from cqc_lem.utilities.utils import get_top_level_domain
+from cqc_lem.utilities.utils import get_top_level_domain, get_aws_ssm_secret
 
 # Load .env file
 load_dotenv()
@@ -27,27 +25,6 @@ MYSQL_DATABASE = os.getenv('MYSQL_DATABASE')
 MYSQL_PORT = os.getenv('MYSQL_PORT')
 
 
-def get_secret(secret_name, region_name):
-    """Gets the secret value from AWS Secrets Manager"""
-    session = boto3.session.Session()
-    client = session.client(
-        service_name=AWS_MYSQL_SECRET_NAME,
-        region_name=region_name
-    )
-
-    try:
-        get_secret_value_response = client.get_secret_value(
-            SecretId=secret_name
-        )
-    except Exception as e:
-        raise e
-
-    secret = get_secret_value_response['SecretString']
-    secret_dict = json.loads(secret)
-
-    return secret_dict
-
-
 def get_db_connection():
     """Establishes a connection to the MySQL database and returns the connection object.
 
@@ -59,7 +36,7 @@ def get_db_connection():
 
     # if MYSQL_USER and MYSQL_PASSWORD are empty try to get it from AWS using get_secret function
     if AWS_MYSQL_SECRET_NAME is not None and AWS_REGION is not None:
-        secret_dict = get_secret(AWS_MYSQL_SECRET_NAME, AWS_REGION)
+        secret_dict = get_aws_ssm_secret(AWS_MYSQL_SECRET_NAME, AWS_REGION)
         MYSQL_HOST = secret_dict['host']
         MYSQL_USER = secret_dict['username']
         MYSQL_PASSWORD = secret_dict['password']

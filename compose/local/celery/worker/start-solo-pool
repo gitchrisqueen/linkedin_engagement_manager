@@ -23,7 +23,8 @@ fi
 printf "Changing ownership of the application directory to: %s\n" "$CELERY_USER"
 chown -R $CELERY_USER:$CELERY_USER /app
 
+
 # Start Celery worker
 printf "Starting Celery Worker as: %s\n" "$CELERY_USER"
-su $CELERY_USER -c "celery --app cqc_lem.app.my_celery worker --loglevel=INFO --autoscale=4,2 -E"
+su $CELERY_USER -c "celery --app cqc_lem.app.my_celery worker --pool=solo --concurrency=1 --queues=$CELERY_QUEUE --loglevel=INFO -E"
 #celery --skip-checks --app cqc_lem.app.my_celery worker --loglevel=DEBUG -E

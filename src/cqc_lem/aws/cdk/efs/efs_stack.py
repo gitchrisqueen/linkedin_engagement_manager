@@ -22,7 +22,7 @@ class EFSStack(NestedStack):
         )
 
         # Create an Access Point for the EFS, with the logical ID CDK-efs-sample-AccessPoint
-        self.access_point = efs.AccessPoint(
+        self.efs_access_point = efs.AccessPoint(
             self, 'AccessPoint',
             file_system=self.file_system,
         )
@@ -34,7 +34,7 @@ class EFSStack(NestedStack):
             # The logical ID of the Access Point to use.
             # This is a string, not an ARN.
             authorization_config=ecs.AuthorizationConfig(
-                access_point_id=self.access_point.access_point_id,
+                access_point_id=self.efs_access_point.access_point_id,
                 iam='ENABLED',
             ),
             transit_encryption='ENABLED',
@@ -90,4 +90,4 @@ class EFSStack(NestedStack):
         )
 
         CfnOutput(self, "EFSFileSystemId", value=self.file_system.file_system_id)
-        CfnOutput(self, "EFSAccessPointId", value=self.access_point.access_point_id)
+        CfnOutput(self, "EFSAccessPointId", value=self.efs_access_point.access_point_id)

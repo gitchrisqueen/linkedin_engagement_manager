@@ -1,33 +1,18 @@
-import os
-from sqlite3.dbapi2 import apilevel
-
 from aws_cdk import (
     Duration,
     aws_ecs as ecs,
-    aws_efs as efs,
-    aws_iam as iam,
-    aws_ecr_assets as ecr_assets,
+    aws_logs as logs,
     aws_elasticloadbalancingv2 as elbv2,
-    aws_ec2 as ec2, Stack, )
+    aws_ec2 as ec2, Stack, RemovalPolicy, )
 from constructs import Construct
-from openai import api_key
+
+from cqc_lem.aws.cdk.shared_stack_props import SharedStackProps
 
 
 class APIStack(Stack):
 
     def __init__(self, scope: Construct, id: str,
-                 vpc: ec2.Vpc,
-                 cluster: ecs.Cluster,
-                 file_system: efs.FileSystem,
-                 ecs_security_group: ec2.SecurityGroup,
-                 cloud_map_namespace: str,
-                 task_execution_role: iam.Role,
-                 repository_image_asset: ecr_assets.DockerImageAsset,
-                 myql_secret_name: str,
-                 efs_volume_name: str,
-                 efs_volume_configuration: ecs.EfsVolumeConfiguration,
-                 mount_point: ecs.MountPoint,
-                 api_listener: elbv2.ApplicationListener,
+                 props: SharedStackProps,
                  **kwargs) -> None:
         super().__init__(scope, id, **kwargs)
 
@@ -35,29 +20,32 @@ class APIStack(Stack):
         task_definition = ecs.FargateTaskDefinition(
             self, 'APIFargateTaskDef',
             family='api',
-            cpu=256,
-            memory_limit_mib=512,
-            task_role=task_execution_role,
+            cpu=512,
+            memory_limit_mib=1024,
+            task_role=props.task_execution_role,
 
         )
 
         # Add a new volume to the Fargate Task Definition
         task_definition.add_volume(
-            name=efs_volume_name,
-            efs_volume_configuration=efs_volume_configuration,
+            name=props.efs_volume_name,
+            efs_volume_configuration=props.efs_volume_configuration,
         )
 
         # Add a new container to the Fargate Task Definition
         api_key_container = task_definition.add_container("APIContainer",
                                                           container_name="api",
                                                           image=ecs.ContainerImage.from_docker_image_asset(
-                                                              repository_image_asset),
+                                                              props.ecr_docker_asset),
                                                           command=["/start-fastapi"],  # Custom command
                                                           environment={
                                                               "OPENAI_API_KEY": 'needs_to_come_from_aws_secret',
                                                               # TODO: Need to get this ^^^ from file or AWS Secret
-                                                              "AWS_MYSQL_SECRET_NAME": myql_secret_name,
+                                                              "AWS_MYSQL_SECRET_NAME": props.ssm_myql_secret_name,
                                                               "API_PORT": "8000",
+                                                              "CELERY_BROKER_URL": f"redis://{props.redis_url}/0",
+                                                              "CELERY_RESULT_BACKEND": f"redis://{props.redis_url}/1",
+
                                                           },
                                                           port_mappings=[
                                                               ecs.PortMapping(
@@ -66,24 +54,32 @@ class APIStack(Stack):
                                                                   name="api"  # Name of the port mapping
                                                               )
                                                           ],
-                                                          # logging=ecs.LogDriver.aws_logs(stream_prefix="web-app-logs")
+                                                          logging=ecs.LogDriver.aws_logs(
+                                                              stream_prefix="api_logs",
+                                                              log_group=logs.LogGroup(
+                                                                  self, "APILogGroup",
+                                                                  log_group_name="/cqc-lem/api",
+                                                                  retention=logs.RetentionDays.ONE_WEEK,
+                                                                  removal_policy=RemovalPolicy.DESTROY
+                                                              )
+                                                          )
                                                           )
 
         # Add a new volume to the Fargate Task Definition
-        api_key_container.add_mount_points(mount_point)
+        api_key_container.add_mount_points(props.ecs_mount_point)
 
         # Create a service definitions and port mappings
         api_service = ecs.FargateService(
             self, 'APIService',
-            cluster=cluster,
+            cluster=props.ecs_cluster,
             task_definition=task_definition,
             desired_count=1,
             max_healthy_percent=500,
             min_healthy_percent=100,
             vpc_subnets=ec2.SubnetSelection(one_per_az=True, subnet_type=ec2.SubnetType.PRIVATE_WITH_EGRESS),
-            security_groups=[ecs_security_group],
+            security_groups=[props.ecs_security_group],
             service_connect_configuration=ecs.ServiceConnectProps(
-                namespace=cloud_map_namespace.namespace_name,
+                namespace=props.ecs_default_cloud_map_namespace.namespace_name,
                 services=[ecs.ServiceConnectService(
                     port_mapping_name="api",  # Logical name for the service
                     port=8000,  # Container port
@@ -131,20 +127,20 @@ class APIStack(Stack):
          '''
 
         # Allow the ECS Service to connect to the EFS
-        #web_app_service.service.connections.allow_from(file_system, ec2.Port.tcp(2049))
-        api_service.connections.allow_from(file_system, ec2.Port.tcp(2049))
+        # web_app_service.service.connections.allow_from(file_system, ec2.Port.tcp(2049))
+        api_service.connections.allow_from(props.efs_file_system, ec2.Port.tcp(2049))
 
         # Allow the EFS to connect to the ECS Service
-        #web_app_service.service.connections.allow_to(file_system, ec2.Port.tcp(2049))
-        api_service.connections.allow_to(file_system, ec2.Port.tcp(2049))
+        # web_app_service.service.connections.allow_to(file_system, ec2.Port.tcp(2049))
+        api_service.connections.allow_to(props.efs_file_system, ec2.Port.tcp(2049))
 
         target_group = elbv2.ApplicationTargetGroup(
             self, "APITargetGroup",
             target_group_name="api-target-group",
-            vpc=vpc,
+            vpc=props.ec2_vpc,
             port=8000,
             targets=[api_service],
-            #targets=[web_app_service.service],
+            # targets=[web_app_service.service],
             target_type=elbv2.TargetType.IP,
             protocol=elbv2.ApplicationProtocol.HTTP,
             health_check=elbv2.HealthCheck(
@@ -161,7 +157,7 @@ class APIStack(Stack):
 
         lb_rule = elbv2.ApplicationListenerRule(
             self, "APIListenerRule",
-            listener=api_listener,
+            listener=props.elbv2_api_listener,
             priority=2,
             action=elbv2.ListenerAction.forward(target_groups=[target_group]),
             conditions=[elbv2.ListenerCondition.path_patterns(["*"])],

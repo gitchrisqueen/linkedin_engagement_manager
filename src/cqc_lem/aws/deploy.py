@@ -13,6 +13,7 @@ def deploy_stacks_in_order():
         config = json.load(f)
         deploy_order = config['context']['deployOrder']
         for stack in deploy_order:
+            print(f"Deploying stack: {stack}")
             subprocess.run(['npx','-p','node@22','cdk', 'deploy', '--require-approval','never', stack], check=False)
 
 if __name__ == "__main__":

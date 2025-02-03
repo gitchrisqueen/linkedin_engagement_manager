@@ -14,6 +14,7 @@ from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
 from pydantic import BaseModel, computed_field
 
 from cqc_lem import assets_dir
+from cqc_lem.app.run_content_plan import auto_create_weekly_content
 from cqc_lem.utilities.db import insert_post, get_post_by_email, get_user_id, update_db_post, \
     add_user_with_access_token, PostType, PostStatus
 from cqc_lem.utilities.jaeger_tracer_helper import get_jaeger_tracer
@@ -83,9 +84,31 @@ def schedule_post(post: PostRequest) -> ResponseModel:
         raise HTTPException(status_code=404, detail="Could not schedule post")
 
 
+# app endpoint to create user weekly content using their user_id
+@app.post("/create_weekly_content/", responses={
+    200: {"description": "Weekly content created successfully"},
+    **{k: v for k, v in error_responses.items() if k in [ 400]}
+})
+def create_weekly_content(user_id: int) -> ResponseModel:
+    """Endpoint to create weekly content for a user."""
+    if not user_id:
+        raise HTTPException(status_code=400, detail="User ID is required")
+
+    kwargs = {'user_id': user_id}
+    # Call the function to create the weekly content
+    auto_create_weekly_content.apply_async(kwargs=kwargs, retry=True,
+                                    retry_policy={
+                                        'max_retries': 1,
+                                    })
+
+
+    return ResponseModel(status_code=200, detail="Weekly content created successfully")
+
+
+
 @app.get('/user_id/', responses={
     200: {"description": "User ID retrieved successfully"},
-    **{k: v for k, v in error_responses.items() if k in [400, 404]}
+    **{k: v for k, v in error_responses.items() if k in [400, 403]}
 })
 def get_user_id_from_email(email: str) -> ResponseModel:
     """Endpoint to get user id by email."""

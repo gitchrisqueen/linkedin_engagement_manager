@@ -1,9 +1,11 @@
 import functools
+import json
 import os
 from enum import Enum
 from datetime import datetime, time, date
 from urllib.parse import urlparse
 
+import boto3
 import requests
 import tldextract
 
@@ -124,3 +126,24 @@ def get_file_extension_from_filepath(file_path: str, remove_leading_dot: bool = 
     # st.info("Base Name: " + basename + " | File Name: " + file_name + " | File Extension : " + file_extension)
 
     return file_extension
+
+
+def get_aws_ssm_secret(secret_name, region_name):
+    """Gets the secret value from AWS Secrets Manager"""
+    session = boto3.session.Session()
+    client = session.client(
+        service_name='secretsmanager',
+        region_name=region_name
+    )
+
+    try:
+        get_secret_value_response = client.get_secret_value(
+            SecretId=secret_name
+        )
+    except Exception as e:
+        raise e
+
+    secret = get_secret_value_response['SecretString']
+    secret_dict = json.loads(secret)
+
+    return secret_dict

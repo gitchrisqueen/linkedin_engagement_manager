@@ -3,7 +3,7 @@ import boto3
 
 
 def lambda_handler(event, context):
-    sqs = boto3.client('sqs')
+    sqs = boto3.client('elasticcache')
     queue_url = event['queue_url']
 
     response = sqs.get_queue_attributes(

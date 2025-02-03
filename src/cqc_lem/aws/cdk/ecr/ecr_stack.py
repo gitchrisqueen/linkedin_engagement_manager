@@ -15,7 +15,9 @@ from cqc_lem import build_dir
 
 class EcrStack(NestedStack):
 
-    def __init__(self, scope: Construct, id: str, **kwargs, ) -> None:
+    def __init__(self, scope: Construct, id: str,
+                 API_BASE_URL_BUILD_ARG: str,
+                 **kwargs, ) -> None:
         super().__init__(scope, id, **kwargs)
 
         # Create ecr repository that will host the docker image for our services
@@ -44,7 +46,8 @@ class EcrStack(NestedStack):
                                             '**/test/**/*',
                                         ],
                                         build_args={
-                                            "API_BASE_URL_BUILD_ARG": "api.cqc-lem.local",
+                                            #"API_BASE_URL_BUILD_ARG": "http://api.cqc-lem.local:8000", #TODO Need the public url ccause this not working
+                                            "API_BASE_URL_BUILD_ARG":API_BASE_URL_BUILD_ARG,
                                             # This argument will be passed to the dockerfile and used as the API_BASE_URL
                                         },
                                         platform=Platform.LINUX_AMD64,

@@ -28,7 +28,7 @@ class EcsStack(NestedStack):
                                                                                             type=servicediscovery.NamespaceType.DNS_PRIVATE)
 
         # Creating the Cloudwatch log group where ECS Logs will be stored
-        self.ECSServiceLogGroup = logs.LogGroup(self, "ECSServiceLogGroup",
+        self.ecs_service_log_group = logs.LogGroup(self, "ECSServiceLogGroup",
                                                 log_group_name=f"{self.ecs_cluster.cluster_name}-service",
                                                 removal_policy=RemovalPolicy.DESTROY,
                                                 retention=logs.RetentionDays.ONE_WEEK,
@@ -36,20 +36,20 @@ class EcsStack(NestedStack):
 
         # ECS Security group, this will allow access from the Load Balancer and allow LAN access so that the
         # ECS containers can talk to each other on ingress ports
-        self.ECSSecurityGroup = ec2.SecurityGroup(self, "ECSSecurityGroup",
+        self.ecs_security_group = ec2.SecurityGroup(self, "ECSSecurityGroup",
                                                   vpc=vpc,
                                                   description="ECS Security Group",
                                                   allow_all_outbound=True,
                                                   )
 
         # TODO: Move below to API Fargate Stack
-        self.ECSSecurityGroup.add_ingress_rule(ec2.Peer.ipv4(vpc.vpc_cidr_block), ec2.Port.tcp(8000),
+        self.ecs_security_group.add_ingress_rule(ec2.Peer.ipv4(vpc.vpc_cidr_block), ec2.Port.tcp(8000),
                                                description="All traffic within VPC", )
 
-        self.ECSSecurityGroup.add_ingress_rule(ec2.Peer.ipv4(vpc.vpc_cidr_block), ec2.Port.tcp(8501),
+        self.ecs_security_group.add_ingress_rule(ec2.Peer.ipv4(vpc.vpc_cidr_block), ec2.Port.tcp(8501),
                                                description="All traffic within VPC", )
 
-        self.ECSSecurityGroup.add_ingress_rule(ec2.Peer.ipv4(vpc.vpc_cidr_block), ec2.Port.tcp(8555),
+        self.ecs_security_group.add_ingress_rule(ec2.Peer.ipv4(vpc.vpc_cidr_block), ec2.Port.tcp(8555),
                                                description="All traffic within VPC", )
 
         # Creating a public load balancer

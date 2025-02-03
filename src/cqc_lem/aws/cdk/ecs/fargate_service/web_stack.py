@@ -1,31 +1,18 @@
-import os
-
 from aws_cdk import (
     Duration,
     aws_ecs as ecs,
-    aws_efs as efs,
-    aws_iam as iam,
-    aws_ecr_assets as ecr_assets,
+    aws_logs as logs,
     aws_elasticloadbalancingv2 as elbv2,
-    aws_ec2 as ec2, Stack, )
+    aws_ec2 as ec2, Stack, RemovalPolicy, )
 from constructs import Construct
+
+from cqc_lem.aws.cdk.shared_stack_props import SharedStackProps
 
 
 class WebStack(Stack):
 
     def __init__(self, scope: Construct, id: str,
-                 vpc: ec2.Vpc,
-                 cluster: ecs.Cluster,
-                 file_system: efs.FileSystem,
-                 ecs_security_group: ec2.SecurityGroup,
-                 cloud_map_namespace: str,
-                 task_execution_role: iam.Role,
-                 repository_image_asset: ecr_assets.DockerImageAsset,
-                 myql_secret_name: str,
-                 efs_volume_name: str,
-                 efs_volume_configuration: ecs.EfsVolumeConfiguration,
-                 mount_point: ecs.MountPoint,
-                 web_listener: elbv2.ApplicationListener,
+                 props: SharedStackProps,
                  **kwargs) -> None:
         super().__init__(scope, id, **kwargs)
 
@@ -33,28 +20,28 @@ class WebStack(Stack):
         task_definition = ecs.FargateTaskDefinition(
             self, 'WebFargateTaskDef',
             family='web_app',
-            cpu=256,
-            memory_limit_mib=512,
-            task_role=task_execution_role,
+            cpu=512,
+            memory_limit_mib=1024,
+            task_role=props.task_execution_role
 
         )
 
         # Add a new volume to the Fargate Task Definition
         task_definition.add_volume(
-            name=efs_volume_name,
-            efs_volume_configuration=efs_volume_configuration,
+            name=props.efs_volume_name,
+            efs_volume_configuration=props.efs_volume_configuration,
         )
 
         # Add a new container to the Fargate Task Definition
         web_app_container = task_definition.add_container("WebAppContainer",
                                                           container_name="web_app",
                                                           image=ecs.ContainerImage.from_docker_image_asset(
-                                                              repository_image_asset),
+                                                              props.ecr_docker_asset),
                                                           command=["/start-streamlit"],  # Custom command
                                                           environment={
                                                               "OPENAI_API_KEY": "Needs to come from secret",
                                                               # TODO: Need to get this ^^^ from file or AWS Secret
-                                                              "AWS_MYSQL_SECRET_NAME": myql_secret_name,
+                                                              "AWS_MYSQL_SECRET_NAME": props.ssm_myql_secret_name,
                                                               "STREAMLIT_EMAIL": "christopher.queen@gmail.com",
                                                               "STREAMLIT_PORT": "8501",
                                                           },
@@ -65,24 +52,32 @@ class WebStack(Stack):
                                                                   name="web_app"  # Name of the port mapping
                                                               )
                                                           ],
-                                                          # logging=ecs.LogDriver.aws_logs(stream_prefix="web-app-logs")
+                                                          logging=ecs.LogDriver.aws_logs(
+                                                              stream_prefix="web_app_logs",
+                                                              log_group=logs.LogGroup(
+                                                                  self, "WebApprLogGroup",
+                                                                  log_group_name="/cqc-lem/web_app",
+                                                                  retention=logs.RetentionDays.ONE_WEEK,
+                                                                  removal_policy=RemovalPolicy.DESTROY
+                                                              )
+                                                          )
                                                           )
 
         # Add a new volume to the Fargate Task Definition
-        web_app_container.add_mount_points(mount_point)
+        web_app_container.add_mount_points(props.ecs_mount_point)
 
         # Create a service definitions and port mappings
         web_app_service = ecs.FargateService(
             self, 'WebAppService',
-            cluster=cluster,
+            cluster=props.ecs_cluster,
             task_definition=task_definition,
             desired_count=1,
             max_healthy_percent=200,
             min_healthy_percent=100,
             vpc_subnets=ec2.SubnetSelection(one_per_az=True, subnet_type=ec2.SubnetType.PRIVATE_WITH_EGRESS),
-            security_groups=[ecs_security_group],
+            security_groups=[props.ecs_security_group],
             service_connect_configuration=ecs.ServiceConnectProps(
-                namespace=cloud_map_namespace.namespace_name,
+                namespace=props.ecs_default_cloud_map_namespace.namespace_name,
                 services=[ecs.ServiceConnectService(
                     port_mapping_name="web_app",  # Logical name for the service
                     port=8501,  # Container port
@@ -130,20 +125,20 @@ class WebStack(Stack):
          '''
 
         # Allow the ECS Service to connect to the EFS
-        #web_app_service.service.connections.allow_from(file_system, ec2.Port.tcp(2049))
-        web_app_service.connections.allow_from(file_system, ec2.Port.tcp(2049))
+        # web_app_service.service.connections.allow_from(file_system, ec2.Port.tcp(2049))
+        web_app_service.connections.allow_from(props.efs_file_system, ec2.Port.tcp(2049))
 
         # Allow the EFS to connect to the ECS Service
-        #web_app_service.service.connections.allow_to(file_system, ec2.Port.tcp(2049))
-        web_app_service.connections.allow_to(file_system, ec2.Port.tcp(2049))
+        # web_app_service.service.connections.allow_to(file_system, ec2.Port.tcp(2049))
+        web_app_service.connections.allow_to(props.efs_file_system, ec2.Port.tcp(2049))
 
         target_group = elbv2.ApplicationTargetGroup(
             self, "WebAppTargetGroup",
             target_group_name="web-app-target-group",
-            vpc=vpc,
+            vpc=props.ec2_vpc,
             port=8501,
             targets=[web_app_service],
-            #targets=[web_app_service.service],
+            # targets=[web_app_service.service],
             target_type=elbv2.TargetType.IP,
             protocol=elbv2.ApplicationProtocol.HTTP,
             health_check=elbv2.HealthCheck(
@@ -160,7 +155,7 @@ class WebStack(Stack):
 
         lb_rule = elbv2.ApplicationListenerRule(
             self, "WebAppListenerRule",
-            listener=web_listener,
+            listener=props.elbv2_web_listener,
             priority=1,
             action=elbv2.ListenerAction.forward(target_groups=[target_group]),
             conditions=[elbv2.ListenerCondition.path_patterns(["*"])],

@@ -6,7 +6,6 @@ import streamlit as st
 from st_aggrid import AgGrid, GridOptionsBuilder, DataReturnMode, GridUpdateMode
 
 from cqc_lem.utilities.db import PostStatus
-from cqc_lem.app.run_content_plan import auto_create_weekly_content
 from cqc_lem.utilities.env_constants import API_BASE_URL, LINKEDIN_PREVIEW_URL
 from cqc_lem.utilities.jaeger_tracer_helper import get_jaeger_tracer
 
@@ -26,6 +25,8 @@ GET_POSTS_URL = API_BASE_URL + "/posts/"
 UPDATE_POST_URL = API_BASE_URL + "/update_post/"
 # API endpoint to get user id
 GET_USER_ID_URL = API_BASE_URL + "/user_id/"
+# API endpoint to create user weekly content
+CREATE_WEEKLY_CONTENT_URL = API_BASE_URL + "/create_weekly_content/"
 
 st.title("Review and Edit Scheduled Posts")
 
@@ -35,11 +36,19 @@ email = st.text_input("Enter your email address")
 tracer = get_jaeger_tracer("streamlit", __name__)
 
 
+def create_weekly_content(user_id):
+    response = requests.post(f"{CREATE_WEEKLY_CONTENT_URL}?user_id={user_id}")
+    if response.status_code == 200:
+        st.success("Weekly content created successfully")
+    else:
+        st.error(f"Failed to create weekly content. Error ({response.status_code}): {response.json()['detail']}")
+
+
 def console_update():
     print("Updating the console")
 
-with tracer.start_as_current_span("review_schedule"):
 
+with tracer.start_as_current_span("review_schedule"):
     # On email address change make the call to get posts
     if st.session_state.email != email:
 
@@ -48,8 +57,9 @@ with tracer.start_as_current_span("review_schedule"):
         # Get the user id
         response = requests.get(f"{GET_USER_ID_URL}?email={st.session_state.email}")
         if response.status_code == 200:
-            #st.success(f"User id fetched successfully: {str(response.json())}")
+            # st.success(f"User id fetched successfully: {str(response.json())}")
             st.session_state.user_id = response.json()['detail']
+            st.success(f"User ID: {st.session_state.user_id}")
         else:
             st.session_state.user_id = None
             st.error(
@@ -67,7 +77,7 @@ with tracer.start_as_current_span("review_schedule"):
 
         if st.session_state.user_id:
             # Add button to fire the create_weekly_content function
-            st.button("Create Content for the Week", on_click=auto_create_weekly_content, args=[st.session_state.user_id])
+            st.button("Create Content for the Week", on_click=create_weekly_content, args=[st.session_state.user_id])
 
         posts = st.session_state.posts
 
@@ -76,7 +86,7 @@ with tracer.start_as_current_span("review_schedule"):
 
         # Convert posts to a DataFrame
         df = pd.DataFrame(posts, columns=columns
-        #["post_id", "content", "video_url", "scheduled_time", "post_type", "status"]
+                          # ["post_id", "content", "video_url", "scheduled_time", "post_type", "status"]
                           )
 
         # Configure the editable grid
@@ -106,7 +116,7 @@ with tracer.start_as_current_span("review_schedule"):
         grid_options = gb.build()
         grid_options['rowHeight'] = 100  # Adjust the height as needed
 
-        #grid_options['onRowDataUpdated'] = console_update
+        # grid_options['onRowDataUpdated'] = console_update
 
         # Display the editable grid
         grid_response = AgGrid(
@@ -123,8 +133,6 @@ with tracer.start_as_current_span("review_schedule"):
 
         # Get the selected cell
         selected_row = grid_response['selected_data']
-
-
 
         # st.write("Selected Data:")
         # st.write(selected_row)
@@ -156,13 +164,12 @@ with tracer.start_as_current_span("review_schedule"):
 
                 # Convert the row to a dict using the row indexes
                 post_data = row.to_dict()
-                #post_data["email"] = email  # Add the email to the dictionary
-                post_data["scheduled_datetime"] =  row["scheduled_time"] # Add the scheduled datetime
+                # post_data["email"] = email  # Add the email to the dictionary
+                post_data["scheduled_datetime"] = row["scheduled_time"]  # Add the scheduled datetime
                 # Remove scheduled_time from post_data
                 post_data.pop("scheduled_time")
 
-                #st.success(f"Post Data: {post_data}")
-
+                # st.success(f"Post Data: {post_data}")
 
                 # Add the post_id to the request query
                 response = requests.post(f"{UPDATE_POST_URL}?post_id={post_id}", json=post_data)
