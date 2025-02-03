@@ -170,6 +170,7 @@ logs/*
 selenium/
 src/cqc_lem/assets/*
 src/cqc_lem/utilities/generated_designs/*
+compose/local/database/dumps/*
 
 
 # exception to the exclude folder rules
