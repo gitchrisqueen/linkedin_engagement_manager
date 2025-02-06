@@ -6,14 +6,15 @@ from cqc_lem import assets_dir
 from cqc_lem.app.run_automation import post_to_linkedin
 from cqc_lem.app.run_content_plan import create_content, auto_generate_content, auto_create_weekly_content, \
     get_main_blog_url_content, fetch_sitemap_urls, filter_relevant_urls, is_blog_post_combined, plan_content_for_user
-from cqc_lem.utilities import get_industry_trend_analysis_based_on_user_profile, \
+from cqc_lem.utilities.ai.ai_helper import get_industry_trend_analysis_based_on_user_profile, \
     get_thought_leadership_post_from_ai, get_flux_image_prompt_from_ai
+
 from cqc_lem.utilities.db import get_user_password_pair_by_id
-from cqc_lem.utilities.env_constants import API_BASE_URL
+from cqc_lem.utilities.env_constants import API_BASE_URL, API_PORT
 from cqc_lem.utilities.linkedin.helper import get_my_profile
 from cqc_lem.utilities.logger import myprint
 from cqc_lem.utilities.selenium_util import clear_sessions, get_driver_wait_pair
-from cqc_lem.utilities import create_folder_if_not_exists, save_video_url_to_dir
+from cqc_lem.utilities.utils import create_folder_if_not_exists, save_video_url_to_dir
 
 
 def test_create_content():
@@ -48,7 +49,7 @@ def test_create_content():
                 video_file_name = os.path.basename(video_file_path)
 
                 # The video url is our api prefix + 'assets/videos' +  video_file_name
-                api_video_url = f"{API_BASE_URL}/assets?file_name=videos/runwayml/{video_file_name}"
+                api_video_url = f"{API_BASE_URL}:{API_PORT}/assets?file_name=videos/runwayml/{video_file_name}"
                 myprint(f"Video URL: {api_video_url}")
 
 

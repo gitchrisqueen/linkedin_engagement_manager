@@ -78,5 +78,5 @@ class LambdaStack(NestedStack):
 
 
         # Output resources
-        CfnOutput(self, "MyLambdaFunctionARN", value=self.get_queue_message_count.function_arn)
+        #CfnOutput(self, "MyLambdaFunctionARN", value=self.get_queue_message_count.function_arn)
 

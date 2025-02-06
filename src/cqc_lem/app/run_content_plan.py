@@ -23,7 +23,7 @@ from cqc_lem.utilities.db import get_post_type_counts, insert_planned_post, upda
     get_planned_posts_for_current_week, get_last_planned_post_date_for_user, get_user_password_pair_by_id, \
     get_user_blog_url, get_user_sitemap_url, get_active_user_ids, get_planned_posts_for_next_week, PostStatus, \
     update_db_post_video_url, update_db_post_status, PostType
-from cqc_lem.utilities.env_constants import API_BASE_URL
+from cqc_lem.utilities.env_constants import API_BASE_URL, API_PORT
 from cqc_lem.utilities.linkedin.helper import get_my_profile
 from cqc_lem.utilities.logger import myprint
 from cqc_lem.utilities.selenium_util import get_driver_wait_pair, quit_gracefully
@@ -691,7 +691,7 @@ def auto_create_weekly_content(user_id: int = None):
             video_file_name = os.path.basename(video_file_path)
 
             # The video url is our api prefix + 'assets?file=videos/runwayml' +  video_file_name
-            api_video_url = f"{API_BASE_URL}/assets?file_name=videos/runwayml/{video_file_name}"
+            api_video_url = f"{API_BASE_URL}:{API_PORT}/assets?file_name=videos/runwayml/{video_file_name}"
             myprint(f"Video URL: {api_video_url}")
 
             # Update the database with the video url

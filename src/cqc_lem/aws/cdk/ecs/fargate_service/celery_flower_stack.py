@@ -40,21 +40,22 @@ class CeleryFlowerStack(Stack):
                                                                 command=["/start-flower-no-wait"],  # Custom command
                                                                 environment={
                                                                     # "AWS_SQS_QUEUE_URL": props.sqs_queue_url,
-                                                                    "AWS_REGION": props.env.region,
                                                                     # "AWS_SQS_SECRET_NAME": 'cqc-lem/elasticcache/access',
+                                                                    "AWS_MYSQL_SECRET_NAME": props.ssm_myql_secret_name,
+                                                                    "AWS_REGION": props.env.region,
                                                                     "CELERY_BROKER_URL": f"redis://{props.redis_url}/0",
                                                                     "CELERY_RESULT_BACKEND": f"redis://{props.redis_url}/1",
                                                                     "FLOWER_UNAUTHENTICATED_API": "True",
                                                                     "FLOWER_PERSISTENT": "True",
                                                                     "FLOWER_SAVE_STATE_INTERVAL": "5000",
-                                                                    "CELERY_FLOWER_PORT": "8555",
+                                                                    "CELERY_FLOWER_PORT": "5555",
                                                                     "OPENAI_API_KEY": "needs_to_come_from_secret"
                                                                     # TODO; Update this
                                                                 },
                                                                 port_mappings=[
                                                                     ecs.PortMapping(
-                                                                        container_port=8555,
-                                                                        host_port=8555,
+                                                                        container_port=5555,
+                                                                        host_port=5555,
                                                                         name="celery_flower"  # Name of the port mapping
                                                                     )
                                                                 ],
@@ -70,7 +71,7 @@ class CeleryFlowerStack(Stack):
                                                                 )
 
         # Add a new volume to the Fargate Task Definition
-        celery_flower_container.add_mount_points(props.ecs_mount_point)
+        celery_flower_container.add_mount_points(props.ecs_celery_flower_data_mount_point)
 
         # Create a service definitions and port mappings
         celery_flower_service = ecs.FargateService(
@@ -87,7 +88,7 @@ class CeleryFlowerStack(Stack):
                 namespace=props.ecs_default_cloud_map_namespace.namespace_name,
                 services=[ecs.ServiceConnectService(
                     port_mapping_name="celery_flower",  # Logical name for the service
-                    port=8555,  # Container port
+                    port=5555,  # Container port
                 )]),
             service_name="celery-flower-service")
         '''
@@ -143,14 +144,14 @@ class CeleryFlowerStack(Stack):
             self, "CeleryFlowerTargetGroup",
             target_group_name="celery-flower-target-group",
             vpc=props.ec2_vpc,
-            port=8555,
+            port=5555,
             targets=[celery_flower_service],
             # targets=[celery_flower_service.service],
             target_type=elbv2.TargetType.IP,
             protocol=elbv2.ApplicationProtocol.HTTP,
             health_check=elbv2.HealthCheck(
                 path="/",
-                port="8555",
+                port="5555",
                 interval=Duration.seconds(60),
                 timeout=Duration.seconds(5),
                 healthy_threshold_count=2,

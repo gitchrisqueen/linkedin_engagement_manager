@@ -29,7 +29,7 @@ class EcsStack(NestedStack):
 
         # Creating the Cloudwatch log group where ECS Logs will be stored
         self.ecs_service_log_group = logs.LogGroup(self, "ECSServiceLogGroup",
-                                                log_group_name=f"{self.ecs_cluster.cluster_name}-service",
+                                                log_group_name=f"/cqc-lem/cluster_service",
                                                 removal_policy=RemovalPolicy.DESTROY,
                                                 retention=logs.RetentionDays.ONE_WEEK,
                                                 )
@@ -42,15 +42,21 @@ class EcsStack(NestedStack):
                                                   allow_all_outbound=True,
                                                   )
 
-        # TODO: Move below to API Fargate Stack
+        # Security Group ingress rules for traffic among containers
         self.ecs_security_group.add_ingress_rule(ec2.Peer.ipv4(vpc.vpc_cidr_block), ec2.Port.tcp(8000),
-                                               description="All traffic within VPC", )
+                                               description="API traffic within VPC", )
 
         self.ecs_security_group.add_ingress_rule(ec2.Peer.ipv4(vpc.vpc_cidr_block), ec2.Port.tcp(8501),
-                                               description="All traffic within VPC", )
+                                               description="Web traffic within VPC", )
 
-        self.ecs_security_group.add_ingress_rule(ec2.Peer.ipv4(vpc.vpc_cidr_block), ec2.Port.tcp(8555),
-                                               description="All traffic within VPC", )
+        self.ecs_security_group.add_ingress_rule(ec2.Peer.ipv4(vpc.vpc_cidr_block), ec2.Port.tcp(5555),
+                                               description="Celery Flower traffic within VPC", )
+
+        self.ecs_security_group.add_ingress_rule(ec2.Peer.ipv4(vpc.vpc_cidr_block), ec2.Port.tcp(6379),
+                                                 description="Redis traffic within VPC", )
+
+        self.ecs_security_group.add_ingress_rule(ec2.Peer.ipv4(vpc.vpc_cidr_block), ec2.Port.tcp(3306),
+                                                 description="MySql traffic within VPC", )
 
         # Creating a public load balancer
         self.public_lb_sg = ec2.SecurityGroup(self, "PublicLBSG", vpc=vpc, description="Public LB SG",
@@ -65,7 +71,7 @@ class EcsStack(NestedStack):
         self.public_lb.set_attribute(key="idle_timeout.timeout_seconds", value="30")
 
         self.public_lb_sg.add_ingress_rule(peer=ec2.Peer.any_ipv4(), connection=ec2.Port.tcp(80),
-                                           description="Allow HTTP traffic")
+                                           description="Allow Web App traffic")
 
         self.web_listener = self.public_lb.add_listener("WebAppListener", port=80,
                                                         default_action=elbv2.ListenerAction.fixed_response(
@@ -74,7 +80,7 @@ class EcsStack(NestedStack):
                                                             message_body="OK"))
 
         self.public_lb_sg.add_ingress_rule(peer=ec2.Peer.any_ipv4(), connection=ec2.Port.tcp(8000),
-                                           description="Allow HTTP traffic")
+                                           description="Allow API traffic")
         self.api_listener = self.public_lb.add_listener("APIListener", port=8000,
                                                         protocol=elbv2.ApplicationProtocol.HTTP,
                                                         default_action=elbv2.ListenerAction.fixed_response(
@@ -82,9 +88,9 @@ class EcsStack(NestedStack):
                                                             content_type="text/plain",
                                                             message_body="OK"))
 
-        self.public_lb_sg.add_ingress_rule(peer=ec2.Peer.any_ipv4(), connection=ec2.Port.tcp(8555),
-                                           description="Allow HTTP traffic")
-        self.flower_listener = self.public_lb.add_listener("CeleryFlowerListener", port=8555,
+        self.public_lb_sg.add_ingress_rule(peer=ec2.Peer.any_ipv4(), connection=ec2.Port.tcp(5555),
+                                           description="Allow Celery Flower traffic")
+        self.flower_listener = self.public_lb.add_listener("CeleryFlowerListener", port=5555,
                                                            protocol=elbv2.ApplicationProtocol.HTTP,
                                                            default_action=elbv2.ListenerAction.fixed_response(
                                                                status_code=200,

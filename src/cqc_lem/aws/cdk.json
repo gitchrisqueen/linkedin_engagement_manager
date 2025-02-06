@@ -17,14 +17,14 @@
   },
   "context": {
     "deployOrder": [
-
-      "CeleryFlowerStack"
-    ],
-    "deployHold": [
       "CQC-LEM",
       "WebStack",
       "APIStack",
-      "CeleryWorkerStack"
+       "CeleryWorkerStack",
+      "CeleryFlowerStack"
+    ],
+    "deployHold": [
+
     ],
     "@aws-cdk/aws-lambda:recognizeLayerVersion": true,
     "@aws-cdk/core:checkSecretUsage": true,

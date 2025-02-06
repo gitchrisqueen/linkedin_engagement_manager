@@ -27,7 +27,8 @@ class SharedStackProps(StackProps):
                  efs_task_role: iam.Role = None,
                  efs_volume_name: str = None,
                  efs_app_assets_path: str = None,
-                 ecs_mount_point: ecs.MountPoint = None,
+                 ecs_asset_mount_point: ecs.MountPoint = None,
+                 ecs_celery_flower_data_mount_point: ecs.MountPoint = None,
                  ecs_task_iam_role: iam.Role = None,
                  task_execution_role: iam.Role = None,
                  ecs_cluster: ecs.Cluster = None,
@@ -44,6 +45,7 @@ class SharedStackProps(StackProps):
                  env: Environment = None,
                  lambda_get_redis_queue_message_count: IFunction = None,
                  celery_worker_log_group_arn: str = None,
+                 api_base_url: str = None,
 
                  **kwargs):
         super().__init__(env=env)
@@ -59,7 +61,8 @@ class SharedStackProps(StackProps):
         self.props['efs_task_role'] = efs_task_role
         self.props['efs_volume_name'] = efs_volume_name
         self.props['efs_app_assets_path'] = efs_app_assets_path
-        self.props['ecs_mount_point'] = ecs_mount_point
+        self.props['ecs_asset_mount_point'] = ecs_asset_mount_point
+        self.props['ecs_celery_flower_data_mount_point'] = ecs_celery_flower_data_mount_point
         self.props['ecs_task_iam_role'] = ecs_task_iam_role
         self.props['task_execution_role'] = task_execution_role
         self.props['ecs_cluster'] = ecs_cluster
@@ -75,6 +78,7 @@ class SharedStackProps(StackProps):
         self.props['redis_url'] = redis_url
         self.props['lambda_get_redis_queue_message_count'] = lambda_get_redis_queue_message_count
         self.props['celery_worker_log_group_arn'] = celery_worker_log_group_arn
+        self.props['api_base_url'] = api_base_url
 
     def get(self, key):
         return self.props.get(key)
@@ -127,8 +131,12 @@ class SharedStackProps(StackProps):
         return self.get('efs_app_assets_path')
 
     @property
-    def ecs_mount_point(self) -> ecs.MountPoint:
-        return self.get('ecs_mount_point')
+    def ecs_asset_mount_point(self) -> ecs.MountPoint:
+        return self.get('ecs_asset_mount_point')
+
+    @property
+    def ecs_celery_flower_data_mount_point(self) -> ecs.MountPoint:
+        return self.get('ecs_celery_flower_data_mount_point')
 
     @property
     def ecs_task_iam_role(self) -> iam.Role:
@@ -193,3 +201,7 @@ class SharedStackProps(StackProps):
     @property
     def celery_worker_log_group_arn(self) -> str:
         return self.get('celery_worker_log_group_arn')
+
+    @property
+    def api_base_url(self) -> str:
+        return self.get('api_base_url')

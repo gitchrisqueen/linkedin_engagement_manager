@@ -8,6 +8,7 @@ class RedisStack(NestedStack):
 
     def __init__(self, scope: Construct, id: str,
                  vpc: ec2.Vpc,
+                 security_group: ec2.SecurityGroup,
                  **kwargs) -> None:
         super().__init__(scope, id, **kwargs)
 
@@ -26,9 +27,12 @@ class RedisStack(NestedStack):
                                                     cache_node_type="cache.t2.micro",
                                                     engine="redis",
                                                     num_cache_nodes=1,
-                                                    vpc_security_group_ids=[vpc.vpc_default_security_group],
+                                                    vpc_security_group_ids=[
+                                                                            #vpc.vpc_default_security_group,
+                                                                            security_group.security_group_id],
                                                     cache_subnet_group_name=redis_subnet_group.ref
                                                     )
+        redis_cluster.add_dependency(redis_subnet_group)
 
         self.redis_url = redis_cluster.attr_redis_endpoint_address
 

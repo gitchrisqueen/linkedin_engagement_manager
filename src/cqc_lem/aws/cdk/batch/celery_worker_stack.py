@@ -30,9 +30,12 @@ class CeleryWorkerStack(Stack):
         for i in range(count):
             name = "CeleryWorkerFargateEnv" + str(i)
             fargate_spot_environment = batch.FargateComputeEnvironment(self, name,
+                                                                       vpc=props.ec2_vpc,
                                                                        vpc_subnets=ec2.SubnetSelection(
                                                                            subnet_type=ec2.SubnetType.PRIVATE_WITH_EGRESS),
-                                                                       vpc=props.ec2_vpc
+                                                                       compute_environment_name=name,
+                                                                       security_groups=[props.ecs_security_group],
+
                                                                        )
 
             self.batch_queue.add_compute_environment(fargate_spot_environment, i)
@@ -50,6 +53,8 @@ class CeleryWorkerStack(Stack):
                                                             # "AWS_SECRET_NAME": props.ssm_myql_secret_name,
                                                             # "AWS_SQS_QUEUE_URL": props.sqs_queue_url,
                                                             # "AWS_SQS_SECRET_NAME": 'cqc-lem/elasticcache/access',
+                                                            "OPENAI_API_KEY": "Needs to come from secret",
+                                                            "AWS_MYSQL_SECRET_NAME": props.ssm_myql_secret_name,
                                                             "AWS_REGION": props.env.region,
                                                             "CELERY_BROKER_URL": f"redis://{props.redis_url}/0",
                                                             "CELERY_RESULT_BACKEND": f"redis://{props.redis_url}/1",
@@ -90,8 +95,7 @@ class CeleryWorkerStack(Stack):
         submit_batch_job_task_small = tasks.BatchSubmitJob(self, "Submit Small Batch Job",
                                                            job_definition_arn=job_def.job_definition_arn,
                                                            job_name="CeleryWorkerJob",
-                                                           job_queue_arn=self.batch_queue.job_queue_arn,
-                                                           array_size=2
+                                                           job_queue_arn=self.batch_queue.job_queue_arn
                                                            )
 
         submit_batch_job_task_large = tasks.BatchSubmitJob(self, "Submit Large Batch Job",
@@ -104,18 +108,18 @@ class CeleryWorkerStack(Stack):
         # Define Step Functions state machine
         definition = get_message_count_task.next(
             sfn.Choice(self, "Message Count Choice")
-            .when(sfn.Condition.number_less_than("$.message_count", 10),
+            .when(sfn.Condition.number_less_than("$.message_count ", 10),
                   submit_batch_job_task_small
                   )
-            .when(sfn.Condition.number_greater_than_equals("$.message_count", 10),
+            .when(sfn.Condition.number_greater_than_equals("$.message_count ", 10),
                   submit_batch_job_task_large
                   )
             .otherwise(sfn.Succeed(self, "No Messages"))
         )
 
-        state_machine = sfn.StateMachine(self, "StateMachine",
+        state_machine = sfn.StateMachine(self, "CeleryWorker_StateMachine",
                                          definition_body=DefinitionBody.from_chainable(definition),
-                                         timeout=Duration.minutes(30)
+                                         timeout=Duration.minutes(4)
                                          )
 
         # Create EventBridge rule to trigger the state machine

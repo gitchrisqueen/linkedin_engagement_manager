@@ -7,6 +7,7 @@ from opentelemetry.instrumentation.celery import CeleryInstrumentor
 
 from cqc_lem.app import celeryconfig
 from cqc_lem.app.celeryconfig import broker_url
+from cqc_lem.utilities.env_constants import CODE_TRACING
 from cqc_lem.utilities.jaeger_tracer_helper import get_jaeger_tracer
 from cqc_lem.utilities.logger import myprint
 
@@ -95,11 +96,14 @@ def restore_all_unacknowledged_messages(*args, **kwargs):
 
 @worker_process_init.connect(weak=False)
 def init_celery_tracing(*args, **kwargs):
-    tracer = get_jaeger_tracer("celery_worker", __name__)
+    if CODE_TRACING:
+        tracer = get_jaeger_tracer("celery_worker", __name__)
 
-    # Instrument Celery
-    ci = CeleryInstrumentor()
-    ci.instrument()
+        # Instrument Celery
+        ci = CeleryInstrumentor()
+        ci.instrument()
 
-    with tracer.start_as_current_span("init_celery_tracing"):
-        myprint("Instrumented Celery for tracing")
+        with tracer.start_as_current_span("init_celery_tracing"):
+            myprint("Instrumented Celery for tracing")
+    else:
+        myprint("Tracing is disabled")

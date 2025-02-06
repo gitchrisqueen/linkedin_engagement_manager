@@ -261,9 +261,11 @@ def get_user_id(email: str):
 def insert_post(email: str, content: str, scheduled_time, post_type: PostType) -> bool:
     user_id = get_user_id(email)
 
+    success=False
+
     if not user_id:
         print(f"User with email {email} not found.")
-        return False
+        return success
 
     connection = get_db_connection()
     cursor = connection.cursor()

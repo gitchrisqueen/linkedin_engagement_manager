@@ -42,8 +42,11 @@ class WebStack(Stack):
                                                               "OPENAI_API_KEY": "Needs to come from secret",
                                                               # TODO: Need to get this ^^^ from file or AWS Secret
                                                               "AWS_MYSQL_SECRET_NAME": props.ssm_myql_secret_name,
+                                                              "AWS_REGION": props.env.region,
                                                               "STREAMLIT_EMAIL": "christopher.queen@gmail.com",
                                                               "STREAMLIT_PORT": "8501",
+                                                              "API_BASE_URL": props.api_base_url,
+                                                              "API_PORT": "8000"
                                                           },
                                                           port_mappings=[
                                                               ecs.PortMapping(
@@ -63,8 +66,8 @@ class WebStack(Stack):
                                                           )
                                                           )
 
-        # Add a new volume to the Fargate Task Definition
-        web_app_container.add_mount_points(props.ecs_mount_point)
+        # Add a new mount point to the Fargate Task Definition
+        web_app_container.add_mount_points(props.ecs_asset_mount_point)
 
         # Create a service definitions and port mappings
         web_app_service = ecs.FargateService(

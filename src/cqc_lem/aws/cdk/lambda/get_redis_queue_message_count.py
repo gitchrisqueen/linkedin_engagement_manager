@@ -1,6 +1,5 @@
-import json
-import redis
 import os
+import redis
 
 
 def lambda_handler(event, context):
@@ -28,14 +27,15 @@ def lambda_handler(event, context):
 
         return {
             'statusCode': 200,
-            'body': json.dumps({'message_count': message_count})
+            'message_count': message_count
         }
 
     except Exception as e:
         print(f"Error connecting to Redis: {e}")
         return {
             'statusCode': 500,
-            'body': json.dumps({'error': 'Failed to connect to Redis', 'message_count': 0})
+            'body': 'Failed to connect to Redis',
+            'message_count': 0
         }
 
 

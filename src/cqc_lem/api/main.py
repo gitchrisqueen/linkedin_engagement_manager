@@ -17,6 +17,7 @@ from cqc_lem import assets_dir
 from cqc_lem.app.run_content_plan import auto_create_weekly_content
 from cqc_lem.utilities.db import insert_post, get_post_by_email, get_user_id, update_db_post, \
     add_user_with_access_token, PostType, PostStatus
+from cqc_lem.utilities.env_constants import CODE_TRACING
 from cqc_lem.utilities.jaeger_tracer_helper import get_jaeger_tracer
 from cqc_lem.utilities.logger import myprint
 from cqc_lem.utilities.mime_type_helper import get_file_mime_type
@@ -24,10 +25,11 @@ from cqc_lem.utilities.utils import get_file_extension_from_filepath
 
 app = FastAPI()
 
-tracer = get_jaeger_tracer("api", __name__)
 
-# Instrument FastAPI
-FastAPIInstrumentor.instrument_app(app)
+if CODE_TRACING:
+    tracer = get_jaeger_tracer("api", __name__)
+    # Instrument FastAPI
+    FastAPIInstrumentor.instrument_app(app)
 
 error_responses = {
     400: {"description": "Bad Request"},

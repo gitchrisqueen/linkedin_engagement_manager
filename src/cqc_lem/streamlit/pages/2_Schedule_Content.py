@@ -1,8 +1,11 @@
+from contextlib import nullcontext
+
 import streamlit as st
 import requests
 from datetime import datetime
 
 from cqc_lem.api.main import PostRequest
+from cqc_lem.utilities.env_constants import CODE_TRACING
 from cqc_lem.utilities.jaeger_tracer_helper import get_jaeger_tracer
 from cqc_lem.utilities.utils import get_best_posting_time, get_12h_format_best_time
 
@@ -36,9 +39,10 @@ scheduled_datetime = datetime.combine(selected_date, selected_time)
 # Add input for email address
 email = st.text_input("Email Address")
 
-tracer = get_jaeger_tracer("streamlit", __name__)
+tracer = get_jaeger_tracer("streamlit", __name__) if CODE_TRACING else None
 
-with tracer.start_as_current_span("schedule_post"):
+
+with (tracer.start_as_current_span("schedule_post") if tracer else nullcontext()):
 
     # Button to submit the form
     if st.button("Schedule Post"):

@@ -38,7 +38,7 @@ class MySQLStack(NestedStack):
         # Allow connections from any IP address to pot 3306
         db_instance.connections.allow_from_any_ipv4(
             ec2.Port.tcp(3306),
-            description="Open port for connection"
+            description="Mysql port for connection"
         )
 
         self.db_instance_endpoint_address = db_instance.db_instance_endpoint_address
@@ -46,5 +46,5 @@ class MySQLStack(NestedStack):
 
         # Output resources
         CfnOutput(self, "DBInstanceEndpoint", value=db_instance.db_instance_endpoint_address)
-        CfnOutput(self, "DBSecretName", value=db_instance.secret.secret_name)
-        CfnOutput(self, "DBInstanceARN", value=db_instance.instance_arn)
+        #CfnOutput(self, "DBSecretName", value=db_instance.secret.secret_name)
+        #CfnOutput(self, "DBInstanceARN", value=db_instance.instance_arn)

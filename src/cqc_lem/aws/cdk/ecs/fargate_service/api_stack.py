@@ -42,7 +42,9 @@ class APIStack(Stack):
                                                               "OPENAI_API_KEY": 'needs_to_come_from_aws_secret',
                                                               # TODO: Need to get this ^^^ from file or AWS Secret
                                                               "AWS_MYSQL_SECRET_NAME": props.ssm_myql_secret_name,
+                                                              "AWS_REGION": props.env.region,
                                                               "API_PORT": "8000",
+                                                              "API_BASE_URL": props.api_base_url,
                                                               "CELERY_BROKER_URL": f"redis://{props.redis_url}/0",
                                                               "CELERY_RESULT_BACKEND": f"redis://{props.redis_url}/1",
 
@@ -65,8 +67,8 @@ class APIStack(Stack):
                                                           )
                                                           )
 
-        # Add a new volume to the Fargate Task Definition
-        api_key_container.add_mount_points(props.ecs_mount_point)
+        # Add a new mount point to the Fargate Task Definition
+        api_key_container.add_mount_points(props.ecs_asset_mount_point)
 
         # Create a service definitions and port mappings
         api_service = ecs.FargateService(

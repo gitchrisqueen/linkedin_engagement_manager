@@ -99,19 +99,4 @@ RUN chmod +x /entrypoint /wait-for-it /start-streamlit /start-fastapi /start-cel
 # Create a logs folder
 RUN mkdir -p /app/logs
 
-
-# Define environment variables from aws builds
-ARG API_BASE_URL_BUILD_ARG
-ENV API_BASE_URL=$API_BASE_URL_BUILD_ARG
-
-# Define default ports if environment variables aren't set
-#ARG STREAMLIT_PORT=8501
-#ARG API_PORT=8000
-#ARG CELERY_FLOWER_PORT=5555
-
-# Expose the ports using variable substitution
-#EXPOSE $STREAMLIT_PORT
-#EXPOSE $API_PORT
-#EXPOSE $CELERY_FLOWER_PORT
-
 ENTRYPOINT ["/entrypoint"]

@@ -83,11 +83,16 @@ class EFSStack(NestedStack):
         # Create container mount point for Fargate Task Definitions
         self.efs_volume_name = EFS_VOLUME_NAME
         self.efs_app_assets_path = CONTAINER_APP_ASSETS_PATH
-        self.mount_point = ecs.MountPoint(
+        self.asset_mount_point = ecs.MountPoint(
             container_path=CONTAINER_APP_ASSETS_PATH,
             source_volume=self.efs_volume_name,
             read_only=False,
         )
+        self.celery_flower_data_mount_point = ecs.MountPoint(
+            container_path='/flower/data',
+            source_volume=self.efs_volume_name,
+            read_only=False,
+        )
 
-        CfnOutput(self, "EFSFileSystemId", value=self.file_system.file_system_id)
-        CfnOutput(self, "EFSAccessPointId", value=self.efs_access_point.access_point_id)
+        #CfnOutput(self, "EFSFileSystemId", value=self.file_system.file_system_id)
+        #CfnOutput(self, "EFSAccessPointId", value=self.efs_access_point.access_point_id)

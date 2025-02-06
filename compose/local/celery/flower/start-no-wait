@@ -6,13 +6,28 @@ set -o nounset
 celery --app cqc_lem.app.my_celery \
   --broker="${CELERY_BROKER_URL}" \
   flower \
-  #--broker-api="${CELERY_BROKER_URL}" \
+  --broker-api="${CELERY_BROKER_URL}" \
   --logging="DEBUG" \
   --logfile="/app/logs" \
-  #--persistent=True \
   --debug=True \
-  --db=/data/flower.db
+  --persistent=True \
+  --state_save_interval=180 \
+  --db=/data/flower.db &
   #--basic_auth=admin:${CELERY_FLOWER_PASSWORD} \
-  #--state_save_interval=5000 \
+
   #-Q (your queue name)
 
+# Function to check if Celery worker is ready
+worker_ready() {
+    celery --app cqc_lem.app.my_celery inspect ping
+}
+
+# Wait for Celery worker to be ready
+until worker_ready; do
+  >&2 echo 'Celery workers not available'
+  sleep 1
+done
+>&2 echo 'Celery workers are available'
+
+# Keep the script running
+wait

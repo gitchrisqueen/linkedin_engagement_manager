@@ -2,7 +2,7 @@ from aws_cdk import (
     Stack,
     aws_logs as logs,
     aws_iam as iam,
-    aws_ec2 as ec2, CfnOutput, RemovalPolicy, )
+    aws_ec2 as ec2, RemovalPolicy, )
 from constructs import Construct
 
 from cqc_lem.aws.cdk.ecr.ecr_stack import EcrStack
@@ -47,20 +47,17 @@ class MainStack(Stack):
         # AWSRegion = Stack.of(self).region
         # AWSStackId = Stack.of(self).stack_id
 
-
         mysql_stack = MySQLStack(self, "MySQLStack", vpc=vpc)
-        redis_stack = RedisStack(self, "RedisStack", vpc=vpc)
+        efs_stack = EFSStack(self, "EFSStack", vpc=vpc)
+        ecs_stack = EcsStack(self, "EcsStack", vpc=vpc)
+        redis_stack = RedisStack(self, "RedisStack", vpc=vpc, security_group=ecs_stack.ecs_security_group)
+        redis_stack.add_dependency(ecs_stack)
         lambda_stack = LambdaStack(self, "LambdaStack",
                                    vpc=vpc, redis_url=redis_stack.redis_url)
         lambda_stack.add_dependency(redis_stack)
 
-        efs_stack = EFSStack(self, "EFSStack", vpc=vpc)
-        ecs_stack = EcsStack(self, "EcsStack", vpc=vpc)
-
-        API_BASE_URL_BUILD_ARG =  f"http://{ecs_stack.public_lb.load_balancer_dns_name}:8000"
-        ecr_stack = EcrStack(self, "EcrStack", API_BASE_URL_BUILD_ARG=API_BASE_URL_BUILD_ARG)
-
-
+        api_base_url = f"http://{ecs_stack.public_lb.load_balancer_dns_name}"
+        ecr_stack = EcrStack(self, "EcrStack")
 
         celery_worker_log_group = logs.LogGroup(
             self, "CeleryWorkerLogGroup",
@@ -68,7 +65,6 @@ class MainStack(Stack):
             retention=logs.RetentionDays.ONE_WEEK,
             removal_policy=RemovalPolicy.DESTROY
         )
-
 
         # Creating the task and execution IAM roles that the containers will assume to read and write to cloudwatch, Task Execution
         # Role will read from ECR
@@ -120,15 +116,23 @@ class MainStack(Stack):
                                    'elasticfilesystem:ClientMount',
                                    'elasticfilesystem:DescribeMountTargets'
                                ]
+                           ),
+                           iam.PolicyStatement(
+                               sid='AllowSecretsManagerAccess',
+                               effect=iam.Effect.ALLOW,
+                               resources=['*'],
+                               actions=[
+                                   'secretsmanager:GetSecretValue'
+                               ]
                            )
                        ]
                        )
         )
 
         # Output resources
-        CfnOutput(self, "VPC", value=vpc.vpc_id)
-        CfnOutput(self, "LoadBalancerArn", value=ecs_stack.public_lb.load_balancer_arn)
-        CfnOutput(self, "LoadBalancerSGID", value=ecs_stack.public_lb_sg.security_group_id)
+        # CfnOutput(self, "VPC", value=vpc.vpc_id)
+        # CfnOutput(self, "LoadBalancerArn", value=ecs_stack.public_lb.load_balancer_arn)
+        # CfnOutput(self, "LoadBalancerSGID", value=ecs_stack.public_lb_sg.security_group_id)
 
         # Prepares output attributes to be passed into other stacks
         self.output_props = props.props.copy()
@@ -142,7 +146,8 @@ class MainStack(Stack):
         self.output_props['efs_task_role'] = efs_stack.EFSTaskRole
         self.output_props['efs_volume_name'] = efs_stack.efs_volume_name
         self.output_props['efs_app_assets_path'] = efs_stack.efs_app_assets_path
-        self.output_props['ecs_mount_point'] = efs_stack.mount_point
+        self.output_props['ecs_asset_mount_point'] = efs_stack.asset_mount_point
+        self.output_props['ecs_celery_flower_data_mount_point'] = efs_stack.celery_flower_data_mount_point
         self.output_props['ecs_task_iam_role'] = ECSTaskIamRole
         self.output_props['task_execution_role'] = TaskExecutionRole
         self.output_props['ecs_cluster'] = ecs_stack.ecs_cluster
@@ -157,6 +162,7 @@ class MainStack(Stack):
         self.output_props['redis_url'] = redis_stack.redis_url
         self.output_props['lambda_get_redis_queue_message_count'] = lambda_stack.get_queue_message_count
         self.output_props['celery_worker_log_group_arn'] = celery_worker_log_group.log_group_arn
+        self.output_props['api_base_url'] = api_base_url
 
     @property
     def outputs(self) -> SharedStackProps:
