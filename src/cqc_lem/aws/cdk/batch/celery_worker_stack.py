@@ -170,7 +170,7 @@ class CeleryWorkerStack(Stack):
             job_definition_arn=celery_job_def.job_definition_arn,
             job_definition_scope=celery_job_def,
             job_name="small-batch-celery-workers",
-            array_size=5  # Launch 5 workers
+            size=5  # Launch 5 workers
         ))
 
         # Add targets for large batch (10 workers)
@@ -180,7 +180,7 @@ class CeleryWorkerStack(Stack):
             job_definition_arn=celery_job_def.job_definition_arn,
             job_definition_scope=celery_job_def,
             job_name="large-batch-celery-workers",
-            array_size=10  # Launch 10 workers
+            size=10  # Launch 10 workers
         ))
 
         # Output resources
