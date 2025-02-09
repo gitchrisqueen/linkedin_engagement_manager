@@ -1,15 +1,16 @@
 from aws_cdk import (
     aws_rds as rds,
     aws_ecs as ecs,
-    aws_ec2 as ec2, RemovalPolicy, CfnOutput, NestedStack, )
+    aws_ec2 as ec2, RemovalPolicy, CfnOutput, NestedStack, Duration, )
 from constructs import Construct
 
 
 class MySQLStack(NestedStack):
-    vpc: ec2.Vpc = None
-    cluster: ecs.Cluster = None
 
-    def __init__(self, scope: Construct, id: str, vpc: ec2.Vpc, **kwargs) -> None:
+    def __init__(self, scope: Construct, id: str,
+                 vpc: ec2.Vpc,
+                 mysql_port: int,
+                 **kwargs) -> None:
         super().__init__(scope, id, **kwargs)
 
         # Create RDS MySQL Database
@@ -25,19 +26,23 @@ class MySQLStack(NestedStack):
                                            allocated_storage=20,
                                            max_allocated_storage=100,
                                            multi_az=False,
-                                           port=3306,
+                                           port=mysql_port,
                                            instance_type=ec2.InstanceType.of(
                                                ec2.InstanceClass.BURSTABLE3, ec2.InstanceSize.MICRO
                                            ),
                                            # credentials=rds.Credentials.from_generated_secret("admin"),  # Optional - will default to 'admin' username and generated password
                                            database_name="linkedin_manager",
                                            removal_policy=RemovalPolicy.DESTROY,
-                                           deletion_protection=False
+                                           deletion_protection=False,
+                                           monitoring_interval=Duration.seconds(0),  # Disable enhanced monitoring
+                                           enable_performance_insights=False,  # Disable performance insights
+                                           cloudwatch_logs_exports=[]  # Disable log exports
+
                                            )
 
-        # Allow connections from any IP address to pot 3306
+        # Allow connections from any IP address to the mysql port
         db_instance.connections.allow_from_any_ipv4(
-            ec2.Port.tcp(3306),
+            ec2.Port.tcp(mysql_port),
             description="Mysql port for connection"
         )
 

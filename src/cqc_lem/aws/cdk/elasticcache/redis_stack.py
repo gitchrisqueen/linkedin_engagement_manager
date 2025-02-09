@@ -34,6 +34,9 @@ class RedisStack(NestedStack):
                                                     )
         redis_cluster.add_dependency(redis_subnet_group)
 
+
+
+        self.redis_cluster_id = redis_cluster.ref
         self.redis_url = redis_cluster.attr_redis_endpoint_address
 
         # Output resources

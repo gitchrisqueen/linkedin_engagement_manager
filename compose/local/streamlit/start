@@ -19,10 +19,12 @@ STREAMLIT_PORT=${STREAMLIT_PORT:-8501}
 
 # Start Streamlit app
 streamlit run \
+  --server.address=0.0.0.0 \
   --server.port $STREAMLIT_PORT \
   --server.headless true \
   --browser.serverAddress="0.0.0.0" \
   --server.enableCORS false \
-  --server.enableXsrfProtection=false \
+  --server.enableXsrfProtection=true \
   --browser.gatherUsageStats false \
+  --server.enableWebsocketCompression=true \
   ./src/cqc_lem/streamlit/Home.py

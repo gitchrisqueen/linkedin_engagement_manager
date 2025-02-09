@@ -66,13 +66,14 @@ runwayml = "^2.1.0"
 huggingface-hub = "^0.26.2"
 replicate = "^1.0.4"
 celery-once = {git = "https://github.com/gitchrisqueen/celery-once.git"}
+pycurl = "^7.45.4"
 
 # AWS CDK Libs
 aws-cdk-lib = "^2.177.0"
 constructs = "^10.4.2"
 boto3 = "^1.36.7"
 cdk-ecr-deployment = "^3.1.8"
-pycurl = "^7.45.4"
+
 aws-cdk-aws-amplify-alpha = "^2.177.0a0"
 aws-cdk-aws-lambda-python-alpha = "^2.177.0a0"
 

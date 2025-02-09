@@ -45,8 +45,8 @@ class EcrStack(NestedStack):
                                             '**/test/**/*',
                                         ],
                                         build_args={
-                                            #"API_BASE_URL_BUILD_ARG": "http://api.cqc-lem.local:8000", #TODO Need the public url cause this not working
-                                            #"API_BASE_URL_BUILD_ARG":API_BASE_URL_BUILD_ARG,
+                                            # "API_BASE_URL_BUILD_ARG": "http://api.cqc-lem.local:8000", #TODO Need the public url cause this not working
+                                            # "API_BASE_URL_BUILD_ARG":API_BASE_URL_BUILD_ARG,
                                             # This argument will be passed to the dockerfile and used as the API_BASE_URL
                                         },
                                         platform=Platform.LINUX_AMD64,
@@ -61,6 +61,7 @@ class EcrStack(NestedStack):
                                 dest=ecrdeploy.DockerImageName(
                                     f"{repository.repository_uri}:latest"),
                                 memory_limit=2048
+
                                 )
 
         # Exporting values to be used in other stacks

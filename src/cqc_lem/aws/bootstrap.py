@@ -17,16 +17,11 @@ def bootstrap_stacks():
 
     from cqc_lem.aws.util import get_aws_account_id, get_aws_region
 
-    # Set environment variable JSII_SILENCE_WARNING_UNTESTED_NODE_VERSION to true
-    # os.environ['JSII_SILENCE_WARNING_UNTESTED_NODE_VERSION'] = 'true'
-
     account_id = get_aws_account_id()
     region = get_aws_region()
 
     print(f"Account ID: {account_id}")
     print(f"Region: {region}")
-
-    exit()
 
     if account_id and region:
         subprocess.run(['npx -p node@22 cdk', 'bootstrap', f"{account_id}/{region}"], check=False, )

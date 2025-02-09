@@ -47,14 +47,22 @@ class MainStack(Stack):
         # AWSRegion = Stack.of(self).region
         # AWSStackId = Stack.of(self).stack_id
 
-        mysql_stack = MySQLStack(self, "MySQLStack", vpc=vpc)
+        mysql_stack = MySQLStack(self, "MySQLStack", vpc=vpc, mysql_port=props.mysql_port)
         efs_stack = EFSStack(self, "EFSStack", vpc=vpc)
-        ecs_stack = EcsStack(self, "EcsStack", vpc=vpc)
+        ecs_stack = EcsStack(self, "EcsStack", vpc=vpc,props=props)
         redis_stack = RedisStack(self, "RedisStack", vpc=vpc, security_group=ecs_stack.ecs_security_group)
         redis_stack.add_dependency(ecs_stack)
+
+        '''
         lambda_stack = LambdaStack(self, "LambdaStack",
-                                   vpc=vpc, redis_url=redis_stack.redis_url)
+                                   vpc=vpc,
+                                   redis_url=redis_stack.redis_url,
+                                   redis_port=props.redis_port,
+                                   redis_db=0 # TODO: Should this redis db be hardcoded ???
+                                   )
         lambda_stack.add_dependency(redis_stack)
+        '''
+
 
         api_base_url = f"http://{ecs_stack.public_lb.load_balancer_dns_name}"
         ecr_stack = EcrStack(self, "EcrStack")
@@ -62,6 +70,13 @@ class MainStack(Stack):
         celery_worker_log_group = logs.LogGroup(
             self, "CeleryWorkerLogGroup",
             log_group_name="/cqc-lem/celery_worker",
+            retention=logs.RetentionDays.ONE_WEEK,
+            removal_policy=RemovalPolicy.DESTROY
+        )
+
+        selenium_log_group = logs.LogGroup(
+            self, "SeleniumLogGroup",
+            log_group_name="/cqc-lem/selenium",
             retention=logs.RetentionDays.ONE_WEEK,
             removal_policy=RemovalPolicy.DESTROY
         )
@@ -152,16 +167,20 @@ class MainStack(Stack):
         self.output_props['task_execution_role'] = TaskExecutionRole
         self.output_props['ecs_cluster'] = ecs_stack.ecs_cluster
         self.output_props['ecs_default_cloud_map_namespace'] = ecs_stack.default_cloud_map_namespace
-        self.output_props['ecs_service_log_group'] = ecs_stack.ecs_service_log_group
         self.output_props['ecs_security_group'] = ecs_stack.ecs_security_group
         self.output_props['ec2_public_lb_sg'] = ecs_stack.public_lb_sg
         self.output_props['elbv2_public_lb'] = ecs_stack.public_lb
         self.output_props['elbv2_web_listener'] = ecs_stack.web_listener
         self.output_props['elbv2_api_listener'] = ecs_stack.api_listener
         self.output_props['elbv2_flower_listener'] = ecs_stack.flower_listener
+        self.output_props['elbv2_selenium_hub_listener'] = ecs_stack.selenium_hub_listener
+        self.output_props['elbv2_selenium_bus_publish_listener'] = ecs_stack.selenium_bus_publish_listener
+        self.output_props['elbv2_selenium_bus_subscribe_listener'] = ecs_stack.selenium_bus_subscribe_listener
+        self.output_props['redis_cluster_id'] = redis_stack.redis_cluster_id
         self.output_props['redis_url'] = redis_stack.redis_url
-        self.output_props['lambda_get_redis_queue_message_count'] = lambda_stack.get_queue_message_count
+        #self.output_props['lambda_get_redis_queue_message_count'] = lambda_stack.get_queue_message_count
         self.output_props['celery_worker_log_group_arn'] = celery_worker_log_group.log_group_arn
+        self.output_props['selenium_log_group_arn'] = selenium_log_group.log_group_arn
         self.output_props['api_base_url'] = api_base_url
 
     @property

@@ -10,7 +10,10 @@
       "requirements*.txt",
       "source.bat",
       "**/__init__.py",
-      "**/__pycache__",
+      "**/.git/**",
+      "**/.DS_Store",
+      "**/node_modules/**",
+      "**/__pycache__/**",
       "**/cdk.out/**/*",
       "**/tests/**/*"
     ]
@@ -20,11 +23,11 @@
       "CQC-LEM",
       "WebStack",
       "APIStack",
-       "CeleryWorkerStack",
+      "SeleniumStack",
+      "CeleryWorkerStack",
       "CeleryFlowerStack"
     ],
     "deployHold": [
-
     ],
     "@aws-cdk/aws-lambda:recognizeLayerVersion": true,
     "@aws-cdk/core:checkSecretUsage": true,

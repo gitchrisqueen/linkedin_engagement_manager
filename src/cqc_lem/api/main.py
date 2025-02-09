@@ -68,6 +68,12 @@ class PostRequest(BaseModel):
         return self.scheduled_datetime.isoformat()
 
 
+
+@app.get("/health")
+def health_check():
+    return {"status": "healthy"}
+
+
 @app.post("/schedule_post/", responses={
     200: {"description": "Post scheduled successfully"},
     **{k: v for k, v in error_responses.items() if k in [403, 404]}
@@ -174,7 +180,7 @@ def linkedin_callback(code: str, state: str = None) -> Union[ResponseModel, Redi
         client_id = os.getenv("LI_CLIENT_ID")
         client_secret = os.getenv("LI_CLIENT_SECRET")
         redirect_url = os.getenv("LI_REDIRECT_URL")
-        resource_path = os.getenv("LI_USERINFO_RESOURCE")
+        resource_path = '/userinfo'
 
         #  Exchange code for access token
         client = AuthClient(client_id, client_secret, redirect_url)

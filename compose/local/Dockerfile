@@ -21,7 +21,9 @@ RUN apt-get update -y && apt-get install --no-install-suggests --no-install-reco
     #pkg-config \
     #libicu-dev \
     #libpython3.13 \
-    # Verify above packages are needed or not
+    # Verify above packages are needed or not \
+    # Curl needed for AWS health checks
+    curl \
     netcat-traditional \
     # cleaning up unused files
     && apt-get purge -y --auto-remove -o APT::AutoRemove::RecommendsImportant=false \
@@ -88,13 +90,14 @@ COPY ./compose/local/entrypoint /entrypoint
 COPY ./compose/local/wait-for-it /wait-for-it
 COPY ./compose/local/streamlit/start /start-streamlit
 COPY ./compose/local/fastapi/start /start-fastapi
+COPY ./compose/local/fastapi/start-cloud /start-fastapi-cloud
 COPY ./compose/local/celery/worker/start /start-celeryworker
 COPY ./compose/local/celery/worker/start-solo-pool /start-celeryworker-solo
 COPY ./compose/local/celery/beat/start /start-celerybeat
 COPY ./compose/local/celery/flower/start /start-flower
 COPY ./compose/local/celery/flower/start-no-wait /start-flower-no-wait
 
-RUN chmod +x /entrypoint /wait-for-it /start-streamlit /start-fastapi /start-celeryworker /start-celeryworker-solo /start-celerybeat /start-flower /start-flower-no-wait
+RUN chmod +x /entrypoint /wait-for-it /start-streamlit /start-fastapi /start-fastapi-cloud /start-celeryworker /start-celeryworker-solo /start-celerybeat /start-flower /start-flower-no-wait
 
 # Create a logs folder
 RUN mkdir -p /app/logs

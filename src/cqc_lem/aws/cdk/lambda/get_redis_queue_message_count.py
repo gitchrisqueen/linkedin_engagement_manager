@@ -3,19 +3,15 @@ import redis
 
 
 def lambda_handler(event, context):
-    celery_broker_url = os.getenv('CELERY_BROKER_URL')
+    redis_url = os.getenv('REDIS_URL')
+    redis_port = os.getenv('REDIS_PORT')
+    redis_db = os.getenv('REDIS_DB')
     celery_queue_name = os.getenv('CELERY_QUEUE_NAME')
 
-    # celery_broker_url='redis://redis:6379/0' # Delete this is for testing
-
-    # parse the celery broker url into its host,port,and db part
-    redis_url = celery_broker_url.split('//')[1].split(':')[0]
-    redis_port = celery_broker_url.split(':')[2].split('/')[0]
-    redis_db = celery_broker_url.split('/')[3]
-
-    print(f"Redis URL: {redis_url}")
-    print(f"Redis Port: {redis_port}")
-    print(f"Redis DB: {redis_db}")
+    #print(f"Redis URL: {redis_url}")
+    #print(f"Redis Port: {redis_port}")
+    #print(f"Redis DB: {redis_db}")
+    #print(f"Celery Queue Name: {celery_queue_name}")
 
     try:
         r = redis.Redis(host=redis_url, port=redis_port, db=redis_db)

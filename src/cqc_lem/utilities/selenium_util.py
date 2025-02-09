@@ -80,7 +80,7 @@ def get_docker_driver(headless=True, session_name: str = "ChromeTests"):
     options.add_argument('--ignore-certificate-errors')
 
     # Enable recording video
-    options.set_capability('se:recordVideo', True)
+    options.set_capability('se:recordVideo', SELENIUM_RECORD_VIDEOS)
     options.set_capability('se:timeZone', "America/New_York")
     options.set_capability('se:screenResolution', '1920x1080')
     options.set_capability('se:name', 'CQC_LEM (' + session_name + ')')
