@@ -64,7 +64,9 @@ class MainStack(Stack):
         '''
 
 
-        api_base_url = f"http://{ecs_stack.public_lb.load_balancer_dns_name}"
+        # api_base_url = f"http://{ecs_stack.public_lb.load_balancer_dns_name}" # Public url
+        api_base_url= f"http://api.{ecs_stack.default_cloud_map_namespace.namespace_name}"# Private url - only accessible within the VPC
+
         ecr_stack = EcrStack(self, "EcrStack")
 
         celery_worker_log_group = logs.LogGroup(
@@ -138,6 +140,16 @@ class MainStack(Stack):
                                resources=['*'],
                                actions=[
                                    'secretsmanager:GetSecretValue'
+                               ]
+                           ),
+                           # Add new policy statement for CloudWatch metrics
+                           iam.PolicyStatement(
+                               sid='AllowCloudWatchMetrics',
+                               effect=iam.Effect.ALLOW,
+                               resources=['*'],
+                               actions=[
+                                   'cloudwatch:PutMetricData',
+                                   'cloudwatch:GetMetricStatistics'
                                ]
                            )
                        ]

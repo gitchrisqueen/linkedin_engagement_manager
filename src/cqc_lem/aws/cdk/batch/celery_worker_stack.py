@@ -1,11 +1,11 @@
 from aws_cdk import (
     aws_ecs as ecs,
     aws_logs as logs,
-    aws_cloudwatch as cloudwatch,
     aws_batch as batch,
-    aws_events as events,
+    aws_cloudwatch as cloudwatch,
     aws_events_targets as targets,
-    aws_ec2 as ec2, Duration, Size, CfnOutput, Stack, )
+    aws_events as events,
+    aws_ec2 as ec2, Size, CfnOutput, Stack, Duration, )
 from constructs import Construct
 
 from cqc_lem.aws.cdk.shared_stack_props import SharedStackProps
@@ -18,26 +18,26 @@ class CeleryWorkerStack(Stack):
                  **kwargs) -> None:
         super().__init__(scope, id, **kwargs)
 
-        # To create number of Batch Compute Environment
-        count = 3
+        fargate_spot_environment = batch.FargateComputeEnvironment(self, "CeleryWorkerFargateEnv",
+                                                                   vpc=props.ec2_vpc,
+                                                                   vpc_subnets=ec2.SubnetSelection(
+                                                                       subnet_type=ec2.SubnetType.PRIVATE_WITH_EGRESS),
+                                                                   compute_environment_name="CeleryWorkerFargateEnv",
+                                                                   security_groups=[props.ecs_security_group],
+                                                                   spot=True,
+                                                                   maxv_cpus=100,
+                                                                   # Set this ^^^ based on maximum expected concurrent jobs                                                                   minvCpus=0,
+                                                                   update_timeout=Duration.minutes(5)
+
+                                                                   )
+
 
         # Create AWS Batch Job Queue
-        self.celery_batch_job_queue = batch.JobQueue(self, "CeleryWorkerJobQueue")
+        self.celery_batch_job_queue = batch.JobQueue(self, "CeleryWorkerJobQueue",
+                                                     job_queue_name="celery-worker-job-queue"
+                                                     )
 
-        # For loop to create Batch Compute Environments
-        for i in range(count):
-            name = "CeleryWorkerFargateEnv" + str(i)
-            fargate_spot_environment = batch.FargateComputeEnvironment(self, name,
-                                                                       vpc=props.ec2_vpc,
-                                                                       vpc_subnets=ec2.SubnetSelection(
-                                                                           subnet_type=ec2.SubnetType.PRIVATE_WITH_EGRESS),
-                                                                       compute_environment_name=name,
-                                                                       security_groups=[props.ecs_security_group],
-                                                                       spot=True
-
-                                                                       )
-
-            self.celery_batch_job_queue.add_compute_environment(fargate_spot_environment, i)
+        self.celery_batch_job_queue.add_compute_environment(fargate_spot_environment, 1)
 
         # Add a new batch container to the Fargate Task Definition
         container = batch.EcsFargateContainerDefinition(self, "CeleryWorkerFargateContainer",
@@ -66,11 +66,14 @@ class CeleryWorkerStack(Stack):
                                                             "CELERY_BROKER_URL": f"redis://{props.redis_url}:{props.redis_port}/0",
                                                             "CELERY_RESULT_BACKEND": f"redis://{props.redis_url}:{props.redis_port}/1",
                                                             "CELERY_QUEUE": "celery",
-                                                            "SELENIUM_HUB_HOST": props.elbv2_public_lb.load_balancer_dns_name,
+                                                            #"SELENIUM_HUB_HOST": props.elbv2_public_lb.load_balancer_dns_name, # Through the public load balancer
+                                                            "SELENIUM_HUB_HOST": f"selenium_hub.{props.ecs_default_cloud_map_namespace.namespace_name}", # Through the internal load balancer
                                                             "SELENIUM_HUB_PORT": str(props.selenium_hub_port),
+                                                            "HEADLESS_BROWSER": "FALSE" # TODO: Turn this to true in production
 
                                                             # ^^^ Use this to define different priority of queues with more or less processing power
                                                         },
+                                                        # TODO: Volume added but no mount point. Need to verify this for assets
                                                         # Add a new volume to the container
                                                         volumes=[batch.EcsVolume.efs(
                                                             name="CeleryWorkerVolume",
@@ -91,97 +94,85 @@ class CeleryWorkerStack(Stack):
 
                                                         )
 
+
+
         # Create Batch job definition
         celery_job_def = batch.EcsJobDefinition(self, "CeleryWorkerJobDef",
-                                         container=container
-                                         )
+                                                job_definition_name='celery_worker',
+                                                container=container,
+                                                timeout=Duration.minutes(15)
+                                                # The time the job has to complete before it will be terminated
+                                                )
 
-
-        # Create metric for number of items in Redis
-        queue_items_metric = cloudwatch.Metric(
-            namespace="cqc-lem/redis/cache",
-            metric_name="CurrItems",
-            dimensions_map={
-                "CacheClusterId": str(props.redis_cluster_id)
+        # Define alarm thresholds and corresponding batch sizes
+        # Define scaling tiers with alarm configurations
+        scaling_configs = [
+            {
+                "threshold": 1,
+                "batch_size": 1,
+                "datapoints": 1,  # Quick response for super small queues
+                "periods": 1
             },
-            statistic="Average",
-            period=Duration.minutes(1)
-        )
+            {
+                "threshold": 10,
+                "batch_size": 5,
+                "datapoints": 1,  # Quick response for small queues
+                "periods": 1
+            },
+            {
+                "threshold": 25,
+                "batch_size": 10,
+                "datapoints": 2,  # More conservative
+                "periods": 2
+            },
+            {
+                "threshold": 50,
+                "batch_size": 25,
+                "datapoints": 3,  # Most conservative
+                "periods": 3  # Ensure sustained load before launching larger batches
+            }
+        ]
 
-        # Alarm for small batch (triggers when there are any items)
-        small_jobs_alarm = cloudwatch.Alarm(
-            self,
-            "CelerySmallJobsAlarm",
-            metric=queue_items_metric,
-            threshold=1,  # Trigger when there's at least one item
-            evaluation_periods=1,
-            comparison_operator=cloudwatch.ComparisonOperator.GREATER_THAN_OR_EQUAL_TO_THRESHOLD,
-            alarm_name="CelerySmallJobsAlarm",
-            alarm_description="Alarm for small amount of jobs in the Celery queue"
-
-        )
-
-        # Alarm for large batch (triggers when there are many items)
-        large_jobs_alarm = cloudwatch.Alarm(
-            self,
-            "CeleryLargeJobsAlarm",
-            metric=queue_items_metric,
-            threshold=10,  # Adjust this number based on your needs
-            evaluation_periods=1,
-            comparison_operator=cloudwatch.ComparisonOperator.GREATER_THAN_OR_EQUAL_TO_THRESHOLD,
-            alarm_name="CeleryLargeJobsAlarm",
-            alarm_description="Alarm for large amount of jobs in the Celery queue"
-        )
-
-        # Create EventBridge rules for small batch
-        small_batch_rule = events.Rule(
-            self, "SmallBatchRule",
-            event_pattern=events.EventPattern(
-                source=["aws.cloudwatch"],
-                detail_type=["CloudWatch CelerySmallJobsAlarm State Change"],
-                detail={
-                    "alarmName": [small_jobs_alarm.alarm_name],
-                    "state": {
-                        "value": ["ALARM"]
-                    }
-                }
+        # Create alarms for each threshold
+        for config in scaling_configs:
+            alarm = cloudwatch.Alarm(
+                self, f"RedisQueueAlarmThreshold{config['threshold']}",
+                metric=cloudwatch.Metric(
+                    namespace="cqc-lem/celery_queue/celery",  # TODO: Need this somewhere central
+                    metric_name="QueueLength",
+                    period=Duration.minutes(1),
+                    statistic="Maximum"
+                ),
+                threshold=config['threshold'],
+                evaluation_periods=config['periods'],
+                datapoints_to_alarm=config['datapoints'],  # Must have x periods in alarm state
+                comparison_operator=cloudwatch.ComparisonOperator.GREATER_THAN_OR_EQUAL_TO_THRESHOLD
             )
-        )
 
-        # Create EventBridge rules for large batch
-        large_batch_rule = events.Rule(
-            self, "LargeBatchRule",
-            event_pattern=events.EventPattern(
-                source=["aws.cloudwatch"],
-                detail_type=["CloudWatch CeleryLargeJobsAlarm State Change"],
-                detail={
-                    "alarmName": [large_jobs_alarm.alarm_name],
-                    "state": {
-                        "value": ["ALARM"]
+            # Create EventBridge rule for each threshold
+            rule = events.Rule(
+                self, f"CeleryWorkerRuleThreshold{config['threshold']}",
+                event_pattern=events.EventPattern(
+                    source=["aws.cloudwatch"],
+                    detail_type=["CloudWatch Alarm State Change"],
+                    detail={
+                        "alarmName": [alarm.alarm_name],
+                        "state": {
+                            "value": ["ALARM"]
+                        }
                     }
-                }
+                )
             )
-        )
 
-        # Add targets for small batch (5 workers)
-        small_batch_rule.add_target(targets.BatchJob(
-            job_queue_arn=self.celery_batch_job_queue.job_queue_arn,
-            job_queue_scope=self.celery_batch_job_queue,
-            job_definition_arn=celery_job_def.job_definition_arn,
-            job_definition_scope=celery_job_def,
-            job_name="small-batch-celery-workers",
-            size=5  # Launch 5 workers
-        ))
-
-        # Add targets for large batch (10 workers)
-        large_batch_rule.add_target(targets.BatchJob(
-            job_queue_arn=self.celery_batch_job_queue.job_queue_arn,
-            job_queue_scope=self.celery_batch_job_queue,
-            job_definition_arn=celery_job_def.job_definition_arn,
-            job_definition_scope=celery_job_def,
-            job_name="large-batch-celery-workers",
-            size=10  # Launch 10 workers
-        ))
+            # Add Batch job target with corresponding batch size
+            rule.add_target(targets.BatchJob(
+                job_queue_scope=self,
+                job_queue_arn=self.celery_batch_job_queue.job_queue_arn,
+                job_definition_arn=celery_job_def.job_definition_arn,
+                job_definition_scope=self,
+                job_name=f"celery-workers-batch-{config['threshold']}",
+                size=config['batch_size'] if config['batch_size'] > 1 else None
+            ))
 
         # Output resources
         CfnOutput(self, "BatchCeleryJobQueue", value=self.celery_batch_job_queue.job_queue_name)

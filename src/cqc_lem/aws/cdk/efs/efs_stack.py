@@ -94,5 +94,14 @@ class EFSStack(NestedStack):
             read_only=False,
         )
 
+        # TODO: Add mount points to Selenium Nodes
+        self.selenium_video_mount_point = ecs.MountPoint(
+            container_path='/opt/selenium/assets',
+            source_volume=self.efs_volume_name,
+            read_only=False,
+        )
+
+
+
         #CfnOutput(self, "EFSFileSystemId", value=self.file_system.file_system_id)
         #CfnOutput(self, "EFSAccessPointId", value=self.efs_access_point.access_point_id)

@@ -1,15 +1,17 @@
-from datetime import timedelta
+from datetime import datetime, timedelta
 
 from celery import Celery
 from celery.schedules import crontab
+from celery.signals import task_sent, task_received, task_success
 from celery.signals import worker_process_init
 from opentelemetry.instrumentation.celery import CeleryInstrumentor
 
 from cqc_lem.app import celeryconfig
 from cqc_lem.app.celeryconfig import broker_url
-from cqc_lem.utilities.env_constants import CODE_TRACING
+from cqc_lem.utilities.env_constants import CODE_TRACING, AWS_REGION
 from cqc_lem.utilities.jaeger_tracer_helper import get_jaeger_tracer
-from cqc_lem.utilities.logger import myprint
+from cqc_lem.utilities.logger import myprint, logger
+from cqc_lem.utilities.utils import get_cloudwatch_client
 
 # Create default Celery app
 app = Celery(
@@ -107,3 +109,76 @@ def init_celery_tracing(*args, **kwargs):
             myprint("Instrumented Celery for tracing")
     else:
         myprint("Tracing is disabled")
+
+
+cloudwatch = get_cloudwatch_client(AWS_REGION)
+
+
+def get_queue_metric(name_space:str='cqc-lem/celery_queue/celery', metric_name:str='QueueLength', period:int=60, time_delta_minutes:int=1, statistics:str="Maximum")->int:
+    try:
+        response = cloudwatch.get_metric_statistics(
+            Namespace=name_space,
+            MetricName=metric_name,
+            StartTime=datetime.now() - timedelta(minutes=time_delta_minutes),
+            EndTime=datetime.now(),
+            Period=period,
+            Statistics=[statistics]
+        )
+
+        if response['Datapoints']:
+            # Get the most recent datapoint
+            latest_datapoint = max(response['Datapoints'], key=lambda x: x['Timestamp'])
+            return latest_datapoint[statistics]
+        return 0  # Return 0 if no datapoints found
+
+    except Exception as e:
+        logger.error(f"Failed to get metric: {str(e)}")
+        return 0
+
+
+@task_sent.connect
+def task_sent_handler(sender=None, headers=None, **kwargs):
+    base_namespace = "cqc-lem/celery_queue/"
+    queue_name = getattr(sender, 'queue', 'celery')
+    name_space = base_namespace + queue_name
+    current_length = get_queue_metric(name_space=name_space)
+    new_length = current_length + 1
+
+    try:
+        cloudwatch.put_metric_data(
+            Namespace=name_space,
+            MetricData=[{
+                'MetricName': 'QueueLength',
+                'Value': new_length,
+                'Unit': 'Count'
+            }]
+        )
+        logger.info(
+            f"Successfully published metric to CloudWatch: Queue length [{queue_name}]: {new_length}")
+    except Exception as e:
+        logger.error(f"Failed to publish metric: {str(e)}")
+
+
+@task_received.connect
+@task_success.connect
+def update_queue_length(sender=None, headers=None, **kwargs):
+    base_namespace = "cqc-lem/celery_queue/"
+    queue_name = getattr(sender, 'queue', 'celery')
+    name_space = base_namespace + queue_name
+    current_length = get_queue_metric(name_space=name_space)
+    new_length = max(0,current_length + 1)
+
+    logger.info(f"Task received/completed. Queue length [{queue_name}]: {new_length}")
+
+    try:
+        cloudwatch.put_metric_data(
+            Namespace=name_space,
+            MetricData=[{
+                'MetricName': 'QueueLength',
+                'Value': new_length,
+                'Unit': 'Count'
+            }]
+        )
+        logger.info("Successfully published metric to CloudWatch")
+    except Exception as e:
+        logger.error(f"Failed to publish metric: {str(e)}")

@@ -23,6 +23,8 @@ from cqc_lem.utilities.logger import myprint
 from cqc_lem.utilities.mime_type_helper import get_file_mime_type
 from cqc_lem.utilities.utils import get_file_extension_from_filepath
 
+from cqc_lem.app.aws_test_celery_task import test_get_my_profile
+
 app = FastAPI()
 
 
@@ -112,6 +114,25 @@ def create_weekly_content(user_id: int) -> ResponseModel:
 
     return ResponseModel(status_code=200, detail="Weekly content created successfully")
 
+
+@app.post("/aws_test_get_my_profile/", responses={
+    200: {"description": "Test Get My Profile on AWS"},
+    **{k: v for k, v in error_responses.items() if k in [ 400]}
+})
+def aws_test_get_my_profile(user_id: int) -> ResponseModel:
+    """Endpoint to test get my profile on AWS."""
+    if not user_id:
+        raise HTTPException(status_code=400, detail="User ID is required")
+
+    kwargs = {'user_id': user_id}
+    # Call the function to create the weekly content
+    test_get_my_profile.apply_async(kwargs=kwargs, retry=True,
+                                    retry_policy={
+                                        'max_retries': 1,
+                                    })
+
+
+    return ResponseModel(status_code=200, detail="Test Get My Profile on AWS Message Sent to Celery Queue")
 
 
 @app.get('/user_id/', responses={

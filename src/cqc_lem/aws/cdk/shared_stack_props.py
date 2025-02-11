@@ -52,7 +52,7 @@ class SharedStackProps(StackProps):
                  api_base_url: str = None,
                  selenium_node_max_instances: int = 50,
                  selenium_node_max_sessions: int = 50,
-                 min_instances: int = 0,
+                 min_instances: int = 1,
                  max_instances: int = 10,
                  # selenium_version: str = "4.26.0-20241101",
                  selenium_version: str = "latest",

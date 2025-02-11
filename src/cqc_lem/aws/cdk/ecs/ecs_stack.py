@@ -55,7 +55,7 @@ class EcsStack(NestedStack):
                                                  ec2.Port.tcp(props.selenium_bus_publish_port),
                                                  'Port for Selenium Bus Publish traffic within VPC')
         self.ecs_security_group.add_ingress_rule(ec2.Peer.ipv4(vpc.vpc_cidr_block),
-                                                    ec2.Port.tcp(props.selenium_bus_subscribe_port),
+                                                 ec2.Port.tcp(props.selenium_bus_subscribe_port),
                                                  'Port for Selenium Bus Subscribe traffic within VPC')
 
         # Allow outbound traffic to EFS
@@ -114,19 +114,21 @@ class EcsStack(NestedStack):
                                                                      content_type="text/plain",
                                                                      message_body="OK"))
 
-        self.selenium_bus_publish_listener = self.public_lb.add_listener("SeleniumBusPublishListener", port=props.selenium_bus_publish_port,
-                                                                 protocol=elbv2.ApplicationProtocol.HTTP,
-                                                                 default_action=elbv2.ListenerAction.fixed_response(
-                                                                     status_code=200,
-                                                                     content_type="text/plain",
-                                                                     message_body="OK"))
+        self.selenium_bus_publish_listener = self.public_lb.add_listener("SeleniumBusPublishListener",
+                                                                         port=props.selenium_bus_publish_port,
+                                                                         protocol=elbv2.ApplicationProtocol.HTTP,
+                                                                         default_action=elbv2.ListenerAction.fixed_response(
+                                                                             status_code=200,
+                                                                             content_type="text/plain",
+                                                                             message_body="OK"))
 
-        self.selenium_bus_subscribe_listener = self.public_lb.add_listener("SeleniumBusSubscribeListener", port=props.selenium_bus_subscribe_port,
-                                                                 protocol=elbv2.ApplicationProtocol.HTTP,
-                                                                 default_action=elbv2.ListenerAction.fixed_response(
-                                                                     status_code=200,
-                                                                     content_type="text/plain",
-                                                                     message_body="OK"))
+        self.selenium_bus_subscribe_listener = self.public_lb.add_listener("SeleniumBusSubscribeListener",
+                                                                           port=props.selenium_bus_subscribe_port,
+                                                                           protocol=elbv2.ApplicationProtocol.HTTP,
+                                                                           default_action=elbv2.ListenerAction.fixed_response(
+                                                                               status_code=200,
+                                                                               content_type="text/plain",
+                                                                               message_body="OK"))
 
         # Creating the ECS Cluster and the cloud map namespace
         self.ecs_cluster = ecs.Cluster(self, "ECSCluster",
@@ -140,9 +142,9 @@ class EcsStack(NestedStack):
         self.ecs_cluster.connections.allow_from(ec2.Peer.any_ipv4(), ec2.Port.tcp(2049))
         self.ecs_cluster.connections.allow_to(ec2.Peer.any_ipv4(), ec2.Port.tcp(2049))
 
-
         self.default_cloud_map_namespace = self.ecs_cluster.add_default_cloud_map_namespace(name="cqc-lem.local",
                                                                                             use_for_service_connect=True,
                                                                                             type=servicediscovery.NamespaceType.DNS_PRIVATE)
+
 
         CfnOutput(self, "Load Balancer URL", value=f"http://{self.public_lb.load_balancer_dns_name}")

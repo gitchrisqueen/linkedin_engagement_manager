@@ -128,10 +128,22 @@ def get_file_extension_from_filepath(file_path: str, remove_leading_dot: bool = 
     return file_extension
 
 
+def get_aws_session():
+    return boto3.session.Session()
+
+def get_aws_client(service_name: str, region_name:str):
+    session = get_aws_session()
+    return session.client(
+        service_name=service_name,
+        region_name=region_name
+    )
+
+def get_cloudwatch_client(region:str):
+    return get_aws_client('cloudwatch', region)
+
 def get_aws_ssm_secret(secret_name, region_name):
     """Gets the secret value from AWS Secrets Manager"""
-    session = boto3.session.Session()
-    client = session.client(
+    client = get_aws_client(
         service_name='secretsmanager',
         region_name=region_name
     )

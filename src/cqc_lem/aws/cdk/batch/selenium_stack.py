@@ -1,4 +1,3 @@
-import re
 from typing import Dict, Optional, List
 
 from aws_cdk import (
@@ -10,8 +9,8 @@ from aws_cdk import (
     aws_logs as logs,
     aws_iam as iam,
     aws_elasticloadbalancingv2 as elbv2,
-    Stack, Fn)
-from aws_cdk.aws_servicediscovery import PrivateDnsNamespace, DnsRecordType
+    Stack)
+from aws_cdk.aws_servicediscovery import DnsRecordType
 from constructs import Construct
 
 from cqc_lem.aws.cdk.shared_stack_props import SharedStackProps
@@ -31,13 +30,13 @@ class SeleniumStack(Stack):
         # Create security groups for hub and node communication
         # Add this to your SeleniumStack
         hub_security_group = ec2.SecurityGroup(
-            self, "HubSecurityGroup",
+            self, "SeleniumHubSecurityGroup",
             vpc=props.ec2_vpc,
             allow_all_outbound=True
         )
 
         node_security_group = ec2.SecurityGroup(
-            self, "NodeSecurityGroup",
+            self, "SeleniumNodeSecurityGroup",
             vpc=props.ec2_vpc,
             allow_all_outbound=True
         )
@@ -62,7 +61,7 @@ class SeleniumStack(Stack):
         # Allow nodes to receive traffic from hub
         node_security_group.add_ingress_rule(
             peer=hub_security_group,
-            connection=ec2.Port.tcp_range(props.selenium_node_port, props.selenium_node_port+345),  # Node ports
+            connection=ec2.Port.tcp_range(props.selenium_node_port, props.selenium_node_port + 345),  # Node ports
             description="Allow hub to node communication"
         )
 
@@ -70,30 +69,20 @@ class SeleniumStack(Stack):
         props.set('sel_hub_sg', hub_security_group)
         props.set('sel_node_sg', node_security_group)
 
-        # Add service discovery to allow nodes to find the hub
-        namespace = PrivateDnsNamespace(
-            self, "SeleniumNamespace",
-            vpc=props.ec2_vpc,
-            name="selenium.local"
-        )
-
-
         # Register SeleniumHub resources
         hub_service = self.create_hub_resources(
-            identifier=id + "-hub",
+            identifier="hub",
             props=props,
             memory_limit=hub_memory_limit,
             cpu=hub_cpu)
 
         # Register Chrome node resources
         node_service = self.create_node_resource(
-            identifier=id + "-chrome",
+            identifier="node_chrome",
             props=props,
             image="selenium/node-chrome",
             memory_limit=node_memory_limit,
             cpu=node_cpu)
-
-
 
     def create_hub_resources(self,
                              identifier: str,
@@ -110,8 +99,9 @@ class SeleniumStack(Stack):
         selenium_hub_service = self.create_service(
             identifier=identifier,
             cluster=props.ecs_cluster,
+            props=props,
             security_groups=[
-                #props.ecs_security_group,
+                # props.ecs_security_group,
                 props.get('sel_hub_sg')
             ],
             task_execution_role=props.task_execution_role,
@@ -138,7 +128,7 @@ class SeleniumStack(Stack):
             ),
             health_check=ecs.HealthCheck(
                 command=["CMD-SHELL",
-                         f"curl -f http://localhost:{props.selenium_hub_port}/wd/hub/status || exit 1"],
+                         f"curl -f http://selenium_{identifier}.{props.ecs_default_cloud_map_namespace.namespace_name}:{props.selenium_hub_port}/wd/hub/status || exit 1"],
                 interval=Duration.seconds(30),
                 timeout=Duration.seconds(5),
                 retries=3,
@@ -147,8 +137,8 @@ class SeleniumStack(Stack):
         )
 
         hub_target_group = elbv2.ApplicationTargetGroup(
-            self, identifier + "-TargetGroup",
-            target_group_name=identifier + "-target-group",
+            self, f"selenium-{identifier}-target-group",
+            target_group_name=f"selenium-{identifier}-target-group",
             vpc=props.ec2_vpc,
             port=props.selenium_hub_port,
             targets=[selenium_hub_service],
@@ -163,6 +153,7 @@ class SeleniumStack(Stack):
                 unhealthy_threshold_count=2,
             ),
             deregistration_delay=Duration.seconds(0),  # No deregistration on hub service
+            # TODO: Review this deregistration value - does it allow for hub containers to process and auto scale as needed
         )
 
         elbv2.ApplicationListenerRule(
@@ -173,7 +164,7 @@ class SeleniumStack(Stack):
             conditions=[elbv2.ListenerCondition.path_patterns(["*"])],
         )
 
-        # TODO: Remove below - ALB shoudn't listen externally for node subscribe and publish
+        # TODO: Remove below - ALB shouldn't listen externally for node subscribe and publish
         '''
         elbv2.ApplicationListenerRule(
             self, "SeleniumBusSubscribeListenerRule",
@@ -199,8 +190,11 @@ class SeleniumStack(Stack):
             identifier=identifier,
             min_instances=props.min_instances,
             max_instances=props.max_instances  # Hub typically needs only one instance
+
         )
 
+        '''
+        
         # Parse load balancer name and ID from the token ARN
         lb_name = Fn.select(1, Fn.split('/', Fn.select(1, Fn.split(':loadbalancer/',
                                                                    props.elbv2_public_lb.load_balancer_arn))))
@@ -223,10 +217,9 @@ class SeleniumStack(Stack):
             tg_id
         ])
 
-
         # Create request count based scaling policy
         scaling_policy = applicationautoscaling.TargetTrackingScalingPolicy(
-            self, "HubRequestScaling",
+            self, "SeleniumHubRequestScaling",
             scaling_target=hub_scalable_target,
             target_value=1,  # Scale up when there's any request
             predefined_metric=applicationautoscaling.PredefinedMetric.ALB_REQUEST_COUNT_PER_TARGET,
@@ -235,9 +228,37 @@ class SeleniumStack(Stack):
             scale_out_cooldown=Duration.seconds(60)
         )
 
+
+        '''
+
+        # TODO: Use below if need separate scaling policy for hub
+        '''
+        # First, create the specific ALB metric for port 4444
+        selenium_request_metric = cloudwatch.Metric(
+            namespace="AWS/ApplicationELB",
+            metric_name="RequestCountPerTarget",
+            statistic="Sum",
+            period=Duration.minutes(1),
+            dimensions_map={
+                "TargetGroup": hub_target_group.target_group_arn,
+                "LoadBalancer": props.elbv2_public_lb.load_balancer_arn
+            }
+        )
+
+        # Create the scaling policy with the specific metric
+        scaling_policy = applicationautoscaling.TargetTrackingScalingPolicy(
+            self, "SeleniumHubRequestScaling",
+            scaling_target=hub_scalable_target,
+            target_value=1.0,  # Scale when there's at least 1 request per target
+            scale_in_cooldown=Duration.seconds(300),
+            scale_out_cooldown=Duration.seconds(60),
+            custom_metric=selenium_request_metric
+        )
+        '''
+
         # Add dependencies
-        scaling_policy.node.add_dependency(hub_target_group)
-        scaling_policy.node.add_dependency(props.elbv2_public_lb)
+        #scaling_policy.node.add_dependency(hub_target_group)
+        #scaling_policy.node.add_dependency(props.elbv2_public_lb)
 
         return selenium_hub_service
 
@@ -251,6 +272,7 @@ class SeleniumStack(Stack):
         # Env parameters configured to connect back to selenium hub when new nodes gets added
         selenium_node_service = self.create_service(
             identifier=identifier,
+            props=props,
             cluster=props.ecs_cluster,
             security_groups=[
                 # props.ecs_security_group,
@@ -263,15 +285,20 @@ class SeleniumStack(Stack):
                 # "NODE_MAX_INSTANCES": str(props.selenium_node_max_instances),
                 "SE_NODE_MAX_SESSIONS": str(props.selenium_node_max_sessions),
                 "SE_VNC_NO_PASSWORD": "true",
-                "SE_EVENT_BUS_HOST": props.elbv2_public_lb.load_balancer_dns_name,
-                # "SE_EVENT_BUS_HOST": "localhost",
-                # "SE_NODE_HOST": "localhost",
+                # "SE_EVENT_BUS_HOST": props.elbv2_public_lb.load_balancer_dns_name, # This is close to right
+                "SE_EVENT_BUS_HOST": f"selenium_hub.{props.ecs_default_cloud_map_namespace.namespace_name}",
+                # use the namespace service name
+                #"SE_NODE_HOST": f"selenium_{identifier}.{props.ecs_default_cloud_map_namespace.namespace_name}",
                 "SE_NODE_PORT": str(props.selenium_node_port),
                 "SE_EVENT_BUS_PUBLISH_PORT": str(props.selenium_bus_publish_port),
                 "SE_EVENT_BUS_SUBSCRIBE_PORT": str(props.selenium_bus_subscribe_port),
                 "SE_SESSION_REQUEST_TIMEOUT": "300",
+                "SE_NODE_SESSION_TIMEOUT": "600",
                 # "SE_OPTS": '-debug',
-                "shm_size": '2g'
+                "shm_size": '2g',
+                # For Video Recording
+                "SE_RECORD_VIDEO": "True",
+                "SE_VIDEO_FILE_NAME": "auto",
             },
             image=image + ':' + props.selenium_version,
             # TODO: Check what the entryp point and command should be for current selenium node chrome image
@@ -291,13 +318,36 @@ class SeleniumStack(Stack):
             ),
             health_check=ecs.HealthCheck(
                 command=["CMD-SHELL",
-                         f"curl -f http://localhost:{props.selenium_node_port}/status || exit 1"],
+                         f"curl -f http://selenium_{identifier}.{props.ecs_default_cloud_map_namespace.namespace_name}:{props.selenium_node_port}/status || exit 1"],
                 interval=Duration.seconds(30),
                 timeout=Duration.seconds(5),
                 retries=3,
                 start_period=Duration.seconds(90)
             )
         )
+
+        # TODO: Node shouldn't need a target group that is used by an ALB listener
+        '''
+        node_target_group = elbv2.ApplicationTargetGroup(
+            self, f"selenium-{identifier}-target-group",
+            target_group_name=f"sel-{identifier.replace('_','-')}-tg",
+            vpc=props.ec2_vpc,
+            port=props.selenium_node_port,
+            targets=[selenium_node_service],
+            target_type=elbv2.TargetType.IP,
+            protocol=elbv2.ApplicationProtocol.HTTP,
+            health_check=elbv2.HealthCheck(
+                path="/status",
+                port=str(props.selenium_hub_port),
+                interval=Duration.seconds(60),
+                timeout=Duration.seconds(5),
+                healthy_threshold_count=2,
+                unhealthy_threshold_count=2,
+            ),
+            deregistration_delay=Duration.seconds(0),  # No deregistration on node service
+            # TODO: Review this deregistration value - does it allow for hub containers to process and auto scale as needed
+        )
+        '''
 
         # Create autoscaling policy
         node_scalable_target = self.create_scaling_policy(
@@ -307,11 +357,13 @@ class SeleniumStack(Stack):
             min_instances=props.min_instances,
             max_instances=props.max_instances
 
+
         )
 
+        '''
         # Create a custom CloudWatch metric for Selenium session requests
         session_count_metric = cloudwatch.Metric(
-            namespace="Selenium",
+            namespace="cqc-lem/selenium/node",
             metric_name="PendingSessionRequests",
             statistic="Sum",
             period=Duration.minutes(1)
@@ -322,9 +374,12 @@ class SeleniumStack(Stack):
             "NodeSessionScaling",
             custom_metric=session_count_metric,
             target_value=1,  # Scale up when there's any pending session
-            scale_in_cooldown=Duration.seconds(300),
-            scale_out_cooldown=Duration.seconds(60)
+            scale_in_cooldown=Duration.minutes(5),
+            scale_out_cooldown=Duration.minutes(1)
         )
+        '''
+
+
 
         return selenium_node_service
 
@@ -332,6 +387,7 @@ class SeleniumStack(Stack):
             self,
             identifier: str,
             cluster: ecs.Cluster,
+            props: SharedStackProps,
             security_groups: List[ec2.SecurityGroup],
             image: str,
             ports: List[int],
@@ -352,50 +408,84 @@ class SeleniumStack(Stack):
         # Task and container definition
         task_definition = ecs.FargateTaskDefinition(
             self,
-            f'{identifier}-service-task-def',
+            f'selenium-{identifier}-service-task-def',
+            family=f'selenium_{identifier}',
             memory_limit_mib=memory_limit,
             cpu=cpu,
             task_role=task_execution_role
         )
 
+        desired_port = props.selenium_hub_port if identifier == "hub" else props.selenium_node_port
+
         container_definition = task_definition.add_container(
-            f'{identifier}-selenium-container',
+            f'selenium_{identifier}-container',
             image=ecs.ContainerImage.from_registry(image),
             environment=environment,
             essential=True,
             logging=log_driver,
             entry_point=entry_point,
             command=command,
-            stop_timeout=Duration.seconds(120),
+            # stop_timeout=Duration.seconds(120), # Do not add stop timeout as it kills the container
             health_check=health_check
         )
 
+        # Create a port name to port number map array
+        port_name_map = [
+            {
+                "name": "selenium_hub",
+                "port": props.selenium_hub_port
+            },
+            {
+                "name": "selenium_node_chrome",
+                "port": props.selenium_node_port
+            },
+            {
+                "name": "selenium_bus_publish",
+                "port": props.selenium_bus_publish_port
+            },
+            {
+                "name": "selenium_bus_subscribe",
+                "port": props.selenium_bus_subscribe_port
+            }
+        ]
+
         for port in ports:
+            # find the port name from the port_name_map based on the port number
+            port_map_item = next((item for item in port_name_map if item["port"] == port), {"name": "selenium_unknown"})
+
             # Add Port mapping
             container_definition.add_port_mappings(
                 ecs.PortMapping(
                     container_port=port,
                     host_port=port,
-                    protocol=ecs.Protocol.TCP
+                    protocol=ecs.Protocol.TCP,
+                    name=port_map_item["name"]
                 )
             )
 
         # Setup Fargate service
         return ecs.FargateService(
             self,
-            f'{identifier}-selenium-service',
+            f'selenium-{identifier}-service',
+            service_name=f"selenium-{identifier}-service",
             cluster=cluster,
             task_definition=task_definition,
             desired_count=1,
             min_healthy_percent=50,
-            max_healthy_percent=100,
+            max_healthy_percent=200,
             health_check_grace_period=Duration.seconds(120),
             security_groups=security_groups,
             cloud_map_options=ecs.CloudMapOptions(
-                name=identifier,
+                name=f"selenium_{identifier}",
                 dns_record_type=DnsRecordType.A,
                 dns_ttl=Duration.seconds(60)
             ),
+            # service_connect_configuration=ecs.ServiceConnectProps(
+            #    namespace=props.ecs_default_cloud_map_namespace.namespace_name,
+            #    services=[ecs.ServiceConnectService(
+            #        port_mapping_name=f"selenium_{identifier}",  # Logical name for the service
+            #        port=desired_port,  # Container port
+            #    )]),
             enable_execute_command=False,
             capacity_provider_strategies=[
                 ecs.CapacityProviderStrategy(
@@ -415,10 +505,11 @@ class SeleniumStack(Stack):
                               cluster_name: str,
                               identifier: str,
                               max_instances: int,
-                              min_instances: int):
+                              min_instances: int,
+                              ) -> applicationautoscaling.ScalableTarget:
         # Create the scalable target
         target = applicationautoscaling.ScalableTarget(
-            self, f'{identifier}-scalable-target',
+            self, f'selenium-{identifier}-scalable-target',
             service_namespace=applicationautoscaling.ServiceNamespace.ECS,
             max_capacity=max_instances,
             min_capacity=min_instances,
@@ -426,7 +517,7 @@ class SeleniumStack(Stack):
             scalable_dimension='ecs:service:DesiredCount'
         )
 
-        # Create the CloudWatch metric
+        # Create the CloudWatch metric for CPU utilization
         worker_utilization_metric = cloudwatch.Metric(
             namespace='AWS/ECS',
             metric_name='CPUUtilization',
@@ -440,7 +531,7 @@ class SeleniumStack(Stack):
 
         # Create the scaling policy with steps
         target.scale_on_metric(
-            f'{identifier}-step-metric-scaling',
+            f'selenium-{identifier}-step-metric-scaling',
             metric=worker_utilization_metric,
             adjustment_type=applicationautoscaling.AdjustmentType.CHANGE_IN_CAPACITY,
             scaling_steps=[
