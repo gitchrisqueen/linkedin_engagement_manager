@@ -39,15 +39,17 @@ class CeleryFlowerStack(Stack):
                                                                     props.ecr_docker_asset),
                                                                 command=["/start-flower-no-wait"],  # Custom command
                                                                 environment={
+                                                                    "OPENAI_API_KEY": props.open_api_key,
                                                                     "AWS_MYSQL_SECRET_NAME": props.ssm_myql_secret_name,
                                                                     "AWS_REGION": props.env.region,
                                                                     "CELERY_BROKER_URL": f"redis://{props.redis_url}:{props.redis_port}/0",
                                                                     "CELERY_RESULT_BACKEND": f"redis://{props.redis_url}:{props.redis_port}/1",
+                                                                    "CELERY_FLOWER_PORT": str(props.celery_flower_port),
+                                                                    "TZ": props.tz,
                                                                     "FLOWER_UNAUTHENTICATED_API": "True",
                                                                     "FLOWER_PERSISTENT": "True",
                                                                     "FLOWER_SAVE_STATE_INTERVAL": "5000",
-                                                                    "CELERY_FLOWER_PORT": str(props.celery_flower_port),
-                                                                    "OPENAI_API_KEY": props.open_api_key
+
                                                                 },
                                                                 port_mappings=[
                                                                     ecs.PortMapping(

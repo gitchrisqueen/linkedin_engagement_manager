@@ -18,26 +18,29 @@ class CeleryWorkerStack(Stack):
                  **kwargs) -> None:
         super().__init__(scope, id, **kwargs)
 
-        fargate_spot_environment = batch.FargateComputeEnvironment(self, "CeleryWorkerFargateEnv",
-                                                                   vpc=props.ec2_vpc,
-                                                                   vpc_subnets=ec2.SubnetSelection(
-                                                                       subnet_type=ec2.SubnetType.PRIVATE_WITH_EGRESS),
-                                                                   compute_environment_name="CeleryWorkerFargateEnv",
-                                                                   security_groups=[props.ecs_security_group],
-                                                                   spot=True,
-                                                                   maxv_cpus=100,
-                                                                   # Set this ^^^ based on maximum expected concurrent jobs                                                                   minvCpus=0,
-                                                                   update_timeout=Duration.minutes(5)
-
-                                                                   )
-
-
         # Create AWS Batch Job Queue
         self.celery_batch_job_queue = batch.JobQueue(self, "CeleryWorkerJobQueue",
                                                      job_queue_name="celery-worker-job-queue"
                                                      )
 
-        self.celery_batch_job_queue.add_compute_environment(fargate_spot_environment, 1)
+        batch_env_count = 3
+
+        for i in range(batch_env_count):
+            fargate_spot_environment = batch.FargateComputeEnvironment(self, f"CeleryWorkerFargateEnv{i}",
+                                                                       vpc=props.ec2_vpc,
+                                                                       vpc_subnets=ec2.SubnetSelection(
+                                                                           subnet_type=ec2.SubnetType.PRIVATE_WITH_EGRESS),
+                                                                       compute_environment_name=f"CeleryWorkerFargateEnv{i}",
+                                                                       security_groups=[props.ecs_security_group],
+                                                                       spot=True if i > 0 else False,
+                                                                       maxv_cpus=49 if i > 0 else 1,
+                                                                       # Set this ^^^ based on maximum expected concurrent jobs                                                                   minvCpus=0,
+                                                                       terminate_on_update=False,
+                                                                       update_timeout=Duration.minutes(3)
+
+                                                                       )
+
+            self.celery_batch_job_queue.add_compute_environment(fargate_spot_environment, batch_env_count - i)
 
         # Add a new batch container to the Fargate Task Definition
         container = batch.EcsFargateContainerDefinition(self, "CeleryWorkerFargateContainer",
@@ -60,16 +63,19 @@ class CeleryWorkerStack(Stack):
                                                             "HF_TOKEN": props.hf_token,
                                                             "REPLICATE_API_TOKEN": props.replicate_api_token,
                                                             "RUNWAYML_API_SECRET": props.runwayml_api_secret,
+                                                            "TZ":props.tz,
                                                             # ENV set variables above
                                                             "AWS_MYSQL_SECRET_NAME": props.ssm_myql_secret_name,
                                                             "AWS_REGION": props.env.region,
                                                             "CELERY_BROKER_URL": f"redis://{props.redis_url}:{props.redis_port}/0",
                                                             "CELERY_RESULT_BACKEND": f"redis://{props.redis_url}:{props.redis_port}/1",
                                                             "CELERY_QUEUE": "celery",
-                                                            #"SELENIUM_HUB_HOST": props.elbv2_public_lb.load_balancer_dns_name, # Through the public load balancer
-                                                            "SELENIUM_HUB_HOST": f"selenium_hub.{props.ecs_default_cloud_map_namespace.namespace_name}", # Through the internal load balancer
+                                                            # "SELENIUM_HUB_HOST": props.elbv2_public_lb.load_balancer_dns_name, # Through the public load balancer
+                                                            "SELENIUM_HUB_HOST": f"selenium_hub.{props.ecs_default_cloud_map_namespace.namespace_name}",
+                                                            # Through the internal load balancer
                                                             "SELENIUM_HUB_PORT": str(props.selenium_hub_port),
-                                                            "HEADLESS_BROWSER": "FALSE" # TODO: Turn this to true in production
+                                                            "HEADLESS_BROWSER": "FALSE"
+                                                            # TODO: Turn this to true in production
 
                                                             # ^^^ Use this to define different priority of queues with more or less processing power
                                                         },
@@ -93,8 +99,6 @@ class CeleryWorkerStack(Stack):
                                                         )
 
                                                         )
-
-
 
         # Create Batch job definition
         celery_job_def = batch.EcsJobDefinition(self, "CeleryWorkerJobDef",

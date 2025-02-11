@@ -1,5 +1,5 @@
 import os
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from enum import StrEnum
 
 import mysql.connector
@@ -168,10 +168,10 @@ def add_user_with_access_token(email: str, linked_sub_id: str, access_token: str
     connection = get_db_connection()
     cursor = connection.cursor()
 
-    access_token_created_at = datetime.now()
+    access_token_created_at = datetime.now(timezone.utc)
 
     if refresh_token is not None:
-        refresh_token_created_at = datetime.now()
+        refresh_token_created_at = datetime.now(timezone.utc)
     else:
         refresh_token_created_at = None
 
@@ -258,7 +258,7 @@ def get_user_id(email: str):
     return user_id['id'] if user_id else None
 
 
-def insert_post(email: str, content: str, scheduled_time, post_type: PostType) -> bool:
+def insert_post(email: str, content: str, scheduled_time: datetime, post_type: PostType) -> bool:
     user_id = get_user_id(email)
 
     success=False
@@ -267,10 +267,17 @@ def insert_post(email: str, content: str, scheduled_time, post_type: PostType) -
         print(f"User with email {email} not found.")
         return success
 
+
     connection = get_db_connection()
     cursor = connection.cursor()
 
     try:
+        # Convert scheduled_time to UTC
+        if scheduled_time.tzinfo is None:
+            scheduled_time = scheduled_time.replace(tzinfo=timezone.utc)
+        else:
+            scheduled_time = scheduled_time.astimezone(timezone.utc)
+
         cursor.execute("""
             INSERT INTO posts (content, scheduled_time, post_type, user_id)
             VALUES (%s, %s, %s, %s)
@@ -288,11 +295,20 @@ def insert_post(email: str, content: str, scheduled_time, post_type: PostType) -
     return success
 
 
-def insert_planned_post(user_id: int, scheduled_time, post_type: PostType, buyer_stage: str) -> bool:
+def insert_planned_post(user_id: int, scheduled_time: datetime, post_type: PostType, buyer_stage: str) -> bool:
     connection = get_db_connection()
     cursor = connection.cursor()
 
+    success = False
+
+
     try:
+        # Convert scheduled_time to UTC
+        if scheduled_time.tzinfo is None:
+            scheduled_time = scheduled_time.replace(tzinfo=timezone.utc)
+        else:
+            scheduled_time = scheduled_time.astimezone(timezone.utc)
+
         cursor.execute("""
             INSERT INTO posts (scheduled_time, post_type, user_id, buyer_stage, status, content)
             VALUES (%s, %s, %s, %s, %s, %s)
@@ -309,12 +325,22 @@ def insert_planned_post(user_id: int, scheduled_time, post_type: PostType, buyer
     return success
 
 
-def update_db_post(content: str, video_url: str, scheduled_time: str, post_type: PostType, post_id: int,
+def update_db_post(content: str, video_url: str, scheduled_time: datetime, post_type: PostType, post_id: int,
                    post_status: PostStatus) -> bool:
     connection = get_db_connection()
     cursor = connection.cursor()
 
+    success = False
+
     try:
+
+        # Convert scheduled_time to UTC
+        if scheduled_time.tzinfo is None:
+            scheduled_time = scheduled_time.replace(tzinfo=timezone.utc)
+        else:
+            scheduled_time = scheduled_time.astimezone(timezone.utc)
+
+
         cursor.execute(
             "UPDATE posts SET content = %s, video_url = %s, scheduled_time =%s, post_type = %s, status = %s WHERE id = %s",
             (content, video_url, scheduled_time, post_type.value, post_status.value, post_id)
@@ -493,7 +519,7 @@ def get_post_video_url(post_id: int):
 def get_ready_to_post_posts(pre_post_time: datetime = None) -> list:
     """Query the database for any pending posts that are scheduled to post now or earlier"""
 
-    now = datetime.now()
+    now = datetime.now(timezone.utc)
     if pre_post_time is None:
         # Get time for 20 minutes after now
         pre_post_time = now + timedelta(minutes=20)

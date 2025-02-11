@@ -50,8 +50,8 @@ class SharedStackProps(StackProps):
                  celery_worker_log_group_arn: str = None,
                  selenium_log_group_arn: str = None,
                  api_base_url: str = None,
-                 selenium_node_max_instances: int = 50,
-                 selenium_node_max_sessions: int = 50,
+                 selenium_node_max_instances: int = 5,
+                 selenium_node_max_sessions: int = 1,
                  min_instances: int = 1,
                  max_instances: int = 10,
                  # selenium_version: str = "4.26.0-20241101",
@@ -75,6 +75,7 @@ class SharedStackProps(StackProps):
                  hf_token: str = None,
                  replicate_api_token: str = None,
                  runwayml_api_secret: str = None,
+                 tz: str = None,
 
                  **kwargs):
         super().__init__(env=env)
@@ -136,6 +137,7 @@ class SharedStackProps(StackProps):
         self.props['hf_token'] = hf_token
         self.props['replicate_api_token'] = replicate_api_token
         self.props['runwayml_api_secret'] = runwayml_api_secret
+        self.props['tz'] = tz
 
     def get(self, key):
         return self.props.get(key)
@@ -400,3 +402,7 @@ class SharedStackProps(StackProps):
     @property
     def runwayml_api_secret(self) -> str:
         return self.get('runwayml_api_secret')
+
+    @property
+    def tz(self) -> str:
+        return self.get('tz')

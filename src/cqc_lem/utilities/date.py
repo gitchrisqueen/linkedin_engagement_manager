@@ -25,8 +25,18 @@ def format_year(year: str) -> str:
 
     return str(y)
 
-def add_local_tz_to_datetime(dt: DT.datetime) -> DT.datetime:
-    return dt.replace(tzinfo=tzlocal.get_localzone())
+def convert_datetime_to_local_tz(dt: DT.datetime, assumed_utc=True) -> DT.datetime:
+    # Add TZ Info if missing
+    if dt.tzinfo is None:
+        if assumed_utc:
+            dt = dt.replace(tzinfo=DT.timezone.utc)
+        else:
+            dt = dt.replace(tzinfo=tzlocal.get_localzone())
+
+    # Convert to Local Timezone
+    dt = dt.astimezone(tzlocal.get_localzone())
+
+    return dt
 
 
 

@@ -284,6 +284,7 @@ class SeleniumStack(Stack):
                 # "HUB_PORT_4444_TCP_PORT": str(props.selenium_hub_port),
                 # "NODE_MAX_INSTANCES": str(props.selenium_node_max_instances),
                 "SE_NODE_MAX_SESSIONS": str(props.selenium_node_max_sessions),
+                "SE_NODE_OVERRIDE_MAX_SESSIONS": "false",
                 "SE_VNC_NO_PASSWORD": "true",
                 # "SE_EVENT_BUS_HOST": props.elbv2_public_lb.load_balancer_dns_name, # This is close to right
                 "SE_EVENT_BUS_HOST": f"selenium_hub.{props.ecs_default_cloud_map_namespace.namespace_name}",
@@ -318,7 +319,7 @@ class SeleniumStack(Stack):
             ),
             health_check=ecs.HealthCheck(
                 command=["CMD-SHELL",
-                         f"curl -f http://selenium_{identifier}.{props.ecs_default_cloud_map_namespace.namespace_name}:{props.selenium_node_port}/status || exit 1"],
+                         f"curl -f http://localhost:{props.selenium_node_port}/status || exit 1"],
                 interval=Duration.seconds(30),
                 timeout=Duration.seconds(5),
                 retries=3,
@@ -471,9 +472,9 @@ class SeleniumStack(Stack):
             cluster=cluster,
             task_definition=task_definition,
             desired_count=1,
-            min_healthy_percent=50,
+            min_healthy_percent=100,
             max_healthy_percent=200,
-            health_check_grace_period=Duration.seconds(120),
+            health_check_grace_period=Duration.seconds(90),
             security_groups=security_groups,
             cloud_map_options=ecs.CloudMapOptions(
                 name=f"selenium_{identifier}",
@@ -540,7 +541,7 @@ class SeleniumStack(Stack):
                     upper=30
                 ),
                 applicationautoscaling.ScalingInterval(
-                    change=3,
+                    change=1,
                     lower=80
                 )
             ],

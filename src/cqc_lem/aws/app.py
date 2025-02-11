@@ -11,7 +11,7 @@ from cqc_lem.aws.cdk.main_stack import MainStack
 from cqc_lem.aws.cdk.shared_stack_props import SharedStackProps
 from cqc_lem.aws.util import get_cdk_env
 from cqc_lem.utilities.env_constants import OPENAI_API_KEY, STREAMLIT_EMAIL, LI_CLIENT_ID, LI_CLIENT_SECRET, \
-    LI_STATE_SALT, LI_API_VERSION, PEXELS_API_KEY, HF_TOKEN, REPLICATE_API_TOKEN, RUNWAYML_API_SECRET
+    LI_STATE_SALT, LI_API_VERSION, PEXELS_API_KEY, HF_TOKEN, REPLICATE_API_TOKEN, RUNWAYML_API_SECRET, TZ
 
 app = cdk.App()
 env = get_cdk_env()
@@ -28,6 +28,7 @@ props.set("pexels_api_key", PEXELS_API_KEY)
 props.set("hf_token", HF_TOKEN)
 props.set("replicate_api_token", REPLICATE_API_TOKEN)
 props.set("runwayml_api_secret", RUNWAYML_API_SECRET)
+props.set("tz", TZ)
 
 main_stack = MainStack(app, "CQC-LEM",
                        props=props,
@@ -52,10 +53,10 @@ api_stack.add_dependency(main_stack)
 selenium_stack = SeleniumStack(app, "SeleniumStack",
                                env=env,
                                props=main_stack.outputs,
-                               hub_cpu=1024, # TODO: Refine these values
-                               hub_memory_limit=2048, # TODO: Refine these values
-                               node_cpu=4096, # TODO: Refine these values
-                               node_memory_limit=16384, # TODO: Refine these values
+                               hub_cpu=256, # TODO: Refine these Selenium Hub CPU values
+                               hub_memory_limit=1024, # TODO: Refine these Selenium Hub Memory values
+                               node_cpu=256, # TODO: Refine these Selenium Node CPU values
+                               node_memory_limit=1024, # TODO: Refine these Selenium Node values
 
                                )
 # Add dependencies to ensure correct order

@@ -65,8 +65,8 @@ class PostRequest(BaseModel):
     @computed_field
     @property
     def scheduled_time(self) -> str:
-        # Add Timezone to scheduled_datetime
-        time.tzset()
+        # Dont Add Timezone to scheduled_datetime (expected function to convert to UTC or local accordingly)
+        #time.tzset()
         return self.scheduled_datetime.isoformat()
 
 
@@ -88,7 +88,8 @@ def schedule_post(post: PostRequest) -> ResponseModel:
     if not user_id:
         raise HTTPException(status_code=403, detail="User not found")
 
-    if insert_post(post.email, post.content, post.scheduled_time, post.post_type):
+
+    if insert_post(post.email, post.content, post.scheduled_datetime, post.post_type):
         return ResponseModel(status_code=200, detail="Post scheduled successfully")
     else:
         raise HTTPException(status_code=404, detail="Could not schedule post")
@@ -183,7 +184,7 @@ def update_post(post_id: int, post: PostRequest) -> ResponseModel:
 
     print(f"Received Post Request: {post}")
 
-    if update_db_post(post.content, post.video_url, post.scheduled_time, post.post_type, post_id, post.status):
+    if update_db_post(post.content, post.video_url, post.scheduled_datetime, post.post_type, post_id, post.status):
         return ResponseModel(status_code=200, detail="Post updated successful")
     else:
         raise HTTPException(status_code=405, detail="Post could not be updated")

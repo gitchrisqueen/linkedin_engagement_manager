@@ -1,15 +1,18 @@
 from contextlib import nullcontext
 
+import pytz
 import streamlit as st
 import requests
 from datetime import datetime
 
 from cqc_lem.api.main import PostRequest
-from cqc_lem.utilities.env_constants import CODE_TRACING
+from cqc_lem.utilities.env_constants import CODE_TRACING, TZ, API_BASE_URL, API_PORT
 from cqc_lem.utilities.jaeger_tracer_helper import get_jaeger_tracer
 from cqc_lem.utilities.utils import get_best_posting_time, get_12h_format_best_time
 
 st.title("Schedule Your Post")
+
+api_base_and_port = f"{API_BASE_URL}:{API_PORT}"
 
 # Initialize session state
 if "content" not in st.session_state:
@@ -36,6 +39,16 @@ selected_time = st.time_input("Select Time", value=best_time)
 # Combine the selected date and time into a single datetime object
 scheduled_datetime = datetime.combine(selected_date, selected_time)
 
+# Define the local timezone (replace 'YourLocalTimezone' with the appropriate timezone, e.g., 'America/New_York')
+local_tz = pytz.timezone(TZ)
+
+# Localize the datetime object to the local timezone
+local_time = local_tz.localize(scheduled_datetime)
+
+# Convert the localized time to UTC
+utc_time = local_time.astimezone(pytz.utc)
+
+
 # Add input for email address
 email = st.text_input("Email Address")
 
@@ -48,15 +61,11 @@ with (tracer.start_as_current_span("schedule_post") if tracer else nullcontext()
     if st.button("Schedule Post"):
         if content and scheduled_datetime and email:
             try:
-                post_request = PostRequest(content=content, post_type="text", scheduled_datetime=scheduled_datetime, email=email)
+                post_request = PostRequest(content=content, post_type="text", scheduled_datetime=utc_time, email=email)
 
                 #st.write(str(post_request.post_json))
 
-                #response = requests.post("http://localhost:8000/schedule_post/", json={
-                #    "content": content,
-                #    "scheduled_time": scheduled_datetime.isoformat()
-                #})
-                response = requests.post("http://localhost:8000/schedule_post/", json=post_request.post_json)
+                response = requests.post(f"http://{api_base_and_port}/schedule_post/", json=post_request.post_json)
                 if response.status_code == 200:
                     st.success("Post scheduled successfully!")
                     # Clear the content field

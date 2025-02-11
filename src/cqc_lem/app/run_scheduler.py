@@ -9,7 +9,7 @@ from cqc_lem.app.my_celery import app as shared_task
 from cqc_lem.app.run_automation import automate_commenting, automate_profile_viewer_engagement, \
     automate_appreciation_dms_for_user, clean_stale_invites, update_stale_profile, post_to_linkedin, \
     automate_invites_to_company_page_for_user
-from cqc_lem.utilities.date import add_local_tz_to_datetime
+from cqc_lem.utilities.date import convert_datetime_to_local_tz
 from cqc_lem.utilities.db import get_ready_to_post_posts, update_db_post_status, get_active_user_ids, PostStatus
 from cqc_lem.utilities.env_constants import SELENIUM_KEEP_VIDEOS_X_DAYS
 from cqc_lem.utilities.logger import myprint
@@ -32,7 +32,7 @@ def auto_check_scheduled_posts(self):
     for post in posts:
         post_id, scheduled_time, user_id = post
 
-        scheduled_time = add_local_tz_to_datetime(scheduled_time)  # Must add timezone info to this
+        scheduled_time = convert_datetime_to_local_tz(scheduled_time)  # Must add timezone info to this
 
         myprint(f"Ready to Post ID: {post_id}")
 

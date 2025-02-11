@@ -1,13 +1,15 @@
 import urllib.parse
 from contextlib import nullcontext
+from datetime import datetime
 
 import pandas as pd
+import pytz
 import requests
 import streamlit as st
 from st_aggrid import AgGrid, GridOptionsBuilder, DataReturnMode, GridUpdateMode
 
 from cqc_lem.utilities.db import PostStatus
-from cqc_lem.utilities.env_constants import API_BASE_URL, API_PORT, LINKEDIN_PREVIEW_URL, CODE_TRACING
+from cqc_lem.utilities.env_constants import API_BASE_URL, API_PORT, LINKEDIN_PREVIEW_URL, CODE_TRACING, TZ
 from cqc_lem.utilities.jaeger_tracer_helper import get_jaeger_tracer
 
 # Change layout to wide
@@ -168,7 +170,22 @@ with (tracer.start_as_current_span("review_schedule") if tracer else nullcontext
                 # Convert the row to a dict using the row indexes
                 post_data = row.to_dict()
                 # post_data["email"] = email  # Add the email to the dictionary
-                post_data["scheduled_datetime"] = row["scheduled_time"]  # Add the scheduled datetime
+
+                # Assuming row["scheduled_time"] is a string, parse it to a datetime object
+                local_time = datetime.strptime(row["scheduled_time"], "%Y-%m-%d %H:%M:%S")
+
+                # Define the local timezone (replace 'YourLocalTimezone' with the appropriate timezone, e.g., 'America/New_York')
+                local_tz = pytz.timezone(TZ)
+
+                # Localize the datetime object to the local timezone
+                local_time = local_tz.localize(local_time)
+
+                # Convert the localized time to UTC
+                utc_time = local_time.astimezone(pytz.utc)
+
+                # Set the UTC time to post_data["scheduled_datetime"]
+                post_data["scheduled_datetime"] = utc_time.strftime("%Y-%m-%d %H:%M:%S")
+
                 # Remove scheduled_time from post_data
                 post_data.pop("scheduled_time")
 

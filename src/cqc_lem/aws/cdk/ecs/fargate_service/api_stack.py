@@ -46,6 +46,7 @@ class APIStack(Stack):
                                                               "LI_REDIRECT_URI": props.li_redirect_uri,
                                                               "LI_STATE_SALT": props.li_state_salt,
                                                               "LI_API_VERSION": props.li_api_version,
+                                                              "TZ": props.tz,
                                                               # ENV set variables above
                                                               "AWS_MYSQL_SECRET_NAME": props.ssm_myql_secret_name,
                                                               "AWS_REGION": props.env.region,

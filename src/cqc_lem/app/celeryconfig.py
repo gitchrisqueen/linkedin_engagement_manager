@@ -43,7 +43,7 @@ worker_concurrency = 1
 worker_prefetch_multiplier = 1
 
 # The maximum number of tasks a worker can execute before it’s replaced by a new process.
-worker_max_tasks_per_child = 100
+worker_max_tasks_per_child = 10
 
 # Gets the max between all the parameters of timeout in the tasks
 max_timeout = 60 * 30  # This value must be bigger than the maximum soft timeout set for a task to prevent an infinity loop
