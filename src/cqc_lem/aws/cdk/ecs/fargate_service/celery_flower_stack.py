@@ -76,6 +76,7 @@ class CeleryFlowerStack(Stack):
                                                                     start_period=Duration.seconds(60)
                                                                     # Flower needs time to connect to broker
 
+
                                                                 )
                                                                 )
 
