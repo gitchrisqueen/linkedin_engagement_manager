@@ -34,6 +34,8 @@ class SharedStackProps(StackProps):
                  ecs_cluster: ecs.Cluster = None,
                  ecs_default_cloud_map_namespace: INamespace = None,
                  ecs_security_group: ec2.SecurityGroup = None,
+                 sel_hub_sg: ec2.SecurityGroup = None,
+                 sel_node_sg: ec2.SecurityGroup = None,
                  ec2_public_lb_sg: ec2.SecurityGroup = None,
                  elbv2_public_lb: elbv2.ApplicationLoadBalancer = None,
                  elbv2_web_listener: elbv2.ApplicationListener = None,
@@ -47,13 +49,13 @@ class SharedStackProps(StackProps):
                  redis_url: str = None,
                  env: Environment = None,
                  lambda_get_redis_queue_message_count: IFunction = None,
-                 celery_worker_log_group_arn: str = None,
+                 celery_worker_batch_log_group_arn: str = None,
                  selenium_log_group_arn: str = None,
                  api_base_url: str = None,
-                 selenium_node_max_instances: int = 5,
-                 selenium_node_max_sessions: int = 1,
+                 selenium_node_max_instances: int = 4,
+                 selenium_node_max_sessions: int = 4,
                  min_instances: int = 1,
-                 max_instances: int = 10,
+                 max_instances: int = 25,
                  # selenium_version: str = "4.26.0-20241101",
                  selenium_version: str = "latest",
                  api_port: int = 8000,
@@ -98,6 +100,8 @@ class SharedStackProps(StackProps):
         self.props['ecs_cluster'] = ecs_cluster
         self.props['ecs_default_cloud_map_namespace'] = ecs_default_cloud_map_namespace
         self.props['ecs_security_group'] = ecs_security_group
+        self.props['sel_hub_sg'] = sel_hub_sg
+        self.props['sel_node_sg'] = sel_node_sg
         self.props['ec2_public_lb_sg'] = ec2_public_lb_sg
         self.props['elbv2_public_lb'] = elbv2_public_lb
         self.props['elbv2_web_listener'] = elbv2_web_listener
@@ -109,7 +113,7 @@ class SharedStackProps(StackProps):
         self.props['sqs_queue_url'] = sqs_queue_url
         self.props['redis_url'] = redis_url
         self.props['lambda_get_redis_queue_message_count'] = lambda_get_redis_queue_message_count
-        self.props['celery_worker_log_group_arn'] = celery_worker_log_group_arn
+        self.props['celery_worker_log_group_arn'] = celery_worker_batch_log_group_arn
         self.props['selenium_log_group_arn'] = selenium_log_group_arn
         self.props['api_base_url'] = api_base_url
         self.props['selenium_node_max_instances'] = selenium_node_max_instances
@@ -218,6 +222,14 @@ class SharedStackProps(StackProps):
         return self.get('ecs_security_group')
 
     @property
+    def sel_hub_sg(self) -> ec2.SecurityGroup:
+        return self.get('sel_hub_sg')
+
+    @property
+    def sel_node_sg(self) -> ec2.SecurityGroup:
+        return self.get('sel_node_sg')
+
+    @property
     def public_lb_sg(self) -> ec2.SecurityGroup:
         return self.get('public_lb_sg')
 
@@ -289,8 +301,8 @@ class SharedStackProps(StackProps):
         return self.get('lambda_get_redis_queue_message_count')
 
     @property
-    def celery_worker_log_group_arn(self) -> str:
-        return self.get('celery_worker_log_group_arn')
+    def celery_worker_batch_log_group_arn(self) -> str:
+        return self.get('celery_worker_batch_log_group_arn')
 
     @property
     def selenium_log_group_arn(self) -> str:

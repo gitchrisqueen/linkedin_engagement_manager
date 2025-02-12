@@ -43,7 +43,7 @@ class SeleniumStack(Stack):
 
         # Allow hub to receive traffic from nodes
         hub_security_group.add_ingress_rule(
-            peer=node_security_group,
+            peer=ec2.Peer.any_ipv4(),
             connection=ec2.Port.tcp(props.selenium_hub_port),  # Hub port
             description="Allow node to hub communication"
         )
@@ -83,6 +83,13 @@ class SeleniumStack(Stack):
             image="selenium/node-chrome",
             memory_limit=node_memory_limit,
             cpu=node_cpu)
+
+        # Add the output properties
+        self.output_props = props.props.copy()
+
+    @property
+    def outputs(self) -> SharedStackProps:
+        return SharedStackProps(**self.output_props)
 
     def create_hub_resources(self,
                              identifier: str,
@@ -257,8 +264,8 @@ class SeleniumStack(Stack):
         '''
 
         # Add dependencies
-        #scaling_policy.node.add_dependency(hub_target_group)
-        #scaling_policy.node.add_dependency(props.elbv2_public_lb)
+        # scaling_policy.node.add_dependency(hub_target_group)
+        # scaling_policy.node.add_dependency(props.elbv2_public_lb)
 
         return selenium_hub_service
 
@@ -289,7 +296,7 @@ class SeleniumStack(Stack):
                 # "SE_EVENT_BUS_HOST": props.elbv2_public_lb.load_balancer_dns_name, # This is close to right
                 "SE_EVENT_BUS_HOST": f"selenium_hub.{props.ecs_default_cloud_map_namespace.namespace_name}",
                 # use the namespace service name
-                #"SE_NODE_HOST": f"selenium_{identifier}.{props.ecs_default_cloud_map_namespace.namespace_name}",
+                # "SE_NODE_HOST": f"selenium_{identifier}.{props.ecs_default_cloud_map_namespace.namespace_name}",
                 "SE_NODE_PORT": str(props.selenium_node_port),
                 "SE_EVENT_BUS_PUBLISH_PORT": str(props.selenium_bus_publish_port),
                 "SE_EVENT_BUS_SUBSCRIBE_PORT": str(props.selenium_bus_subscribe_port),
@@ -297,9 +304,9 @@ class SeleniumStack(Stack):
                 "SE_NODE_SESSION_TIMEOUT": "600",
                 # "SE_OPTS": '-debug',
                 "shm_size": '2g',
-                # For Video Recording
-                "SE_RECORD_VIDEO": "True",
-                "SE_VIDEO_FILE_NAME": "auto",
+                # TODO: For Video Recording - (Mount folder and upload to S3 Bucket???)
+                #"SE_RECORD_VIDEO": "True",
+                #"SE_VIDEO_FILE_NAME": "auto",
             },
             image=image + ':' + props.selenium_version,
             # TODO: Check what the entryp point and command should be for current selenium node chrome image
@@ -358,7 +365,6 @@ class SeleniumStack(Stack):
             min_instances=props.min_instances,
             max_instances=props.max_instances
 
-
         )
 
         '''
@@ -379,8 +385,6 @@ class SeleniumStack(Stack):
             scale_out_cooldown=Duration.minutes(1)
         )
         '''
-
-
 
         return selenium_node_service
 
@@ -491,6 +495,7 @@ class SeleniumStack(Stack):
             capacity_provider_strategies=[
                 ecs.CapacityProviderStrategy(
                     capacity_provider='FARGATE',
+                    base=1,
                     weight=1
 
                 ),

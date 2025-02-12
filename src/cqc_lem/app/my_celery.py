@@ -2,13 +2,13 @@ from datetime import datetime, timedelta
 
 from celery import Celery
 from celery.schedules import crontab
-from celery.signals import task_sent, task_received, task_success
+# from celery.signals import task_sent, task_received, task_success
 from celery.signals import worker_process_init
 from opentelemetry.instrumentation.celery import CeleryInstrumentor
 
 from cqc_lem.app import celeryconfig
 from cqc_lem.app.celeryconfig import broker_url
-from cqc_lem.utilities.env_constants import CODE_TRACING, AWS_REGION
+from cqc_lem.utilities.env_constants import CODE_TRACING, AWS_REGION, CQC_LEM_POST_TIME_DELTA_MINUTES
 from cqc_lem.utilities.jaeger_tracer_helper import get_jaeger_tracer
 from cqc_lem.utilities.logger import myprint, logger
 from cqc_lem.utilities.utils import get_cloudwatch_client
@@ -49,7 +49,7 @@ app.conf.update(
         # },
         'check-scheduled-posts': {
             'task': 'cqc_lem.app.run_scheduler.auto_check_scheduled_posts',
-            'schedule': timedelta(minutes=5)  # Run every 5 minutes
+            'schedule': timedelta(minutes=CQC_LEM_POST_TIME_DELTA_MINUTES)  # Run every x minutes
         },
         'generate-content-plan': {
             'task': 'cqc_lem.app.run_content_plan.auto_generate_content',
@@ -114,7 +114,8 @@ def init_celery_tracing(*args, **kwargs):
 cloudwatch = get_cloudwatch_client(AWS_REGION)
 
 
-def get_queue_metric(name_space:str='cqc-lem/celery_queue/celery', metric_name:str='QueueLength', period:int=60, time_delta_minutes:int=1, statistics:str="Maximum")->int:
+def get_queue_metric(name_space: str = 'cqc-lem/celery_queue/celery', metric_name: str = 'QueueLength',
+                     period: int = 60, time_delta_minutes: int = 1, statistics: str = "Maximum") -> int:
     try:
         response = cloudwatch.get_metric_statistics(
             Namespace=name_space,
@@ -136,6 +137,7 @@ def get_queue_metric(name_space:str='cqc-lem/celery_queue/celery', metric_name:s
         return 0
 
 
+'''
 @task_sent.connect
 def task_sent_handler(sender=None, headers=None, **kwargs):
     base_namespace = "cqc-lem/celery_queue/"
@@ -182,3 +184,4 @@ def update_queue_length(sender=None, headers=None, **kwargs):
         logger.info("Successfully published metric to CloudWatch")
     except Exception as e:
         logger.error(f"Failed to publish metric: {str(e)}")
+'''

@@ -7,7 +7,6 @@ from aws_cdk import (
 from constructs import Construct
 
 from cqc_lem.aws.cdk.shared_stack_props import SharedStackProps
-from cqc_lem.utilities.env_constants import OPENAI_API_KEY
 
 
 class WebStack(Stack):
@@ -21,8 +20,8 @@ class WebStack(Stack):
         task_definition = ecs.FargateTaskDefinition(
             self, 'WebFargateTaskDef',
             family='web_app',
-            cpu=256,
-            memory_limit_mib=512,
+            cpu=1024,
+            memory_limit_mib=2048,
             task_role=props.task_execution_role
 
         )
@@ -67,11 +66,12 @@ class WebStack(Stack):
                                                           health_check=ecs.HealthCheck(
                                                               command=["CMD-SHELL",
                                                                        f"curl -f http://localhost:{props.streamlit_port}/_stcore/health || exit 1"],
-                                                              interval=Duration.seconds(30),
+                                                              interval=Duration.seconds(15),
                                                               timeout=Duration.seconds(5),
-                                                              retries=3,
-                                                              start_period=Duration.seconds(60)
+                                                              retries=1,
+                                                              start_period=Duration.seconds(30)
                                                               # Give Streamlit time to start up
+
                                                           )
                                                           )
 
@@ -86,7 +86,7 @@ class WebStack(Stack):
             task_definition=task_definition,
             desired_count=1,
             max_healthy_percent=200,
-            min_healthy_percent=50,
+            min_healthy_percent=100,
             vpc_subnets=ec2.SubnetSelection(one_per_az=True, subnet_type=ec2.SubnetType.PRIVATE_WITH_EGRESS),
             security_groups=[props.ecs_security_group],
             service_connect_configuration=ecs.ServiceConnectProps(

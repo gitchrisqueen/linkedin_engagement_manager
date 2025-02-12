@@ -2,10 +2,11 @@
 
 import aws_cdk as cdk
 
-from cqc_lem.aws.cdk.batch.celery_worker_stack import CeleryWorkerStack
 from cqc_lem.aws.cdk.batch.selenium_stack import SeleniumStack
 from cqc_lem.aws.cdk.ecs.fargate_service.api_stack import APIStack
+from cqc_lem.aws.cdk.ecs.fargate_service.celery_beat_stack import CeleryBeatStack
 from cqc_lem.aws.cdk.ecs.fargate_service.celery_flower_stack import CeleryFlowerStack
+from cqc_lem.aws.cdk.ecs.fargate_service.celery_worker_stack import CeleryWorkerStack
 from cqc_lem.aws.cdk.ecs.fargate_service.web_stack import WebStack
 from cqc_lem.aws.cdk.main_stack import MainStack
 from cqc_lem.aws.cdk.shared_stack_props import SharedStackProps
@@ -53,10 +54,10 @@ api_stack.add_dependency(main_stack)
 selenium_stack = SeleniumStack(app, "SeleniumStack",
                                env=env,
                                props=main_stack.outputs,
-                               hub_cpu=256, # TODO: Refine these Selenium Hub CPU values
-                               hub_memory_limit=1024, # TODO: Refine these Selenium Hub Memory values
-                               node_cpu=256, # TODO: Refine these Selenium Node CPU values
-                               node_memory_limit=1024, # TODO: Refine these Selenium Node values
+                               hub_cpu=1024,  # TODO: Refine these Selenium Hub CPU values
+                               hub_memory_limit=2048,  # TODO: Refine these Selenium Hub Memory values
+                               node_cpu=4096,  # TODO: Refine these Selenium Node CPU values
+                               node_memory_limit=8192,  # TODO: Refine these Selenium Node values
 
                                )
 # Add dependencies to ensure correct order
@@ -64,16 +65,22 @@ selenium_stack.add_dependency(main_stack)
 
 celery_worker_stack = CeleryWorkerStack(app, "CeleryWorkerStack",
                                         env=env,
-                                        props=main_stack.outputs
+                                        props=selenium_stack.outputs
                                         )
 
 # Add dependencies to ensure correct order
-celery_worker_stack.add_dependency(main_stack)
+celery_worker_stack.add_dependency(selenium_stack)
 
 celery_flower_stack = CeleryFlowerStack(app, "CeleryFlowerStack", env=env,
                                         props=main_stack.outputs)
 
 # Add dependencies to ensure correct order
 celery_flower_stack.add_dependency(main_stack)
+
+celery_beat_stack = CeleryBeatStack(app, "CeleryBeatStack", env=env,
+                                    props=main_stack.outputs)
+
+# Add dependencies to ensure correct order
+celery_beat_stack.add_dependency(main_stack)
 
 app.synth()

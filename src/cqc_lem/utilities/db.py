@@ -516,23 +516,23 @@ def get_post_video_url(post_id: int):
     return post['video_url'] if post else None
 
 
-def get_ready_to_post_posts(pre_post_time: datetime = None) -> list:
+def get_ready_to_post_posts(pre_post_time: datetime = None, post_time_delta_minutes=20) -> list:
     """Query the database for any pending posts that are scheduled to post now or earlier"""
 
     now = datetime.now(timezone.utc)
     if pre_post_time is None:
-        # Get time for 20 minutes after now
-        pre_post_time = now + timedelta(minutes=20)
+        # Get time for post_time_delta after now
+        pre_post_time = now + timedelta(minutes=post_time_delta_minutes)
 
     yesterday = now - timedelta(days=1)
 
-    myprint(f"Getting post between : {yesterday} and {pre_post_time}")
+    myprint(f"Getting post between : {yesterday} and {pre_post_time} (UTC)")
 
     connection = get_db_connection()
     cursor = connection.cursor()
 
     try:
-        # Get posts that have scheduled time between 24 hours ago and the next 20 minutes
+        # Get posts that have scheduled time between 24 hours ago and the pre_post_time
         cursor.execute(
             """SELECT p.id, p.scheduled_time, p.user_id 
                 FROM posts AS p

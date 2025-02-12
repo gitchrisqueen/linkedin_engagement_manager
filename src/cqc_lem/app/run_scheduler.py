@@ -11,7 +11,7 @@ from cqc_lem.app.run_automation import automate_commenting, automate_profile_vie
     automate_invites_to_company_page_for_user
 from cqc_lem.utilities.date import convert_datetime_to_local_tz
 from cqc_lem.utilities.db import get_ready_to_post_posts, update_db_post_status, get_active_user_ids, PostStatus
-from cqc_lem.utilities.env_constants import SELENIUM_KEEP_VIDEOS_X_DAYS
+from cqc_lem.utilities.env_constants import SELENIUM_KEEP_VIDEOS_X_DAYS, CQC_LEM_POST_TIME_DELTA_MINUTES
 from cqc_lem.utilities.logger import myprint
 
 
@@ -27,7 +27,7 @@ def auto_check_scheduled_posts(self):
     """Checks if there are any posts to publish."""
 
     # Get post that should have run between yesterday and in the next 20 minutes
-    posts = get_ready_to_post_posts()
+    posts = get_ready_to_post_posts(post_time_delta_minutes=CQC_LEM_POST_TIME_DELTA_MINUTES)
 
     for post in posts:
         post_id, scheduled_time, user_id = post

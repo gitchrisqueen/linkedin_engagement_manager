@@ -11,7 +11,7 @@ from constructs import Construct
 from cqc_lem.aws.cdk.shared_stack_props import SharedStackProps
 
 
-class CeleryWorkerStack(Stack):
+class CeleryBatchWorkerStack(Stack):
 
     def __init__(self, scope: Construct, id: str,
                  props: SharedStackProps,
@@ -19,18 +19,18 @@ class CeleryWorkerStack(Stack):
         super().__init__(scope, id, **kwargs)
 
         # Create AWS Batch Job Queue
-        self.celery_batch_job_queue = batch.JobQueue(self, "CeleryWorkerJobQueue",
-                                                     job_queue_name="celery-worker-job-queue"
+        self.celery_batch_job_queue = batch.JobQueue(self, "CeleryBatchWorkerJobQueue",
+                                                     job_queue_name="celery-batch-worker-job-queue"
                                                      )
 
         batch_env_count = 3
 
         for i in range(batch_env_count):
-            fargate_spot_environment = batch.FargateComputeEnvironment(self, f"CeleryWorkerFargateEnv{i}",
+            fargate_spot_environment = batch.FargateComputeEnvironment(self, f"CeleryBatchWorkerFargateEnv{i}",
                                                                        vpc=props.ec2_vpc,
                                                                        vpc_subnets=ec2.SubnetSelection(
                                                                            subnet_type=ec2.SubnetType.PRIVATE_WITH_EGRESS),
-                                                                       compute_environment_name=f"CeleryWorkerFargateEnv{i}",
+                                                                       compute_environment_name=f"CeleryBatchWorkerFargateEnv{i}",
                                                                        security_groups=[props.ecs_security_group],
                                                                        spot=True if i > 0 else False,
                                                                        maxv_cpus=49 if i > 0 else 1,
@@ -43,7 +43,7 @@ class CeleryWorkerStack(Stack):
             self.celery_batch_job_queue.add_compute_environment(fargate_spot_environment, batch_env_count - i)
 
         # Add a new batch container to the Fargate Task Definition
-        container = batch.EcsFargateContainerDefinition(self, "CeleryWorkerFargateContainer",
+        container = batch.EcsFargateContainerDefinition(self, "CeleryBatchWorkerFargateContainer",
                                                         image=ecs.ContainerImage.from_docker_image_asset(
                                                             props.ecr_docker_asset),
                                                         command=["/start-celeryworker-solo"],
@@ -70,6 +70,7 @@ class CeleryWorkerStack(Stack):
                                                             "CELERY_BROKER_URL": f"redis://{props.redis_url}:{props.redis_port}/0",
                                                             "CELERY_RESULT_BACKEND": f"redis://{props.redis_url}:{props.redis_port}/1",
                                                             "CELERY_QUEUE": "celery",
+                                                            # ^^^ Use this to define different priority of queues with more or less processing power
                                                             # "SELENIUM_HUB_HOST": props.elbv2_public_lb.load_balancer_dns_name, # Through the public load balancer
                                                             "SELENIUM_HUB_HOST": f"selenium_hub.{props.ecs_default_cloud_map_namespace.namespace_name}",
                                                             # Through the internal load balancer
@@ -77,12 +78,12 @@ class CeleryWorkerStack(Stack):
                                                             "HEADLESS_BROWSER": "FALSE"
                                                             # TODO: Turn this to true in production
 
-                                                            # ^^^ Use this to define different priority of queues with more or less processing power
+
                                                         },
                                                         # TODO: Volume added but no mount point. Need to verify this for assets
                                                         # Add a new volume to the container
                                                         volumes=[batch.EcsVolume.efs(
-                                                            name="CeleryWorkerVolume",
+                                                            name="CeleryBatchWorkerVolume",
                                                             file_system=props.efs_file_system,
                                                             container_path=props.efs_app_assets_path,
                                                             access_point_id=props.efs_access_point.access_point_id,
@@ -91,18 +92,18 @@ class CeleryWorkerStack(Stack):
                                                         )],
                                                         job_role=props.task_execution_role,
                                                         logging=ecs.LogDriver.aws_logs(
-                                                            stream_prefix="celery_worker_logs",
+                                                            stream_prefix="celery_batch_worker_logs",
                                                             log_group=logs.LogGroup.from_log_group_arn(
-                                                                self, "CeleryWorkerLogGroup",
-                                                                log_group_arn=props.celery_worker_log_group_arn
+                                                                self, "CeleryBatchWorkerLogGroup",
+                                                                log_group_arn=props.celery_worker_batch_log_group_arn
                                                             )
                                                         )
 
                                                         )
 
         # Create Batch job definition
-        celery_job_def = batch.EcsJobDefinition(self, "CeleryWorkerJobDef",
-                                                job_definition_name='celery_worker',
+        celery_job_def = batch.EcsJobDefinition(self, "CeleryBatchWorkerJobDef",
+                                                job_definition_name='celery_batch_worker',
                                                 container=container,
                                                 timeout=Duration.minutes(15)
                                                 # The time the job has to complete before it will be terminated
@@ -155,7 +156,7 @@ class CeleryWorkerStack(Stack):
 
             # Create EventBridge rule for each threshold
             rule = events.Rule(
-                self, f"CeleryWorkerRuleThreshold{config['threshold']}",
+                self, f"CeleryBatchWorkerRuleThreshold{config['threshold']}",
                 event_pattern=events.EventPattern(
                     source=["aws.cloudwatch"],
                     detail_type=["CloudWatch Alarm State Change"],

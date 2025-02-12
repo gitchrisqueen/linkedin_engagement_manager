@@ -1,0 +1,170 @@
+from aws_cdk import (
+    Duration,
+    aws_ecs as ecs,
+    aws_logs as logs,
+    aws_cloudwatch as cloudwatch,
+    aws_applicationautoscaling as applicationautoscaling,
+    aws_ec2 as ec2, Stack, RemovalPolicy, )
+from constructs import Construct
+
+from cqc_lem.aws.cdk.shared_stack_props import SharedStackProps
+
+
+class CeleryWorkerStack(Stack):
+
+    def __init__(self, scope: Construct, id: str,
+                 props: SharedStackProps,
+                 **kwargs) -> None:
+        super().__init__(scope, id, **kwargs)
+
+        # Create a new Fargate Task Definition
+        task_definition = ecs.FargateTaskDefinition(
+            self, 'CeleryWorkerFargateTaskDef',
+            family='celery_worker',
+            cpu=4096,
+            memory_limit_mib=8192,
+            task_role=props.task_execution_role
+
+        )
+
+        # Add a new volume to the Fargate Task Definition
+        task_definition.add_volume(
+            name=props.efs_volume_name,
+            efs_volume_configuration=props.efs_volume_configuration,
+        )
+
+        # Add a new container to the Fargate Task Definition
+        celery_worker_container = task_definition.add_container("CeleryWorkerContainer",
+                                                                container_name="celery_worker",
+                                                                image=ecs.ContainerImage.from_docker_image_asset(
+                                                                    props.ecr_docker_asset),
+                                                                command=["/start-celeryworker-solo"],
+                                                                environment={
+                                                                    # Env passed through props back to service ENV
+                                                                    "OPENAI_API_KEY": props.open_api_key,
+                                                                    "LI_CLIENT_ID": props.li_client_id,
+                                                                    "LI_CLIENT_SECRET": props.li_client_secret,
+                                                                    "LI_REDIRECT_URI": props.li_redirect_uri,
+                                                                    "LI_STATE_SALT": props.li_state_salt,
+                                                                    "LI_API_VERSION": props.li_api_version,
+                                                                    "PEXELS_API_KEY": props.pexels_api_key,
+                                                                    "HF_TOKEN": props.hf_token,
+                                                                    "REPLICATE_API_TOKEN": props.replicate_api_token,
+                                                                    "RUNWAYML_API_SECRET": props.runwayml_api_secret,
+                                                                    "TZ": props.tz,
+                                                                    # ENV set variables above
+                                                                    "AWS_MYSQL_SECRET_NAME": props.ssm_myql_secret_name,
+                                                                    "AWS_REGION": props.env.region,
+                                                                    "CELERY_BROKER_URL": f"redis://{props.redis_url}:{props.redis_port}/0",
+                                                                    "CELERY_RESULT_BACKEND": f"redis://{props.redis_url}:{props.redis_port}/1",
+                                                                    "CELERY_QUEUE": "celery",
+                                                                    # ^^^ Use this to define different priority of queues with more or less processing power
+                                                                    # "SELENIUM_HUB_HOST": props.elbv2_public_lb.load_balancer_dns_name, # Through the public load balancer
+                                                                    "SELENIUM_HUB_HOST": f"selenium_hub.{props.ecs_default_cloud_map_namespace.namespace_name}",
+                                                                    # Through the internal load balancer
+                                                                    "SELENIUM_HUB_PORT": str(props.selenium_hub_port),
+                                                                    "HEADLESS_BROWSER": "FALSE",
+                                                                    "CQC_LEM_CHECK_SCHEDULE_DELTA_MINUTES": "60",
+                                                                    "CQC_LEM_POST_TIME_DELTA_MINUTES": "80"
+
+                                                                    # TODO: Turn this to true in production
+
+                                                                },
+                                                                logging=ecs.LogDriver.aws_logs(
+                                                                    stream_prefix="celery_worker_logs",
+                                                                    log_group=logs.LogGroup(
+                                                                        self, "CeleryWorkerLogGroup",
+                                                                        log_group_name="/cqc-lem/celery_worker",
+                                                                        retention=logs.RetentionDays.ONE_WEEK,
+                                                                        removal_policy=RemovalPolicy.DESTROY
+                                                                    )
+                                                                ),
+                                                                health_check=ecs.HealthCheck(
+                                                                    command=["CMD-SHELL",
+                                                                             "python -c 'import celery.bin.worker; exit(0)' || exit 1"]
+                                                                    , interval=Duration.seconds(15),
+                                                                    timeout=Duration.seconds(5),
+                                                                    retries=1,
+                                                                    start_period=Duration.seconds(30)
+
+
+                                                                )
+                                                                )
+
+        # Add a new volume to the Fargate Task Definition
+        celery_worker_container.add_mount_points(props.ecs_asset_mount_point)
+
+        # Create a service definitions and port mappings
+        celery_worker_service = ecs.FargateService(
+            self, 'CeleryWorkerService',
+            cluster=props.ecs_cluster,
+            enable_execute_command=False,  # Reduces metrics
+            task_definition=task_definition,
+            desired_count=1,
+            max_healthy_percent=200,
+            min_healthy_percent=100,
+            vpc_subnets=ec2.SubnetSelection(one_per_az=True, subnet_type=ec2.SubnetType.PRIVATE_WITH_EGRESS),
+            security_groups=[props.ecs_security_group,
+                             props.get('sel_hub_sg')  # Need the hub security group to allow ingress
+                             ],
+            service_name="celery-worker-service",
+            capacity_provider_strategies=[
+                ecs.CapacityProviderStrategy(
+                    capacity_provider='FARGATE',
+                    base=1,
+                    weight=1
+
+                ),
+                ecs.CapacityProviderStrategy(
+                    capacity_provider='FARGATE_SPOT',
+                    weight=4
+                )
+            ]
+
+        )
+
+        # TODO: already handled - remove - Allow the ECS Service to connect to the EFS
+        celery_worker_service.connections.allow_from(props.efs_file_system, ec2.Port.tcp(2049))
+
+        # TODO: already handled - remove - Allow the EFS to connect to the ECS Service
+        celery_worker_service.connections.allow_to(props.efs_file_system, ec2.Port.tcp(2049))
+
+        # Create the scalable target
+        target = applicationautoscaling.ScalableTarget(
+            self, f'celery-worker-scalable-target',
+            service_namespace=applicationautoscaling.ServiceNamespace.ECS,
+            max_capacity=100,
+            min_capacity=1,
+            resource_id=f'service/{props.ecs_cluster.cluster_name}/{celery_worker_service.service_name}',
+            scalable_dimension='ecs:service:DesiredCount'
+        )
+
+        # Create the CloudWatch metric for CPU utilization
+        worker_utilization_metric = cloudwatch.Metric(
+            namespace='AWS/ECS',
+            metric_name='CPUUtilization',
+            statistic='max',
+            period=Duration.minutes(1),
+            dimensions_map={
+                'ClusterName': props.ecs_cluster.cluster_name,
+                'ServiceName': celery_worker_service.service_name
+            }
+        )
+
+        # Create the scaling policy with steps
+        target.scale_on_metric(
+            f'celery-worker-step-metric-scaling',
+            metric=worker_utilization_metric,
+            adjustment_type=applicationautoscaling.AdjustmentType.CHANGE_IN_CAPACITY,
+            scaling_steps=[
+                applicationautoscaling.ScalingInterval(
+                    change=-1,
+                    upper=30
+                ),
+                applicationautoscaling.ScalingInterval(
+                    change=1,
+                    lower=75
+                )
+            ],
+            cooldown=Duration.seconds(180)
+        )

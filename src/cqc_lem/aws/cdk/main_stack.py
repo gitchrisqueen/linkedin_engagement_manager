@@ -69,12 +69,13 @@ class MainStack(Stack):
 
         ecr_stack = EcrStack(self, "EcrStack")
 
-        celery_worker_log_group = logs.LogGroup(
-            self, "CeleryWorkerLogGroup",
-            log_group_name="/cqc-lem/celery_worker",
-            retention=logs.RetentionDays.ONE_WEEK,
-            removal_policy=RemovalPolicy.DESTROY
-        )
+
+        #celery_worker_batch_log_group = logs.LogGroup(
+        #    self, "CeleryWorkerBatchLogGroup",
+        #    log_group_name="/cqc-lem/celery_worke_batchr",
+        #    retention=logs.RetentionDays.ONE_WEEK,
+        #    removal_policy=RemovalPolicy.DESTROY
+        #)
 
         selenium_log_group = logs.LogGroup(
             self, "SeleniumLogGroup",
@@ -191,7 +192,7 @@ class MainStack(Stack):
         self.output_props['redis_cluster_id'] = redis_stack.redis_cluster_id
         self.output_props['redis_url'] = redis_stack.redis_url
         #self.output_props['lambda_get_redis_queue_message_count'] = lambda_stack.get_queue_message_count
-        self.output_props['celery_worker_log_group_arn'] = celery_worker_log_group.log_group_arn
+        #self.output_props['celery_worker_batch_log_group_arn'] = celery_worker_batch_log_group.log_group_arn
         self.output_props['selenium_log_group_arn'] = selenium_log_group.log_group_arn
         self.output_props['api_base_url'] = api_base_url
 

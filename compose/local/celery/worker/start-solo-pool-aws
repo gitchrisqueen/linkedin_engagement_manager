@@ -6,24 +6,10 @@ set -o nounset
 # Define the non-root user
 CELERY_USER=celeryworker
 
-# Create the user if it doesn't exist
-if ! id -u $CELERY_USER > /dev/null 2>&1; then
-    printf "Creating non-root user: %s\n" "$CELERY_USER"
-    useradd -m $CELERY_USER
-fi
-
-# Copy the /root/.aws files to the non-root user's home directory if they exists
-if [ -d "/root/.aws" ]; then
-    printf "Copying /root/.aws files to /home/%s/.aws\n" "$CELERY_USER"
-    cp -r /root/.aws /home/$CELERY_USER
-    chown -R $CELERY_USER:$CELERY_USER /home/$CELERY_USER/.aws
-fi
 
 # Change ownership of the application directory to the non-root user
 printf "Changing ownership of the application directory to: %s\n" "$CELERY_USER"
 chown -R $CELERY_USER:$CELERY_USER /app
-chown -R $CELERY_USER:$CELERY_USER /app/logs && \
-    chmod 755 /app/logs
 
 
 # Start Celery worker

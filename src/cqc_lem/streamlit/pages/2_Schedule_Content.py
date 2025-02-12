@@ -65,7 +65,7 @@ with (tracer.start_as_current_span("schedule_post") if tracer else nullcontext()
 
                 #st.write(str(post_request.post_json))
 
-                response = requests.post(f"http://{api_base_and_port}/schedule_post/", json=post_request.post_json)
+                response = requests.post(f"{api_base_and_port}/schedule_post/", json=post_request.post_json)
                 if response.status_code == 200:
                     st.success("Post scheduled successfully!")
                     # Clear the content field
