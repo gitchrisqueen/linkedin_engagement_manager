@@ -49,7 +49,9 @@ app.conf.update(
         # },
         'check-scheduled-posts': {
             'task': 'cqc_lem.app.run_scheduler.auto_check_scheduled_posts',
-            'schedule': timedelta(minutes=CQC_LEM_POST_TIME_DELTA_MINUTES)  # Run every x minutes
+            #'schedule': timedelta(minutes=CQC_LEM_POST_TIME_DELTA_MINUTES)  # Run every x minutes
+            'schedule': crontab(minute='0,30')  # Run every hour and half hour
+            #'schedule': crontab(minute='0')  # Run every hour
         },
         'generate-content-plan': {
             'task': 'cqc_lem.app.run_content_plan.auto_generate_content',

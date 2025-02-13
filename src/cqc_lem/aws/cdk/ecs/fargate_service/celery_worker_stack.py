@@ -63,6 +63,8 @@ class CeleryWorkerStack(Stack):
                                                                     "SELENIUM_HUB_HOST": f"selenium_hub.{props.ecs_default_cloud_map_namespace.namespace_name}",
                                                                     # Through the internal load balancer
                                                                     "SELENIUM_HUB_PORT": str(props.selenium_hub_port),
+                                                                    "API_BASE_URL": props.api_base_url,
+                                                                    "API_PORT": str(props.api_port),
                                                                     "HEADLESS_BROWSER": "FALSE",
                                                                     "CQC_LEM_CHECK_SCHEDULE_DELTA_MINUTES": "60",
                                                                     "CQC_LEM_POST_TIME_DELTA_MINUTES": "80"

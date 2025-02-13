@@ -19,8 +19,8 @@ class CeleryBeatStack(Stack):
         task_definition = ecs.FargateTaskDefinition(
             self, 'CeleryBeatFargateTaskDef',
             family='celery_beat',
-            cpu=1024,
-            memory_limit_mib=2048,
+            cpu=2048,
+            memory_limit_mib=4096,
             task_role=props.task_execution_role
 
         )
@@ -63,7 +63,7 @@ class CeleryBeatStack(Stack):
                                                               ),
                                                               health_check=ecs.HealthCheck(
                                                                   command=["CMD-SHELL",
-                                                                           "test -f celerybeat-schedule && [ $(find celerybeat-schedule -mmin -2) ] || exit 1"
+                                                                           "test -f celerybeat-schedule || exit 1"
                                                                            ],
                                                                   interval=Duration.seconds(15),
                                                                   timeout=Duration.seconds(5),
