@@ -89,7 +89,6 @@ class CeleryWorkerStack(Stack):
                                                                     retries=1,
                                                                     start_period=Duration.seconds(30)
 
-
                                                                 )
                                                                 )
 
@@ -141,6 +140,7 @@ class CeleryWorkerStack(Stack):
             scalable_dimension='ecs:service:DesiredCount'
         )
 
+        '''
         # Create the CloudWatch metric for CPU utilization
         worker_utilization_metric = cloudwatch.Metric(
             namespace='AWS/ECS',
@@ -169,4 +169,58 @@ class CeleryWorkerStack(Stack):
                 )
             ],
             cooldown=Duration.seconds(180)
+        )
+        '''
+
+        scaling_policy = applicationautoscaling.TargetTrackingScalingPolicy(
+            self, f"celery_worker-target-cpu-scaling-policy",
+            policy_name=f"celery-worker-scalable-target-cpu-scaling",
+            scaling_target=target,
+            target_value=40.0,  # 40% CPU utilization target
+            scale_in_cooldown=Duration.seconds(300),  # 5 minutes
+            scale_out_cooldown=Duration.seconds(180),  # 3 minutes
+            predefined_metric=applicationautoscaling.PredefinedMetric.ECS_SERVICE_AVERAGE_CPU_UTILIZATION
+        )
+
+        queue_length_metric = cloudwatch.Metric(
+            namespace="cqc-lem/celery_queue/celery",
+            metric_name="QueueLength",
+            period=Duration.minutes(1),
+            statistic="Maximum",
+            dimensions_map={
+                "QueueName": "celery"
+            }
+        )
+
+        # Create the scaling policy with steps based on queue length thresholds
+        target.scale_on_metric(
+            'celery-worker-queue-length-scaling',
+            metric=queue_length_metric,  # Use queue_length_metric instead of worker_utilization_metric
+            adjustment_type=applicationautoscaling.AdjustmentType.EXACT_CAPACITY,
+            scaling_steps=[
+                applicationautoscaling.ScalingInterval(
+                    change=1,  # Minimum 1 worker when queue length < 5
+                    upper=5
+                ),
+                applicationautoscaling.ScalingInterval(
+                    change=3,  # 3 workers when queue length 5-25
+                    lower=5,
+                    upper=25
+                ),
+                applicationautoscaling.ScalingInterval(
+                    change=8,  # 8 workers when queue length 25-100
+                    lower=25,
+                    upper=100
+                ),
+                applicationautoscaling.ScalingInterval(
+                    change=15,  # 15 workers when queue length 100-200
+                    lower=100,
+                    upper=200
+                ),
+                applicationautoscaling.ScalingInterval(
+                    change=30,  # 30 workers when queue length > 200
+                    lower=200
+                )
+            ],
+            cooldown=Duration.seconds(60)  # Reduce cooldown to make scaling more responsive
         )

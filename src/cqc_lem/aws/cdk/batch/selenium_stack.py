@@ -431,7 +431,9 @@ class SeleniumStack(Stack):
             entry_point=entry_point,
             command=command,
             # stop_timeout=Duration.seconds(120), # Do not add stop timeout as it kills the container
-            health_check=health_check
+            health_check=health_check,
+            cpu=max(cpu/2,256),  # Limit to half the task definition CPU
+            memory_limit_mib=max(memory_limit/2,512),  # Limit to half the task definition memory
         )
 
         # Create a port name to port number map array
@@ -514,7 +516,7 @@ class SeleniumStack(Stack):
                               min_instances: int,
                               ) -> applicationautoscaling.ScalableTarget:
         # Create the scalable target
-        target = applicationautoscaling.ScalableTarget(
+        scaling_target = applicationautoscaling.ScalableTarget(
             self, f'selenium-{identifier}-scalable-target',
             service_namespace=applicationautoscaling.ServiceNamespace.ECS,
             max_capacity=max_instances,
@@ -523,8 +525,20 @@ class SeleniumStack(Stack):
             scalable_dimension='ecs:service:DesiredCount'
         )
 
-        # Create the CloudWatch metric for CPU utilization
-        worker_utilization_metric = cloudwatch.Metric(
+        scaling_policy = applicationautoscaling.TargetTrackingScalingPolicy(
+            self, f"selenium-{identifier}-scalable-target-cpu-scaling-policy",
+            policy_name=f"selenium-{identifier}-scalable-target-cpu-scaling",
+            scaling_target=scaling_target,
+            target_value=40.0,  # 40% CPU utilization target
+            scale_in_cooldown=Duration.seconds(300),  # 5 minutes
+            scale_out_cooldown=Duration.seconds(180),  # 3 minutes
+            predefined_metric=applicationautoscaling.PredefinedMetric.ECS_SERVICE_AVERAGE_CPU_UTILIZATION
+        )
+
+
+        '''
+        # Create the CloudWatch metric for CPU Max utilization
+        worker_utilization_max_cpu_metric = cloudwatch.Metric(
             namespace='AWS/ECS',
             metric_name='CPUUtilization',
             statistic='max',
@@ -536,9 +550,9 @@ class SeleniumStack(Stack):
         )
 
         # Create the scaling policy with steps
-        target.scale_on_metric(
-            f'selenium-{identifier}-step-metric-scaling',
-            metric=worker_utilization_metric,
+        scaling_target.scale_on_metric(
+            f'selenium-{identifier}-cpu-max-step-metric-scaling',
+            metric=worker_utilization_max_cpu_metric,
             adjustment_type=applicationautoscaling.AdjustmentType.CHANGE_IN_CAPACITY,
             scaling_steps=[
                 applicationautoscaling.ScalingInterval(
@@ -553,4 +567,35 @@ class SeleniumStack(Stack):
             cooldown=Duration.seconds(180)
         )
 
-        return target
+        # Create the CloudWatch metric for CPU Average utilization
+        worker_utilization_avg_cpu_metric = cloudwatch.Metric(
+            namespace='AWS/ECS',
+            metric_name='CPUUtilization',
+            statistic='avg',
+            period=Duration.minutes(1),
+            dimensions_map={
+                'ClusterName': cluster_name,
+                'ServiceName': service_name
+            }
+        )
+
+        # Create the scaling policy with steps
+        scaling_target.scale_on_metric(
+            f'selenium-{identifier}-cpu-avg-step-metric-scaling',
+            metric=worker_utilization_avg_cpu_metric,
+            adjustment_type=applicationautoscaling.AdjustmentType.CHANGE_IN_CAPACITY,
+            scaling_steps=[
+                applicationautoscaling.ScalingInterval(
+                    change=-1,
+                    upper=10
+                ),
+                applicationautoscaling.ScalingInterval(
+                    change=1,
+                    lower=70
+                )
+            ],
+            cooldown=Duration.seconds(180)
+        )
+        '''
+
+        return scaling_target

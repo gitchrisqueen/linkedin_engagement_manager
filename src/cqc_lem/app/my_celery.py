@@ -1,14 +1,15 @@
 from datetime import datetime, timedelta
 
 from celery import Celery
+from celery import current_app
 from celery.schedules import crontab
-# from celery.signals import task_sent, task_received, task_success
-from celery.signals import worker_process_init
+from celery.signals import worker_process_init, task_received, task_success, task_sent
+from celery.app.control import Inspect
 from opentelemetry.instrumentation.celery import CeleryInstrumentor
 
 from cqc_lem.app import celeryconfig
 from cqc_lem.app.celeryconfig import broker_url
-from cqc_lem.utilities.env_constants import CODE_TRACING, AWS_REGION, CQC_LEM_POST_TIME_DELTA_MINUTES
+from cqc_lem.utilities.env_constants import CODE_TRACING, AWS_REGION
 from cqc_lem.utilities.jaeger_tracer_helper import get_jaeger_tracer
 from cqc_lem.utilities.logger import myprint, logger
 from cqc_lem.utilities.utils import get_cloudwatch_client
@@ -19,6 +20,8 @@ app = Celery(
     broker=broker_url,
 
 )
+
+
 
 # Set the Celery configuration
 app.config_from_object(celeryconfig)
@@ -49,9 +52,9 @@ app.conf.update(
         # },
         'check-scheduled-posts': {
             'task': 'cqc_lem.app.run_scheduler.auto_check_scheduled_posts',
-            #'schedule': timedelta(minutes=CQC_LEM_POST_TIME_DELTA_MINUTES)  # Run every x minutes
+            # 'schedule': timedelta(minutes=CQC_LEM_POST_TIME_DELTA_MINUTES)  # Run every x minutes
             'schedule': crontab(minute='0,30')  # Run every hour and half hour
-            #'schedule': crontab(minute='0')  # Run every hour
+            # 'schedule': crontab(minute='0')  # Run every hour
         },
         'generate-content-plan': {
             'task': 'cqc_lem.app.run_content_plan.auto_generate_content',
@@ -113,11 +116,10 @@ def init_celery_tracing(*args, **kwargs):
         myprint("Tracing is disabled")
 
 
-cloudwatch = get_cloudwatch_client(AWS_REGION)
-
-
 def get_queue_metric(name_space: str = 'cqc-lem/celery_queue/celery', metric_name: str = 'QueueLength',
                      period: int = 60, time_delta_minutes: int = 1, statistics: str = "Maximum") -> int:
+    cloudwatch = get_cloudwatch_client(AWS_REGION)
+
     try:
         response = cloudwatch.get_metric_statistics(
             Namespace=name_space,
@@ -139,6 +141,60 @@ def get_queue_metric(name_space: str = 'cqc-lem/celery_queue/celery', metric_nam
         return 0
 
 
+@task_sent.connect
+@task_received.connect
+@task_success.connect
+def update_queue_length_metric(sender=None, headers=None, **kwargs) -> int:
+    """
+    Get the current queue length from Redis broker and push to CloudWatch
+    """
+    # Use the global app
+    global app
+
+    base_namespace = "cqc-lem/celery_queue/"
+    queue_name = getattr(sender, 'queue', 'celery')
+    name_space = base_namespace + queue_name
+
+    # For Redis broker, get the actual Redis connection
+    with app.pool.acquire(block=True) as conn:
+        redis = conn.default_channel.client
+
+        # Get length of the main celery queue
+        total_tasks = redis.llen(queue_name)
+        #print(f"List length for {queue_name}: {total_tasks}")
+
+    #print(f"Total tasks found: {total_tasks}")
+
+
+    cloudwatch = get_cloudwatch_client(AWS_REGION)
+
+    try:
+        # Push metric to CloudWatch
+        cloudwatch.put_metric_data(
+            Namespace=name_space,
+            MetricData=[
+                {
+                    'MetricName': 'QueueLength',
+                    'Value': total_tasks,
+                    'Unit': 'Count',
+                    'Timestamp': datetime.utcnow(),
+                    'Dimensions': [
+                        {
+                            'Name': 'QueueName',
+                            'Value': 'celery'
+                        }
+                    ]
+                }
+            ]
+        )
+        logger.info(
+            f"Successfully published metric to CloudWatch: Queue length [{queue_name}]: {total_tasks}")
+
+    except Exception as e:
+        logger.error(f"Failed to publish metric: {str(e)}")
+
+    return total_tasks
+
 '''
 @task_sent.connect
 def task_sent_handler(sender=None, headers=None, **kwargs):
@@ -147,6 +203,8 @@ def task_sent_handler(sender=None, headers=None, **kwargs):
     name_space = base_namespace + queue_name
     current_length = get_queue_metric(name_space=name_space)
     new_length = current_length + 1
+
+    cloudwatch = get_cloudwatch_client(AWS_REGION)
 
     try:
         cloudwatch.put_metric_data(
@@ -170,9 +228,11 @@ def update_queue_length(sender=None, headers=None, **kwargs):
     queue_name = getattr(sender, 'queue', 'celery')
     name_space = base_namespace + queue_name
     current_length = get_queue_metric(name_space=name_space)
-    new_length = max(0,current_length + 1)
+    new_length = max(0, current_length - 1)
 
     logger.info(f"Task received/completed. Queue length [{queue_name}]: {new_length}")
+
+    cloudwatch = get_cloudwatch_client(AWS_REGION)
 
     try:
         cloudwatch.put_metric_data(

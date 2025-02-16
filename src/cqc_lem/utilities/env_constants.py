@@ -54,6 +54,8 @@ WAIT_DEFAULT_TIMEOUT = float(get_constant_from_env('WAIT_DEFAULT_TIMEOUT', defau
 MAX_WAIT_RETRY = int(get_constant_from_env('MAX_WAIT_RETRY', default_value='2'))
 RETRY_PARSER_MAX_RETRY = int(get_constant_from_env('RETRY_PARSER_MAX_RETRY', default_value='3'))
 SHOW_ERROR_LINE_NUMBERS = isTrue(get_constant_from_env('SHOW_ERROR_LINE_NUMBERS', default_value='False'))
+PURGE_TASKS = isTrue(get_constant_from_env('PURGE_TASKS', default_value='False'))
+CLEAR_SELENIUM_SESSIONS = isTrue(get_constant_from_env('CLEAR_SELENIUM_SESSIONS', default_value='False'))
 
 AWS_APPLICATION_NAME=get_constant_from_env('AWS_APPLICATION_NAME', default_value='CQC=LEM')
 AWS_APPLICATION_TAG=get_constant_from_env('AWS_APPLICATION_TAG', default_value='CQC=LEM')

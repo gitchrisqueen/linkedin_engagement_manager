@@ -78,6 +78,8 @@ class SharedStackProps(StackProps):
                  replicate_api_token: str = None,
                  runwayml_api_secret: str = None,
                  tz: str = None,
+                 purge_tasks: bool = False,
+                 clear_selenium_sessions: bool = False,
 
                  **kwargs):
         super().__init__(env=env)
@@ -142,6 +144,8 @@ class SharedStackProps(StackProps):
         self.props['replicate_api_token'] = replicate_api_token
         self.props['runwayml_api_secret'] = runwayml_api_secret
         self.props['tz'] = tz
+        self.props['purge_tasks'] = purge_tasks
+        self.props['clear_selenium_sessions'] = clear_selenium_sessions
 
     def get(self, key):
         return self.props.get(key)
@@ -249,14 +253,14 @@ class SharedStackProps(StackProps):
     # Get just the name
     @property
     def elbv2_public_lb_name(self) -> str:
-        #return self.elbv2_public_lb_arn.split('//')[2] if self.elbv2_public_lb_arn else None
+        # return self.elbv2_public_lb_arn.split('//')[2] if self.elbv2_public_lb_arn else None
         match = re.search(r'\/([^\/]+)\/[^\/]+$', self.elbv2_public_lb_arn)
         return match.group(1) if match else None
 
     # Get just the ID
     @property
     def elbv2_public_lb_id(self) -> str:
-        #return self.elbv2_public_lb_arn.split('//')[-1] if self.elbv2_public_lb_arn else None
+        # return self.elbv2_public_lb_arn.split('//')[-1] if self.elbv2_public_lb_arn else None
         match = re.search(r'\/([^\/]+)$', self.elbv2_public_lb_arn)
         return match.group(1) if match else None
 
@@ -418,3 +422,11 @@ class SharedStackProps(StackProps):
     @property
     def tz(self) -> str:
         return self.get('tz')
+
+    @property
+    def purge_tasks(self) -> bool:
+        return self.get('purge_tasks')
+
+    @property
+    def clear_selenium_sessions(self) -> bool:
+        return self.get('clear_selenium_sessions')

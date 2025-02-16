@@ -5,12 +5,12 @@ on:
     branches:
       - main
 env:
-  CDK_VERSION: "2.177.0"
+  CDK_VERSION: ${{ vars.CDK_VERSION }}
   AWS_ACCOUNT_ID: ${{ secrets.AWS_ACCOUNT_ID }}
   AWS_REGION: ${{ secrets.AWS_REGION }}
-  API_KEY: ${{ secrets.API_KEY }}
-  APPLICATION_TAG: ${{ vars.APPLICATION_TAG }}
-  APPLICATION_NAME: "cqc-lem"
+  API_KEY: ${{ secrets.AWS_API_KEY }}
+  APPLICATION_TAG: ${{ vars.AWS_APPLICATION_NAME }}
+  APPLICATION_NAME:  ${{ vars.AWS_APPLICATION_TAG }}
 
 permissions:
   id-token: write # This is required for requesting the JWT

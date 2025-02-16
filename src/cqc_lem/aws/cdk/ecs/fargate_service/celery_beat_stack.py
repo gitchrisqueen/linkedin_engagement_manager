@@ -36,17 +36,23 @@ class CeleryBeatStack(Stack):
                                                               container_name="celery_beat",
                                                               image=ecs.ContainerImage.from_docker_image_asset(
                                                                   props.ecr_docker_asset),
-                                                              command=["/start-celerybeat-only"],  # Custom command
+                                                              command=["/start-celerybeat"],  # Custom command
                                                               environment={
                                                                   # Env passed through props back to service ENV
                                                                   "OPENAI_API_KEY": props.open_api_key,
                                                                   "TZ": props.tz,
+                                                                  "PURGE_TASKS": "True" if props.purge_tasks else "False",
+                                                                  "CLEAR_SELENIUM_SESSIONS": "True" if props.clear_selenium_sessions else "False",
                                                                   # ENV set variables above
                                                                   "AWS_MYSQL_SECRET_NAME": props.ssm_myql_secret_name,
                                                                   "AWS_REGION": props.env.region,
                                                                   "CELERY_BROKER_URL": f"redis://{props.redis_url}:{props.redis_port}/0",
                                                                   "CELERY_RESULT_BACKEND": f"redis://{props.redis_url}:{props.redis_port}/1",
                                                                   "CELERY_QUEUE": "celery",
+                                                                  # "SELENIUM_HUB_HOST": props.elbv2_public_lb.load_balancer_dns_name, # Through the public load balancer
+                                                                  "SELENIUM_HUB_HOST": f"selenium_hub.{props.ecs_default_cloud_map_namespace.namespace_name}",
+                                                                  # Through the internal load balancer
+                                                                  "SELENIUM_HUB_PORT": str(props.selenium_hub_port),
                                                                   # ^^^ Use this to define different priority of queues with more or less processing power
                                                                   "CQC_LEM_CHECK_SCHEDULE_DELTA_MINUTES": "30",
                                                                   "CQC_LEM_POST_TIME_DELTA_MINUTES": "50"

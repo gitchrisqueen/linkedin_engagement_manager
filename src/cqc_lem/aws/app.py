@@ -12,7 +12,7 @@ from cqc_lem.aws.cdk.main_stack import MainStack
 from cqc_lem.aws.cdk.shared_stack_props import SharedStackProps
 from cqc_lem.aws.util import get_cdk_env
 from cqc_lem.utilities.env_constants import OPENAI_API_KEY, STREAMLIT_EMAIL, LI_CLIENT_ID, LI_CLIENT_SECRET, \
-    LI_STATE_SALT, LI_API_VERSION, PEXELS_API_KEY, HF_TOKEN, REPLICATE_API_TOKEN, RUNWAYML_API_SECRET, TZ
+    LI_STATE_SALT, LI_API_VERSION, PEXELS_API_KEY, HF_TOKEN, REPLICATE_API_TOKEN, RUNWAYML_API_SECRET, TZ, PURGE_TASKS
 
 app = cdk.App()
 env = get_cdk_env()
@@ -30,6 +30,8 @@ props.set("hf_token", HF_TOKEN)
 props.set("replicate_api_token", REPLICATE_API_TOKEN)
 props.set("runwayml_api_secret", RUNWAYML_API_SECRET)
 props.set("tz", TZ)
+props.set("purge_tasks", PURGE_TASKS)
+props.set("clear_selenium_sessions", CeleryBeatStack)
 
 main_stack = MainStack(app, "CQC-LEM",
                        props=props,
@@ -78,9 +80,9 @@ celery_flower_stack = CeleryFlowerStack(app, "CeleryFlowerStack", env=env,
 celery_flower_stack.add_dependency(main_stack)
 
 celery_beat_stack = CeleryBeatStack(app, "CeleryBeatStack", env=env,
-                                    props=main_stack.outputs)
+                                    props=selenium_stack.outputs)
 
 # Add dependencies to ensure correct order
-celery_beat_stack.add_dependency(main_stack)
+celery_beat_stack.add_dependency(selenium_stack)
 
 app.synth()

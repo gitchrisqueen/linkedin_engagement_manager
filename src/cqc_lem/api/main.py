@@ -1,5 +1,4 @@
 import os
-import time
 from datetime import datetime
 from typing import BinaryIO, Union
 from typing import Optional, Any
@@ -14,6 +13,8 @@ from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
 from pydantic import BaseModel, computed_field
 
 from cqc_lem import assets_dir
+from cqc_lem.app.aws_test_celery_task import test_get_my_profile
+from cqc_lem.app.run_automation import automate_invites_to_company_page_for_user
 from cqc_lem.app.run_content_plan import auto_create_weekly_content
 from cqc_lem.utilities.db import insert_post, get_post_by_email, get_user_id, update_db_post, \
     add_user_with_access_token, PostType, PostStatus
@@ -23,10 +24,7 @@ from cqc_lem.utilities.logger import myprint
 from cqc_lem.utilities.mime_type_helper import get_file_mime_type
 from cqc_lem.utilities.utils import get_file_extension_from_filepath
 
-from cqc_lem.app.aws_test_celery_task import test_get_my_profile
-
 app = FastAPI()
-
 
 if CODE_TRACING:
     tracer = get_jaeger_tracer("api", __name__)
@@ -66,9 +64,8 @@ class PostRequest(BaseModel):
     @property
     def scheduled_time(self) -> str:
         # Dont Add Timezone to scheduled_datetime (expected function to convert to UTC or local accordingly)
-        #time.tzset()
+        # time.tzset()
         return self.scheduled_datetime.isoformat()
-
 
 
 @app.get("/health")
@@ -88,7 +85,6 @@ def schedule_post(post: PostRequest) -> ResponseModel:
     if not user_id:
         raise HTTPException(status_code=403, detail="User not found")
 
-
     if insert_post(post.email, post.content, post.scheduled_datetime, post.post_type):
         return ResponseModel(status_code=200, detail="Post scheduled successfully")
     else:
@@ -98,7 +94,7 @@ def schedule_post(post: PostRequest) -> ResponseModel:
 # app endpoint to create user weekly content using their user_id
 @app.post("/create_weekly_content/", responses={
     200: {"description": "Weekly content created successfully"},
-    **{k: v for k, v in error_responses.items() if k in [ 400]}
+    **{k: v for k, v in error_responses.items() if k in [400]}
 })
 def create_weekly_content(user_id: int) -> ResponseModel:
     """Endpoint to create weekly content for a user."""
@@ -108,17 +104,37 @@ def create_weekly_content(user_id: int) -> ResponseModel:
     kwargs = {'user_id': user_id}
     # Call the function to create the weekly content
     auto_create_weekly_content.apply_async(kwargs=kwargs, retry=True,
-                                    retry_policy={
-                                        'max_retries': 1,
-                                    })
-
+                                           retry_policy={
+                                               'max_retries': 1,
+                                           })
 
     return ResponseModel(status_code=200, detail="Weekly content created successfully")
 
 
+@app.post("/invite_to_li_company_page/", responses={
+    200: {"description": "Invite Users to LinkedIn Company Page"},
+    **{k: v for k, v in error_responses.items() if k in [400]}
+})
+def invite_to_li_company_page(user_id: int) -> ResponseModel:
+    """Endpoint to test get my profile on AWS."""
+    if not user_id:
+        raise HTTPException(status_code=400, detail="User ID is required")
+
+    # Call the function to create the weekly content
+    automate_invites_to_company_page_for_user.apply_async(kwargs={'user_id': user_id},
+                                                          retry=True,
+                                                          retry_policy={
+                                                              'max_retries': 3,
+                                                              'interval_start': 60,
+                                                              'interval_step': 30
+                                                          })
+
+    return ResponseModel(status_code=200, detail="Process to invite to LinkedIn Company Page Started")
+
+
 @app.post("/aws_test_get_my_profile/", responses={
     200: {"description": "Test Get My Profile on AWS"},
-    **{k: v for k, v in error_responses.items() if k in [ 400]}
+    **{k: v for k, v in error_responses.items() if k in [400]}
 })
 def aws_test_get_my_profile(user_id: int) -> ResponseModel:
     """Endpoint to test get my profile on AWS."""
@@ -131,7 +147,6 @@ def aws_test_get_my_profile(user_id: int) -> ResponseModel:
                                     retry_policy={
                                         'max_retries': 1,
                                     })
-
 
     return ResponseModel(status_code=200, detail="Test Get My Profile on AWS Message Sent to Celery Queue")
 
@@ -311,7 +326,7 @@ def _get_range_header(range_header: str, file_size: int) -> tuple[int, int]:
 
 def range_requests_response(
         request: Request, file_path: str, content_type: str
-)->StreamingResponse:
+) -> StreamingResponse:
     """Returns StreamingResponse using Range Requests of a given file"""
 
     file_size = os.stat(file_path).st_size

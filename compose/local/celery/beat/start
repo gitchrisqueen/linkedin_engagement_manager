@@ -1,18 +1,41 @@
 #!/bin/bash
 
+# Check if .env exists before trying to source it
+if [ -f .env ]; then
+    export $(grep -v '^#' .env | xargs)
+fi
+
 set -o errexit
 set -o nounset
 
 rm -f './celerybeat.pid'
 
-# Purge previous task
-echo "Purging previous task"
-celery --app cqc_lem.app.my_celery purge -f
+# Function to check if string represents true
+is_true() {
+    local value=$(echo "$1" | tr '[:upper:]' '[:lower:]')
+    case "$value" in
+        true|1|t|y|yes)
+            return 0  # true
+            ;;
+        *)
+            return 1  # false
+            ;;
+    esac
+}
+
+# Use the function to check PURGE_TASKS
+if is_true "${PURGE_TASKS:-false}"; then
+  echo "Purging tasks"
+  celery -A cqc_lem.app.my_celery purge -f
+fi
 
 
-# clear the selenium sessions
-echo "Clearing selenium sessions"
-python -c "from cqc_lem.utilities.selenium_util import clear_sessions; clear_sessions()"
+# Check env variable to determine to clear selenium sessions
+# Use the function to check CLEAR_SELENIUM_SESSIONS
+if is_true "${CLEAR_SELENIUM_SESSIONS:-false}"; then
+  echo "Clearing selenium sessions"
+  python -c "from cqc_lem.utilities.selenium_util import clear_sessions; clear_sessions()"
+fi
 
 # Start Celery Beat
 echo "Starting Celery Beat"
