@@ -41,6 +41,8 @@ class CeleryBeatStack(Stack):
                                                                   # Env passed through props back to service ENV
                                                                   "OPENAI_API_KEY": props.open_api_key,
                                                                   "TZ": props.tz,
+                                                                  #"CELERY_ENABLE_UTC": "True",
+                                                                  "CELERY_TIMEZONE" : props.tz,
                                                                   "PURGE_TASKS": "True" if props.purge_tasks else "False",
                                                                   "CLEAR_SELENIUM_SESSIONS": "True" if props.clear_selenium_sessions else "False",
                                                                   # ENV set variables above

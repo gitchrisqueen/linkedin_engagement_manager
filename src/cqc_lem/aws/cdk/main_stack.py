@@ -64,8 +64,8 @@ class MainStack(Stack):
         '''
 
 
-        # api_base_url = f"http://{ecs_stack.public_lb.load_balancer_dns_name}" # Public url
-        api_base_url= f"http://api.{ecs_stack.default_cloud_map_namespace.namespace_name}"# Private url - only accessible within the VPC
+        api_base_url = f"http://{ecs_stack.public_lb.load_balancer_dns_name}" # Public url
+        #api_base_url= f"http://api.{ecs_stack.default_cloud_map_namespace.namespace_name}"# Private url - only accessible within the VPC
 
         ecr_stack = EcrStack(self, "EcrStack")
 

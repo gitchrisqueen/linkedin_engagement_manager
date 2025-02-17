@@ -45,7 +45,12 @@ class WebStack(Stack):
                                                               "STREAMLIT_EMAIL": props.streamlit_email,
                                                               "STREAMLIT_PORT": str(props.streamlit_port),
                                                               "API_BASE_URL": props.api_base_url,
-                                                              "API_PORT": str(props.api_port)
+                                                              "API_PORT": str(props.api_port),
+                                                              "LI_CLIENT_ID": props.li_client_id,
+                                                              "LI_CLIENT_SECRET": props.li_client_secret,
+                                                              "LI_REDIRECT_URL": props.li_redirect_url,
+                                                              "LI_STATE_SALT": props.li_state_salt,
+                                                              "LI_API_VERSION": props.li_api_version,
                                                           },
                                                           port_mappings=[
                                                               ecs.PortMapping(

@@ -14,6 +14,8 @@ class CeleryWorkerStack(Stack):
 
     def __init__(self, scope: Construct, id: str,
                  props: SharedStackProps,
+                 cpu: int = 4096,
+                 memory_limit_mib: int = 8192,
                  **kwargs) -> None:
         super().__init__(scope, id, **kwargs)
 
@@ -21,8 +23,8 @@ class CeleryWorkerStack(Stack):
         task_definition = ecs.FargateTaskDefinition(
             self, 'CeleryWorkerFargateTaskDef',
             family='celery_worker',
-            cpu=4096,
-            memory_limit_mib=8192,
+            cpu=cpu,
+            memory_limit_mib=memory_limit_mib,
             task_role=props.task_execution_role
 
         )
@@ -36,6 +38,11 @@ class CeleryWorkerStack(Stack):
         # Add a new container to the Fargate Task Definition
         celery_worker_container = task_definition.add_container("CeleryWorkerContainer",
                                                                 container_name="celery_worker",
+                                                                cpu=max(cpu / 2, 256),
+                                                                # Limit to half the task definition CPU
+                                                                memory_limit_mib=max(memory_limit_mib / 2, 512),
+                                                                # Limit to half the task definition memory
+
                                                                 image=ecs.ContainerImage.from_docker_image_asset(
                                                                     props.ecr_docker_asset),
                                                                 command=["/start-celeryworker-solo"],
@@ -44,7 +51,7 @@ class CeleryWorkerStack(Stack):
                                                                     "OPENAI_API_KEY": props.open_api_key,
                                                                     "LI_CLIENT_ID": props.li_client_id,
                                                                     "LI_CLIENT_SECRET": props.li_client_secret,
-                                                                    "LI_REDIRECT_URI": props.li_redirect_uri,
+                                                                    "LI_REDIRECT_URL": props.li_redirect_url,
                                                                     "LI_STATE_SALT": props.li_state_salt,
                                                                     "LI_API_VERSION": props.li_api_version,
                                                                     "PEXELS_API_KEY": props.pexels_api_key,
@@ -52,6 +59,8 @@ class CeleryWorkerStack(Stack):
                                                                     "REPLICATE_API_TOKEN": props.replicate_api_token,
                                                                     "RUNWAYML_API_SECRET": props.runwayml_api_secret,
                                                                     "TZ": props.tz,
+                                                                    # "CELERY_ENABLE_UTC": "True",
+                                                                    "CELERY_TIMEZONE": props.tz,
                                                                     # ENV set variables above
                                                                     "AWS_MYSQL_SECRET_NAME": props.ssm_myql_secret_name,
                                                                     "AWS_REGION": props.env.region,
@@ -172,6 +181,7 @@ class CeleryWorkerStack(Stack):
         )
         '''
 
+
         scaling_policy = applicationautoscaling.TargetTrackingScalingPolicy(
             self, f"celery_worker-target-cpu-scaling-policy",
             policy_name=f"celery-worker-scalable-target-cpu-scaling",
@@ -182,10 +192,11 @@ class CeleryWorkerStack(Stack):
             predefined_metric=applicationautoscaling.PredefinedMetric.ECS_SERVICE_AVERAGE_CPU_UTILIZATION
         )
 
+
         queue_length_metric = cloudwatch.Metric(
             namespace="cqc-lem/celery_queue/celery",
             metric_name="QueueLength",
-            period=Duration.minutes(1),
+            period=Duration.minutes(2),
             statistic="Maximum",
             dimensions_map={
                 "QueueName": "celery"
@@ -197,6 +208,8 @@ class CeleryWorkerStack(Stack):
             'celery-worker-queue-length-scaling',
             metric=queue_length_metric,  # Use queue_length_metric instead of worker_utilization_metric
             adjustment_type=applicationautoscaling.AdjustmentType.EXACT_CAPACITY,
+            evaluation_periods=2,  # Add this
+            datapoints_to_alarm=2,  # Add this
             scaling_steps=[
                 applicationautoscaling.ScalingInterval(
                     change=1,  # Minimum 1 worker when queue length < 5
@@ -222,5 +235,5 @@ class CeleryWorkerStack(Stack):
                     lower=200
                 )
             ],
-            cooldown=Duration.seconds(60)  # Reduce cooldown to make scaling more responsive
+            cooldown=Duration.seconds(300)  # Reduce cooldown to make scaling more responsive
         )

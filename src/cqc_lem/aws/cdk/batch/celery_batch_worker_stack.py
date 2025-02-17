@@ -56,7 +56,7 @@ class CeleryBatchWorkerStack(Stack):
                                                             "OPENAI_API_KEY": props.open_api_key,
                                                             "LI_CLIENT_ID": props.li_client_id,
                                                             "LI_CLIENT_SECRET": props.li_client_secret,
-                                                            "LI_REDIRECT_URI": props.li_redirect_uri,
+                                                            "LI_REDIRECT_URI": props.li_redirect_url,
                                                             "LI_STATE_SALT": props.li_state_salt,
                                                             "LI_API_VERSION": props.li_api_version,
                                                             "PEXELS_API_KEY": props.pexels_api_key,

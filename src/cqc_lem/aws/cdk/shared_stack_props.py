@@ -392,7 +392,7 @@ class SharedStackProps(StackProps):
         return self.get('li_client_secret')
 
     @property
-    def li_redirect_uri(self) -> str:
+    def li_redirect_url(self) -> str:
         return f"{self.api_base_url}:{self.api_port}/auth/linkedin/callback"
 
     @property

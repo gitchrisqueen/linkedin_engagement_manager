@@ -2,6 +2,7 @@ import os
 from datetime import datetime
 from typing import BinaryIO, Union
 from typing import Optional, Any
+from urllib.parse import urlparse, urlunparse
 
 from fastapi import FastAPI, HTTPException, Request, status
 from fastapi.responses import FileResponse
@@ -18,7 +19,7 @@ from cqc_lem.app.run_automation import automate_invites_to_company_page_for_user
 from cqc_lem.app.run_content_plan import auto_create_weekly_content
 from cqc_lem.utilities.db import insert_post, get_post_by_email, get_user_id, update_db_post, \
     add_user_with_access_token, PostType, PostStatus
-from cqc_lem.utilities.env_constants import CODE_TRACING
+from cqc_lem.utilities.env_constants import CODE_TRACING, LI_CLIENT_ID, LI_CLIENT_SECRET, LI_REDIRECT_URL, LI_STATE_SALT
 from cqc_lem.utilities.jaeger_tracer_helper import get_jaeger_tracer
 from cqc_lem.utilities.logger import myprint
 from cqc_lem.utilities.mime_type_helper import get_file_mime_type
@@ -209,18 +210,15 @@ def update_post(post_id: int, post: PostRequest) -> ResponseModel:
 def linkedin_callback(code: str, state: str = None) -> Union[ResponseModel, RedirectResponse]:
     """ Handle LinkedIn OAuth callback and retrieve user details"""
 
-    # Verify the state parame matches the state from teh environment variable
-    if state is not None and state != os.getenv("LI_STATE_SALT"):
+    # Verify the state param matches the state from teh environment variable
+    if state is not None and state != LI_STATE_SALT:
         raise HTTPException(status_code=400, detail="Invalid state parameter")
     else:
         # Get needed environment variables
-        client_id = os.getenv("LI_CLIENT_ID")
-        client_secret = os.getenv("LI_CLIENT_SECRET")
-        redirect_url = os.getenv("LI_REDIRECT_URL")
         resource_path = '/userinfo'
 
         #  Exchange code for access token
-        client = AuthClient(client_id, client_secret, redirect_url)
+        client = AuthClient(LI_CLIENT_ID, LI_CLIENT_SECRET, LI_REDIRECT_URL)
         access_token_response = client.exchange_auth_code_for_access_token(code)
 
         myprint("Access token Response from api call")
@@ -249,10 +247,19 @@ def linkedin_callback(code: str, state: str = None) -> Union[ResponseModel, Redi
                                    access_token_response.refresh_token,
                                    access_token_response.refresh_token_expires_in)
 
-        # Redirect the user to the main Streamlit app from env variable
-        streamlit_url = os.environ.get('NGROK_CUSTOM_DOMAIN')
-        return RedirectResponse(
-            url=f"https://{streamlit_url}")  # TODO: Figure out better redirect. Should we just close the window
+        # Redirect the user to a final url using the base of the LI_REDIRECT_URL and append /My_Account
+        parsed_url = urlparse(LI_REDIRECT_URL)
+        # Split the netloc to remove port
+        netloc = parsed_url.netloc.split(':')[0]  # This will keep only the hostname part
+        final_redirect_url = urlunparse((parsed_url.scheme, netloc, '/My_Account', '', '', ''))
+
+        # If ENV variable NGROK_CUSTOM_DOMAIN is set, use it as the final redirect URL
+        if os.environ.get('NGROK_CUSTOM_DOMAIN'):
+            final_redirect_url = "http://"+os.environ.get('NGROK_CUSTOM_DOMAIN') + '/My_Account'
+
+
+        # final_redirect_url = os.environ.get('NGROK_CUSTOM_DOMAIN')
+        return RedirectResponse(url=final_redirect_url)
 
 
 @app.get("/assets", response_model=None, responses={

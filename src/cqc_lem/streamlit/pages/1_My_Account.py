@@ -4,6 +4,7 @@ import streamlit as st
 from linkedin_api.clients.auth.client import AuthClient
 
 from cqc_lem.streamlit.utils import get_file_as_data_image
+from cqc_lem.utilities.env_constants import LI_CLIENT_ID, LI_CLIENT_SECRET, LI_REDIRECT_URL, LI_STATE_SALT
 
 
 # Function to load user data (replace with actual data loading logic)
@@ -48,63 +49,64 @@ def main():
         save_user_data(user_data)
         st.success("User data updated successfully!")
 
-    # Checkbox for user to consent to storing LinkedIn Data
-    st.subheader("LinkedIn Data Consent")
-    agreement_label = "I agree to let LinkedIn Engagement Manager store my LinkedIn data."
-    consent = st.checkbox(agreement_label)
 
-    current_dir = os.path.dirname(__file__)
-    active_image_path = os.path.join(current_dir,
-                                     '../libs/signin_with_linkedin-buttons/Retina/Sign-In-Small---Active.png')
-    hover_image_path = os.path.join(current_dir,
-                                    '../libs/signin_with_linkedin-buttons/Retina/Sign-In-Small---Hover.png')
+    # TODO: Check DB for user and see if they need to re-consent to LinkedIn Data
+    needs_consent = True
 
-    auth_url = ''
 
-    if consent:
-        # Get needed environment variables
-        client_id = os.getenv("LI_CLIENT_ID")
-        client_secret = os.getenv("LI_CLIENT_SECRET")
-        redirect_url = os.getenv("LI_REDIRECT_URL")
-        state = os.getenv("LI_STATE_SALT")
 
-        #  Exchange code for access token
-        client = AuthClient(client_id, client_secret, redirect_url)
+    if needs_consent:
+        # Checkbox for user to consent to storing LinkedIn Data
+        st.subheader("LinkedIn Data Consent")
+        agreement_label = "I agree to let LinkedIn Engagement Manager store my LinkedIn data."
+        consent = st.checkbox(agreement_label)
 
-        auth_url = client.generate_member_auth_url(
-            state=state,
-            scopes=["openid", "profile", "email", "w_member_social"]
-        )
+        current_dir = os.path.dirname(__file__)
+        active_image_path = os.path.join(current_dir,
+                                         '../libs/signin_with_linkedin-buttons/Retina/Sign-In-Small---Active.png')
+        hover_image_path = os.path.join(current_dir,
+                                        '../libs/signin_with_linkedin-buttons/Retina/Sign-In-Small---Hover.png')
 
-        #st.write(f"""Auth URL: {auth_url}""")
+        auth_url = ''
 
-        # Authorize LinkedIn for API Usage
-        st.markdown(
-            f"""
-            <style>
-            .button {{
-                background-image: url('{get_file_as_data_image(active_image_path)}');
-                background-repeat: no-repeat;
-                background-size: cover;
-                width: 292px;
-                height: 40px;
-                border: none;
-                cursor: pointer;
-            }}
-            .button:hover {{
-                background-image: url('{get_file_as_data_image(hover_image_path)}');
-            }}
-            .button:disabled {{
-                cursor: not-allowed;
-                opacity: 0.5;
-            }}
-            </style>
-            
-            """,
-            unsafe_allow_html=True
-        )
+        if consent:
+            #  Exchange code for access token
+            client = AuthClient(LI_CLIENT_ID, LI_CLIENT_SECRET, LI_REDIRECT_URL)
 
-    st.link_button(label=f"Sign In with LinkedIn", url=auth_url, disabled=not consent)
+            auth_url = client.generate_member_auth_url(
+                state=LI_STATE_SALT,
+                scopes=["openid", "profile", "email", "w_member_social"]
+            )
+
+            #st.write(f"""Auth URL: {auth_url}""")
+
+            # Authorize LinkedIn for API Usage
+            st.markdown(
+                f"""
+                <style>
+                .button {{
+                    background-image: url('{get_file_as_data_image(active_image_path)}');
+                    background-repeat: no-repeat;
+                    background-size: cover;
+                    width: 292px;
+                    height: 40px;
+                    border: none;
+                    cursor: pointer;
+                }}
+                .button:hover {{
+                    background-image: url('{get_file_as_data_image(hover_image_path)}');
+                }}
+                .button:disabled {{
+                    cursor: not-allowed;
+                    opacity: 0.5;
+                }}
+                </style>
+                
+                """,
+                unsafe_allow_html=True
+            )
+
+        st.link_button(label=f"Sign In with LinkedIn", url=auth_url, disabled=not consent)
 
 
 if __name__ == '__main__':
