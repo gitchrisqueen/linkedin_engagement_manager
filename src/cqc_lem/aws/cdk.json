@@ -15,7 +15,8 @@
       "**/node_modules/**",
       "**/__pycache__/**",
       "**/cdk.out/**/*",
-      "**/tests/**/*"
+      "**/tests/**/*",
+      "**/diagram/**/*",
     ]
   },
   "context": {

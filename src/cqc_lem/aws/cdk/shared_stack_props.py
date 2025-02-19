@@ -55,7 +55,7 @@ class SharedStackProps(StackProps):
                  selenium_node_max_instances: int = 4,
                  selenium_node_max_sessions: int = 4,
                  min_instances: int = 1,
-                 max_instances: int = 25,
+                 max_instances: int = 4,
                  # selenium_version: str = "4.26.0-20241101",
                  selenium_version: str = "latest",
                  api_port: int = 8000,
