@@ -16,7 +16,7 @@
       "**/__pycache__/**",
       "**/cdk.out/**/*",
       "**/tests/**/*",
-      "**/diagram/**/*",
+      "**/diagram/**/*"
     ]
   },
   "context": {

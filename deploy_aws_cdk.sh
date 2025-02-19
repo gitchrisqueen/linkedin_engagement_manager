@@ -21,9 +21,13 @@ case $choice in
         echo "Available stacks:"
         # Store the stack list in an array
         stacks=()
-        while IFS= read -r line; do
-            stacks+=("$line")
-        done < <(npx -p node@22 cdk list --app "python -m cqc_lem.aws.app")
+
+        #while IFS= read -r line; do
+        #    stacks+=("$line")
+        #done < <(npx -p node@22 cdk list --app "python -m cqc_lem.aws.app")
+
+        # Get the list of stacks from the deploy order in the cdk.json file
+        stacks=($(jq -r '.context.deployOrder[]' src/cqc_lem/aws/cdk.json))
 
         # Display stacks with numbers
         for i in "${!stacks[@]}"; do
