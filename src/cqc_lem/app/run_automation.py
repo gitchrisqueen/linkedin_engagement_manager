@@ -1350,7 +1350,8 @@ def post_to_linkedin(self, user_id: int, post_id: int):
         base_kwargs = {
             'user_id': user_id,
             'post_id': post_id,
-            'loop_for_duration': 60 * 60 * 24
+            'loop_for_duration': 60 * 60 * 24,
+            'future_forward': 0
         }
         automate_reply_commenting.apply_async(kwargs=base_kwargs)
 

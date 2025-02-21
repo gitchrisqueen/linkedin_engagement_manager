@@ -20,7 +20,7 @@ celery --app cqc_lem.app.my_celery \
   --logging="DEBUG" \
   --logfile="/app/logs" \
   --debug=True \
-  --state_save_interval="${S}" \
+  --state_save_interval="${CELERY_FLOWER_STATE_SAVE_INTERVAL}" \
   --persistent=True \
   --db=/data/flower.db
   #--basic_auth=admin:${CELERY_FLOWER_PASSWORD} \

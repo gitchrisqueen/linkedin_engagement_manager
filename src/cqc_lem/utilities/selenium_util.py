@@ -290,6 +290,14 @@ def getText(curElement: WebElement):
     # print("elementText=%s" % elementText)
     return elementText
 
+def window_scroll(driver: WebDriver, scroll_times: int = 0, wait_on_ajax=False):
+    # Force bottom page scroll by scroll_times
+    for _ in range(scroll_times):
+        driver.execute_script("window.scrollTo(0, document.body.scrollHeight);")
+        if wait_on_ajax:
+            wait_for_ajax(driver)
+            # time.sleep(2)
+
 
 def close_tab(driver: WebDriver, handles: list[str] = None, max_retry=3):
     if handles is None:
@@ -312,8 +320,11 @@ def close_tab(driver: WebDriver, handles: list[str] = None, max_retry=3):
                 pass
 
 
-def get_driver_wait(driver):
-    return WebDriverWait(driver, WAIT_DEFAULT_TIMEOUT,
+def get_driver_wait(driver, wait_time: int = None):
+    if wait_time is None:
+        wait_time = WAIT_DEFAULT_TIMEOUT
+
+    return WebDriverWait(driver, wait_time,
                          # poll_frequency=3,
                          ignored_exceptions=[
                              NoSuchElementException,  # This is handled individually

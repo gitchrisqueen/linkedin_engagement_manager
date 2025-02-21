@@ -4,14 +4,14 @@ import re
 from typing import List
 
 from bs4 import BeautifulSoup, PageElement
-from selenium import webdriver
-from selenium.webdriver.common.by import By
-
 from cqc_lem.utilities.date import convert_datetime_to_start_of_day
 from cqc_lem.utilities.date import convert_viewed_on_to_date
 from cqc_lem.utilities.date import get_linkedin_datetime_from_text
-from cqc_lem.utilities.selenium_util import click_element_wait_retry, get_driver_wait, get_elements_as_list_wait_stale, \
+from cqc_lem.utilities.selenium_util import window_scroll, click_element_wait_retry, get_driver_wait, \
+    get_elements_as_list_wait_stale, \
     getText, wait_for_ajax
+from selenium import webdriver
+from selenium.webdriver.common.by import By
 
 start_identifier_map = {
     "education": 19,
@@ -72,11 +72,7 @@ def get_page_source(driver, url, scroll_times=0):
         driver.get(url)
         wait_for_ajax(driver)
 
-    # Force bottom page scroll by scroll_times
-    for _ in range(scroll_times):
-        driver.execute_script("window.scrollTo(0, document.body.scrollHeight);")
-        wait_for_ajax(driver)
-        # time.sleep(2)
+    window_scroll(driver, scroll_times, True)
 
     return BeautifulSoup(driver.page_source, "html.parser")
 
@@ -150,7 +146,6 @@ def returnProfileInfo(driver: webdriver, profile_url, company_name=None, is_main
         except Exception as e:
             print("Error getting ", key, " | ", e)
 
-
     # print_header("Profile")
     # print(profile)
     # print_header("")
@@ -172,7 +167,8 @@ def get_mutual_connections(driver, employee_link):
     wait = get_driver_wait(driver)
 
     # click the link for mutual connections
-    click_element_wait_retry(driver, wait, "//a[contains(@href,'facetNetwork')]", "Finding Mutual Connections Link", max_retry=0)
+    click_element_wait_retry(driver, wait, "//a[contains(@href,'facetNetwork')]", "Finding Mutual Connections Link",
+                             max_retry=0)
 
     # Get the text of the element that contains the connection's name
     mutual_connections = get_elements_as_list_wait_stale(wait,
@@ -460,9 +456,9 @@ def get_profile_skills(driver, employee_link):
     # Skills
     url = driver.current_url.rstrip('/') + '/details/skills/'
     driver.get(url)
-    wait_for_ajax(driver)
+    window_scroll(driver, 5, True)
 
-    wait = get_driver_wait(driver)
+    wait = get_driver_wait(driver, 1)  # Significanlty reduced wait time
 
     profile_skills = []
 
@@ -492,7 +488,7 @@ def get_profile_skills(driver, employee_link):
 
         if endorsement_element:
             endorse_text = getText(endorsement_element)
-            #print(f"Endorsement Text: {endorse_text}")
+            # print(f"Endorsement Text: {endorse_text}")
             skill_dict["endorsements"] = int(re.search(r'\d+', endorse_text).group())
 
         profile_skills.append(skill_dict)

@@ -1,14 +1,15 @@
 import os
 from datetime import datetime
+from enum import IntEnum
 from typing import BinaryIO, Union
 from typing import Optional, Any
 from urllib.parse import urlparse, urlunparse
 
 from cqc_lem import assets_dir
 from cqc_lem.app.aws_test_celery_task import test_get_my_profile
-from cqc_lem.app.run_automation import automate_invites_to_company_page_for_user
+from cqc_lem.app.run_automation import automate_invites_to_company_page_for_user, automate_reply_commenting
 from cqc_lem.app.run_content_plan import auto_create_weekly_content
-from cqc_lem.utilities.db import insert_post, get_post_by_email, get_user_id, update_db_post, \
+from cqc_lem.utilities.db import insert_post, get_post_by_email, get_user_id, update_db_post, get_post_user_id, \
     add_user_with_access_token, PostType, PostStatus
 from cqc_lem.utilities.env_constants import CODE_TRACING, LI_CLIENT_ID, LI_CLIENT_SECRET, LI_REDIRECT_URL, LI_STATE_SALT
 from cqc_lem.utilities.jaeger_tracer_helper import get_jaeger_tracer
@@ -16,6 +17,7 @@ from cqc_lem.utilities.logger import myprint, logger
 from cqc_lem.utilities.mime_type_helper import get_file_mime_type
 from cqc_lem.utilities.utils import get_file_extension_from_filepath
 from fastapi import FastAPI, HTTPException, Request, status
+from fastapi import Query
 from fastapi.responses import FileResponse
 from fastapi.responses import RedirectResponse
 from fastapi.responses import StreamingResponse
@@ -72,9 +74,49 @@ class PostRequest(BaseModel):
         return self.scheduled_datetime.isoformat()
 
 
+class FutureForwardValues(IntEnum):
+    Zero = 0
+    ONE = 1
+    TWO = 2
+    THREE = 3
+    FOUR = 4
+    FIVE = 5
+
+
 @app.get("/health")
 def health_check():
     return {"status": "healthy"}
+
+
+@app.post("/automate_reply_commenting", responses={
+    200: {"description": "Post reply automation scheduled successfully"},
+    **{k: v for k, v in error_responses.items() if k in [403, 404]}
+})
+def automate_reply_commenting_for_post_id(post_id: int, loop_for_duration: int = 60 * 60,
+                                          future_forward: FutureForwardValues = Query(
+                                              default=0,
+                                              description="Forward index (0-5) to use for future calls",
+                                              examples=[0,1, 2, 3, 4, 5]
+                                          )):
+    # Check if post_id exists in DB
+    user_id = get_post_user_id(post_id)
+
+    if not user_id:
+        raise HTTPException(status_code=403, detail="User Id for Post not found")
+
+    try:
+        # Schedule Reply to comments for 24 hours now that this has been posted
+        base_kwargs = {
+            'user_id': user_id,
+            'post_id': post_id,
+            'loop_for_duration': loop_for_duration,
+            'future_forward': future_forward
+        }
+        automate_reply_commenting.apply_async(kwargs=base_kwargs)
+        return ResponseModel(status_code=200, detail="Post automation reply successfully scheduled")
+
+    except Exception as e:
+        raise HTTPException(status_code=404, detail=f"Could not schedule automation for post. Error: {e}")
 
 
 @app.post("/schedule_post/", responses={

@@ -35,18 +35,36 @@ case $choice in
             echo "$((i+1))) ${stacks[$i]}"
         done
 
-        # Get user selection
-        read -p "Enter the number of the stack to deploy: " stack_num
+       # Get user selection
+       read -p "Enter the stack numbers to deploy (comma-separated): " stack_nums
 
-        # Validate input
-        if [[ "$stack_num" =~ ^[0-9]+$ ]] && [ "$stack_num" -ge 1 ] && [ "$stack_num" -le "${#stacks[@]}" ]; then
-            selected_stack="${stacks[$((stack_num-1))]}"
-            poetry run python -m cqc_lem.aws.deploy --stack "$selected_stack"
-        else
-            echo "Invalid selection. Please choose a number between 1 and ${#stacks[@]}"
-            exit 1
-        fi
-        ;;
+       # Convert comma-separated string to array
+       IFS=',' read -ra selected_nums <<< "$stack_nums"
+       selected_stacks=()
+
+       # Validate each input number and collect stack names
+       valid=true
+       for num in "${selected_nums[@]}"; do
+           # Remove leading/trailing whitespace
+           num=$(echo "$num" | tr -d '[:space:]')
+
+           if [[ "$num" =~ ^[0-9]+$ ]] && [ "$num" -ge 1 ] && [ "$num" -le "${#stacks[@]}" ]; then
+               selected_stacks+=("${stacks[$((num-1))]}")
+           else
+               echo "Invalid selection: $num. Please choose numbers between 1 and ${#stacks[@]}"
+               valid=false
+               break
+           fi
+       done
+
+       if [ "$valid" = true ]; then
+           # Join stack names with spaces
+           stack_list="${selected_stacks[*]}"
+           poetry run python -m cqc_lem.aws.deploy --stack "$stack_list"
+       else
+           exit 1
+       fi
+       ;;
     *)
         poetry run python -m cqc_lem.aws.deploy --all
         ;;

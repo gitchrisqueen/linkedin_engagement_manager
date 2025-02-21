@@ -3,13 +3,12 @@ from datetime import datetime, timedelta, timezone
 from enum import StrEnum
 
 import mysql.connector
-from dotenv import load_dotenv
-from mysql.connector import errorcode
-
 from cqc_lem.utilities.env_constants import AWS_MYSQL_SECRET_NAME, AWS_REGION
 from cqc_lem.utilities.linkedin.profile import LinkedInProfile
 from cqc_lem.utilities.logger import myprint
 from cqc_lem.utilities.utils import get_top_level_domain, get_aws_ssm_secret
+from dotenv import load_dotenv
+from mysql.connector import errorcode
 
 # Load .env file
 load_dotenv()
@@ -261,12 +260,11 @@ def get_user_id(email: str):
 def insert_post(email: str, content: str, scheduled_time: datetime, post_type: PostType) -> bool:
     user_id = get_user_id(email)
 
-    success=False
+    success = False
 
     if not user_id:
         print(f"User with email {email} not found.")
         return success
-
 
     connection = get_db_connection()
     cursor = connection.cursor()
@@ -300,7 +298,6 @@ def insert_planned_post(user_id: int, scheduled_time: datetime, post_type: PostT
     cursor = connection.cursor()
 
     success = False
-
 
     try:
         # Convert scheduled_time to UTC
@@ -339,7 +336,6 @@ def update_db_post(content: str, video_url: str, scheduled_time: datetime, post_
             scheduled_time = scheduled_time.replace(tzinfo=timezone.utc)
         else:
             scheduled_time = scheduled_time.astimezone(timezone.utc)
-
 
         cursor.execute(
             "UPDATE posts SET content = %s, video_url = %s, scheduled_time =%s, post_type = %s, status = %s WHERE id = %s",
@@ -498,6 +494,24 @@ def get_post_content(post_id: int):
     return post['content'] if post else None
 
 
+def get_post_user_id(post_id: int):
+    connection = get_db_connection()
+    cursor = connection.cursor(dictionary=True)
+
+    try:
+        cursor.execute("SELECT user_id FROM posts WHERE id = %s", (post_id,))
+
+        post = cursor.fetchone()
+    except mysql.connector.Error as err:
+        myprint(f"Could not get post user id for post id: {post_id} | Error: {err}")
+        post = False
+    finally:
+        cursor.close()
+        connection.close()
+
+    return post['user_id'] if post else None
+
+
 def get_post_video_url(post_id: int):
     connection = get_db_connection()
     cursor = connection.cursor(dictionary=True)
@@ -507,7 +521,7 @@ def get_post_video_url(post_id: int):
 
         post = cursor.fetchone()
     except mysql.connector.Error as err:
-        myprint(f"Could not get post video url for post id: {post_id} | Error: {err}")
+        myprint(f"Could not get post video_url for post id: {post_id} | Error: {err}")
         post = False
     finally:
         cursor.close()

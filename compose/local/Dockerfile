@@ -97,4 +97,15 @@ RUN chmod +x /entrypoint /wait-for-it /start-streamlit /start-fastapi \
     /start-celerybeat /start-flower /start-flower-no-wait && \
     mkdir -p /app/logs
 
+
+# Create non-root user during build
+RUN useradd -m -s /bin/bash celeryworker
+# Create the .aws directory for the non-root user and set correct ownership during build
+RUN chown -R celeryworker:celeryworker /app && \
+    mkdir -p /home/celeryworker/.aws && \
+    chown -R celeryworker:celeryworker /home/celeryworker/.aws && \
+    mkdir -p /app/logs && \
+    chown -R celeryworker:celeryworker /app/logs && \
+    chmod 755 /app/logs
+
 ENTRYPOINT ["/entrypoint"]

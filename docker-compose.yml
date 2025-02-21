@@ -105,7 +105,8 @@ services:
         reservations:
           cpus: '2'   # Reserve at least 2 CPUs for this container
     #restart: always
-    #volumes:
+    volumes:
+      - ~/.aws:/home/celeryworker/.aws:ro  # read-only mount
       # Below used to override the start
       #- ./compose/local/celery/worker/start:/start-celeryworker
     volumes_from:

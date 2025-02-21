@@ -23,9 +23,11 @@ def deploy_stacks_in_order():
     elif stack_flag:
         stack_index = sys.argv.index('--stack')
         stack_name = sys.argv[stack_index + 1]
-        print(f"Deploying Stack: {stack_name}")
-        subprocess.run(['npx', '-p', 'node@22', 'cdk', 'deploy', '--require-approval', 'never', stack_name], check=False)
-    else:
+        print(f"Deploying Stack(s): {stack_name}")
+        # Split the stack names into a list and extend the command
+        stack_names = stack_name.split()
+        command = ['npx', '-p', 'node@22', 'cdk', 'deploy', '--require-approval', 'never'] + stack_names
+        subprocess.run(command, check=False)
         with open('cdk.json') as f:
             print(f"Deploying Sequentially")
             config = json.load(f)
