@@ -89,7 +89,7 @@ class EFSStack(NestedStack):
             read_only=False,
         )
         self.celery_flower_data_mount_point = ecs.MountPoint(
-            container_path='/flower/data',
+            container_path='/data',
             source_volume=self.efs_volume_name,
             read_only=False,
         )

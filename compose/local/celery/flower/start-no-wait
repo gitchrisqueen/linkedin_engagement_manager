@@ -3,6 +3,8 @@
 set -o errexit
 set -o nounset
 
+
+
 celery --app cqc_lem.app.my_celery \
   --broker="${CELERY_BROKER_URL}" \
   flower \
@@ -10,7 +12,7 @@ celery --app cqc_lem.app.my_celery \
   --broker-api="${CELERY_BROKER_URL}" \
   --logging="DEBUG" \
   --logfile="/app/logs" \
-  --state_save_interval=5000 \
+  --state_save_interval="${CELERY_FLOWER_STATE_SAVE_INTERVAL}" \
   --persistent=True \
   --db=/data/flower.db \
   --debug=True &

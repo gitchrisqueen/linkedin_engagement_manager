@@ -21,6 +21,11 @@ WORKDIR /app
 
 FROM base AS builder
 
+# Create arg to install dev dependencies
+ARG INSTALL_DEV_DEPS=false
+# Set the env variable to use in the next stage
+ENV INSTALL_DEV_DEPS=${INSTALL_DEV_DEPS}
+
 # --- Install Poetry ---
 ARG POETRY_VERSION=2.0
 
@@ -45,7 +50,12 @@ COPY ./pyproject.toml ./poetry.lock ./
 
 # Install the dependencies and clear the cache afterwards.
 #   This may save some MBs.
-RUN poetry install --no-root && rm -rf $POETRY_CACHE_DIR
+RUN if [ "$INSTALL_DEV_DEPS" = "true" ]; then \
+    poetry install --with dev --no-root  && rm -rf $POETRY_CACHE_DIR; \
+    else \
+    poetry install --only main --no-root  && rm -rf $POETRY_CACHE_DIR; \
+    fi
+
 
 
 # Now let's build the runtime image from the builder.
@@ -61,7 +71,11 @@ COPY ./README.md ./README.md
 
 # Install our package and clear the cache afterwards.
 #   This may save some MBs.
-RUN poetry install --only main && rm -rf $POETRY_CACHE_DIR
+RUN if [ "$INSTALL_DEV_DEPS" = "true" ]; then \
+    poetry install --with dev && rm -rf $POETRY_CACHE_DIR; \
+    else \
+    poetry install --only main && rm -rf $POETRY_CACHE_DIR; \
+    fi
 
 FROM my_app_code AS final
 

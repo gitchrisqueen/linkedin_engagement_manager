@@ -5,6 +5,8 @@ services:
       context: .
       #context: https://github.com/gitchrisqueen/linkedin_engagement_manager.git
       dockerfile: ./compose/local/Dockerfile
+      args:
+        - INSTALL_DEV_DEPS=${INSTALL_DEV_DEPS}
     image: "${DOCKER_IMAGE_NAME}:latest"
     container_name: web_app
     command: /start-streamlit

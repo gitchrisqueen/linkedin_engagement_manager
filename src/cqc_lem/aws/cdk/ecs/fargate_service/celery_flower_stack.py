@@ -45,6 +45,7 @@ class CeleryFlowerStack(Stack):
                                                                     "CELERY_BROKER_URL": f"redis://{props.redis_url}:{props.redis_port}/0",
                                                                     "CELERY_RESULT_BACKEND": f"redis://{props.redis_url}:{props.redis_port}/1",
                                                                     "CELERY_FLOWER_PORT": str(props.celery_flower_port),
+                                                                    "CELERY_FLOWER_STATE_SAVE_INTERVAL": str(1000*60*15),  # 15 minutes
                                                                     "TZ": props.tz,
                                                                     # "CELERY_ENABLE_UTC": "True",
                                                                     "CELERY_TIMEZONE": props.tz,

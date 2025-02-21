@@ -138,7 +138,7 @@ def get_aws_client(service_name: str, region_name:str):
         region_name=region_name
     )
 
-def get_cloudwatch_client(region:str):
+def get_cloudwatch_client(region:str = 'us-east-1'):
     return get_aws_client('cloudwatch', region)
 
 def get_aws_ssm_secret(secret_name, region_name):

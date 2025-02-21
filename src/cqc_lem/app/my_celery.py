@@ -124,9 +124,10 @@ def init_celery_tracing(*args, **kwargs):
 
 def get_queue_metric(name_space: str = 'cqc-lem/celery_queue/celery', metric_name: str = 'QueueLength',
                      period: int = 60, time_delta_minutes: int = 1, statistics: str = "Maximum") -> int:
-    cloudwatch = get_cloudwatch_client(AWS_REGION)
 
     try:
+        cloudwatch = get_cloudwatch_client(AWS_REGION)
+
         response = cloudwatch.get_metric_statistics(
             Namespace=name_space,
             MetricName=metric_name,
@@ -172,9 +173,9 @@ def update_queue_length_metric(sender=None, headers=None, **kwargs) -> int:
     #print(f"Total tasks found: {total_tasks}")
 
 
-    cloudwatch = get_cloudwatch_client(AWS_REGION)
-
     try:
+        cloudwatch = get_cloudwatch_client(AWS_REGION)
+
         # Push metric to CloudWatch
         cloudwatch.put_metric_data(
             Namespace=name_space,
@@ -200,56 +201,3 @@ def update_queue_length_metric(sender=None, headers=None, **kwargs) -> int:
         logger.error(f"Failed to publish metric: {str(e)}")
 
     return total_tasks
-
-'''
-@task_sent.connect
-def task_sent_handler(sender=None, headers=None, **kwargs):
-    base_namespace = "cqc-lem/celery_queue/"
-    queue_name = getattr(sender, 'queue', 'celery')
-    name_space = base_namespace + queue_name
-    current_length = get_queue_metric(name_space=name_space)
-    new_length = current_length + 1
-
-    cloudwatch = get_cloudwatch_client(AWS_REGION)
-
-    try:
-        cloudwatch.put_metric_data(
-            Namespace=name_space,
-            MetricData=[{
-                'MetricName': 'QueueLength',
-                'Value': new_length,
-                'Unit': 'Count'
-            }]
-        )
-        logger.info(
-            f"Successfully published metric to CloudWatch: Queue length [{queue_name}]: {new_length}")
-    except Exception as e:
-        logger.error(f"Failed to publish metric: {str(e)}")
-
-
-@task_received.connect
-@task_success.connect
-def update_queue_length(sender=None, headers=None, **kwargs):
-    base_namespace = "cqc-lem/celery_queue/"
-    queue_name = getattr(sender, 'queue', 'celery')
-    name_space = base_namespace + queue_name
-    current_length = get_queue_metric(name_space=name_space)
-    new_length = max(0, current_length - 1)
-
-    logger.info(f"Task received/completed. Queue length [{queue_name}]: {new_length}")
-
-    cloudwatch = get_cloudwatch_client(AWS_REGION)
-
-    try:
-        cloudwatch.put_metric_data(
-            Namespace=name_space,
-            MetricData=[{
-                'MetricName': 'QueueLength',
-                'Value': new_length,
-                'Unit': 'Count'
-            }]
-        )
-        logger.info("Successfully published metric to CloudWatch")
-    except Exception as e:
-        logger.error(f"Failed to publish metric: {str(e)}")
-'''

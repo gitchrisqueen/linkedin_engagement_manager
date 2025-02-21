@@ -58,7 +58,6 @@ flower = "^2.0.1"  # Celery monitoring
 # AWS
 boto3 = "^1.36.7"
 
-
 [tool.poetry.group.dev]
 optional = true
 
