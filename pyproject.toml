@@ -9,75 +9,84 @@ packages = [
 ]
 
 [tool.poetry.dependencies]
-
 python = ">=3.12,<4.0"
-# Core libraries
+# Core Application Dependencies
 selenium = "^4.25"
-chromedriver-autoinstaller = "^0.6"
-chromium = "^0.0"
-webdriver-manager = "^4.0"
-pyvirtualdisplay = "^3.0"
 mysql-connector-python = "^9.1"
 python-dotenv = "^1.0"
-
-# OpenAI
 openai = "^1.52.2"
+fastapi = "^0.115.4"
+linkedin-api-client = "^0.3.0"
+uvicorn = "^0.32.0"
+celery = {version = "^5.4.0", extras = ["redis"]}
+redis = "^5.2.0"
+bs4 = "^0.0.2"
+pandas = "^2.2.3"
+dateparser = "^1.2.0"
+requests = "^2.32.3"
+pydantic-extra-types = "^2.10.0"
+celery-once = {git = "https://github.com/gitchrisqueen/celery-once.git"}
 
-
-# Stream lit and compnents
+# Frontend/UI Dependencies
 streamlit = ">=1.39,<1.40.0 || >1.40.1,<2.0"
 streamlit-ext = "^0.1"
 streamlit-elements = "^0.1"
 extra-streamlit-components = "^0.1"
 streamlit-aggrid = "^1.0"
 
-# Aditional dependencies
-os-env = "^0.3"
-typing-extensions = "^4.12.2"
-bs4 = "^0.0.2"
-pandas = "^2.2.3"
-datetime = "^5.5"
-dateparser = "^1.2.0"
-celery = {version = "^5.4.0", extras = ["redis"]}
-fastapi = "^0.115.4"
-uvicorn = "^0.32.0"
+# Content Processing
 markdownify = "^0.13.1"
-flower = "^2.0.1"
-redis = "^5.2.0"
-watchdog = "^5.0.3"
-requests = "^2.32.3"
 tldextract = "^5.1.2"
 nltk = "^3.9.1"
 fpdf = "^1.7.2"
-linkedin-api-client = "^0.3.0"
 python-pptx = "^1.0.2"
-pydantic-extra-types = "^2.10.0"
+mammoth = "^1.8.0"
+docx = "^0.2.4"
+pycurl = "^7.45.4"
+
+# AI/ML Development Tools
+googlenews = "^1.6.15"
+runwayml = "^2.1.0"
+#huggingface-hub = "^0.26.2"
+#gradio-client = "^1.4.3"
+replicate = "^1.0.4"
+pexels-api = "^1.0.1"
+
+# Monitoring
+flower = "^2.0.1"  # Celery monitoring
+
+# AWS
+boto3 = "^1.36.7"
+
+
+[tool.poetry.group.dev]
+optional = true
+
+[tool.poetry.group.dev.dependencies]
+# Development Tools
+jupyter = "^1.0.0"
+setuptools = "^67.6.1"
+grandalf = "^0.8"
+#flower = "^2.0.1"  # Celery monitoring
+watchdog = "^5.0.3"
+typing-extensions = "^4.12.2"
+os-env = "^0.3"  # Redundant with python-dotenv
+datetime = "^5.5"  # Built-in module
+
+# AWS Development Tools
+aws-cdk-lib = "^2.177.0"
+constructs = "^10.4.2"
+#boto3 = "^1.36.7"
+cdk-ecr-deployment = "^3.1.8"
+aws-cdk-aws-amplify-alpha = "^2.177.0a0"
+aws-cdk-aws-lambda-python-alpha = "^2.177.0a0"
+
+# Observability Tools (Development)
 opentelemetry-api = "^1.28.2"
 opentelemetry-sdk = "^1.28.2"
 opentelemetry-instrumentation-celery = "^0.49b2"
 opentelemetry-exporter-otlp = "^1.28.2"
 opentelemetry-instrumentation-fastapi = "^0.49b2"
-pexels-api = "^1.0.1"
-mammoth = "^1.8.0"
-docx = "^0.2.4"
-googlenews = "^1.6.15"
-gradio-client = "^1.4.3"
-runwayml = "^2.1.0"
-huggingface-hub = "^0.26.2"
-replicate = "^1.0.4"
-celery-once = {git = "https://github.com/gitchrisqueen/celery-once.git"}
-pycurl = "^7.45.4"
-
-# AWS CDK Libs
-aws-cdk-lib = "^2.177.0"
-constructs = "^10.4.2"
-boto3 = "^1.36.7"
-cdk-ecr-deployment = "^3.1.8"
-
-aws-cdk-aws-amplify-alpha = "^2.177.0a0"
-aws-cdk-aws-lambda-python-alpha = "^2.177.0a0"
-
-
 
 
 [tool.poetry.group.lint]
@@ -85,15 +94,6 @@ optional = true
 
 [tool.poetry.group.lint.dependencies]
 ruff = "^0.1.5"
-
-[tool.poetry.group.dev]
-optional = true
-
-[tool.poetry.group.dev.dependencies]
-jupyter = "^1.0.0"
-setuptools = "^67.6.1"
-grandalf = "^0.8"
-
 
 [tool.poetry.group.test]
 optional = true

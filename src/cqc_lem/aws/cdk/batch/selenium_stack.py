@@ -478,6 +478,7 @@ class SeleniumStack(Stack):
             cluster=cluster,
             task_definition=task_definition,
             desired_count=1,
+            # VVV - Better for zero-downtime deployments - VVV
             min_healthy_percent=100,
             max_healthy_percent=200,
             health_check_grace_period=Duration.seconds(90),

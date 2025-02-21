@@ -111,8 +111,9 @@ class CeleryWorkerStack(Stack):
             enable_execute_command=False,  # Reduces metrics
             task_definition=task_definition,
             desired_count=1,
-            max_healthy_percent=200,
-            min_healthy_percent=100,
+            # VVV - Forces a "stop-then-start" deployment pattern - VVV
+            max_healthy_percent=100,
+            min_healthy_percent=50,
             vpc_subnets=ec2.SubnetSelection(one_per_az=True, subnet_type=ec2.SubnetType.PRIVATE_WITH_EGRESS),
             security_groups=[props.ecs_security_group,
                              props.get('sel_hub_sg')  # Need the hub security group to allow ingress

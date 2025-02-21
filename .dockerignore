@@ -1,0 +1,98 @@
+# Python specific
+*.py[cod]
+__pycache__/
+*.so
+.Python
+*.pyc
+*.pyo
+*.pyd
+.pytest_cache/
+.coverage
+coverage.xml
+*.cover
+.hypothesis/
+.mypy_cache/
+nosetests.xml
+
+# Virtual Environment
+.env
+.venv/
+venv/
+ENV/
+env/
+pip-log.txt
+pip-delete-this-directory.txt
+
+# Application specific
+src/cqc_lem/assets/
+src/cqc_lem/aws/
+
+# Development and IDE
+.git/
+.gitignore
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Build and Distribution
+dist/
+build/
+*.egg-info/
+wheels/
+.eggs/
+.tox/
+.installed.cfg
+*.egg
+
+# Test and Documentation
+test/
+tests/
+htmlcov/
+.coverage
+.coverage.*
+coverage.xml
+*.cover
+.pytest_cache/
+
+# Temporary and Log files
+logs/
+*.log
+*.tmp
+*.temp
+*.swp
+*.swo
+tmp/
+temp/
+
+# Docker specific
+Dockerfile
+.dockerignore
+docker-compose*.yml
+.docker/
+
+# Documentation
+docs/
+*.md
+!README.md
+
+# Cache directories
+.cache/
+.npm/
+.yarn/
+
+# Local development
+*.local
+local_settings.py
+*.sqlite3
+*.db
+
+# Poetry specific
+# poetry.lock
+# poetry.toml
+
+# Jupyter Notebook
+.ipynb_checkpoints
+*.ipynb

@@ -5,7 +5,6 @@ from celery import current_app
 from celery.schedules import crontab
 from celery.signals import worker_process_init, task_received, task_success, task_sent
 from celery.app.control import Inspect
-from opentelemetry.instrumentation.celery import CeleryInstrumentor
 
 from cqc_lem.app import celeryconfig
 from cqc_lem.app.celeryconfig import broker_url
@@ -37,7 +36,9 @@ app.conf.ONCE = {
     'backend': 'celery_once.backends.Redis',  # TODO: What should this be for AWS SQS
     'settings': {
         'url': broker_url,
-        'default_timeout': 60 * 60
+        'default_timeout': 60 * 60,
+        'blocking': True,
+        'blocking_timeout': 30,
     }
 }
 
@@ -104,14 +105,19 @@ def restore_all_unacknowledged_messages(*args, **kwargs):
 @worker_process_init.connect(weak=False)
 def init_celery_tracing(*args, **kwargs):
     if CODE_TRACING:
-        tracer = get_jaeger_tracer("celery_worker", __name__)
 
-        # Instrument Celery
-        ci = CeleryInstrumentor()
-        ci.instrument()
+        try:
+            tracer = get_jaeger_tracer("celery_worker", __name__)
 
-        with tracer.start_as_current_span("init_celery_tracing"):
-            myprint("Instrumented Celery for tracing")
+            # Instrument Celery
+            from opentelemetry.instrumentation.celery import CeleryInstrumentor
+            ci = CeleryInstrumentor()
+            ci.instrument()
+
+            with tracer.start_as_current_span("init_celery_tracing"):
+                myprint("Instrumented Celery for tracing")
+        except ImportError:
+            logger.debug("Celery tracing dependencies not found. Tracing Disabled")
     else:
         myprint("Tracing is disabled")
 

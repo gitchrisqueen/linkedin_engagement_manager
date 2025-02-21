@@ -17,7 +17,6 @@ def deploy_stacks_in_order():
     # Get the --stack flag from the command line arguments
     stack_flag = '--stack' in sys.argv
 
-
     if all_flag:
         print(f"Deploying All Stacks")
         subprocess.run(['npx', '-p', 'node@22', 'cdk', 'deploy', '--require-approval', 'never', '--all'], check=False)

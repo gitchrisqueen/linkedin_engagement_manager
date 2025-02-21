@@ -1,5 +1,4 @@
 FROM python:3.13-slim AS base
-#FROM public.ecr.aws/docker/library/python:3.13-slim AS base
 
 ENV PYTHONFAULTHANDLER=1 \
     PYTHONHASHSEED=random \
@@ -8,20 +7,6 @@ ENV PYTHONFAULTHANDLER=1 \
 
 # Install dependencies
 RUN apt-get update -y && apt-get install --no-install-suggests --no-install-recommends --yes \
-    #curl \
-    #unzip \
-    #xvfb \
-    #libxi6 \
-    #libgconf-2-4 \
-    #build-essential \
-    # Additional dependencies
-    #&& apt-get install -y  \
-    # Below is needed for pptx - Verify these
-    #libgdiplus \
-    #pkg-config \
-    #libicu-dev \
-    #libpython3.13 \
-    # Verify above packages are needed or not \
     # Curl needed for AWS health checks
     curl \
     netcat-traditional \
@@ -29,12 +14,8 @@ RUN apt-get update -y && apt-get install --no-install-suggests --no-install-reco
     && apt-get purge -y --auto-remove -o APT::AutoRemove::RecommendsImportant=false \
     && rm -rf /var/lib/apt/lists/*
 
-# Create a symbolic link for libpython if necessary
-#RUN ln -s /usr/lib/x86_64-linux-gnu/libpython3.13m.so.1.0 /usr/lib/libpython3.13m.so.1.0 || true
-
 # Upgrade Pip
 RUN python3 -m pip install --upgrade pip
-
 
 WORKDIR /app
 
@@ -73,7 +54,6 @@ FROM builder AS my_app_code
 
 ENV VIRTUAL_ENV=/app/.venv
 ENV PATH="/app/.venv/bin:$PATH"
-ENV USE_DOCKER_BROWSER=True
 
 # Copy app src files
 COPY ./src ./src
@@ -81,7 +61,7 @@ COPY ./README.md ./README.md
 
 # Install our package and clear the cache afterwards.
 #   This may save some MBs.
-RUN poetry install && rm -rf $POETRY_CACHE_DIR
+RUN poetry install --only main && rm -rf $POETRY_CACHE_DIR
 
 FROM my_app_code AS final
 
@@ -97,9 +77,10 @@ COPY ./compose/local/celery/beat/start /start-celerybeat
 COPY ./compose/local/celery/flower/start /start-flower
 COPY ./compose/local/celery/flower/start-no-wait /start-flower-no-wait
 
-RUN chmod +x /entrypoint /wait-for-it /start-streamlit /start-fastapi /start-fastapi-cloud /start-celeryworker /start-celeryworker-solo /start-celerybeat /start-flower /start-flower-no-wait
-
-# Create a logs folder
-RUN mkdir -p /app/logs
+# Set permissions and create logs directory
+RUN chmod +x /entrypoint /wait-for-it /start-streamlit /start-fastapi \
+    /start-fastapi-cloud /start-celeryworker /start-celeryworker-solo \
+    /start-celerybeat /start-flower /start-flower-no-wait && \
+    mkdir -p /app/logs
 
 ENTRYPOINT ["/entrypoint"]

@@ -9,7 +9,6 @@ from aws_cdk import (
 )
 from aws_cdk.aws_ecr_assets import DockerImageAsset, Platform
 from constructs import Construct
-
 from cqc_lem import build_dir
 
 
@@ -23,7 +22,14 @@ class EcrStack(NestedStack):
         repository = ecr.Repository(self, "Repository",
                                     repository_name="cqc-lem",
                                     removal_policy=RemovalPolicy.DESTROY,
-                                    empty_on_delete=True)
+                                    empty_on_delete=True,
+                                    lifecycle_rules=[
+                                        ecr.LifecycleRule(
+                                            max_image_count=5,  # Keep only the 5 most recent images
+                                            description="Cleanup old images"
+                                        )
+                                    ]
+                                    )
 
         # Create timestamp to add and create unique asset_name
         timestamp = (datetime.now()).strftime("%Y%m%d%H%M%S")
@@ -37,12 +43,36 @@ class EcrStack(NestedStack):
                                         exclude=[
                                             '**/.*/*',
                                             '**/_CL/**/*',
-                                            # '**/compose/**/*',
                                             '**/docs/**/*',
                                             '**/logs/**/*',
                                             '**/src/cqc_lem/aws/**/*',
                                             '**/src/cqc_lem/assets/**/*',
                                             '**/test/**/*',
+                                            # Additional recommended exclusions
+                                            '**/__pycache__',
+                                            '**/*.pyc',
+                                            '**/*.pyo',
+                                            '**/*.pyd',
+                                            '.pytest_cache',
+                                            '.coverage',
+                                            '.git',
+                                            '.gitignore',
+                                            '.env',
+                                            '.venv',
+                                            'venv',
+                                            'ENV',
+                                            'dist',
+                                            'build',
+                                            '**/*.egg-info',
+                                            '.idea',
+                                            '.vscode',
+                                            'docker-compose*.yml',
+                                            'Dockerfile',
+                                            '.dockerignore',
+                                            'htmlcov',
+                                            '**/*.log',
+                                            '**/*.swp',
+                                            '**/*.swo'
                                         ],
                                         build_args={
                                             # "API_BASE_URL_BUILD_ARG": "http://api.cqc-lem.local:8000", #TODO Need the public url cause this not working

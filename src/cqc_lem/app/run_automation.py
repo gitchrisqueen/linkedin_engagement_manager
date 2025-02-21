@@ -459,7 +459,7 @@ def automate_commenting(self, user_id: int, loop_for_duration: int = None, futur
 
 
 
-@shared_task.task(bind=True, base=QueueOnce, once={'graceful': True, 'unlock_before_run': True, 'keys': ['user_id', 'post_id']})
+@shared_task.task(bind=True, base=QueueOnce, once={'graceful': True, 'keys': ['user_id', 'post_id', 'future_forward']})
 def automate_reply_commenting(self, user_id: int, post_id: int, loop_for_duration: int = 60, future_forward=0):
     """Reply to recent comments left on the post recently posted"""
 

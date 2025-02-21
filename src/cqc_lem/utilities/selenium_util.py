@@ -1,28 +1,21 @@
 import json
-import random
-import shutil
 import time
 from datetime import datetime, timedelta
 
 import requests
 import selenium
-from pyvirtualdisplay import Display
+from cqc_lem.utilities.env_constants import *
+from cqc_lem.utilities.logger import myprint
 from selenium import webdriver
 from selenium.common import JavascriptException, ElementNotInteractableException, StaleElementReferenceException, \
     TimeoutException, WebDriverException, NoSuchElementException, SessionNotCreatedException
 from selenium.webdriver import ActionChains
 from selenium.webdriver.chrome.options import Options
-from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.common.by import By
 from selenium.webdriver.remote.webdriver import WebDriver
 from selenium.webdriver.remote.webelement import WebElement
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.support.wait import WebDriverWait
-from webdriver_manager.chrome import ChromeDriverManager
-
-from cqc_lem.utilities.env_constants import *
-from cqc_lem.utilities.logger import myprint
-from cqc_lem.utilities.utils import create_folder_if_not_exists
 
 
 def quit_gracefully(driver: WebDriver):
@@ -89,7 +82,7 @@ def get_docker_driver(headless=True, session_name: str = "ChromeTests"):
 
     driver = webdriver.Remote(
         command_executor=f'http://{SELENIUM_HUB_HOST}:{SELENIUM_HUB_PORT}',  # Works
-        #command_executor=f'http://{SELENIUM_HUB_HOST}:4444',  # Works
+        # command_executor=f'http://{SELENIUM_HUB_HOST}:4444',  # Works
         options=options
     )
 
@@ -147,91 +140,12 @@ def getBaseOptions(base_download_directory: str = None):
         "user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.6723.91 Safari/537.36"
     )
 
-    #options.set_capability("browserVersion", "100.0")  # This is needed for this version
+    # options.set_capability("browserVersion", "100.0")  # This is needed for this version
 
     # options.page_load_strategy = 'eager'  # interactive
     # options.page_load_strategy = "normal"  # complete
 
     return options
-
-
-def create_driver(headless: bool = HEADLESS_BROWSER, create_copy: bool = False, port: int = 9515):
-    # Setup Selenium options (headless for Docker use)
-    options = Options()
-    if headless:
-        options.add_argument('--headless')  # Run in headless mode for Docker
-        display = Display(visible=False, size=(800, 800))
-        display.start()
-
-    driver_path = ChromeDriverManager().install()
-    print(f"Chrome Driver Path: {driver_path}")
-
-    service = Service(driver_path, port=port)
-
-    options.add_argument('--disable-gpu')
-    options.add_argument('--no-sandbox')
-    options.add_argument('--disable-dev-shm-usage')
-
-    debugging_port = int(9222 + (port - 9515))
-    debugging_port = 9222  # Keep the same to see what happens
-    myprint(f"Debugging port: {debugging_port}")
-    options.add_argument('--remote-debugging-port=' + str(
-        debugging_port))  # This is to avoid DevToolsActivePort file doesn't exist error
-    options.add_experimental_option("detach", False)  # Change if you want to close when program ends
-
-    # Options to make us undetectable (Review https://amiunique.org/fingerprint from the browser to verify)
-    options.add_argument("window-size=1280,800")
-    options.add_argument(
-        "user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/74.0.3729.169 Safari/537.36")
-
-    if not headless:
-
-        # Create a sub_folder for the current user to use as the profile folder
-        # Get the directory of the current file
-        current_dir = os.path.dirname(os.path.abspath(__file__))
-
-        # Define the local path relative to the current file
-        profile_folder_path = os.path.join(current_dir, 'selenium_profiles')
-
-        create_folder_if_not_exists(profile_folder_path)
-
-        # If create_copy the copy the folder to a second folder using timestamp and random number
-        if create_copy:
-            timestamp = datetime.now().strftime("%Y%m%d%H%M%S")
-            random_number = random.randint(1000, 9999)
-            profile_folder_path_copy = os.path.join(current_dir, 'selenium_profiles',
-                                                    f"{LI_USER}_{timestamp}_{random_number}")
-
-            def ignore_socket_files(dir, files):
-                return [f for f in files if
-                        os.path.islink(os.path.join(dir, f)) or os.path.ismount(os.path.join(dir, f))]
-
-            if os.path.exists(profile_folder_path):
-                shutil.copytree(profile_folder_path, profile_folder_path_copy, ignore_dangling_symlinks=True,
-                                dirs_exist_ok=True, ignore=ignore_socket_files)
-                myprint(f"Profile folder copied to: {profile_folder_path_copy}")
-                profile_folder_path = profile_folder_path_copy
-            else:
-                myprint(f"Source directory does not exist: {profile_folder_path}")
-
-        # Set up the Chrome driver options
-        # Note: This will create a new profile for each run (not shared between runs)
-        # options.add_argument("--user-data-dir=" + profile_folder_path)  # This is to keep the browser logged in between runs
-        options.add_argument(
-            "user-data-dir=" + str(profile_folder_path))  # This is to keep the browser logged in between runs
-        options.add_argument("--profile-directory=" + LI_USER)
-
-    # Set up the Chrome driver
-    driver = webdriver.Chrome(service=service, options=options)
-
-    try:
-        # Remove navigator.webdriver Flag using JavaScript
-        driver.execute_script("Object.defineProperty(navigator, 'webdriver', {get: () => undefined})")
-    except JavascriptException as je:
-        myprint(f"Error while removing navigator.webdriver flag: {je}")
-        pass
-
-    return driver
 
 
 def click_element_wait_retry(driver: WebDriver, wait: WebDriverWait, find_by_value: str, wait_text: str,
@@ -409,18 +323,15 @@ def get_driver_wait(driver):
 
 def get_driver_wait_pair(headless=False, session_name: str = "ChromeTests", max_retry=3):
     # Create the driver
-    if USE_DOCKER_BROWSER:
-        for attempt in range(max_retry):
-            try:
-                driver = get_docker_driver(headless=headless, session_name=session_name)
-                break  # Exit the loop if successful
-            except SessionNotCreatedException as e:
-                if attempt == max_retry - 1:
-                    raise e  # Raise the exception if max retries reached
-                wait_time = 30 * (2 ** attempt)  # Exponential backoff starting at 30 seconds
-                time.sleep(wait_time)  # Wait before retrying
-    else:
-        driver = create_driver(headless=headless)
+    for attempt in range(max_retry):
+        try:
+            driver = get_docker_driver(headless=headless, session_name=session_name)
+            break  # Exit the loop if successful
+        except SessionNotCreatedException as e:
+            if attempt == max_retry - 1:
+                raise e  # Raise the exception if max retries reached
+            wait_time = 30 * (2 ** attempt)  # Exponential backoff starting at 30 seconds
+            time.sleep(wait_time)  # Wait before retrying
 
     wait = get_driver_wait(driver)
 
@@ -438,7 +349,7 @@ def get_driver_wait_pair(headless=False, session_name: str = "ChromeTests", max_
 
 
 def clear_sessions():
-    #base_url = f"http://{SELENIUM_HUB_HOST}:4444"
+    # base_url = f"http://{SELENIUM_HUB_HOST}:4444"
     base_url = f"http://{SELENIUM_HUB_HOST}:{SELENIUM_HUB_PORT}"
     response = requests.get(f"{base_url}/status")
     data = json.loads(response.text)

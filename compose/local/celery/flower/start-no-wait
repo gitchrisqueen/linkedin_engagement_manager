@@ -10,6 +10,9 @@ celery --app cqc_lem.app.my_celery \
   --broker-api="${CELERY_BROKER_URL}" \
   --logging="DEBUG" \
   --logfile="/app/logs" \
+  --state_save_interval=5000 \
+  --persistent=True \
+  --db=/data/flower.db \
   --debug=True &
 
   # TODO: Get the db state working

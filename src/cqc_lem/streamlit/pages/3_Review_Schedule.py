@@ -6,11 +6,10 @@ import pandas as pd
 import pytz
 import requests
 import streamlit as st
-from st_aggrid import AgGrid, GridOptionsBuilder, DataReturnMode, GridUpdateMode
-
 from cqc_lem.utilities.db import PostStatus
-from cqc_lem.utilities.env_constants import API_BASE_URL, API_PORT, LINKEDIN_PREVIEW_URL, CODE_TRACING, TZ
+from cqc_lem.utilities.env_constants import LINKEDIN_PREVIEW_URL, CODE_TRACING, TZ, API_URL_FINAL
 from cqc_lem.utilities.jaeger_tracer_helper import get_jaeger_tracer
+from st_aggrid import AgGrid, GridOptionsBuilder, DataReturnMode, GridUpdateMode
 
 # Change layout to wide
 st.set_page_config(layout="wide")
@@ -22,17 +21,14 @@ if "email" not in st.session_state:
 if "posts" not in st.session_state:
     st.session_state.posts = []
 
-
-api_base_and_port = f"{API_BASE_URL}:{API_PORT}"
-
 # API endpoint to get posts
-GET_POSTS_URL = api_base_and_port + "/posts/"
+GET_POSTS_URL = API_URL_FINAL + "/posts/"
 # API endpoint to update posts
-UPDATE_POST_URL = api_base_and_port + "/update_post/"
+UPDATE_POST_URL = API_URL_FINAL + "/update_post/"
 # API endpoint to get user id
-GET_USER_ID_URL = api_base_and_port + "/user_id/"
+GET_USER_ID_URL = API_URL_FINAL + "/user_id/"
 # API endpoint to create user weekly content
-CREATE_WEEKLY_CONTENT_URL = api_base_and_port + "/create_weekly_content/"
+CREATE_WEEKLY_CONTENT_URL = API_URL_FINAL + "/create_weekly_content/"
 
 st.title("Review and Edit Scheduled Posts")
 
@@ -52,6 +48,7 @@ def create_weekly_content(user_id):
 
 def console_update():
     print("Updating the console")
+
 
 with (tracer.start_as_current_span("review_schedule") if tracer else nullcontext()):
     # On email address change make the call to get posts

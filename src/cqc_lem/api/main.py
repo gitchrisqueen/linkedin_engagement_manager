@@ -4,15 +4,6 @@ from typing import BinaryIO, Union
 from typing import Optional, Any
 from urllib.parse import urlparse, urlunparse
 
-from fastapi import FastAPI, HTTPException, Request, status
-from fastapi.responses import FileResponse
-from fastapi.responses import RedirectResponse
-from fastapi.responses import StreamingResponse
-from linkedin_api.clients.auth.client import AuthClient
-from linkedin_api.clients.restli.client import RestliClient
-from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
-from pydantic import BaseModel, computed_field
-
 from cqc_lem import assets_dir
 from cqc_lem.app.aws_test_celery_task import test_get_my_profile
 from cqc_lem.app.run_automation import automate_invites_to_company_page_for_user
@@ -21,16 +12,28 @@ from cqc_lem.utilities.db import insert_post, get_post_by_email, get_user_id, up
     add_user_with_access_token, PostType, PostStatus
 from cqc_lem.utilities.env_constants import CODE_TRACING, LI_CLIENT_ID, LI_CLIENT_SECRET, LI_REDIRECT_URL, LI_STATE_SALT
 from cqc_lem.utilities.jaeger_tracer_helper import get_jaeger_tracer
-from cqc_lem.utilities.logger import myprint
+from cqc_lem.utilities.logger import myprint, logger
 from cqc_lem.utilities.mime_type_helper import get_file_mime_type
 from cqc_lem.utilities.utils import get_file_extension_from_filepath
+from fastapi import FastAPI, HTTPException, Request, status
+from fastapi.responses import FileResponse
+from fastapi.responses import RedirectResponse
+from fastapi.responses import StreamingResponse
+from linkedin_api.clients.auth.client import AuthClient
+from linkedin_api.clients.restli.client import RestliClient
+from pydantic import BaseModel, computed_field
 
 app = FastAPI()
 
 if CODE_TRACING:
-    tracer = get_jaeger_tracer("api", __name__)
-    # Instrument FastAPI
-    FastAPIInstrumentor.instrument_app(app)
+    try:
+        tracer = get_jaeger_tracer("api", __name__)
+        # Instrument FastAPI
+        from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
+
+        FastAPIInstrumentor.instrument_app(app)
+    except ImportError:
+        logger.debug("OpenTelemetry tracing dependencies not found. Tracing Disabled")
 
 error_responses = {
     400: {"description": "Bad Request"},
@@ -255,8 +258,7 @@ def linkedin_callback(code: str, state: str = None) -> Union[ResponseModel, Redi
 
         # If ENV variable NGROK_CUSTOM_DOMAIN is set, use it as the final redirect URL
         if os.environ.get('NGROK_CUSTOM_DOMAIN'):
-            final_redirect_url = "http://"+os.environ.get('NGROK_CUSTOM_DOMAIN') + '/My_Account'
-
+            final_redirect_url = "http://" + os.environ.get('NGROK_CUSTOM_DOMAIN') + '/My_Account'
 
         # final_redirect_url = os.environ.get('NGROK_CUSTOM_DOMAIN')
         return RedirectResponse(url=final_redirect_url)

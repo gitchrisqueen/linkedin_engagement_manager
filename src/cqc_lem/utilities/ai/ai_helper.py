@@ -5,17 +5,14 @@ import time
 
 import openai
 import replicate
-from dotenv import load_dotenv
-from gradio_client import Client as GCLIENT
-from huggingface_hub import login
-from runwayml import RunwayML
-
 from cqc_lem import assets_dir
-from cqc_lem.utilities.linkedin.profile import LinkedInProfile
 from cqc_lem.utilities.ai.client import client
 from cqc_lem.utilities.ai.tools import search_recent_news
+from cqc_lem.utilities.linkedin.profile import LinkedInProfile
 from cqc_lem.utilities.logger import myprint
 from cqc_lem.utilities.utils import create_folder_if_not_exists, save_video_url_to_dir
+from dotenv import load_dotenv
+from runwayml import RunwayML
 
 # Load .env file
 load_dotenv()
@@ -642,7 +639,8 @@ def get_thought_leadership_post_from_ai(linked_user_profile: LinkedInProfile, bu
     return content
 
 
-def get_industry_trend_analysis_based_on_user_profile(linked_in_profile: LinkedInProfile, limit_to = None, randomize = True):
+def get_industry_trend_analysis_based_on_user_profile(linked_in_profile: LinkedInProfile, limit_to=None,
+                                                      randomize=True):
     my_industries = get_industries_of_profile_from_ai(linked_in_profile, 3)
     myprint(f"Likely Industries: {my_industries}")
 
@@ -1497,46 +1495,6 @@ def get_flux_image_prompt_from_ai(post_content: str):
     return content
 
 
-def get_flux_image_via_huggingface(prompt: str):
-    # Make sure we are logged into hugging face
-    login(token=os.getenv("HF_TOKEN"))
-
-    # gclient = GCLIENT("black-forest-labs/FLUX.1-dev", hf_token=os.getenv("HF_TOKEN"))
-    gclient = GCLIENT("frostbyte07/FLUX.1-dev", hf_token=os.getenv("HF_TOKEN"))
-    # gclient = GCLIENT.duplicate("black-forest-labs/FLUX.1-dev", hf_token=os.getenv("HF_TOKEN"))
-    job = gclient.submit(
-        prompt=prompt,
-        seed=0,
-        randomize_seed=True,
-        width=1024,
-        height=1024,
-        guidance_scale=3.5,
-        num_inference_steps=28,
-        api_name="/infer"
-    )
-
-    while not job.done():
-        print(f"Job still working. Status: {job.status()}")
-        time.sleep(1)
-
-    print(f"Outputs: {job.outputs()}")
-
-    print(f"Result: {job.result()}")  # This is blocking
-
-    job.result()
-
-    # Get the result
-    result = job.result()
-
-    # If result is a tuple return the first item
-    if isinstance(result, tuple):
-        video_file_path = result[0]
-    else:
-        video_file_path = result
-
-    return video_file_path
-
-
 def get_flux_image_via_replicate(prompt: str, ref: str = "black-forest-labs/flux-dev"):
     output = replicate.run(
         ref,
@@ -1562,7 +1520,7 @@ def get_flux_image_via_replicate(prompt: str, ref: str = "black-forest-labs/flux
     url_image_folder = os.path.basename(os.path.dirname(url))
 
     # Save the file to assets/videos/replicate folder
-    save_dir = os.path.join(assets_dir, "images",'replicate',url_image_folder)
+    save_dir = os.path.join(assets_dir, "images", 'replicate', url_image_folder)
 
     print(f"Save to Folder: {save_dir}")
 
@@ -1575,7 +1533,6 @@ def get_flux_image_via_replicate(prompt: str, ref: str = "black-forest-labs/flux
 
 
 def generate_flux1_image_from_prompt(prompt: str):
-
     """
     video_file_path = get_flux_image_via_huggingface(prompt)
 
@@ -1602,7 +1559,6 @@ def generate_flux1_image_from_prompt(prompt: str):
     """
 
     return get_flux_image_via_replicate(prompt)
-
 
 
 def get_runway_ml_video_prompt_from_ai(post_content: str, image_prompt: str):

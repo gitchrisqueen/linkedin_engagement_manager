@@ -6,6 +6,7 @@ export $(grep -v '^#' .env | xargs)
 # Set environment variable NO_PREBUILT_LAMBDA =1
 export NO_PREBUILT_LAMBDA=1
 
+
 echo "Choose deployment option:"
 echo "1) Deploy all stacks at once"
 echo "2) Deploy all stacks sequentially "
@@ -50,3 +51,12 @@ case $choice in
         poetry run python -m cqc_lem.aws.deploy --all
         ;;
 esac
+
+
+echo "Cleaning up old Docker images older than 7 days..."
+docker image prune -a --filter "until=168h" -f
+
+# Remove build cache only
+echo "Cleaning up Docker build cache older than 7 days..."
+docker builder prune --filter "until=168h" -f
+

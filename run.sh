@@ -27,11 +27,13 @@ echo "Generating Prometheus Configs..."
 echo "Starting Docker Containers..."
 docker-compose up -d --remove-orphans
 
-# Step 3: (Optional) Add cleanup commands, if needed
-# docker-compose down
-# Remove docker dangling images
-echo "Removing Dangling Docker Images..."
-docker rmi $(docker images -f dangling=true -q)
+# Step 3:
+echo "Cleaning up old Docker images older than 7 days..."
+docker image prune -a --filter "until=168h" -f
+
+# Remove build cache only
+echo "Cleaning up Docker build cache older than 7 days..."
+docker builder prune --filter "until=168h" -f
 
 printf "\nExecution completed!\n\n"
 
@@ -124,6 +126,9 @@ print_urls() {
 
 # Pass the arrays by reference
 print_urls "titles[@]" "urls[@]"
+
+# Remove Dangling Images
+docker image prune -f --filter "dangling=true"
 
 
 # Step Final: Prompt the user if they want to open all the urls

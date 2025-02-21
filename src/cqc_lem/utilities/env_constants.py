@@ -68,8 +68,11 @@ NGROK_API_PREFIX=get_constant_from_env('NGROK_API_PREFIX')
 # If both NGROK_FREE_DOMAIN and NGROK_API_PREFIX are not None then set API_BASE_URL as the concatenation of both
 if NGROK_FREE_DOMAIN and NGROK_API_PREFIX:
     API_BASE_URL = f"https://{NGROK_API_PREFIX}.{NGROK_FREE_DOMAIN}"
+    API_URL_FINAL = f"{API_BASE_URL}"
 else:
     API_BASE_URL = get_constant_from_env('API_BASE_URL', default_value='http://localhost')
+    API_URL_FINAL = f"{API_BASE_URL}:{API_PORT}"
+
 NGROK_LIPREVIEW_PREFIX=get_constant_from_env('NGROK_LIPREVIEW_PREFIX')
 if NGROK_FREE_DOMAIN and NGROK_LIPREVIEW_PREFIX:
     LINKEDIN_PREVIEW_URL = f"https://{NGROK_LIPREVIEW_PREFIX}.{NGROK_FREE_DOMAIN}"
@@ -77,4 +80,4 @@ else:
     LINKEDIN_PREVIEW_URL = get_constant_from_env('LINKEDIN_PREVIEW_URL', default_value='http://localhost:8081')
 
 # Set other constants here
-USE_DOCKER_BROWSER = isTrue(get_constant_from_env('USE_DOCKER_BROWSER', default_value='False'))
+USE_DOCKER_BROWSER = isTrue(get_constant_from_env('USE_DOCKER_BROWSER', default_value='True'))

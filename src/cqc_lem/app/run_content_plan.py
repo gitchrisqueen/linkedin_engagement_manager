@@ -690,6 +690,8 @@ def auto_create_weekly_content(user_id: int = None):
             # Get the file name from the video file path
             video_file_name = os.path.basename(video_file_path)
 
+
+
             # The video url is our api prefix + 'assets?file=videos/runwayml' +  video_file_name
             api_video_url = f"{API_BASE_URL}:{API_PORT}/assets?file_name=videos/runwayml/{video_file_name}"
             myprint(f"Video URL: {api_video_url}")

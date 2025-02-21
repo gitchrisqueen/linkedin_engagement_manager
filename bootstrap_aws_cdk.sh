@@ -14,7 +14,9 @@ echo "Removing files from cdk.out Directory..."
 rm -rf cdk.out/*
 
 echo "Removing Dangling Docker Images..."
-docker rmi $(docker images -f dangling=true -q)
+
+# Remove Dangling Images
+docker image prune -f --filter "dangling=true"
 
 # Call the bootstrap command
 echo "AWS CDK Bootstrapping..."
