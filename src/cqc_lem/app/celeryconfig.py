@@ -8,6 +8,11 @@ REDIS_PORT = os.getenv('REDIS_PORT', '6379')
 
 # Broker settings.
 broker_url = os.getenv('CELERY_BROKER_URL', f'redis://redis:{REDIS_PORT}/0')
+broker_connection_retry_on_startup = True
+broker_connection_max_retries = None
+broker_connection_timeout = 30
+redis_socket_connect_timeout = 30
+redis_socket_timeout = 30
 
 ## Using the database to store task state and results.
 result_backend = os.getenv('CELERY_RESULT_BACKEND', f'redis://redis:{REDIS_PORT}/1')
@@ -27,7 +32,8 @@ redis_backend_health_check_interval = 300
 
 timezone = os.getenv('TZ')
 
-broker_connection_retry_on_startup = True
+# Prevent task messages from being lost
+task_acks_late = True,
 
 # Set the maximum time in seconds that the ETA scheduler can sleep between rechecking the schedule.
 # Default: 1.0 seconds.
@@ -46,21 +52,24 @@ worker_prefetch_multiplier = 1
 worker_max_tasks_per_child = 10
 
 # Gets the max between all the parameters of timeout in the tasks
-max_timeout = 60 * 30  # This value must be bigger than the maximum soft timeout set for a task to prevent an infinity loop
-broker_transport_options = {'visibility_timeout': max_timeout + 60}  # 60 seconds of margin
+max_timeout = 60 * 60  # This value must be bigger than the maximum soft timeout set for a task to prevent an infinity loop
+broker_transport_options = {'visibility_timeout': max_timeout + 60,# 60 seconds of margin
+                            'max_retries':5}
 
 
 def get_aws_sqs(queue_name: str,
-                #region_name: str,
-                session: boto3.session.Session)->dict:
+                # region_name: str,
+                session: boto3.session.Session) -> dict:
     sqs = session.client(
         service_name='elasticcache',
-        #region_name=region_name
+        # region_name=region_name
     )
 
     return sqs.get_queue_url(QueueName=queue_name)
 
+
 task_create_missing_queues = True
+
 
 # Addition setting for AWS SQS Usage
 

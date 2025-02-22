@@ -90,16 +90,19 @@ app.conf.update(
 )
 
 
+# Dont use for reds
+'''
 @worker_process_init.connect(weak=False)
 def restore_all_unacknowledged_messages(*args, **kwargs):
     """
-    Restores all the unacknowledged messages in the queue.
+    Restores all the unacknowledged messages in the queue but with proper visibility timeout
     Taken from https://gist.github.com/mlavin/6671079
     """
-    conn = app.connection(transport_options={'visibility_timeout': 0})
+    conn = app.connection(transport_options={'visibility_timeout': 3600})
     qos = conn.channel().qos
     qos.restore_visible()
     myprint('Unacknowledged messages restored')
+'''
 
 
 @worker_process_init.connect(weak=False)

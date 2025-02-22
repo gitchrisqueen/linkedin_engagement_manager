@@ -28,6 +28,7 @@ def deploy_stacks_in_order():
         stack_names = stack_name.split()
         command = ['npx', '-p', 'node@22', 'cdk', 'deploy', '--require-approval', 'never'] + stack_names
         subprocess.run(command, check=False)
+    else:
         with open('cdk.json') as f:
             print(f"Deploying Sequentially")
             config = json.load(f)

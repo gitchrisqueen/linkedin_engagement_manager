@@ -144,8 +144,8 @@ class CeleryWorkerStack(Stack):
         target = applicationautoscaling.ScalableTarget(
             self, f'celery-worker-scalable-target',
             service_namespace=applicationautoscaling.ServiceNamespace.ECS,
-            max_capacity=4, # TODO: Find a good number for max celery workers capacity
             min_capacity=1,
+            max_capacity=50, # TODO: Find a good number for max celery workers capacity
             resource_id=f'service/{props.ecs_cluster.cluster_name}/{celery_worker_service.service_name}',
             scalable_dimension='ecs:service:DesiredCount'
         )
