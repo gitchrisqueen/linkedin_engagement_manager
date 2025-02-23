@@ -273,6 +273,84 @@ def get_industries_of_profile_from_ai(linked_in_profile: LinkedInProfile, indust
     comment = response.choices[0].message.content.strip()
     return comment
 
+def get_ai_linked_post_refinement(original_message: str, character_limit: int = 3000):
+    character_limit_string = (f"""\nThe refined LinkedIn Post needs to be less than or equal to {character_limit} characters including white spaces and punctuations. You may use symbols, abbreviations, and other and short-hand.
+                               Ideally, Posts between 1,300 and 2,000 characters tend to perform well by providing enough detail while maintaining readability.\n\n""") if character_limit > 0 else ""
+
+    prompt = f"""Please review and refine the following LinkedIn Post Draft. {character_limit_string} LinkedIn Post Draft: {original_message}
+                """
+
+    # myprint(f"Prompt: {prompt}")
+
+    content = [{"type": "text", "text": prompt}]
+
+    # System prompt to be included in every request
+    system_prompt = {
+        "role": "system",
+        "content": f"""Act like a professional editor with expertise in business communication, particularly for LinkedIn posts.**  
+
+        You have over 15 years of experience helping professionals craft polished, engaging, and impactful LinkedIn content. 
+        Your expertise ensures that messages maintain proper grammar, clarity, and professionalism while also being compelling and easy to read.  
+        
+        Your task is to take a provided draft LinkedIn post and refine it into a final, ready-to-publish version. 
+        The primary focus is on proper capitalization for sentences, pronouns, and abbreviations, but you should also apply a full editorial review to enhance readability, impact, and professionalism.  
+        
+        Your review process includes:  
+        
+        1. **Correct capitalization and formatting**  
+           - Ensure that all sentences start with capital letters.  
+           - Capitalize proper nouns, job titles (when used formally), and abbreviations correctly.  
+           - Maintain consistency in formatting for emphasis (e.g., bullet points when appropriate).  
+        
+        2. **Enhance clarity and coherence**  
+           - Ensure a smooth flow between sentences and paragraphs.  
+           - Eliminate redundant words or phrases while preserving the original intent.  
+           - Rewrite awkward or overly complex sentences for readability.  
+        
+        3. **Refine for engagement and impact**  
+           - Optimize sentence structure to maintain a professional yet approachable tone.  
+           - Ensure the opening is engaging to hook the audience and the closing provides a strong takeaway.  
+           - Maintain an authentic voice suited for LinkedIn.  
+        
+        4. **Ensure grammatical accuracy and professionalism**  
+           - Correct any typos, punctuation errors, or inconsistencies.  
+           - Adapt the tone to be confident, clear, and aligned with business communication best practices.  
+        
+        All responses should be **finalized drafts** ready for publishing. Do not ask for additional input—refine the given draft based on available information.  
+        
+        Provide only the **edited version of the LinkedIn post** without explanations or notes.  
+        
+        ---  
+        
+        Take a deep breath and work on this problem step-by-step.  
+        """
+    }
+
+    # User prompt to be sent with each API call
+    user_message = {
+        "role": "user",
+        "content": content
+    }
+
+    # Call the API with the system and user prompt only (no memory of past prompts)
+    response = client.chat.completions.create(
+        model="gpt-4o-mini",  # Specify the model you want to use
+        messages=[system_prompt, user_message],  # System prompt + current user prompt
+
+        # Emphasizes succinct, professional outputs over creative variance.
+        top_p=round(random.uniform(0.75, 0.85), 2),
+        # Discourages redundancy in phrase selection.
+        frequency_penalty=round(random.uniform(0.4, 0.6), 2),
+        # Ensures refined and novel phrasings without losing coherence.
+        presence_penalty=round(random.uniform(0.4, 0.6), 2),
+
+        # temperature=0.3,  # Adjust this parameter as per your needs
+        # max_tokens=150  # Set token limit as required
+    )
+
+    # Extract and return the model's response
+    comment = response.choices[0].message.content.strip()
+    return comment
 
 def get_ai_message_refinement(original_message: str, character_limit: int = 300):
     character_limit_string = f"\nThe refined message needs to be less than or equal to {character_limit} characters including white spaces and punctuations. You may use symbols, abbreviations, and other and short-hand\n\n " if character_limit > 0 else ""

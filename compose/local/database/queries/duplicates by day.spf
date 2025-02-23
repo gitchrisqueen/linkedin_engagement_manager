@@ -1,0 +1,128 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>ContentFilters</key>
+	<dict/>
+	<key>auto_connect</key>
+	<true/>
+	<key>data</key>
+	<dict>
+		<key>connection</key>
+		<dict>
+			<key>allowDataLocalInfile</key>
+			<integer>1</integer>
+			<key>database</key>
+			<string>linkedin_manager</string>
+			<key>enableClearTextPlugin</key>
+			<integer>0</integer>
+			<key>host</key>
+			<string>cqc-lem-mysqlstacknestedstac-mysqldatabase22bdac80-qslbfbpuczmh.clesomss6iar.us-east-1.rds.amazonaws.com</string>
+			<key>kcid</key>
+			<string>2807669390905764738</string>
+			<key>name</key>
+			<string>LEM AWS</string>
+			<key>port</key>
+			<integer>3306</integer>
+			<key>rdbms_type</key>
+			<string>mysql</string>
+			<key>sslCACertFileLocation</key>
+			<string></string>
+			<key>sslCACertFileLocationEnabled</key>
+			<integer>0</integer>
+			<key>sslCertificateFileLocation</key>
+			<string></string>
+			<key>sslCertificateFileLocationEnabled</key>
+			<integer>0</integer>
+			<key>sslKeyFileLocation</key>
+			<string></string>
+			<key>sslKeyFileLocationEnabled</key>
+			<integer>0</integer>
+			<key>type</key>
+			<string>SPTCPIPConnection</string>
+			<key>useSSL</key>
+			<integer>0</integer>
+			<key>user</key>
+			<string>admin</string>
+		</dict>
+		<key>session</key>
+		<dict>
+			<key>connectionEncoding</key>
+			<string>utf8mb4</string>
+			<key>contentFilterV2</key>
+			<dict>
+				<key>column</key>
+				<string>created_at</string>
+				<key>enabled</key>
+				<true/>
+				<key>filterClass</key>
+				<string>expressionNode</string>
+				<key>filterComparison</key>
+				<string>=</string>
+				<key>filterType</key>
+				<string>date</string>
+				<key>filterValues</key>
+				<array>
+					<string></string>
+				</array>
+			</dict>
+			<key>contentPageNumber</key>
+			<integer>1</integer>
+			<key>contentSelection</key>
+			<data>
+			YnBsaXN0MDDUAQIDBAUGBwpYJHZlcnNpb25ZJGFyY2hpdmVyVCR0
+			b3BYJG9iamVjdHMSAAGGoF8QD05TS2V5ZWRBcmNoaXZlctEICVRk
+			YXRhgAGvEA8LDBkaGxwdIyQlLDA0ODxVJG51bGzTDQ4PEBQYV05T
+			LmtleXNaTlMub2JqZWN0c1YkY2xhc3OjERITgAKAA4AEoxUWF4AF
+			gAaACoAOVHR5cGVUcm93c1RrZXlzXxAmU2VsZWN0aW9uRGV0YWls
+			VHlwZVByaW1hcnlLZXllZERldGFpbHPTDQ4PHiAioR+AB6EhgAiA
+			CVM1NTAJ0iYnKClaJGNsYXNzbmFtZVgkY2xhc3Nlc18QE05TTXV0
+			YWJsZURpY3Rpb25hcnmjKCorXE5TRGljdGlvbmFyeVhOU09iamVj
+			dNIODy0voS6AC4AN0g8xMjNZTlMuc3RyaW5ngAxSaWTSJic1Nl8Q
+			D05TTXV0YWJsZVN0cmluZ6M1NytYTlNTdHJpbmfSJic5Ol5OU011
+			dGFibGVBcnJheaM5OytXTlNBcnJhedImJyo9oiorAAgAEQAaACQA
+			KQAyADcASQBMAFEAUwBlAGsAcgB6AIUAjACQAJIAlACWAJoAnACe
+			AKAAogCnAKwAsQDaAOEA4wDlAOcA6QDrAO8A8AD1AQABCQEfASMB
+			MAE5AT4BQAFCAUQBSQFTAVUBWAFdAW8BcwF8AYEBkAGUAZwBoQAA
+			AAAAAAIBAAAAAAAAAD4AAAAAAAAAAAAAAAAAAAGk
+			</data>
+			<key>contentSortColIsAsc</key>
+			<true/>
+			<key>contentViewport</key>
+			<string>{{0, 10791}, {1500, 822}}</string>
+			<key>isToolbarVisible</key>
+			<true/>
+			<key>queries</key>
+			<string>SELECT 
+    DATE(created_at) AS action_date,
+    action_type,
+    post_url,
+    COUNT(*) AS duplicate_count
+FROM logs
+WHERE result = 'success'
+GROUP BY action_date, action_type, post_url
+HAVING duplicate_count &gt; 1
+ORDER BY action_date DESC, duplicate_count DESC;
+</string>
+			<key>table</key>
+			<string>logs</string>
+			<key>view</key>
+			<string>SP_VIEW_CUSTOMQUERY</string>
+			<key>windowVerticalDividerPosition</key>
+			<real>214</real>
+		</dict>
+	</dict>
+	<key>encrypted</key>
+	<false/>
+	<key>format</key>
+	<string>connection</string>
+	<key>queryFavorites</key>
+	<array/>
+	<key>rdbms_type</key>
+	<string>mysql</string>
+	<key>rdbms_version</key>
+	<string>8.0.40</string>
+	<key>version</key>
+	<integer>1</integer>
+</dict>
+</plist>

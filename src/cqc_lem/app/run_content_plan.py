@@ -9,25 +9,24 @@ from xml.etree import ElementTree
 
 import requests
 from bs4 import BeautifulSoup
-from requests.adapters import HTTPAdapter
-from urllib3 import Retry
-
 from cqc_lem import assets_dir
 from cqc_lem.app.my_celery import app as shared_task
 from cqc_lem.utilities.ai.ai_helper import get_blog_summary_post_from_ai, get_website_content_post_from_ai, \
     get_flux_image_prompt_from_ai, generate_flux1_image_from_prompt, get_runway_ml_video_prompt_from_ai, \
-    create_runway_video
+    create_runway_video, get_ai_linked_post_refinement
 from cqc_lem.utilities.ai.ai_helper import get_thought_leadership_post_from_ai, \
     get_industry_news_post_from_ai, get_personal_story_post_from_ai, generate_engagement_prompt_post
 from cqc_lem.utilities.db import get_post_type_counts, insert_planned_post, update_db_post_content, \
     get_planned_posts_for_current_week, get_last_planned_post_date_for_user, get_user_password_pair_by_id, \
     get_user_blog_url, get_user_sitemap_url, get_active_user_ids, get_planned_posts_for_next_week, PostStatus, \
     update_db_post_video_url, update_db_post_status, PostType
-from cqc_lem.utilities.env_constants import API_BASE_URL, API_PORT
+from cqc_lem.utilities.env_constants import API_URL_FINAL
 from cqc_lem.utilities.linkedin.helper import get_my_profile
 from cqc_lem.utilities.logger import myprint
 from cqc_lem.utilities.selenium_util import get_driver_wait_pair, quit_gracefully
 from cqc_lem.utilities.utils import get_best_posting_time, create_folder_if_not_exists, save_video_url_to_dir
+from requests.adapters import HTTPAdapter
+from urllib3 import Retry
 
 
 @shared_task.task
@@ -206,8 +205,6 @@ def create_video_content(user_id: int, stage: str) -> tuple[str, str | None]:
 
     # Get Text Content
     text_content = create_text_post(user_id, stage)  # TODO: Should we limit this to specific post_types ???
-    # Strip leading and ending white spaces
-    text_content = text_content.strip()
 
     # Create an image prompt from the text content
     image_prompt = get_flux_image_prompt_from_ai(text_content)
@@ -233,7 +230,8 @@ def create_video_content(user_id: int, stage: str) -> tuple[str, str | None]:
     return text_content, video_url
 
 
-def create_text_post(user_id: int, stage: str, post_type: str = None, user_profile=None):
+def create_text_post(user_id: int, stage: str, post_type: str = None, user_profile=None,
+                     refine_final_post: bool = True):
     """
     Generate a text post for LinkedIn based on the user's profile, blog, or website content.
 
@@ -277,7 +275,7 @@ def create_text_post(user_id: int, stage: str, post_type: str = None, user_profi
             # Chose another random post type that is not "blog_summary"
             post_types.remove("blog_summary")
             post_type = random.choice(post_types)
-            final_content = create_text_post(user_id, stage, post_type, user_profile)
+            final_content = create_text_post(user_id, stage, post_type, user_profile, refine_final_post=False)
     elif post_type == "website_content":
         # Get the users sitemap url
         sitemap_url = get_user_sitemap_url(user_id)
@@ -290,19 +288,25 @@ def create_text_post(user_id: int, stage: str, post_type: str = None, user_profi
                 # Chose another random post type that is not "website_content"
                 post_types.remove("website_content")
                 post_type = random.choice(post_types)
-                final_content = create_text_post(user_id, stage, post_type, user_profile)
+                final_content = create_text_post(user_id, stage, post_type, user_profile, refine_final_post=False)
         else:
             myprint("No sitemap found for this user. Generating another post type")
             # Chose another random post type that is not "website_content"
             post_types.remove("website_content")
             post_type = random.choice(post_types)
-            final_content = create_text_post(user_id, stage, post_type, user_profile)
+            final_content = create_text_post(user_id, stage, post_type, user_profile, refine_final_post=False)
     elif post_type == "industry_news":
         final_content = get_industry_news_post_from_ai(user_profile, stage)
     elif post_type == "personal_story":
         final_content = get_personal_story_post_from_ai(user_profile, stage)
     else:
         final_content = generate_engagement_prompt_post(user_profile, stage)
+
+    if refine_final_post:
+        final_content = get_ai_linked_post_refinement(final_content)
+
+        # Strip leading and ending white spaces
+        final_content = final_content.strip()
 
     return final_content
 
@@ -410,8 +414,7 @@ def scrape_recent_posts(blog_url):
                 if not post_url.startswith("http"):
                     post_url = urlparse(blog_url).scheme + "://" + urlparse(blog_url).hostname + post_url
 
-
-                #post_content = title_element.get_text(strip=True)
+                # post_content = title_element.get_text(strip=True)
                 post_content = fetch_content(post_url)
                 recent_posts.append({
                     "link": post_url,
@@ -494,6 +497,7 @@ def generate_website_content_post(sitemap_url, linked_user_profile, stage: str):
         myprint("No relevant URLs found in the sitemap.")
         return None
 
+
 def get_session_for_response() -> Tuple[requests.Session, dict]:
     # Set up headers to simulate a browser request
     headers = {
@@ -518,6 +522,7 @@ def get_session_for_response() -> Tuple[requests.Session, dict]:
     session.mount("http://", adapter)
 
     return session, headers
+
 
 # Function to make a request and return parsed HTML content
 def fetch_content(url):
@@ -586,9 +591,8 @@ def fetch_sitemap_urls(sitemap_url):
             url_lastmod_pairs.sort(key=lambda x: x[1], reverse=True)
             urls = [url for url, lastmod in url_lastmod_pairs]
 
-
         # Process sub-sitemaps recursively if present (except for certain sitemap URLs)
-        skip_if_contains_text = ['sitemap-misc.xml','post_tag-sitemap.xml','category-sitemap.xml','page-sitemap.xml']
+        skip_if_contains_text = ['sitemap-misc.xml', 'post_tag-sitemap.xml', 'category-sitemap.xml', 'page-sitemap.xml']
         if sitemap_elements:
             for sitemap in sitemap_elements:
                 sub_sitemap_url = sitemap.text
@@ -690,10 +694,8 @@ def auto_create_weekly_content(user_id: int = None):
             # Get the file name from the video file path
             video_file_name = os.path.basename(video_file_path)
 
-
-
             # The video url is our api prefix + 'assets?file=videos/runwayml' +  video_file_name
-            api_video_url = f"{API_BASE_URL}:{API_PORT}/assets?file_name=videos/runwayml/{video_file_name}"
+            api_video_url = f"{API_URL_FINAL}/assets?file_name=videos/runwayml/{video_file_name}"
             myprint(f"Video URL: {api_video_url}")
 
             # Update the database with the video url

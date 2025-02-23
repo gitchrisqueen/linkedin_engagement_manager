@@ -392,7 +392,7 @@ def automate_commenting(self, user_id: int, loop_for_duration: int = None, futur
 
     myprint("Starting Automate Commenting Thread...")
 
-    driver, wait, user_email, my_profile = get_current_profile(user_id=user_id, session_name="Commenting")
+    driver, wait, user_email, my_profile = get_current_profile(user_id=user_id, session_name="Auto Commenting")
 
     navigate_to_feed(driver, wait)
 
