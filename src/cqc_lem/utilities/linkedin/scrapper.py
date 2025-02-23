@@ -456,9 +456,10 @@ def get_profile_skills(driver, employee_link):
     # Skills
     url = driver.current_url.rstrip('/') + '/details/skills/'
     driver.get(url)
+    wait_for_ajax(driver)
     window_scroll(driver, 5, True)
 
-    wait = get_driver_wait(driver, 1)  # Significanlty reduced wait time
+    wait = get_driver_wait(driver, 3)  # Significantly reduced wait time
 
     profile_skills = []
 
