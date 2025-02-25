@@ -167,7 +167,7 @@ def clear_text_from_element(element: WebElement):
     element.send_keys(Keys.DELETE)
 
 
-def simulate_typing(driver: WebDriver, editable_element: WebElement, text):
+def simulate_typing(driver: WebDriver, editable_element: WebElement, text, allow_pauses: bool = True):
     # Simulate typing the comment
     myprint("Typing Text...")
     type_speed_reducer = .5
@@ -198,9 +198,10 @@ def simulate_typing(driver: WebDriver, editable_element: WebElement, text):
         except Exception as e:
             myprint("Error while sending char(" + char + "): " + str(e))
 
-        type_pause = random.uniform(0.05 * type_speed_reducer, 0.15 * type_speed_reducer)
-        # time.sleep(type_pause)  # Simulate human typing speed
-        actions.pause(type_pause)
+        if allow_pauses:
+            type_pause = random.uniform(0.05 * type_speed_reducer, 0.15 * type_speed_reducer)
+            # time.sleep(type_pause)  # Simulate human typing speed
+            actions.pause(type_pause)
 
     actions.perform()
 
@@ -214,7 +215,7 @@ def simulate_typing(driver: WebDriver, editable_element: WebElement, text):
             driver.execute_script(script_pre, editable_element, key, char)
         except JavascriptException as e:
             myprint("Error while replacing char(" + key + "): " + str(e))
-            # Get the current test
+            # Get the current text
             current_text = getText(editable_element)
             # Remove the key from the text
             current_text = current_text.replace(key, '')
@@ -459,7 +460,7 @@ def automate_commenting(self, user_id: int, loop_for_duration: int = None, futur
 
 
 
-@shared_task.task(bind=True, base=QueueOnce, once={'graceful': True, 'keys': ['user_id', 'post_id', 'future_forward']})
+@shared_task.task(bind=True, base=QueueOnce, once={'graceful': True, 'unlock_before_run': True, 'keys': ['user_id', 'post_id', 'future_forward']})
 def automate_reply_commenting(self, user_id: int, post_id: int, loop_for_duration: int = 60, future_forward=0):
     """Reply to recent comments left on the post recently posted"""
 
@@ -553,8 +554,8 @@ def automate_reply_commenting(self, user_id: int, post_id: int, loop_for_duratio
                     # Find the text box (should be the element that now has focus)
                     text_box = driver.switch_to.active_element
 
-                    # Simulate typing the comment in the text box
-                    simulate_typing(driver, text_box, response)
+                    # Simulate superfast typing the comment in the text box
+                    simulate_typing(driver, text_box, response, allow_pauses=False)
 
                     # Sleep so post button shows up
                     time.sleep(2)
