@@ -47,6 +47,7 @@ class EcrStack(NestedStack):
                                             '**/logs/**/*',
                                             '**/src/cqc_lem/aws/**/*',
                                             '**/src/cqc_lem/assets/**/*',
+                                            '**/compose/local/linkedinpreview/**/*',
                                             '**/test/**/*',
                                             # Additional recommended exclusions
                                             '**/__pycache__',
@@ -75,9 +76,8 @@ class EcrStack(NestedStack):
                                             '**/*.swo'
                                         ],
                                         build_args={
-                                            # "API_BASE_URL_BUILD_ARG": "http://api.cqc-lem.local:8000", #TODO Need the public url cause this not working
-                                            # "API_BASE_URL_BUILD_ARG":API_BASE_URL_BUILD_ARG,
-                                            # This argument will be passed to the dockerfile and used as the API_BASE_URL
+                                            # Make sure the dev dependencies are not installed
+                                            "INSTALL_DEV_DEPS":"false"
                                         },
                                         platform=Platform.LINUX_AMD64,
                                         invalidation=ecr_assets.DockerImageAssetInvalidationOptions(

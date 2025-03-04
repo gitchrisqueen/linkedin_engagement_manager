@@ -1,17 +1,16 @@
 import time
 
+from cqc_lem.utilities.ai.ai_helper import get_industries_of_profile_from_ai
+from cqc_lem.utilities.db import get_cookies, store_cookies, get_linked_in_profile_by_email, add_linkedin_profile, \
+    get_linked_in_profile_by_url
+from cqc_lem.utilities.linkedin.profile import LinkedInProfile
+from cqc_lem.utilities.linkedin.scrapper import returnProfileInfo
+from cqc_lem.utilities.logger import myprint
+from cqc_lem.utilities.selenium_util import load_cookies, click_element_wait_retry, get_element_wait_retry, getText
 from selenium.webdriver.common.by import By
 from selenium.webdriver.remote.webdriver import WebDriver
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.support.wait import WebDriverWait
-
-from cqc_lem.utilities.linkedin.profile import LinkedInProfile
-from cqc_lem.utilities.ai.ai_helper import get_industries_of_profile_from_ai
-from cqc_lem.utilities.db import get_cookies, store_cookies, get_linked_in_profile_by_email, add_linkedin_profile, \
-    get_linked_in_profile_by_url
-from cqc_lem.utilities.linkedin.scrapper import returnProfileInfo
-from cqc_lem.utilities.logger import myprint
-from cqc_lem.utilities.selenium_util import load_cookies, click_element_wait_retry, get_element_wait_retry, getText
 
 
 def login_to_linkedin(driver: WebDriver, wait: WebDriverWait, user_email: str, user_password: str):
@@ -119,7 +118,7 @@ def get_my_profile(driver, wait, user_email: str, user_password: str) -> LinkedI
     return profile
 
 
-def get_linkedin_profile_from_url(driver, wait, profile_url, is_main_user = False, force_save = False):
+def get_linkedin_profile_from_url(driver, wait, profile_url, is_main_user=False, force_save=False):
     # Get the profile from the DB if it exists
     profile_json = get_linked_in_profile_by_url(profile_url)
 
@@ -135,14 +134,11 @@ def get_linkedin_profile_from_url(driver, wait, profile_url, is_main_user = Fals
 
             # Check if current url changes (redirects)
             if profile_url != driver.current_url:
-
                 # Use the current url as the profile url
                 profile_url = driver.current_url
 
                 # Get the profile using the new url
                 return get_linkedin_profile_from_url(driver, wait, profile_url, is_main_user)
-
-
 
         # Get the company name
         company_element = get_element_wait_retry(driver, wait, '//button[contains(@aria-label,"Current company")]',
@@ -153,7 +149,6 @@ def get_linkedin_profile_from_url(driver, wait, profile_url, is_main_user = Fals
             company_name = getText(company_element)
 
         profile_data = returnProfileInfo(driver, profile_url, company_name, is_main_user)
-
 
         if profile_data:
             profile = LinkedInProfile(**profile_data)

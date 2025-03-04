@@ -20,8 +20,8 @@ class APIStack(Stack):
         task_definition = ecs.FargateTaskDefinition(
             self, 'APIFargateTaskDef',
             family='api',
-            cpu=1024,
-            memory_limit_mib=2048,
+            cpu=512,
+            memory_limit_mib=1024,
             task_role=props.task_execution_role,
 
         )

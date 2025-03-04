@@ -55,7 +55,7 @@ class SharedStackProps(StackProps):
                  selenium_node_max_instances: int = 4,
                  selenium_node_max_sessions: int = 4,
                  min_instances: int = 1,
-                 max_instances: int = 4,
+                 max_instances: int = 4,  # TODO: Increase this to 10 or more once resources sizes are set correctly
                  # selenium_version: str = "4.26.0-20241101",
                  selenium_version: str = "latest",
                  api_port: int = 8000,
@@ -80,6 +80,8 @@ class SharedStackProps(StackProps):
                  tz: str = None,
                  purge_tasks: bool = False,
                  clear_selenium_sessions: bool = False,
+                 device_farm_project_arn: str = "103658592769",
+                 test_grid_project_arn: str = "52615a58-16b0-461e-9130-e9a6272423c7",
 
                  **kwargs):
         super().__init__(env=env)
@@ -146,6 +148,8 @@ class SharedStackProps(StackProps):
         self.props['tz'] = tz
         self.props['purge_tasks'] = purge_tasks
         self.props['clear_selenium_sessions'] = clear_selenium_sessions
+        self.props['device_farm_project_arn'] = device_farm_project_arn
+        self.props['test_grid_project_arn'] = test_grid_project_arn
 
     def get(self, key):
         return self.props.get(key)
@@ -430,3 +434,11 @@ class SharedStackProps(StackProps):
     @property
     def clear_selenium_sessions(self) -> bool:
         return self.get('clear_selenium_sessions')
+
+    @property
+    def device_farm_project_arn(self) -> str:
+        return self.get('device_farm_project_arn')
+
+    @property
+    def test_grid_project_arn(self) -> str:
+        return self.get('test_grid_project_arn')

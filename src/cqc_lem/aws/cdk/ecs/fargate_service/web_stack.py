@@ -20,8 +20,8 @@ class WebStack(Stack):
         task_definition = ecs.FargateTaskDefinition(
             self, 'WebFargateTaskDef',
             family='web_app',
-            cpu=1024,
-            memory_limit_mib=2048,
+            cpu=256,
+            memory_limit_mib=512,
             task_role=props.task_execution_role
 
         )

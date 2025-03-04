@@ -22,6 +22,7 @@ from cqc_lem.utilities.db import get_post_type_counts, insert_planned_post, upda
     update_db_post_video_url, update_db_post_status, PostType
 from cqc_lem.utilities.env_constants import API_URL_FINAL
 from cqc_lem.utilities.linkedin.helper import get_my_profile
+from cqc_lem.utilities.linkedin.profile import LinkedInProfile
 from cqc_lem.utilities.logger import myprint
 from cqc_lem.utilities.selenium_util import get_driver_wait_pair, quit_gracefully
 from cqc_lem.utilities.utils import get_best_posting_time, create_folder_if_not_exists, save_video_url_to_dir
@@ -230,7 +231,7 @@ def create_video_content(user_id: int, stage: str) -> tuple[str, str | None]:
     return text_content, video_url
 
 
-def create_text_post(user_id: int, stage: str, post_type: str = None, user_profile=None,
+def create_text_post(user_id: int, stage: str, post_type: str = None, user_profile: LinkedInProfile=None,
                      refine_final_post: bool = True):
     """
     Generate a text post for LinkedIn based on the user's profile, blog, or website content.
@@ -256,8 +257,14 @@ def create_text_post(user_id: int, stage: str, post_type: str = None, user_profi
     if user_profile is None:
         user_email, user_password = get_user_password_pair_by_id(user_id)
         driver, wait = get_driver_wait_pair(session_name='Create Text Post')
-        user_profile = get_my_profile(driver, wait, user_email, user_password)
-        quit_gracefully(driver)
+        try:
+            user_profile = get_my_profile(driver, wait, user_email, user_password)
+        except Exception as e:
+            myprint(f"Error getting user profile: {e}")
+            # Create empty dummy user profile
+            user_profile = LinkedInProfile(full_name="John Doe", job_title="Software Developer", company_name="ABC Inc.",)
+        finally:
+            quit_gracefully(driver)
 
     # Generate the post based on the selected type
     myprint(f"Creating text post of type: {post_type} for stage: {stage}")

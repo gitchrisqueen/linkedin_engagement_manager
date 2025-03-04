@@ -51,20 +51,12 @@
 			<string>utf8mb4</string>
 			<key>contentFilterV2</key>
 			<dict>
-				<key>column</key>
-				<string>created_at</string>
-				<key>enabled</key>
-				<true/>
+				<key>children</key>
+				<array/>
 				<key>filterClass</key>
-				<string>expressionNode</string>
-				<key>filterComparison</key>
-				<string>=</string>
-				<key>filterType</key>
-				<string>date</string>
-				<key>filterValues</key>
-				<array>
-					<string></string>
-				</array>
+				<string>groupNode</string>
+				<key>isConjunction</key>
+				<true/>
 			</dict>
 			<key>contentPageNumber</key>
 			<integer>1</integer>
@@ -72,40 +64,37 @@
 			<data>
 			YnBsaXN0MDDUAQIDBAUGBwpYJHZlcnNpb25ZJGFyY2hpdmVyVCR0
 			b3BYJG9iamVjdHMSAAGGoF8QD05TS2V5ZWRBcmNoaXZlctEICVRk
-			YXRhgAGvEA8LDBkaGxwdIyQlLDA0ODxVJG51bGzTDQ4PEBQYV05T
-			LmtleXNaTlMub2JqZWN0c1YkY2xhc3OjERITgAKAA4AEoxUWF4AF
-			gAaACoAOVHR5cGVUcm93c1RrZXlzXxAmU2VsZWN0aW9uRGV0YWls
-			VHlwZVByaW1hcnlLZXllZERldGFpbHPTDQ4PHiAioR+AB6EhgAiA
-			CVM1NTAJ0iYnKClaJGNsYXNzbmFtZVgkY2xhc3Nlc18QE05TTXV0
-			YWJsZURpY3Rpb25hcnmjKCorXE5TRGljdGlvbmFyeVhOU09iamVj
-			dNIODy0voS6AC4AN0g8xMjNZTlMuc3RyaW5ngAxSaWTSJic1Nl8Q
-			D05TTXV0YWJsZVN0cmluZ6M1NytYTlNTdHJpbmfSJic5Ol5OU011
-			dGFibGVBcnJheaM5OytXTlNBcnJhedImJyo9oiorAAgAEQAaACQA
-			KQAyADcASQBMAFEAUwBlAGsAcgB6AIUAjACQAJIAlACWAJoAnACe
-			AKAAogCnAKwAsQDaAOEA4wDlAOcA6QDrAO8A8AD1AQABCQEfASMB
-			MAE5AT4BQAFCAUQBSQFTAVUBWAFdAW8BcwF8AYEBkAGUAZwBoQAA
-			AAAAAAIBAAAAAAAAAD4AAAAAAAAAAAAAAAAAAAGk
+			YXRhgAGtCwwZGhscHSEoLDA0OFUkbnVsbNMNDg8QFBhXTlMua2V5
+			c1pOUy5vYmplY3RzViRjbGFzc6MREhOAAoADgASjFRYXgAWABoAI
+			gAxUdHlwZVRyb3dzVGtleXNfECZTZWxlY3Rpb25EZXRhaWxUeXBl
+			UHJpbWFyeUtleWVkRGV0YWlsc9MNDg8eHyCgoIAH0iIjJCVaJGNs
+			YXNzbmFtZVgkY2xhc3Nlc18QE05TTXV0YWJsZURpY3Rpb25hcnmj
+			JCYnXE5TRGljdGlvbmFyeVhOU09iamVjdNIODykroSqACYAL0g8t
+			Li9ZTlMuc3RyaW5ngApSaWTSIiMxMl8QD05TTXV0YWJsZVN0cmlu
+			Z6MxMydYTlNTdHJpbmfSIiM1Nl5OU011dGFibGVBcnJheaM1NydX
+			TlNBcnJhedIiIyY5oiYnAAgAEQAaACQAKQAyADcASQBMAFEAUwBh
+			AGcAbgB2AIEAiACMAI4AkACSAJYAmACaAJwAngCjAKgArQDWAN0A
+			3gDfAOEA5gDxAPoBEAEUASEBKgEvATEBMwE1AToBRAFGAUkBTgFg
+			AWQBbQFyAYEBhQGNAZIAAAAAAAACAQAAAAAAAAA6AAAAAAAAAAAA
+			AAAAAAABlQ==
 			</data>
 			<key>contentSortColIsAsc</key>
 			<true/>
 			<key>contentViewport</key>
-			<string>{{0, 10791}, {1500, 822}}</string>
+			<string>{{0, -28}, {1500, 822}}</string>
 			<key>isToolbarVisible</key>
 			<true/>
 			<key>queries</key>
 			<string>SELECT 
-    DATE(created_at) AS action_date,
-    action_type,
-    post_url,
-    COUNT(*) AS duplicate_count
+    DATE(created_at) AS action_date, 
+    COUNT(*) AS action_count
 FROM logs
 WHERE result = 'success'
-GROUP BY action_date, action_type, post_url
-HAVING duplicate_count &gt; 1
-ORDER BY action_date DESC, duplicate_count DESC;
+GROUP BY action_date
+ORDER BY action_date DESC;
 </string>
 			<key>table</key>
-			<string>logs</string>
+			<string>profiles</string>
 			<key>view</key>
 			<string>SP_VIEW_CUSTOMQUERY</string>
 			<key>windowVerticalDividerPosition</key>

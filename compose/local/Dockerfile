@@ -1,11 +1,12 @@
 FROM python:3.13-slim AS base
 
+
 ENV PYTHONFAULTHANDLER=1 \
     PYTHONHASHSEED=random \
     PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1
 
-# Install dependencies
+# Install dependencies (When using python-slim)
 RUN apt-get update -y && apt-get install --no-install-suggests --no-install-recommends --yes \
     # Curl needed for AWS health checks
     curl \
@@ -100,6 +101,7 @@ RUN chmod +x /entrypoint /wait-for-it /start-streamlit /start-fastapi \
 
 # Create non-root user during build
 RUN useradd -m -s /bin/bash celeryworker
+
 # Create the .aws directory for the non-root user and set correct ownership during build
 RUN chown -R celeryworker:celeryworker /app && \
     mkdir -p /home/celeryworker/.aws && \

@@ -3,8 +3,6 @@
 set -o errexit
 set -o nounset
 
-
-
 celery --app cqc_lem.app.my_celery \
   --broker="${CELERY_BROKER_URL}" \
   flower \
@@ -33,7 +31,7 @@ worker_ready() {
 # Wait for Celery worker to be ready
 until worker_ready; do
   >&2 echo 'Celery workers not available'
-  sleep 1
+  sleep 5
 done
 >&2 echo 'Celery workers are available'
 

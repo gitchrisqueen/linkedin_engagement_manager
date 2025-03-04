@@ -43,6 +43,10 @@ python-pptx = "^1.0.2"
 mammoth = "^1.8.0"
 docx = "^0.2.4"
 pycurl = "^7.45.4"
+typing-extensions = "^4.12.2"
+os-env = "^0.3"  # Redundant with python-dotenv
+datetime = "^5.5"  # Built-in module
+
 
 # AI/ML Development Tools
 googlenews = "^1.6.15"
@@ -68,14 +72,10 @@ setuptools = "^67.6.1"
 grandalf = "^0.8"
 #flower = "^2.0.1"  # Celery monitoring
 watchdog = "^5.0.3"
-typing-extensions = "^4.12.2"
-os-env = "^0.3"  # Redundant with python-dotenv
-datetime = "^5.5"  # Built-in module
 
-# AWS Development Tools
+#AWS
 aws-cdk-lib = "^2.177.0"
 constructs = "^10.4.2"
-#boto3 = "^1.36.7"
 cdk-ecr-deployment = "^3.1.8"
 aws-cdk-aws-amplify-alpha = "^2.177.0a0"
 aws-cdk-aws-lambda-python-alpha = "^2.177.0a0"

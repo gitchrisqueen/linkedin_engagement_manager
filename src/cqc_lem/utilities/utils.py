@@ -1,8 +1,8 @@
 import functools
 import json
 import os
+from datetime import time, date
 from enum import Enum
-from datetime import datetime, time, date
 from urllib.parse import urlparse
 
 import boto3
@@ -10,6 +10,7 @@ import requests
 import tldextract
 
 DEBUG_LEVEL = 3
+
 
 def debug_function(func):
     global DEBUG_LEVEL
@@ -64,9 +65,11 @@ class Satisfactory(Enum):
     YES = 1
     NO = 0
 
+
 def get_top_level_domain(url: str) -> str:
     extracted = tldextract.extract(url)
     return f"{extracted.domain}.{extracted.suffix}"
+
 
 def get_best_posting_times():
     # Determine the best time for posting based on the selected date
@@ -91,6 +94,7 @@ def get_best_posting_time(selected_date: date):
 
     return best_time
 
+
 def get_12h_format_best_time(best_time: time):
     # Format the best time to 12-hour format
     best_time_12hr = best_time.strftime("%I:%M %p")
@@ -113,6 +117,7 @@ def save_video_url_to_dir(video_url: str, dir_path):
 
     return video_path
 
+
 def get_file_extension_from_filepath(file_path: str, remove_leading_dot: bool = False) -> str:
     basename = os.path.basename(file_path)
     file_name, file_extension = os.path.splitext(basename)
@@ -131,15 +136,18 @@ def get_file_extension_from_filepath(file_path: str, remove_leading_dot: bool = 
 def get_aws_session():
     return boto3.session.Session()
 
-def get_aws_client(service_name: str, region_name:str):
+
+def get_aws_client(service_name: str, region_name: str):
     session = get_aws_session()
     return session.client(
         service_name=service_name,
         region_name=region_name
     )
 
-def get_cloudwatch_client(region:str = 'us-east-1'):
+
+def get_cloudwatch_client(region: str = 'us-east-1'):
     return get_aws_client('cloudwatch', region)
+
 
 def get_aws_ssm_secret(secret_name, region_name):
     """Gets the secret value from AWS Secrets Manager"""
@@ -159,3 +167,13 @@ def get_aws_ssm_secret(secret_name, region_name):
     secret_dict = json.loads(secret)
 
     return secret_dict
+
+
+def get_aws_device_farm_url(deviceFarmProjectArn: str, testGridProjectArn: str, expiresInSeconds: int = 600,
+                            region_name: str = "us-west-2"):
+    devicefarm_client = get_aws_client(service_name="devicefarm", region_name=region_name)
+    response = devicefarm_client.create_test_grid_url(
+        projectArn=f"arn:aws:devicefarm:{region_name}:{deviceFarmProjectArn}:testgrid-project:{testGridProjectArn}",
+
+        expiresInSeconds=expiresInSeconds)
+    return response["url"]

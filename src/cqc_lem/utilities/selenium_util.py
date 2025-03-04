@@ -1,13 +1,12 @@
 import json
 import time
 from datetime import datetime, timedelta
+from functools import wraps
 
 import requests
 import selenium
-from cqc_lem.utilities.env_constants import *
-from cqc_lem.utilities.logger import myprint
 from selenium import webdriver
-from selenium.common import JavascriptException, ElementNotInteractableException, StaleElementReferenceException, \
+from selenium.common import ElementNotInteractableException, StaleElementReferenceException, \
     TimeoutException, WebDriverException, NoSuchElementException, SessionNotCreatedException
 from selenium.webdriver import ActionChains
 from selenium.webdriver.chrome.options import Options
@@ -16,6 +15,10 @@ from selenium.webdriver.remote.webdriver import WebDriver
 from selenium.webdriver.remote.webelement import WebElement
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.support.wait import WebDriverWait
+
+from cqc_lem.utilities.env_constants import *
+from cqc_lem.utilities.logger import myprint
+from cqc_lem.utilities.utils import get_aws_device_farm_url
 
 
 def quit_gracefully(driver: WebDriver):
@@ -80,8 +83,13 @@ def get_docker_driver(headless=True, session_name: str = "ChromeTests"):
 
     # myprint(f"Options: {vars(options)}")
 
+    if DEVICE_FARM_PROJECT_ARN and TEST_GRID_PROJECT_ARN:
+        remote_url = get_aws_device_farm_url(DEVICE_FARM_PROJECT_ARN, TEST_GRID_PROJECT_ARN)
+    else:
+        remote_url = f"http://{SELENIUM_HUB_HOST}:{SELENIUM_HUB_PORT}/wd/hub"
+
     driver = webdriver.Remote(
-        command_executor=f'http://{SELENIUM_HUB_HOST}:{SELENIUM_HUB_PORT}',  # Works
+        command_executor=remote_url,  # Works
         # command_executor=f'http://{SELENIUM_HUB_HOST}:4444',  # Works
         options=options
     )
@@ -290,6 +298,7 @@ def getText(curElement: WebElement):
     # print("elementText=%s" % elementText)
     return elementText
 
+
 def window_scroll(driver: WebDriver, scroll_times: int = 0, wait_on_ajax=False):
     # Force bottom page scroll by scroll_times
     for _ in range(scroll_times):
@@ -397,3 +406,130 @@ def load_cookies(driver: WebDriver, cookies: list[dict]):
             myprint(f"Error loading cookie: {cookie}")
             myprint(f"Exception: {e}")
             pass
+
+
+class RetryableWebDriver:
+    def __init__(self, original_driver, max_retries=3, base_delay=1):
+        self.driver = original_driver
+        self.max_retries = max_retries
+        self.base_delay = base_delay
+
+    def __getattr__(self, name):
+        # Get the original attribute from the wrapped driver
+        attr = getattr(self.driver, name)
+
+        # If it's a method, wrap it with retry logic
+        if callable(attr):
+            return self._wrap_with_retry(attr)
+        return attr
+
+    def _wrap_with_retry(self, func):
+        @wraps(func)
+        def wrapper(*args, **kwargs):
+            last_exception = None
+            for attempt in range(self.max_retries):
+                try:
+                    return func(*args, **kwargs)
+                except (WebDriverException, StaleElementReferenceException) as e:
+                    last_exception = e
+                    if attempt < self.max_retries - 1:
+                        delay = self.base_delay * (2 ** attempt)  # exponential backoff
+                        time.sleep(delay)
+                    continue
+            raise last_exception
+
+        return wrapper
+
+    # Explicitly handle quit to ensure proper cleanup
+    def quit(self):
+        try:
+            self.driver.quit()
+        except Exception as e:
+            print(f"Error during driver quit: {e}")
+
+
+# Example usage with your existing code structure:
+def create_retryable_driver(original_driver, max_retries=3):
+    return RetryableWebDriver(original_driver, max_retries)
+
+
+# Usage example 1 - Basic setup
+def setup_driver():
+    driver = webdriver.Chrome()  # Your original driver setup
+    return create_retryable_driver(driver)
+
+
+# Usage example 2 - With context manager
+class WebDriverManager:
+    def __init__(self, max_retries=3):
+        self.max_retries = max_retries
+        self.driver = None
+
+    def __enter__(self):
+        original_driver = webdriver.Chrome()  # Or your preferred driver
+        self.driver = create_retryable_driver(original_driver, self.max_retries)
+        return self.driver
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        if self.driver:
+            self.driver.quit()
+
+
+# Example of how to use it in your existing code:
+def example_automation():
+    # Option 1: Direct usage
+    driver = setup_driver()
+    try:
+        # Your existing code remains largely unchanged
+        driver.get("https://example.com")
+        element = driver.find_element(By.ID, "some-id")
+        element.click()
+    finally:
+        driver.quit()
+
+    # Option 2: Using context manager
+    with WebDriverManager() as driver:
+        # Your existing code remains unchanged
+        driver.get("https://example.com")
+        element = driver.find_element(By.ID, "some-id")
+        element.click()
+
+
+# Example with more complex scenarios
+def complex_automation_example():
+    with WebDriverManager(max_retries=5) as driver:
+        try:
+            # All these operations will automatically retry on failure
+            driver.get("https://example.com")
+
+            # Find and interact with elements
+            login_button = driver.find_element(By.ID, "login")
+            login_button.click()
+
+            # Handle dynamic elements
+            username_field = driver.find_element(By.NAME, "username")
+            username_field.send_keys("user@example.com")
+
+            # Even chained operations are handled
+            driver.find_element(By.CLASS_NAME, "submit-btn").click()
+
+        except Exception as e:
+            print(f"Automation failed after retries: {e}")
+            raise
+
+
+# Example with custom retry logic for specific operations
+def custom_retry_example():
+    with WebDriverManager() as driver:
+        def custom_action():
+            elements = driver.find_elements(By.CLASS_NAME, "dynamic-content")
+            for element in elements:
+                # Each interaction will have retry capability
+                element.click()
+                element.send_keys("test")
+
+        try:
+            driver.get("https://example.com")
+            custom_action()
+        except Exception as e:
+            print(f"Failed to complete custom action: {e}")

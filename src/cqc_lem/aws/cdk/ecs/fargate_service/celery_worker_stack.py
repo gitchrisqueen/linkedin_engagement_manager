@@ -14,8 +14,8 @@ class CeleryWorkerStack(Stack):
 
     def __init__(self, scope: Construct, id: str,
                  props: SharedStackProps,
-                 cpu: int = 4096,
-                 memory_limit_mib: int = 8192,
+                 cpu: int = 512,
+                 memory_limit_mib: int = 1024,
                  **kwargs) -> None:
         super().__init__(scope, id, **kwargs)
 
@@ -38,11 +38,6 @@ class CeleryWorkerStack(Stack):
         # Add a new container to the Fargate Task Definition
         celery_worker_container = task_definition.add_container("CeleryWorkerContainer",
                                                                 container_name="celery_worker",
-                                                                cpu=max(cpu / 2, 256),
-                                                                # Limit to half the task definition CPU
-                                                                memory_limit_mib=max(memory_limit_mib / 2, 512),
-                                                                # Limit to half the task definition memory
-
                                                                 image=ecs.ContainerImage.from_docker_image_asset(
                                                                     props.ecr_docker_asset),
                                                                 command=["/start-celeryworker-solo"],
@@ -68,6 +63,9 @@ class CeleryWorkerStack(Stack):
                                                                     "CELERY_RESULT_BACKEND": f"redis://{props.redis_url}:{props.redis_port}/1",
                                                                     "CELERY_QUEUE": "celery",
                                                                     # ^^^ Use this to define different priority of queues with more or less processing power
+                                                                    # Use the AWS Device Farm by setting below env variables
+                                                                    "DEVICE_FARM_PROJECT_ARN": props.device_farm_project_arn,
+                                                                    "TEST_GRID_PROJECT_ARN": props.test_grid_project_arn,
                                                                     # "SELENIUM_HUB_HOST": props.elbv2_public_lb.load_balancer_dns_name, # Through the public load balancer
                                                                     "SELENIUM_HUB_HOST": f"selenium_hub.{props.ecs_default_cloud_map_namespace.namespace_name}",
                                                                     # Through the internal load balancer
@@ -104,6 +102,11 @@ class CeleryWorkerStack(Stack):
         # Add a new volume to the Fargate Task Definition
         celery_worker_container.add_mount_points(props.ecs_asset_mount_point)
 
+        # Define needed security groups
+        security_groups = [props.ecs_security_group]
+        if props.sel_hub_sg:
+            security_groups.append(props.sel_hub_sg)  # Need the hub security group to allow ingress
+
         # Create a service definitions and port mappings
         celery_worker_service = ecs.FargateService(
             self, 'CeleryWorkerService',
@@ -115,9 +118,7 @@ class CeleryWorkerStack(Stack):
             max_healthy_percent=200,
             min_healthy_percent=100,
             vpc_subnets=ec2.SubnetSelection(one_per_az=True, subnet_type=ec2.SubnetType.PRIVATE_WITH_EGRESS),
-            security_groups=[props.ecs_security_group,
-                             props.get('sel_hub_sg')  # Need the hub security group to allow ingress
-                             ],
+            security_groups=security_groups,
             service_name="celery-worker-service",
             capacity_provider_strategies=[
                 ecs.CapacityProviderStrategy(
@@ -145,7 +146,7 @@ class CeleryWorkerStack(Stack):
             self, f'celery-worker-scalable-target',
             service_namespace=applicationautoscaling.ServiceNamespace.ECS,
             min_capacity=1,
-            max_capacity=50, # TODO: Find a good number for max celery workers capacity
+            max_capacity=50,  # TODO: Find a good number for max celery workers capacity
             resource_id=f'service/{props.ecs_cluster.cluster_name}/{celery_worker_service.service_name}',
             scalable_dimension='ecs:service:DesiredCount'
         )
@@ -182,7 +183,6 @@ class CeleryWorkerStack(Stack):
         )
         '''
 
-
         scaling_policy = applicationautoscaling.TargetTrackingScalingPolicy(
             self, f"celery_worker-target-cpu-scaling-policy",
             policy_name=f"celery-worker-scalable-target-cpu-scaling",
@@ -193,11 +193,10 @@ class CeleryWorkerStack(Stack):
             predefined_metric=applicationautoscaling.PredefinedMetric.ECS_SERVICE_AVERAGE_CPU_UTILIZATION
         )
 
-
         queue_length_metric = cloudwatch.Metric(
             namespace="cqc-lem/celery_queue/celery",
             metric_name="QueueLength",
-            period=Duration.minutes(2),
+            period=Duration.minutes(1),
             statistic="Maximum",
             dimensions_map={
                 "QueueName": "celery"
@@ -222,18 +221,23 @@ class CeleryWorkerStack(Stack):
                     upper=25
                 ),
                 applicationautoscaling.ScalingInterval(
-                    change=8,  # 8 workers when queue length 25-100
+                    change=8,  # 8 workers when queue length 25-50
                     lower=25,
+                    upper=50
+                ),
+                applicationautoscaling.ScalingInterval(
+                    change=15,  # 15 workers when queue length 50-100
+                    lower=50,
                     upper=100
                 ),
                 applicationautoscaling.ScalingInterval(
-                    change=15,  # 15 workers when queue length 100-200
+                    change=25,  # 30 workers when queue length 100-150
                     lower=100,
-                    upper=200
+                    upper=150
                 ),
                 applicationautoscaling.ScalingInterval(
-                    change=30,  # 30 workers when queue length > 200
-                    lower=200
+                    change=50,  # 30 workers when queue length > 150
+                    lower=150
                 )
             ],
             cooldown=Duration.seconds(300)  # Reduce cooldown to make scaling more responsive

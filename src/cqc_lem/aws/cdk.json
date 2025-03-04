@@ -24,7 +24,7 @@
       "CQC-LEM",
       "APIStack",
       "WebStack",
-      "SeleniumStack",
+
       "CeleryBeatStack",
       "CeleryWorkerStack",
       "CeleryFlowerStack"
@@ -33,6 +33,7 @@
       "CQC-LEM",
       "APIStack",
       "WebStack",
+      "DeviceFarmStack",
       "SeleniumStack",
       "APIStack",
       "CeleryBeatStack",

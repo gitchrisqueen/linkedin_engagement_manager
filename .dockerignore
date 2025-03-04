@@ -26,6 +26,7 @@ pip-delete-this-directory.txt
 # Application specific
 src/cqc_lem/assets/
 src/cqc_lem/aws/
+compose/local/linkedinpreview/
 
 # Development and IDE
 .git/

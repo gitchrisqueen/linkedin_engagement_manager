@@ -1,9 +1,10 @@
 from aws_cdk import (
-    Duration,
     aws_ecs as ecs,
     aws_logs as logs,
+    aws_applicationautoscaling as appscaling,
+    Duration,
     aws_elasticloadbalancingv2 as elbv2,
-    aws_ec2 as ec2, Stack, RemovalPolicy, )
+    aws_ec2 as ec2, Stack, RemovalPolicy, TimeZone, )
 from constructs import Construct
 
 from cqc_lem.aws.cdk.shared_stack_props import SharedStackProps
@@ -20,8 +21,8 @@ class CeleryFlowerStack(Stack):
         task_definition = ecs.FargateTaskDefinition(
             self, 'CeleryFlowerFargateTaskDef',
             family='celery_flower',
-            cpu=1024,
-            memory_limit_mib=2048,
+            cpu=512,  # TODO: FInd out why celery flower needs so much CPU
+            memory_limit_mib=1024,  # TODO: Find out why celery flower needs so much memory
             task_role=props.task_execution_role
 
         )
@@ -45,13 +46,15 @@ class CeleryFlowerStack(Stack):
                                                                     "CELERY_BROKER_URL": f"redis://{props.redis_url}:{props.redis_port}/0",
                                                                     "CELERY_RESULT_BACKEND": f"redis://{props.redis_url}:{props.redis_port}/1",
                                                                     "CELERY_FLOWER_PORT": str(props.celery_flower_port),
-                                                                    "CELERY_FLOWER_STATE_SAVE_INTERVAL": str(1000*60*15),  # 15 minutes
+                                                                    "CELERY_FLOWER_STATE_SAVE_INTERVAL": str(
+                                                                        1000 * 60 * 15),  # 15 minutes
                                                                     "TZ": props.tz,
                                                                     # "CELERY_ENABLE_UTC": "True",
                                                                     "CELERY_TIMEZONE": props.tz,
                                                                     "FLOWER_UNAUTHENTICATED_API": "True",
                                                                     "FLOWER_PERSISTENT": "True",
-                                                                    "FLOWER_SAVE_STATE_INTERVAL": "5000",
+                                                                    "FLOWER_SAVE_STATE_INTERVAL": str(1000 * 60 * 15)
+                                                                    # 15 minutes
 
                                                                 },
                                                                 port_mappings=[
@@ -73,12 +76,11 @@ class CeleryFlowerStack(Stack):
                                                                 health_check=ecs.HealthCheck(
                                                                     command=["CMD-SHELL",
                                                                              f"curl -f http://localhost:{props.celery_flower_port}/healthcheck || exit 1"],
-                                                                    interval=Duration.seconds(15),
-                                                                    timeout=Duration.seconds(5),
-                                                                    retries=1,
-                                                                    start_period=Duration.seconds(60)
+                                                                    interval=Duration.seconds(30),
+                                                                    timeout=Duration.seconds(10),
+                                                                    retries=5,
+                                                                    start_period=Duration.seconds(90)
                                                                     # Flower needs time to connect to broker
-
 
                                                                 )
                                                                 )
@@ -138,4 +140,34 @@ class CeleryFlowerStack(Stack):
             priority=40,
             action=elbv2.ListenerAction.forward(target_groups=[target_group]),
             conditions=[elbv2.ListenerCondition.path_patterns(["*"])],
+        )
+
+        # Add scheduled scaling to the Fargate service
+        scaling = celery_flower_service.auto_scale_task_count(
+            min_capacity=0,
+            max_capacity=1  # Or whatever your max capacity should be
+        )
+
+        # Scale down to 0 at 5 PM every day
+        scaling.scale_on_schedule(
+            id="CeleryFlowerScaleDown",
+            time_zone=TimeZone.AMERICA_NEW_YORK,
+            schedule=appscaling.Schedule.cron(
+                hour="17",
+                minute="0"
+            ),
+            min_capacity=0,
+            max_capacity=0
+        )
+
+        # Scale up to 1 at 9 AM every day
+        scaling.scale_on_schedule(
+            id="CeleryFlowerScaleUp",
+            time_zone=TimeZone.AMERICA_NEW_YORK,
+            schedule=appscaling.Schedule.cron(
+                hour="9",
+                minute="0"
+            ),
+            min_capacity=1,
+            max_capacity=1
         )

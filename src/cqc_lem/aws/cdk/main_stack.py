@@ -9,7 +9,6 @@ from cqc_lem.aws.cdk.ecr.ecr_stack import EcrStack
 from cqc_lem.aws.cdk.ecs.ecs_stack import EcsStack
 from cqc_lem.aws.cdk.efs.efs_stack import EFSStack
 from cqc_lem.aws.cdk.elasticcache.redis_stack import RedisStack
-from cqc_lem.aws.cdk.lambda_stack import LambdaStack
 from cqc_lem.aws.cdk.rds.mysql_stack import MySQLStack
 from cqc_lem.aws.cdk.shared_stack_props import SharedStackProps
 
@@ -49,7 +48,7 @@ class MainStack(Stack):
 
         mysql_stack = MySQLStack(self, "MySQLStack", vpc=vpc, mysql_port=props.mysql_port)
         efs_stack = EFSStack(self, "EFSStack", vpc=vpc)
-        ecs_stack = EcsStack(self, "EcsStack", vpc=vpc,props=props)
+        ecs_stack = EcsStack(self, "EcsStack", vpc=vpc, props=props)
         redis_stack = RedisStack(self, "RedisStack", vpc=vpc, security_group=ecs_stack.ecs_security_group)
         redis_stack.add_dependency(ecs_stack)
 
@@ -63,19 +62,17 @@ class MainStack(Stack):
         lambda_stack.add_dependency(redis_stack)
         '''
 
-
-        api_base_url = f"http://{ecs_stack.public_lb.load_balancer_dns_name}" # Public url
-        #api_base_url= f"http://api.{ecs_stack.default_cloud_map_namespace.namespace_name}"# Private url - only accessible within the VPC
+        api_base_url = f"http://{ecs_stack.public_lb.load_balancer_dns_name}"  # Public url
+        # api_base_url= f"http://api.{ecs_stack.default_cloud_map_namespace.namespace_name}"# Private url - only accessible within the VPC
 
         ecr_stack = EcrStack(self, "EcrStack")
 
-
-        #celery_worker_batch_log_group = logs.LogGroup(
+        # celery_worker_batch_log_group = logs.LogGroup(
         #    self, "CeleryWorkerBatchLogGroup",
         #    log_group_name="/cqc-lem/celery_worke_batchr",
         #    retention=logs.RetentionDays.ONE_WEEK,
         #    removal_policy=RemovalPolicy.DESTROY
-        #)
+        # )
 
         selenium_log_group = logs.LogGroup(
             self, "SeleniumLogGroup",
@@ -152,6 +149,17 @@ class MainStack(Stack):
                                    'cloudwatch:PutMetricData',
                                    'cloudwatch:GetMetricStatistics'
                                ]
+                           ),
+                           # Add Device Farm permissions
+                           iam.PolicyStatement(
+                               sid="AllowDeviceFarmAccess",
+                               effect=iam.Effect.ALLOW,
+                               resources=['*'],
+                               actions=[
+                                   "devicefarm:CreateTestGridUrl",
+                                   "devicefarm:GetTestGridProject",
+                                   "devicefarm:ListTestGridProjects",
+                               ]
                            )
                        ]
                        )
@@ -191,8 +199,8 @@ class MainStack(Stack):
         self.output_props['elbv2_selenium_bus_subscribe_listener'] = ecs_stack.selenium_bus_subscribe_listener
         self.output_props['redis_cluster_id'] = redis_stack.redis_cluster_id
         self.output_props['redis_url'] = redis_stack.redis_url
-        #self.output_props['lambda_get_redis_queue_message_count'] = lambda_stack.get_queue_message_count
-        #self.output_props['celery_worker_batch_log_group_arn'] = celery_worker_batch_log_group.log_group_arn
+        # self.output_props['lambda_get_redis_queue_message_count'] = lambda_stack.get_queue_message_count
+        # self.output_props['celery_worker_batch_log_group_arn'] = celery_worker_batch_log_group.log_group_arn
         self.output_props['selenium_log_group_arn'] = selenium_log_group.log_group_arn
         self.output_props['api_base_url'] = api_base_url
 

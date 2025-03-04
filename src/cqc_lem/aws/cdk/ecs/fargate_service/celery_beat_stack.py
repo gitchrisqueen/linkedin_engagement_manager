@@ -19,8 +19,8 @@ class CeleryBeatStack(Stack):
         task_definition = ecs.FargateTaskDefinition(
             self, 'CeleryBeatFargateTaskDef',
             family='celery_beat',
-            cpu=2048,
-            memory_limit_mib=4096,
+            cpu=256,
+            memory_limit_mib=512,
             task_role=props.task_execution_role
 
         )
@@ -51,6 +51,9 @@ class CeleryBeatStack(Stack):
                                                                   "CELERY_BROKER_URL": f"redis://{props.redis_url}:{props.redis_port}/0",
                                                                   "CELERY_RESULT_BACKEND": f"redis://{props.redis_url}:{props.redis_port}/1",
                                                                   "CELERY_QUEUE": "celery",
+                                                                  # Use the AWS Device Farm by setting below env variables
+                                                                  "DEVICE_FARM_PROJECT_ARN": props.device_farm_project_arn,
+                                                                  "TEST_GRID_PROJECT_ARN": props.test_grid_project_arn,
                                                                   # "SELENIUM_HUB_HOST": props.elbv2_public_lb.load_balancer_dns_name, # Through the public load balancer
                                                                   "SELENIUM_HUB_HOST": f"selenium_hub.{props.ecs_default_cloud_map_namespace.namespace_name}",
                                                                   # Through the internal load balancer

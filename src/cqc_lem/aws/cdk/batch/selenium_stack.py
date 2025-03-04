@@ -21,8 +21,8 @@ class SeleniumStack(Stack):
     def __init__(self, scope: Construct, id: str,
                  props: SharedStackProps,
                  hub_memory_limit: int = 512,
-                 node_memory_limit: int = 512,
                  hub_cpu: int = 256,
+                 node_memory_limit: int = 512,
                  node_cpu: int = 256,
                  **kwargs) -> None:
         super().__init__(scope, id, **kwargs)
@@ -94,8 +94,8 @@ class SeleniumStack(Stack):
     def create_hub_resources(self,
                              identifier: str,
                              props: SharedStackProps,
-                             memory_limit: int = 512,
-                             cpu: int = 256
+                             memory_limit: int = 1024,
+                             cpu: int = 512
                              ) -> ecs.FargateService:
         """
         Create Selenium Hub resources including service, autoscaling, and load balancer configuration
@@ -135,7 +135,9 @@ class SeleniumStack(Stack):
             ),
             health_check=ecs.HealthCheck(
                 command=["CMD-SHELL",
-                         f"curl -f http://selenium_{identifier}.{props.ecs_default_cloud_map_namespace.namespace_name}:{props.selenium_hub_port}/wd/hub/status || exit 1"],
+                            #f"curl -f http://selenium_{identifier}.{props.ecs_default_cloud_map_namespace.namespace_name}:{props.selenium_hub_port}/wd/hub/status || exit 1",
+                            f"/opt/bin/check-grid.sh --host 0.0.0.0 --port {props.selenium_hub_port}" # TODO: Should we use the cloud map namespace url for host?
+                         ],
                 interval=Duration.seconds(30),
                 timeout=Duration.seconds(5),
                 retries=3,
@@ -283,7 +285,7 @@ class SeleniumStack(Stack):
             cluster=props.ecs_cluster,
             security_groups=[
                 # props.ecs_security_group,
-                props.get('sel_node_sg')
+                props.sel_node_sg
             ],
             task_execution_role=props.task_execution_role,
             environment={
@@ -303,7 +305,10 @@ class SeleniumStack(Stack):
                 "SE_SESSION_REQUEST_TIMEOUT": "300",
                 "SE_NODE_SESSION_TIMEOUT": "600",
                 # "SE_OPTS": '-debug',
-                "shm_size": '2g',
+
+                # NOTE: This is not needed since we are using --disable-dev-shm-usage flag which tells Chrome to use the disk for shared memory instead of /dev/shm
+                # str(props.selenium_node_max_sessions)+'g', # 1 GB per selenium node session
+
                 # TODO: For Video Recording - (Mount folder and upload to S3 Bucket???)
                 #"SE_RECORD_VIDEO": "True",
                 #"SE_VIDEO_FILE_NAME": "auto",
@@ -420,8 +425,6 @@ class SeleniumStack(Stack):
             task_role=task_execution_role
         )
 
-        desired_port = props.selenium_hub_port if identifier == "hub" else props.selenium_node_port
-
         container_definition = task_definition.add_container(
             f'selenium_{identifier}-container',
             image=ecs.ContainerImage.from_registry(image),
@@ -432,8 +435,6 @@ class SeleniumStack(Stack):
             command=command,
             # stop_timeout=Duration.seconds(120), # Do not add stop timeout as it kills the container
             health_check=health_check,
-            cpu=max(cpu/2,256),  # Limit to half the task definition CPU
-            memory_limit_mib=max(memory_limit/2,512),  # Limit to half the task definition memory
         )
 
         # Create a port name to port number map array
@@ -535,6 +536,8 @@ class SeleniumStack(Stack):
             scale_out_cooldown=Duration.seconds(180),  # 3 minutes
             predefined_metric=applicationautoscaling.PredefinedMetric.ECS_SERVICE_AVERAGE_CPU_UTILIZATION
         )
+
+
 
 
         '''

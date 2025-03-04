@@ -14,7 +14,7 @@ services:
       - mysql
       - redis
     volumes:
-      - ./src:/app/src
+      #- ./src:/app/src
       # Mount the assets folder (already done in current file structure)
       #- ./src/cqc_lem/assets:/app/src/cqc_lem/assets
       # mount test folder
@@ -142,7 +142,8 @@ services:
   flower:
     image:  ${DOCKER_IMAGE_NAME}
     container_name: celery_flower
-    command: /start-flower
+    #command: /start-flower
+    command: /start-flower-no-wait
     #restart: always
     volumes:
       - ./logs:/app/logs
@@ -160,7 +161,7 @@ services:
       #- AWS_PROFILE=default
       - FLOWER_UNAUTHENTICATED_API=True
       - FLOWER_PERSISTENT=True
-      - FLOWER_SAVE_STATE_INTERVAL=5000  # 5s
+      - FLOWER_SAVE_STATE_INTERVAL=${CELERY_FLOWER_STATE_SAVE_INTERVAL}
     ports:
       - "${CELERY_FLOWER_PORT}:5555"
     depends_on:
