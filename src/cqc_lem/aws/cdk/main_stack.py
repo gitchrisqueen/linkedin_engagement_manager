@@ -111,7 +111,7 @@ class MainStack(Stack):
 
         # Attach a managed policy to the IAM Role
         TaskExecutionRole.attach_inline_policy(
-            iam.Policy(self, 'TaskExecEFSPolicy',
+            iam.Policy(self, 'TaskExecutionRolePolicy',
                        statements=[
                            iam.PolicyStatement(
                                effect=iam.Effect.ALLOW,

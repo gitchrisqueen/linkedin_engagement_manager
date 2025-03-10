@@ -74,9 +74,16 @@ def plan_content_for_user(self, user_id: int):
     # Use the last planned date if it exists and it is after today
     if last_planned_date and last_planned_date.date() > datetime.now().date():
         start_date = last_planned_date + timedelta(days=1)  # Start with the next day
+
+        # If the start date is greate than 30 days from today just skip the process
+        if start_date > datetime.now() + timedelta(days=30):
+            myprint(f"Content Plan | Start Date: {start_date} | >30 days out | Skipped")
+            return
     else:
         start_date = datetime.now() + timedelta(days=1)  # Start with the next day
     myprint(f"Content Plan | Start Date: {start_date}")
+
+
 
     # Determine how many days are left in this month
     days_left_in_month = days_in_month - start_date.day
@@ -677,7 +684,7 @@ def auto_create_weekly_content(user_id: int = None):
         myprint(f"Creating weekly content for user id: {user_id}")
 
     # Get the planned content for the current week or next week if today is saturday
-    if datetime.now().weekday() == 5:
+    if datetime.now().weekday() >= 5:
         planned_posts = get_planned_posts_for_next_week(user_id)
     else:
         planned_posts = get_planned_posts_for_current_week(user_id)

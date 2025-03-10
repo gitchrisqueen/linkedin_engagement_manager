@@ -73,10 +73,10 @@ app.conf.update(
             'task': 'cqc_lem.app.run_scheduler.auto_clean_stale_profiles',
             'schedule': crontab(hour='3', minute='0', )  # Run every day at 3:00 AM
         },
-        'clen-up-old_videos': {
-            'task': 'cqc_lem.app.run_scheduler.auto_clean_old_videos',
-            'schedule': crontab(hour='4', minute='0', )  # Run every day at 4:00 AM
-        },
+        #'clen-up-old_videos': {
+        #    'task': 'cqc_lem.app.run_scheduler.auto_clean_old_videos',
+        #    'schedule': crontab(hour='4', minute='0', )  # Run every day at 4:00 AM
+        #},
         'invite_to_company_pages': {
             'task': 'cqc_lem.app.run_scheduler.auto_invite_to_company_pages',
             'schedule': crontab(hour='5', minute='0', day_of_month='1')  # Run on the 1st of the month at 5:00 AM

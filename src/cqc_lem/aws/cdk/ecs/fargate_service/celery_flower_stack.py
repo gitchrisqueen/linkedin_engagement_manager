@@ -148,25 +148,25 @@ class CeleryFlowerStack(Stack):
             max_capacity=1  # Or whatever your max capacity should be
         )
 
-        # Scale down to 0 at 5 PM every day
+        # Scale down to 0 at 10 AM every day
         scaling.scale_on_schedule(
             id="CeleryFlowerScaleDown",
             time_zone=TimeZone.AMERICA_NEW_YORK,
             schedule=appscaling.Schedule.cron(
-                hour="17",
+                hour="10",
                 minute="0"
             ),
             min_capacity=0,
             max_capacity=0
         )
 
-        # Scale up to 1 at 9 AM every day
+        # Scale up to 1 at 8:30 AM every day
         scaling.scale_on_schedule(
             id="CeleryFlowerScaleUp",
             time_zone=TimeZone.AMERICA_NEW_YORK,
             schedule=appscaling.Schedule.cron(
-                hour="9",
-                minute="0"
+                hour="8",
+                minute="30"
             ),
             min_capacity=1,
             max_capacity=1
