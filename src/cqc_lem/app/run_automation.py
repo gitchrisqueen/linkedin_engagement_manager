@@ -721,6 +721,58 @@ def accept_connection_request(user_id: int):
     return invitation_data
 
 
+def get_recent_recommendations(user_id: int) -> dict:
+    """Get recent recommendations received for the given user.
+    
+    Returns:
+        dict: Dictionary with profile_url as key and name as value for people who gave recommendations
+    """
+    # TODO: Implement logic to detect recent recommendations
+    # This could involve checking LinkedIn notifications, parsing the profile page, or tracking database changes
+    # For now, return empty dict as placeholder
+    myprint(f"Checking for recent recommendations for user {user_id}")
+    return {}
+
+
+def get_recent_interviews(user_id: int) -> dict:
+    """Get recent interview completions for the given user.
+    
+    Returns:
+        dict: Dictionary with profile_url as key and company/interviewer name as value
+    """
+    # TODO: Implement logic to detect completed interviews
+    # This could involve checking calendar integrations, manual user input, or tracking specific LinkedIn activities
+    # For now, return empty dict as placeholder
+    myprint(f"Checking for recent interviews for user {user_id}")
+    return {}
+
+
+def get_successful_collaborations(user_id: int) -> dict:
+    """Get recently completed successful collaborations for the given user.
+    
+    Returns:
+        dict: Dictionary with profile_url as key and collaborator name as value
+    """
+    # TODO: Implement logic to detect successful collaborations
+    # This could involve project completion tracking, user input, or integration with project management tools
+    # For now, return empty dict as placeholder  
+    myprint(f"Checking for successful collaborations for user {user_id}")
+    return {}
+
+
+def get_general_appreciation_contacts(user_id: int) -> dict:
+    """Get contacts for general appreciation messages.
+    
+    Returns:
+        dict: Dictionary with profile_url as key and contact info as value
+    """
+    # TODO: Implement logic to identify contacts for general appreciation
+    # This could be based on recent interactions, meaningful conversations, or periodic outreach
+    # For now, return empty dict as placeholder
+    myprint(f"Checking for general appreciation contacts for user {user_id}")
+    return {}
+
+
 @shared_task.task(bind=True, base=QueueOnce, once={'graceful': True, 'unlock_before_run': True, 'keys': ['user_id']},
                   reject_on_worker_lost=True,
                   rate_limit='2/m')
@@ -746,17 +798,36 @@ def automate_appreciation_dms_for_user(self, user_id: int, loop_for_duration: in
             send_private_dm.apply_async(kwargs={"user_id": user_id, "profile_url": profile_url, "message": message})
 
         # TODO: After Receiving a Recommendation:
+        recommendations_received = get_recent_recommendations(user_id)
+        for profile_url, name in recommendations_received.items():
+            message = f"Hi {name}, thank you so much for the thoughtful recommendation! Your kind words truly mean a lot to me, and I'm grateful for your support. It's wonderful to have colleagues like you who take the time to recognize others' work."
+            send_private_dm.apply_async(kwargs={"user_id": user_id, "profile_url": profile_url, "message": message})
 
         # TODO: After an Interview:
+        recent_interviews = get_recent_interviews(user_id)
+        for profile_url, interviewer_name in recent_interviews.items():
+            message = f"Hi {interviewer_name}, I wanted to thank you for taking the time to interview me. I really enjoyed our conversation and learning more about the role and your team. I appreciate the opportunity and look forward to hearing from you soon."
+            send_private_dm.apply_async(kwargs={"user_id": user_id, "profile_url": profile_url, "message": message})
 
         # TODO: For a Successful Collaboration:
+        successful_collaborations = get_successful_collaborations(user_id)
+        for profile_url, collaborator_name in successful_collaborations.items():
+            message = f"Hi {collaborator_name}, I wanted to reach out and thank you for the fantastic collaboration on our recent project. Working with you was truly a pleasure, and I'm proud of what we accomplished together. I hope we get the chance to collaborate again soon!"
+            send_private_dm.apply_async(kwargs={"user_id": user_id, "profile_url": profile_url, "message": message})
 
         # General Appreciation:
-        # "Hi [Name], I really appreciate your insights on [topic]. Your perspective helped me see things differently, and I'm grateful for the opportunity to learn from you."
-
-        # profile_url = '' # TODO: Update
-        # message = '' # TODO: Update
-        # TODO: Use this line #send_private_dm.apply_async(kwargs={"user_id": user_id, "profile_url": profile_url, "message": message})
+        general_appreciation_contacts = get_general_appreciation_contacts(user_id)
+        for profile_url, contact_info in general_appreciation_contacts.items():
+            # Extract name and topic from contact_info if it's a dict, otherwise use it as name
+            if isinstance(contact_info, dict):
+                name = contact_info.get('name', 'there')
+                topic = contact_info.get('topic', 'your recent insights')
+            else:
+                name = contact_info
+                topic = 'your recent insights'
+            
+            message = f"Hi {name}, I really appreciate your insights on {topic}. Your perspective helped me see things differently, and I'm grateful for the opportunity to learn from you."
+            send_private_dm.apply_async(kwargs={"user_id": user_id, "profile_url": profile_url, "message": message})
 
         # Re-schedule the task in the queue for the future
         if loop_for_duration:
