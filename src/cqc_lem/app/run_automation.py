@@ -1076,15 +1076,31 @@ def engage_with_profile_viewer(self, user_id: int, viewer_url, viewer_name):
 
                         # Get the first name from the view_name by splitting on space
                         first_name = viewer_name.split(" ")[0]
+
+                        # TODO : Review/Retrieve previous messages with user first.
+                        message_history = []
+
+                        # TODO: Check user profile to find what type of focus the message should have to then send.
+                        main_focus = "I'd like to connect with LinkedIn users to discuss my project and see if they would be interested in it."
+
+                        # TODO: Get initial message from user profile
                         message = f"Hi {first_name}, I noticed we're connected on LinkedIn and wanted to reach out. I'm currently working on a project that I think you might find interesting. Would you be open to a quick chat to discuss it further?"
 
-                        # Send actual DM
-                        kwargs = {'user_id': get_user_id(my_profile.email),
-                                  'profile_url': str(profile.profile_url),
-                                  'message': message}
-                        send_private_dm.apply_async(kwargs=kwargs)
-                        result = f"Profile Viewer Engagement Completed. Sent DM to {viewer_name}"
-                        engagement_successful = True
+                        # If message was already sent do not send again
+                        message = ai_check_message_history(message_history, main_focus, message)
+
+
+                        if message:
+
+                            # Send actual DM
+                            kwargs = {'user_id': get_user_id(my_profile.email),
+                                      'profile_url': str(profile.profile_url),
+                                      'message': message}
+                            send_private_dm.apply_async(kwargs=kwargs)
+                            result = f"Profile Viewer Engagement Completed. Sent DM to {viewer_name}"
+                            engagement_successful = True
+                        else:
+                            result = f"Message already sent to {viewer_name}"
                 else:
                     # myprint(f"We Are {profile.connection} Connections")
                     # If not 1st connections, send them a connection request

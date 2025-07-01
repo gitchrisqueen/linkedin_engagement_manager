@@ -66,7 +66,7 @@ def get_available_session_driver_id(wait_for_available=True, wait_time=60, retry
     return session_id
 
 
-def get_docker_driver(headless=True, session_name: str = "ChromeTests"):
+def get_docker_driver(headless=True, session_name: str = "ChromeTests", coordinates: dict = None) -> WebDriver:
     options = getBaseOptions()
     # options.headless = headless
     if headless:
@@ -96,6 +96,19 @@ def get_docker_driver(headless=True, session_name: str = "ChromeTests"):
 
     if not headless:
         driver.maximize_window()
+
+    # TODO: Get this from function parameter
+    # Define geolocation coordinates for Jacksonville, FL
+    if coordinates is None:
+        coordinates = {
+            "latitude": 30.3321,  # Jacksonville, FL latitude
+            "longitude": -81.6556,  # Jacksonville, FL longitude
+            "accuracy": 100  # Specify the accuracy
+        }
+
+    # Emulate geolocation
+    if coordinates is not None:
+        driver.execute_cdp_cmd("Emulation.setGeolocationOverride", coordinates)
 
     return driver
 
@@ -145,7 +158,8 @@ def getBaseOptions(base_download_directory: str = None):
     options.add_argument("window-size=1920x1080")
     options.add_argument(
         # "user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/74.0.3729.169 Safari/537.36"
-        "user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.6723.91 Safari/537.36"
+        #"user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.6723.91 Safari/537.36"
+        "user-agent=Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.6723.91 Safari/537.36"
     )
 
     # options.set_capability("browserVersion", "100.0")  # This is needed for this version
@@ -341,11 +355,13 @@ def get_driver_wait(driver, wait_time: int = None):
                          ])
 
 
-def get_driver_wait_pair(headless=False, session_name: str = "ChromeTests", max_retry=3):
+def get_driver_wait_pair(headless=False, session_name: str = "ChromeTests", max_retry=3, coordinates: dict = None):
+    # TODO: Get the coordinates from the user's entry in the database for methods calling
+
     # Create the driver
     for attempt in range(max_retry):
         try:
-            driver = get_docker_driver(headless=headless, session_name=session_name)
+            driver = get_docker_driver(headless=headless, session_name=session_name, coordinates=coordinates)
             break  # Exit the loop if successful
         except SessionNotCreatedException as e:
             if attempt == max_retry - 1:

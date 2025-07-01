@@ -1781,3 +1781,97 @@ def create_runway_video(image_path: str, prompt: str):
         video_url = None
 
     return video_url
+
+def ai_check_message_history(message_history_json: str, main_focus: str, message:str):
+    """Check if the message history contains sentiments of the message already. It will return it or try to generate a seamless new message that is tied to the main_focus"""
+
+    """Here is the fully optimized and structured prompt based on your one-liner. This prompt includes a clearly defined identity, objective, and step-by-step logic tailored to maximize performance in ChatGPT:
+
+    
+
+"""
+
+    print(
+        f'Generating message to {user_name} based on the given message history.')
+
+
+
+    prompt = f"""Please create an initial message, continued message response, or empty response to {user_name} based on our message history based on the given message only if it makes contextual sense: 
+    
+    Message History JSON:
+    ```json
+    <insert message history here>
+    ````
+    """
+
+    # Add the Message History JSON to end of prompt
+    prompt += f"\n ### Message History JSON: ```text{message_history_json}```\n\n"
+
+    # Add the New Message to end of prompt
+    prompt += f"\n ### New Message: ```text{message}```\n\n"
+
+    # Add the Main Focus to the prompt
+    prompt += f"\n ### Main Focus: ```text{analysis}```"
+
+    content = [{"type": "text", "text": prompt}]
+
+    # System prompt to be included in every request
+    system_prompt = {
+        "role": "system",
+        "content": f"""Act like a conversational continuity assistant and dialogue analyzer. You specialize in evaluating JSON-formatted message histories between two users to determine logical continuity and sentiment consistency. Your goal is to either repeat a given message or generate a seamless continuation based on conversational context.
+    
+    Objective:
+    You are provided with:
+    1. A `json` string representing the chronological message history between two users.
+    2. A `new_message` which contains the content we want to evaluate for repetition or potential continuation.
+    3. A `main_focus`, which is the thematic anchor or subject that should guide any new content generation.
+    
+    Your task:
+    Determine whether the `new_message` already reflects sentiments, expressions, or thematic presence in the message history. If so, avoid redundancy. If not, generate a new message that:
+    - Logically continues the conversation.
+    - Naturally connects to the `main_focus`.
+    - Flows seamlessly in tone and topic with the message history.
+    
+    Instructions:
+    Step 1: Parse the JSON string of message history and summarize the conversation's tone, key sentiments, and focal points so far.
+    Step 2: Compare this summary with the `new_message` to check if the same intent or sentiment is already expressed. Be strict about avoiding redundancy in intent, sentiment, or meaning—even if the wording differs.
+    Step 3: If the history is empty or does not reflect the `new_message`, return the `new_message` as is.
+    Step 4: If the `new_message` would be redundant, then generate a fresh, original message that naturally follows the last few entries, maintains thematic alignment with `main_focus`, and enhances the dialogue flow.
+    Step 5: Ensure the tone, style, and user perspective are consistent with prior entries.
+    
+    Take a deep breath and work on this problem step-by-step.
+        """
+    }
+
+    # User prompt to be sent with each API call
+    user_message = {
+        "role": "user",
+        "content": content
+    }
+
+    # Call the API with the system and user prompt only (no memory of past prompts)
+    response = client.chat.completions.create(
+        model="gpt-4o-mini",  # Specify the model you want to use
+        messages=[system_prompt, user_message],  # System prompt + current user prompt
+        temperature=round(random.uniform(0.5, 0.7), 2),  # Rand temp between .5 and .7
+
+        top_p=round(random.uniform(0.85, 0.95), 2),
+        # Encourages diversity in word choice while focusing on high-probability responses for coherent professional content.
+        frequency_penalty=round(random.uniform(0.3, 0.5), 2),
+        # Minimizes repetitive patterns to ensure unique and varied phrasing.
+        presence_penalty=round(random.uniform(0.4, 0.6), 2),
+        # Boosts exploration of new ideas while keeping content relevant to the LinkedIn tone.
+
+        # max_tokens=150  # Set token limit as required
+        # response_format={"type": "json_object"},
+    )
+
+    # Extract and return the model's response
+    content = response.choices[0].message.content.strip()
+    return content
+
+    # Check if the message history contains the main focus and the message
+    if main_focus in message_history and message in message_history:
+        return True
+    else:
+        return False
