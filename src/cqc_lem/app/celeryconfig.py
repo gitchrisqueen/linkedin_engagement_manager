@@ -61,7 +61,7 @@ def get_aws_sqs(queue_name: str,
                 # region_name: str,
                 session: boto3.session.Session) -> dict:
     sqs = session.client(
-        service_name='elasticcache',
+        service_name='sqs',
         # region_name=region_name
     )
 
@@ -96,7 +96,7 @@ def setup_aws_sqs_config():
                 print(f"SQS Queue URL: {sqs_queue_url}")
 
                 # Set broker_url, broker_transport_options and task_create_missing_queues
-                broker_url = "elasticcache://"  # Note: Can use this when environment variables AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY are set
+                broker_url = "sqs://"  # Use SQS as the message broker
                 print(f"Broker URL: {broker_url}")
 
                 broker_transport_options = {

@@ -12,6 +12,86 @@ from cqc_lem.utilities.env_constants import CODE_TRACING, AWS_REGION
 from cqc_lem.utilities.jaeger_tracer_helper import get_jaeger_tracer
 from cqc_lem.utilities.logger import myprint, logger
 from cqc_lem.utilities.utils import get_cloudwatch_client
+import os
+
+def get_celery_once_config():
+    """
+    Get the appropriate celery-once configuration based on the broker type.
+    
+    This function solves the problem of determining the correct celery-once backend
+    when using AWS SQS as the Celery broker. The key insight is that the Celery
+    broker and celery-once backend are independent concerns:
+    
+    - Celery broker: Handles message queuing (Redis, SQS, etc.)
+    - celery-once backend: Handles task deduplication (Redis, File, etc.)
+    
+    For AWS SQS deployments:
+    - Use SQS for Celery message brokering (scalable, cloud-native)
+    - Use Redis (ElastiCache) for celery-once backend (fast, reliable deduplication)
+    
+    For Redis deployments:
+    - Use Redis for both broker and celery-once backend
+    - Use different databases to avoid conflicts (broker=0, once=2)
+    
+    Returns:
+        dict: Configuration for celery-once with backend and settings
+    """
+    # Check if we're using AWS SQS as broker
+    if broker_url.startswith(('sqs://', 'elasticcache://')):
+        # When using SQS as broker, we still use Redis for celery-once backend
+        # Get Redis connection info from environment or use ElastiCache
+        redis_host = os.getenv('REDIS_HOST', os.getenv('ELASTICACHE_HOST', 'redis'))
+        redis_port = os.getenv('REDIS_PORT', '6379')
+        
+        # Construct Redis URL for celery-once backend (separate from SQS broker)
+        redis_once_url = f'redis://{redis_host}:{redis_port}/2'  # Use DB 2 for once locks
+        
+        logger.info(f"Using SQS broker with Redis celery-once backend: {redis_once_url}")
+        
+        return {
+            'backend': 'celery_once.backends.Redis',
+            'settings': {
+                'url': redis_once_url,
+                'default_timeout': 60 * 60,
+                'blocking': True,
+                'blocking_timeout': 30,
+            }
+        }
+    
+    elif broker_url.startswith('redis://'):
+        # When using Redis as broker, use the same Redis for celery-once
+        # but use a different database to avoid conflicts
+        import re
+        # Replace the database number with 2, preserving the rest of the URL
+        redis_once_url = re.sub(r'/\d+$', '/2', broker_url)
+        if not redis_once_url.endswith('/2'):
+            # If no database was specified, add /2
+            redis_once_url = broker_url.rstrip('/') + '/2'
+        
+        logger.info(f"Using Redis broker with Redis celery-once backend: {redis_once_url}")
+        
+        return {
+            'backend': 'celery_once.backends.Redis',
+            'settings': {
+                'url': redis_once_url,
+                'default_timeout': 60 * 60,
+                'blocking': True,
+                'blocking_timeout': 30,
+            }
+        }
+    
+    else:
+        # Fallback to File backend for unknown brokers
+        logger.warning(f"Unknown broker type '{broker_url}', falling back to File backend for celery-once")
+        
+        return {
+            'backend': 'celery_once.backends.File',
+            'settings': {
+                'location': '/tmp/celery_once',
+                'default_timeout': 60 * 60,
+            }
+        }
+
 
 # Create default Celery app
 app = Celery(
@@ -31,16 +111,7 @@ app.config_from_object(celeryconfig)
 app.autodiscover_tasks(['cqc_lem'])
 
 # Setup Celery Once for task that should only be queued once per parameters sent
-
-app.conf.ONCE = {
-    'backend': 'celery_once.backends.Redis',  # TODO: What should this be for AWS SQS
-    'settings': {
-        'url': broker_url,
-        'default_timeout': 60 * 60,
-        'blocking': True,
-        'blocking_timeout': 30,
-    }
-}
+app.conf.ONCE = get_celery_once_config()
 
 # Celery configuration
 app.conf.update(
