@@ -104,13 +104,13 @@ def test_send_dm():
     my_profile = get_my_profile(driver, wait, LI_USER, LI_PASSWORD)
 
     # 2nd Connection
-    profile_url = "https://www.linkedin.com/in/eric-partaker-5560b92"
-    name = "Eric Partaker"
+    profile_url = "https://www.linkedin.com/in/user-5560b92"
+    name = "User Lastname"
     engage_with_profile_viewer(driver, wait, my_profile, profile_url, name)
 
     # 1st Connection
-    profile_url_2 = "https://www.linkedin.com/in/byron-mcclure-0a20a837/"
-    name_2 = "Bryon McClure"
+    profile_url_2 = "https://www.linkedin.com/in/user-0a20a837/"
+    name_2 = "User2 Lastname"
     engage_with_profile_viewer(driver, wait, my_profile, profile_url_2, name_2)
 
     driver.quit()
@@ -152,7 +152,7 @@ def test_summarize_interesting_recent_activity_and_response():
     if profile_data:
         main_profile = LinkedInProfile(**profile_data)
 
-        profile_2_url = "https://www.linkedin.com/in/eric-partaker-5560b92"
+        profile_2_url = "https://www.linkedin.com/in/user-5560b92"
         profile_2_data = get_linkedin_profile_from_url(driver, wait, profile_2_url)
         if profile_2_data:
             second_profile = LinkedInProfile(**profile_2_data)
@@ -203,8 +203,8 @@ def test_invite_to_connect():
     driver, wait = get_driver_wait_pair(session_name='Test Invite to Connect')
     login_to_linkedin(driver, wait, LI_USER, LI_PASSWORD)
 
-    invite_list = ["https://www.linkedin.com/in/eric-partaker-5560b92/",
-                   "https://www.linkedin.com/in/bhavika-hariyani-444178222/"]
+    invite_list = ["https://www.linkedin.com/in/user-5560b92/",
+                   "https://www.linkedin.com/in/user2-444178222/"]
 
     message = """I came across your profile and was impressed by your experience as The CEO Coach and your recognition as CEO of the Year in 2019. Your work at The CEO Accelerator truly stands out. I also read your recent post, "20 Harsh Truths You Need to Accept to Take Your Career to the Next Level" [https://www.linkedin.com/feed/update/urn:li:activity:7253734954646339584], and found it incredibly insightful. Your thoughts on resilience, leadership, and continuous improvement align well with my commitment to empowering enterprises with AI solutions. 
 
@@ -252,8 +252,8 @@ def test_already_commented():
 
 def test_send_private_dm():
     user_id = 60
-    profile_url = "https://www.linkedin.com/in/shivenarora"
-    name = "Shiven"
+    profile_url = "https://www.linkedin.com/in/userdoesntexit"
+    name = "NotRealUser"
     message = f"Hi {name} 😃, I noticed we're connected on LinkedIn and wanted to reach out. I'm currently working on a project that I think you might find interesting. Would you be open to a quick chat to discuss it further?"
 
     print(f"""Sending message: {message}""")
@@ -286,8 +286,8 @@ def test_send_private_dm():
 def test_engage_with_profile_viewer():
     clear_sessions()
     user_id = 60
-    profile_url = "https://www.linkedin.com/in/ACoAAAhxNBwBxKLTu4LeFsTLvsC4vxe8hbPQ8zQ"
-    name = "Badsha Dash"
+    profile_url = "https://www.linkedin.com/in/replace-with-real-link"
+    name = "Users Post"
     engage_with_profile_viewer(user_id, profile_url, name)
 
 
