@@ -23,8 +23,8 @@ def test_accept_invites():
 
 def test_send_dm():
     user_id = 60
-    profile_url = "https://www.linkedin.com/in/meet-sabhaya/"
-    name = "Meet Sabhaya"
+    profile_url = "https://www.linkedin.com/in/user-name/"
+    name = "Meet LI User"
     message = f"Hi {name}, I appreciate you connecting with me on LinkedIn. I look forward to learning more about you and your work."
     send_private_dm(user_id, profile_url, message)
 
@@ -32,7 +32,7 @@ def test_send_dm():
 def test_mutual_connections():
     driver, wait = get_driver_wait_pair(session_name='Test Mutual Connections')
     login_to_linkedin(driver, wait, LI_USER, LI_PASSWORD)
-    profile_url = "https://www.linkedin.com/in/meet-sabhaya/"
+    profile_url = "https://www.linkedin.com/in/user-name/"
     profile_data = returnProfileInfo(driver, profile_url)
     if profile_data:
         profile = LinkedInProfile(**profile_data)
