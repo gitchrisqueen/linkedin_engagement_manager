@@ -102,6 +102,7 @@ optional = true
 # dependencies used for running tests (e.g., pytest, freezegun, response).
 # Any dependencies that do not meet that criteria will be removed.
 pytest = "^7.3.0"
+pytest-cov = "^4.1.0"
 freezegun = "^1.2.2"
 pytest-mock = "^3.10.0"
 syrupy = "^4.0.2"
@@ -114,6 +115,19 @@ pytest-profiling = "^1.7.0"
 [tool.coverage.run]
 omit = [
     "tests/*",
+    "src/cqc_lem/aws/*",
+]
+source = ["src/cqc_lem"]
+
+[tool.coverage.report]
+exclude_lines = [
+    "pragma: no cover",
+    "def __repr__",
+    "raise AssertionError",
+    "raise NotImplementedError",
+    "if __name__ == .__main__.:",
+    "if TYPE_CHECKING:",
+    "if typing.TYPE_CHECKING:",
 ]
 
 [tool.ruff.lint]
@@ -140,7 +154,7 @@ pythonpath = ["src"]
 #
 # https://github.com/tophat/syrupy
 # --snapshot-warn-unused    Prints a warning on unused snapshots rather than fail the test suite.
-addopts = "--snapshot-warn-unused --strict-markers --strict-config --durations=5"
+addopts = "--snapshot-warn-unused --strict-markers --strict-config --durations=5 -v"
 # Registering custom markers.
 # https://docs.pytest.org/en/7.1.x/example/markers.html#registering-markers
 markers = [
@@ -149,5 +163,10 @@ markers = [
     "compile: mark placeholder test used to compile integration tests without running them",
     "unit: mark a test as a unit test",
     "integration: mark a test as an integration test",
+    "e2e: mark a test as an end-to-end test",
+    "slow: mark test as slow running",
+    "requires_openai: mark test as requiring real OpenAI API access",
+    "requires_database: mark test as requiring real database connection",
+    "requires_selenium: mark test as requiring real browser automation",
 ]
 asyncio_mode = "auto"
