@@ -18,15 +18,14 @@ class TestLinkedInPoster:
     @pytest.mark.requires_selenium
     def test_create_text_post(self, mock_selenium_driver, sample_post_data):
         """Test creating a text-only post on LinkedIn."""
-        from cqc_lem.utilities.linkedin.poster import post_to_linkedin
+        from cqc_lem.utilities.linkedin.poster import share_on_linkedin
         
-        with patch("cqc_lem.utilities.linkedin.poster.post_to_linkedin") as mock_post:
+        with patch("cqc_lem.utilities.linkedin.poster.share_on_linkedin") as mock_post:
             mock_post.return_value = True
             
             result = mock_post(
-                driver=mock_selenium_driver,
-                content=sample_post_data["content"],
-                post_type="TEXT"
+                user_id=60,
+                content=sample_post_data["content"]
             )
             
             assert result is True
