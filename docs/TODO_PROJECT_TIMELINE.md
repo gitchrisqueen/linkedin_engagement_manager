@@ -6,8 +6,8 @@ This document provides a comprehensive overview of all TODO items identified acr
 
 ### Priority Distribution
 - **P0 (Critical)**: 15 items - MVP blockers affecting core functionality
-- **P1 (High)**: 28 items - Important improvements for user experience and stability  
-- **P2 (Medium)**: 34 items - Quality improvements and technical debt
+- **P1 (High)**: 27 items - Important improvements for user experience and stability  
+- **P2 (Medium)**: 35 items - Quality improvements and technical debt
 
 ### Timeline Overview
 The TODO items span multiple areas of the application:
@@ -197,13 +197,10 @@ The TODO items span multiple areas of the application:
    - TODO: Figure out if and how to implement this one
    - Impact: Limited carousel layout options
 
-7. **Add image grabber integration** (`src/cqc_lem/utilities/carousel_creator.py:264`)
+8. **Add image grabber integration** (`src/cqc_lem/utilities/carousel_creator.py:264,279`)
    - TODO: Update this with something from pexels or other image grabber function
    - Impact: Manual image selection required
-
-8. **Add image grabber integration (duplicate)** (`src/cqc_lem/utilities/carousel_creator.py:279`)
-   - TODO: Update this with something from pexels or other image grabber function
-   - Impact: Manual image selection required
+   - Note: Two locations need same integration (lines 264 and 279)
 
 9. **Implement two-column slide layout** (`src/cqc_lem/utilities/carousel_creator.py:319`)
    - TODO: Figure how to implement this one
@@ -242,10 +239,11 @@ The TODO items span multiple areas of the application:
    - TODO: Refine these Selenium Node values
    - Impact: Over/under-provisioned resources
 
-3. **Remove ECS-EFS duplicate code (multiple files)**
+3. **Remove ECS-EFS duplicate code (Code Cleanup)** (8 locations)
    - Files: `api_stack.py:108,111`, `web_stack.py:106,109`, `celery_beat_stack.py:120,123`, `celery_flower_stack.py:111,114`, `celery_worker_stack.py:138,141`
-   - TODO: already handled - remove
-   - Impact: Code duplication
+   - TODO: Code cleanup - remove comments stating "already handled - remove"
+   - Impact: Code duplication comments need cleanup (functionality already implemented)
+   - Note: These are cleanup tasks for obsolete comments, not functional TODOs
 
 4. **Optimize Celery Flower resources** (`src/cqc_lem/aws/cdk/ecs/fargate_service/celery_flower_stack.py:24-25`)
    - TODO: Find out why celery flower needs so much CPU/memory
@@ -427,9 +425,9 @@ Please start with Group 1 (LinkedIn API Error Handling & Core Features) and work
 
 ## Implementation Roadmap
 
-### Phase 1: Critical MVP (Weeks 1-5)
+### Phase 1: Critical MVP (Weeks 1-6)
 - **Weeks 1-3**: Group 1 - LinkedIn API Error Handling & Core Features
-- **Weeks 3-5**: Group 2 - User Interaction & Notification System
+- **Weeks 4-6**: Group 2 - User Interaction & Notification System
 
 ### Phase 2: Foundation & Stability (Weeks 6-10)
 - **Weeks 6-7**: Group 3 - Database Schema & Models
