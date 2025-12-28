@@ -4,10 +4,19 @@
 
 This document provides a comprehensive overview of all TODO items identified across the LinkedIn Engagement Manager codebase. A total of **77 TODO comments** have been cataloged, analyzed, and organized into 8 themed issue groups based on priority and business impact.
 
+**CRITICAL REQUIREMENT**: Before implementing any TODO items, a comprehensive test infrastructure must be established. All TODO fixes MUST follow a Test-Driven Development (TDD) approach to prevent regressions and ensure code quality.
+
 ### Priority Distribution
 - **P0 (Critical)**: 15 items - MVP blockers affecting core functionality
+  - **MUST COMPLETE FIRST**: Test Infrastructure Setup (3 weeks)
 - **P1 (High)**: 27 items - Important improvements for user experience and stability  
 - **P2 (Medium)**: 35 items - Quality improvements and technical debt
+
+### Testing Requirements
+- **Current State**: 44 existing test functions across 9 test files
+- **Target State**: 70%+ code coverage minimum, 85%+ target
+- **Approach**: Test-Driven Development (TDD) for all TODO implementations
+- **Timeline Impact**: +3 weeks for test infrastructure, but prevents costly regressions
 
 ### Timeline Overview
 The TODO items span multiple areas of the application:
@@ -17,6 +26,194 @@ The TODO items span multiple areas of the application:
 - **Content Creation** (carousels, posts, AI generation)
 - **Infrastructure** (AWS CDK, Selenium, scaling)
 - **Code Quality** (documentation, cleanup, performance)
+
+---
+
+## Testing Strategy & Requirements
+
+### Current Test Coverage Analysis
+
+The LinkedIn Engagement Manager currently has **44 test functions** across multiple test files:
+
+**Existing Test Files:**
+- `tests/db_tests.py` - Database operations (post status, video URLs, content updates)
+- `tests/ai_tests.py` - AI integration (image/video generation, prompts)
+- `tests/date_tests.py` - Date/time handling and timezone conversions
+- `tests/run_automation_test.py` - Automation workflows
+- `tests/run_content_plan_test.py` - Content planning functionality
+- `tests/simple_automation_tests.py` - Basic automation scenarios
+- `tests/chrome_test.py` - Selenium/Chrome integration
+- `tests/aws_test.py` - AWS infrastructure
+- `tests/unit/test_cdk_stack.py` - AWS CDK stack validation
+
+### Test Infrastructure Improvements (P0 - Must Complete Before New Development)
+
+**Priority**: P0 - Critical Foundation  
+**Estimated Effort**: 2-3 weeks  
+**Business Impact**: Prevents regression and ensures code quality during TODO implementation
+
+#### Required Test Improvements:
+
+1. **Establish Test Running Infrastructure**
+   - Set up CI/CD pipeline with automated test execution
+   - Configure pytest with proper test discovery and markers
+   - Add test coverage reporting (target: 70%+ coverage)
+   - Document test running commands in README
+   - Estimated: 3-5 days
+
+2. **Create Comprehensive Unit Tests for Core Utilities**
+   - `src/cqc_lem/utilities/db.py` - All database operations
+   - `src/cqc_lem/utilities/linkedin/scrapper.py` - Profile scraping functions
+   - `src/cqc_lem/utilities/linkedin/poster.py` - Post creation and publishing
+   - `src/cqc_lem/utilities/carousel_creator.py` - Carousel generation
+   - `src/cqc_lem/utilities/ai/ai_helper.py` - AI prompt generation and content creation
+   - Estimated: 1-2 weeks
+
+3. **Add Integration Tests for Critical Workflows**
+   - End-to-end automation workflows (connection requests, engagement, DMs)
+   - Content creation and scheduling pipeline
+   - LinkedIn API interaction flows
+   - Estimated: 1 week
+
+4. **Implement Test Fixtures and Mocks**
+   - Mock LinkedIn API responses to avoid rate limits
+   - Database fixtures for consistent test data
+   - AI service mocks for predictable testing
+   - Selenium/WebDriver mocks for UI testing
+   - Estimated: 3-5 days
+
+5. **Add Regression Tests for Known Issues**
+   - Test cases for each TODO item before implementation
+   - Test cases to verify TODO fixes don't break existing functionality
+   - Estimated: Ongoing per TODO
+
+### Testing Requirements Per Issue Group
+
+#### Group 1: LinkedIn API Error Handling & Core Features
+**Test Requirements:**
+- [ ] Unit tests for scrapper methods (including edge cases like empty prefix)
+- [ ] Mock LinkedIn responses for reliable testing
+- [ ] Integration tests for profile data collection
+- [ ] Tests for error handling and retry logic
+- [ ] Performance tests for batch scraping operations
+
+#### Group 2: User Interaction & Notification System
+**Test Requirements:**
+- [ ] Unit tests for DM composition and personalization
+- [ ] Integration tests for message sending workflows
+- [ ] Tests for message history retrieval and duplicate detection
+- [ ] Mock tests for various user profile types
+- [ ] Tests for notification triggers and delivery
+
+#### Group 3: Database Schema & Models
+**Test Requirements:**
+- [ ] Unit tests for all database operations (CRUD)
+- [ ] Tests for token expiration filtering
+- [ ] Tests for Enum handling across different contexts
+- [ ] Tests for active user detection logic
+- [ ] Database migration tests
+- [ ] Tests for connection invite logging
+
+#### Group 4: Configuration & Settings Management
+**Test Requirements:**
+- [ ] Unit tests for configuration loading and validation
+- [ ] Tests for environment variable handling
+- [ ] Tests for user-specific settings retrieval
+- [ ] Tests for AWS SQS Celery backend configuration
+- [ ] Tests for consent and compliance checks
+
+#### Group 5: Content Processing & Validation
+**Test Requirements:**
+- [ ] Unit tests for each carousel type handler
+- [ ] Tests for image grabber integration (Pexels/other services)
+- [ ] Tests for content validation and sanitization
+- [ ] Tests for post type limits and restrictions
+- [ ] Tests for AI preference learning
+- [ ] Tests for reaction type validation
+
+#### Group 6: Infrastructure & AWS Configuration
+**Test Requirements:**
+- [ ] Unit tests for CDK stack definitions
+- [ ] Tests for resource allocation (CPU, memory)
+- [ ] Tests for auto-scaling policies
+- [ ] Tests for service discovery (Cloud Map)
+- [ ] Tests for EFS mount point configuration
+- [ ] Integration tests for Selenium Grid setup
+- [ ] Tests for production vs development configuration flags
+
+#### Group 7: Testing & Code Quality
+**Test Requirements:**
+- [ ] Add Jaeger tracing validation tests
+- [ ] Tests for performance metrics collection
+- [ ] Tests for de-duplication logic
+- [ ] Load tests for concurrent task execution
+
+#### Group 8: Documentation & Enhancement
+**Test Requirements:**
+- [ ] Tests for textract alternatives
+- [ ] UI component tests (Streamlit pages)
+- [ ] Tests for pricing structure calculations
+
+### Test Development Workflow
+
+**CRITICAL RULE**: Before implementing any TODO item, the following test workflow MUST be followed:
+
+1. **Pre-Implementation Phase**
+   - Write failing tests that demonstrate the current broken/missing behavior
+   - Document expected behavior in test assertions
+   - Ensure tests are runnable (even if failing)
+
+2. **Implementation Phase**
+   - Implement the TODO fix/feature
+   - Run tests frequently to verify progress
+   - Refactor code while maintaining passing tests
+
+3. **Validation Phase**
+   - All new/modified tests must pass
+   - No existing tests should break (regression check)
+   - Code coverage should maintain or improve
+   - Run full test suite before marking TODO as complete
+
+4. **Documentation Phase**
+   - Update test documentation
+   - Add comments for complex test scenarios
+   - Document any test limitations or known issues
+
+### Test Commands
+
+```bash
+# Install test dependencies
+poetry install --with dev
+
+# Run all tests
+poetry run pytest
+
+# Run tests with coverage
+poetry run pytest --cov=src/cqc_lem --cov-report=html --cov-report=term
+
+# Run specific test file
+poetry run pytest tests/db_tests.py
+
+# Run tests matching pattern
+poetry run pytest -k "test_scrapper"
+
+# Run tests with verbose output
+poetry run pytest -v
+
+# Run tests and stop on first failure
+poetry run pytest -x
+
+# Run tests in parallel (faster)
+poetry run pytest -n auto
+```
+
+### Success Metrics for Testing
+
+- **Code Coverage**: Maintain minimum 70% coverage, target 85%+
+- **Test Execution Time**: Full test suite < 5 minutes
+- **Test Reliability**: Zero flaky tests, 100% deterministic results
+- **Regression Prevention**: All TODO fixes must include tests that would catch regression
+- **Documentation**: Every test file has clear docstrings explaining what is tested
 
 ---
 
@@ -405,61 +602,141 @@ To enable Copilot to automatically process these TODO items, use the following p
 ```
 @copilot I need you to systematically address TODO items from the project timeline.
 
+**CRITICAL**: Before implementing any TODO, you MUST first ensure proper test coverage exists.
+
 Process:
 1. Review the TODO_PROJECT_TIMELINE.md document
-2. Select the next highest priority unaddressed TODO from Group 1 (P0 items first)
-3. Analyze the TODO item and its context in the codebase
+2. Review the "Testing Strategy & Requirements" section
+3. For the next highest priority TODO:
+   a. Check if adequate tests exist for the affected code
+   b. If tests are missing, write them FIRST (they should fail)
+   c. Implement the TODO fix/feature
+   d. Verify all tests pass (new and existing)
+   e. Check code coverage hasn't decreased
 4. Create an implementation plan with:
+   - Current test coverage assessment
+   - Required new tests (written before implementation)
    - Clear acceptance criteria
    - Testing strategy
    - Risk assessment
-5. Implement the changes
+5. Implement the changes following Test-Driven Development
 6. Run relevant tests to validate
-7. Report progress with commit
-8. Move to next TODO item
+7. Run full test suite to prevent regression
+8. Report progress with commit
+9. Move to next TODO item
 
-Please start with Group 1 (LinkedIn API Error Handling & Core Features) and work through items in priority order.
+**Test-First Approach**: Always write failing tests before implementing fixes. This ensures:
+- Clear specification of expected behavior
+- Regression prevention
+- Confidence in the fix
+
+Please start with the Testing Infrastructure improvements, then proceed to Group 1 (LinkedIn API Error Handling & Core Features) and work through items in priority order.
 ```
 
 ---
 
 ## Implementation Roadmap
 
-### Phase 1: Critical MVP (Weeks 1-6)
-- **Weeks 1-3**: Group 1 - LinkedIn API Error Handling & Core Features
-- **Weeks 4-6**: Group 2 - User Interaction & Notification System
+### Phase 0: Test Foundation (Weeks 1-3) **[MUST COMPLETE FIRST]**
+- **Week 1**: Set up test infrastructure and CI/CD pipeline
+- **Week 2**: Create comprehensive unit tests for core utilities
+- **Week 3**: Add integration tests and test fixtures
 
-### Phase 2: Foundation & Stability (Weeks 6-10)
-- **Weeks 6-7**: Group 3 - Database Schema & Models
-- **Weeks 8-9**: Group 4 - Configuration & Settings Management
-- **Weeks 9-10**: Group 5 - Content Processing & Validation
+**Deliverables:**
+- ✅ Automated test execution in CI/CD
+- ✅ 70%+ code coverage on core modules
+- ✅ Documented test running procedures
+- ✅ Mock infrastructure for LinkedIn API and external services
 
-### Phase 3: Production & Quality (Weeks 11-17)
-- **Weeks 11-14**: Group 6 - Infrastructure & AWS Configuration
-- **Weeks 15-16**: Group 7 - Testing & Code Quality
-- **Weeks 16-17**: Group 8 - Documentation & Enhancement
+### Phase 1: Critical MVP (Weeks 4-9)
+- **Weeks 4-6**: Group 1 - LinkedIn API Error Handling & Core Features
+  - Write tests for each scrapper/poster method BEFORE fixing
+  - Ensure all edge cases are covered (empty values, errors, etc.)
+- **Weeks 7-9**: Group 2 - User Interaction & Notification System
+  - Mock DM workflows for testing
+  - Test message personalization and duplicate prevention
+
+### Phase 2: Foundation & Stability (Weeks 10-14)
+- **Weeks 10-11**: Group 3 - Database Schema & Models
+  - Add database operation tests
+  - Test migration and data integrity
+- **Weeks 12-13**: Group 4 - Configuration & Settings Management
+  - Test configuration loading and validation
+  - Test environment-specific settings
+- **Week 14**: Group 5 - Content Processing & Validation (Start)
+  - Test carousel generation pipelines
+
+### Phase 3: Content & Quality (Weeks 15-19)
+- **Weeks 15-16**: Group 5 - Content Processing & Validation (Complete)
+  - Test all carousel types
+  - Test image grabber integration
+- **Weeks 17-18**: Group 7 - Testing & Code Quality
+  - Add performance and load tests
+  - Implement de-duplication tests
+- **Week 19**: Review and improve test coverage to 85%+
+
+### Phase 4: Production & Infrastructure (Weeks 20-25)
+- **Weeks 20-23**: Group 6 - Infrastructure & AWS Configuration
+  - Test CDK stacks and resource allocation
+  - Test auto-scaling and service discovery
+- **Weeks 24-25**: Group 8 - Documentation & Enhancement
+  - Test UI components
+  - Final integration testing
+
+---
+
+## Updated Priority Distribution with Testing
+
+### P0 (Critical) - Must Complete Before Other Work
+1. **Test Infrastructure Setup** (Phase 0) - 3 weeks
+2. **Group 1**: LinkedIn API Error Handling - 3 weeks (with tests)
+3. **Group 2**: User Interaction & Notification System - 3 weeks (with tests)
+
+### P1 (High) - Core Improvements
+4. **Group 3**: Database Schema & Models - 2 weeks (with tests)
+5. **Group 4**: Configuration & Settings Management - 2 weeks (with tests)
+6. **Group 5**: Content Processing & Validation - 3 weeks (with tests)
+
+### P2 (Medium) - Quality & Optimization
+7. **Group 6**: Infrastructure & AWS Configuration - 4 weeks (with tests)
+8. **Group 7**: Testing & Code Quality - 2 weeks
+9. **Group 8**: Documentation & Enhancement - 2 weeks (with tests)
+
+**Total Timeline**: 25 weeks with proper test coverage
+**Previous Timeline**: 18 weeks (unrealistic without test foundation)
 
 ---
 
 ## Success Metrics
 
+### Test Quality (P0 - Critical)
+- **Code Coverage**: Minimum 70% (baseline), Target 85%+ (goal)
+- **Test Execution**: Full suite completes in < 5 minutes
+- **Test Reliability**: 100% deterministic, zero flaky tests
+- **Regression Prevention**: Every TODO fix includes test that prevents regression
+- **Test Documentation**: All test files have clear docstrings
+- **CI/CD Integration**: Automated test execution on every commit
+- **Test-First Adoption**: 100% of TODO items implemented using TDD approach
+
 ### Code Quality
-- All P0 TODO items resolved
-- 80%+ of P1 TODO items resolved
-- Test coverage maintained or improved
-- No new TODO items introduced without corresponding issues
+- All P0 TODO items resolved **with tests**
+- 80%+ of P1 TODO items resolved **with tests**
+- Test coverage maintained or improved (never decreased)
+- No new TODO items introduced without corresponding issues **and tests**
+- All existing tests continue to pass (zero regression)
 
 ### Business Impact
-- Core LinkedIn engagement features operational
-- User messaging and DM automation functional
-- Production infrastructure stable and scalable
-- Improved user experience with complete carousel types
+- Core LinkedIn engagement features operational **and tested**
+- User messaging and DM automation functional **with integration tests**
+- Production infrastructure stable and scalable **with validation tests**
+- Improved user experience with complete carousel types **with unit tests**
 
 ### Technical Debt
 - Reduced hard-coded configuration values
-- Improved observability and logging
-- Cleaner, more maintainable codebase
+- Improved observability and logging **with performance tests**
+- Cleaner, more maintainable codebase **validated by tests**
 - Better documentation coverage
+- Comprehensive test suite that enables confident refactoring
 
 ---
 
