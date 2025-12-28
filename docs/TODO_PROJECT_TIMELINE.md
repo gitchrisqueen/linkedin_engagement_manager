@@ -13,7 +13,7 @@ This document provides a comprehensive overview of all TODO items identified acr
 - **P2 (Medium)**: 35 items - Quality improvements and technical debt
 
 ### Testing Requirements
-- **Current State**: 44 existing test functions across 9 test files
+- **Current State**: 44 existing test functions across 9 test files (as of December 2025)
 - **Target State**: 70%+ code coverage minimum, 85%+ target
 - **Approach**: Test-Driven Development (TDD) for all TODO implementations
 - **Timeline Impact**: +3 weeks for test infrastructure, but prevents costly regressions
@@ -49,7 +49,7 @@ The LinkedIn Engagement Manager currently has **44 test functions** across multi
 ### Test Infrastructure Improvements (P0 - Must Complete Before New Development)
 
 **Priority**: P0 - Critical Foundation  
-**Estimated Effort**: 2-3 weeks  
+**Estimated Effort**: 3 weeks  
 **Business Impact**: Prevents regression and ensures code quality during TODO implementation
 
 #### Required Test Improvements:
@@ -182,6 +182,10 @@ The LinkedIn Engagement Manager currently has **44 test functions** across multi
 ### Test Commands
 
 ```bash
+# Set up virtual environment (recommended)
+python3 -m venv venv
+source venv/bin/activate  # On Windows: venv\Scripts\activate
+
 # Install test dependencies
 poetry install --with dev
 
@@ -702,8 +706,8 @@ Please start with the Testing Infrastructure improvements, then proceed to Group
 8. **Group 7**: Testing & Code Quality - 2 weeks
 9. **Group 8**: Documentation & Enhancement - 2 weeks (with tests)
 
-**Total Timeline**: 25 weeks with proper test coverage
-**Previous Timeline**: 18 weeks (unrealistic without test foundation)
+**Total Timeline**: 25 weeks with proper test coverage  
+**Previous Timeline**: 18 weeks (excluding test infrastructure requirements)
 
 ---
 
