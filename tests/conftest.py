@@ -25,6 +25,7 @@ def setup_test_environment():
     os.environ.setdefault("DB_NAME", "test_db")
     os.environ.setdefault("CELERY_BROKER_URL", "redis://localhost:6379/0")
     os.environ.setdefault("CELERY_RESULT_BACKEND", "redis://localhost:6379/0")
+    os.environ.setdefault("PEXELS_API_KEY", "test-pexels-api-key-12345")
 
 
 @pytest.fixture
@@ -79,25 +80,16 @@ def sample_linkedin_profile():
     """Sample LinkedIn profile data for testing."""
     return {
         "full_name": "John Doe",
-        "headline": "Software Engineer at Tech Company",
-        "location": "San Francisco, CA",
-        "about": "Experienced software engineer with a passion for AI and automation.",
+        "job_title": "Software Engineer",
+        "company_name": "Tech Company",
+        "industry": "Technology",
         "profile_url": "https://www.linkedin.com/in/johndoe/",
         "mutual_connections": ["Alice Smith", "Bob Johnson"],
-        "experience": [
-            {
-                "title": "Senior Software Engineer",
-                "company": "Tech Company",
-                "duration": "2020 - Present",
-            }
-        ],
         "education": [
-            {
-                "school": "University of California",
-                "degree": "B.S. Computer Science",
-                "years": "2012 - 2016",
-            }
+            "University of California - B.S. Computer Science (2012-2016)"
         ],
+        "experiences": [],
+        "skills": ["Python", "AI", "Machine Learning"],
     }
 
 

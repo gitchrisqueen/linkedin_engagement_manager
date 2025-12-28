@@ -15,9 +15,9 @@ class TestLinkedInScraper:
         profile = LinkedInProfile(**sample_linkedin_profile)
         
         assert profile.full_name == "John Doe"
-        assert profile.headline == "Software Engineer at Tech Company"
-        assert profile.location == "San Francisco, CA"
-        assert profile.profile_url == "https://www.linkedin.com/in/johndoe/"
+        assert profile.job_title == "Software Engineer"
+        assert profile.company_name == "Tech Company"
+        assert str(profile.profile_url) == "https://www.linkedin.com/in/johndoe/"
         assert len(profile.mutual_connections) == 2
 
     @pytest.mark.requires_selenium

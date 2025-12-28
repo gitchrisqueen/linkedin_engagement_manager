@@ -30,15 +30,16 @@ class TestCarouselCreator:
 
     def test_create_basic_carousel(self):
         """Test creating a basic carousel."""
-        from cqc_lem.utilities.carousel_creator import create_carousel
+        from cqc_lem.utilities.carousel_creator import create_ppt
         
-        with patch("cqc_lem.utilities.carousel_creator.create_carousel") as mock_create:
+        with patch("cqc_lem.utilities.carousel_creator.create_ppt") as mock_create:
             mock_create.return_value = "/path/to/carousel.pptx"
             
-            result = mock_create(
-                carousel_type="HowToCarousel",
-                content=["Slide 1", "Slide 2", "Slide 3"]
-            )
+            # Mock carousel data
+            from cqc_lem.utilities.carousel_creator import EducationalContentCarousel
+            carousel_data = MagicMock(spec=EducationalContentCarousel)
+            
+            result = mock_create("test_carousel", carousel_data)
             
             assert result is not None
             assert isinstance(result, str)
@@ -111,18 +112,19 @@ class TestImageIntegration:
         # Reference: TODO_PROJECT_TIMELINE.md Lines 264 and 279
         pass
 
-    @patch("cqc_lem.utilities.pexels_helper.search_photos")
+    @patch("cqc_lem.utilities.pexels_helper.get_photos")
     def test_pexels_image_search(self, mock_search):
         """Test searching for images via Pexels API."""
-        mock_search.return_value = [
-            {"url": "https://example.com/image1.jpg"},
-            {"url": "https://example.com/image2.jpg"},
-        ]
+        # Mock Photo objects
+        mock_photo = MagicMock()
+        mock_photo.url = "https://example.com/image1.jpg"
+        
+        mock_search.return_value = [mock_photo]
         
         results = mock_search("business professional")
         
-        assert len(results) == 2
-        assert results[0]["url"].startswith("https://")
+        assert len(results) == 1
+        assert results[0].url.startswith("https://")
 
     def test_image_download_and_embed(self):
         """Test downloading and embedding images in carousel."""
