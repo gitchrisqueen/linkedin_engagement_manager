@@ -20,7 +20,7 @@ def load_user_data():
 
 # Function to save user data (replace with actual data saving logic)
 def save_user_data(user_data):
-    # Implement the logic to save user data
+    # TODO: Implement the logic to save user data
     pass
 
 
@@ -28,6 +28,8 @@ def main():
     st.set_page_config(layout="wide", page_title="My Account", page_icon="👤")
 
     st.header("My Account")
+
+    # TODO: Have user login with email and password (verify in database and return with user id to get data)
 
     # Load user data once they login
     user_data = load_user_data()
@@ -52,7 +54,6 @@ def main():
 
     # TODO: Check DB for user and see if they need to re-consent to LinkedIn Data
     needs_consent = True
-
 
 
     if needs_consent:
