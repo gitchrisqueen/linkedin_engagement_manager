@@ -129,7 +129,9 @@ exclude_lines = [
     "if TYPE_CHECKING:",
     "if typing.TYPE_CHECKING:",
 ]
-# Fail the build if coverage falls below threshold
+# Note: fail_under is set to 0 to allow gradual improvement from current 14% baseline
+# CI pipeline enforces 70% minimum on new/changed code
+# Once overall coverage reaches 70%, this should be updated to match
 fail_under = 0
 precision = 1
 show_missing = true

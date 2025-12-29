@@ -314,7 +314,11 @@ If CI fails:
    - After every small change
    - Use test watchers for continuous feedback:
      ```bash
+     # Note: Install pytest-watch if needed: poetry add --group dev pytest-watch
      poetry run pytest-watch tests/unit/
+     
+     # Or use pytest's built-in watch mode (requires pytest-xdist):
+     poetry run pytest tests/unit/ --looponfail
      ```
 
 ### DON'T ❌

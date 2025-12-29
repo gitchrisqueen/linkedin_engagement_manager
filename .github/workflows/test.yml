@@ -77,7 +77,9 @@ jobs:
           
           # Check if coverage meets minimum threshold (70%)
           MINIMUM_COVERAGE=70
-          if (( $(echo "$COVERAGE < $MINIMUM_COVERAGE" | bc -l) )); then
+          MEETS_THRESHOLD=$(python3 -c "import sys; sys.exit(0 if float('$COVERAGE') >= $MINIMUM_COVERAGE else 1)" && echo "yes" || echo "no")
+          
+          if [ "$MEETS_THRESHOLD" = "no" ]; then
             echo "::warning::Coverage ${COVERAGE}% is below minimum threshold of ${MINIMUM_COVERAGE}%"
             echo "::warning::Please add tests to improve coverage. Target: 85%"
           else
@@ -86,7 +88,9 @@ jobs:
           
           # Set aspirational goal (85%)
           ASPIRATIONAL_GOAL=85
-          if (( $(echo "$COVERAGE >= $ASPIRATIONAL_GOAL" | bc -l) )); then
+          MEETS_GOAL=$(python3 -c "import sys; sys.exit(0 if float('$COVERAGE') >= $ASPIRATIONAL_GOAL else 1)" && echo "yes" || echo "no")
+          
+          if [ "$MEETS_GOAL" = "yes" ]; then
             echo "🎉 Excellent! Coverage ${COVERAGE}% meets aspirational goal of ${ASPIRATIONAL_GOAL}%"
           fi
         continue-on-error: true
@@ -114,6 +118,7 @@ jobs:
         if: always()
         run: |
           # Generate a simple coverage badge in the summary
+          # Note: Using same Python script for consistency with coverage checking
           COVERAGE=$(python3 -c "import json; data = json.load(open('coverage.json')); print(f\"{data['totals']['percent_covered']:.1f}\")" 2>/dev/null || echo "N/A")
           echo "## 📊 Test Coverage Report" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
@@ -123,9 +128,12 @@ jobs:
           echo "" >> $GITHUB_STEP_SUMMARY
           
           if [ "$COVERAGE" != "N/A" ]; then
-            if (( $(echo "$COVERAGE >= 85" | bc -l) )); then
+            MEETS_GOAL=$(python3 -c "import sys; sys.exit(0 if float('$COVERAGE') >= 85 else 1)" && echo "yes" || echo "no")
+            MEETS_MIN=$(python3 -c "import sys; sys.exit(0 if float('$COVERAGE') >= 70 else 1)" && echo "yes" || echo "no")
+            
+            if [ "$MEETS_GOAL" = "yes" ]; then
               echo "✅ **Status:** Excellent - Meets aspirational goal!" >> $GITHUB_STEP_SUMMARY
-            elif (( $(echo "$COVERAGE >= 70" | bc -l) )); then
+            elif [ "$MEETS_MIN" = "yes" ]; then
               echo "✅ **Status:** Good - Meets minimum threshold" >> $GITHUB_STEP_SUMMARY
             else
               echo "⚠️ **Status:** Below minimum threshold - Please add tests" >> $GITHUB_STEP_SUMMARY
