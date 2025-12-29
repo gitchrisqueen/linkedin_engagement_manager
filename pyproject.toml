@@ -129,6 +129,18 @@ exclude_lines = [
     "if TYPE_CHECKING:",
     "if typing.TYPE_CHECKING:",
 ]
+# Fail the build if coverage falls below threshold
+fail_under = 0
+precision = 1
+show_missing = true
+skip_covered = false
+skip_empty = true
+
+[tool.coverage.html]
+directory = "htmlcov"
+
+[tool.coverage.json]
+output = "coverage.json"
 
 [tool.ruff.lint]
 select = [

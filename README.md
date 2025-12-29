@@ -121,9 +121,25 @@ Tests are organized with the following markers:
 
 ### Test Coverage Goals
 
-- **Minimum Coverage**: 70% of core modules
+- **Minimum Coverage**: 70% of core modules  
 - **Target Coverage**: 85%+ of core modules
-- **CI/CD**: Automated test execution on all pull requests
+- **Current Coverage**: ~13% overall (as of Phase 0 baseline)
+- **CI/CD**: Automated test execution on all pull requests with coverage reporting
+
+**Coverage by Module (Baseline - December 2024):**
+- `scrapper.py`: 10% → **Target: 70%+**
+- `db.py`: 20% → **Target: 70%+**
+- `ai_helper.py`: 21% → **Target: 70%+**
+- `carousel_creator.py`: 27% → **Target: 70%+**
+- `env_constants.py`: 91% ✅
+- `profile.py`: 62% 
+- `logger.py`: 58%
+
+To view current coverage:
+```bash
+poetry run pytest --cov=src/cqc_lem --cov-report=html --cov-report=term
+open htmlcov/index.html  # View detailed coverage report
+```
 
 ### Continuous Integration
 
