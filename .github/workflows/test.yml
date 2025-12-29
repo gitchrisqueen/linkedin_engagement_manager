@@ -65,7 +65,34 @@ jobs:
 
       - name: Run tests with coverage
         run: |
-          poetry run pytest tests/ -v --cov=src/cqc_lem --cov-report=xml --cov-report=term --cov-report=html -m "not (requires_openai or requires_database or requires_selenium or slow)"
+          poetry run pytest tests/ -v --cov=src/cqc_lem --cov-report=xml --cov-report=term --cov-report=html --cov-report=json -m "not (requires_openai or requires_database or requires_selenium or slow)"
+        continue-on-error: false
+      
+      - name: Check coverage thresholds
+        run: |
+          # Extract overall coverage percentage from coverage.json
+          COVERAGE=$(python3 -c "import json; data = json.load(open('coverage.json')); print(f\"{data['totals']['percent_covered']:.1f}\")")
+          echo "Current coverage: ${COVERAGE}%"
+          echo "COVERAGE=${COVERAGE}" >> $GITHUB_ENV
+          
+          # Check if coverage meets minimum threshold (70%)
+          MINIMUM_COVERAGE=70
+          MEETS_THRESHOLD=$(python3 -c "import sys; sys.exit(0 if float('$COVERAGE') >= $MINIMUM_COVERAGE else 1)" && echo "yes" || echo "no")
+          
+          if [ "$MEETS_THRESHOLD" = "no" ]; then
+            echo "::warning::Coverage ${COVERAGE}% is below minimum threshold of ${MINIMUM_COVERAGE}%"
+            echo "::warning::Please add tests to improve coverage. Target: 85%"
+          else
+            echo "✅ Coverage ${COVERAGE}% meets minimum threshold of ${MINIMUM_COVERAGE}%"
+          fi
+          
+          # Set aspirational goal (85%)
+          ASPIRATIONAL_GOAL=85
+          MEETS_GOAL=$(python3 -c "import sys; sys.exit(0 if float('$COVERAGE') >= $ASPIRATIONAL_GOAL else 1)" && echo "yes" || echo "no")
+          
+          if [ "$MEETS_GOAL" = "yes" ]; then
+            echo "🎉 Excellent! Coverage ${COVERAGE}% meets aspirational goal of ${ASPIRATIONAL_GOAL}%"
+          fi
         continue-on-error: true
 
       - name: Upload coverage reports
@@ -85,6 +112,36 @@ jobs:
           name: coverage-html-report
           path: htmlcov/
           retention-days: 30
+        continue-on-error: true
+      
+      - name: Generate coverage badge
+        if: always()
+        run: |
+          # Generate a simple coverage badge in the summary
+          # Note: Using same Python script for consistency with coverage checking
+          COVERAGE=$(python3 -c "import json; data = json.load(open('coverage.json')); print(f\"{data['totals']['percent_covered']:.1f}\")" 2>/dev/null || echo "N/A")
+          echo "## 📊 Test Coverage Report" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "- **Current Coverage:** ${COVERAGE}%" >> $GITHUB_STEP_SUMMARY
+          echo "- **Minimum Target:** 70%" >> $GITHUB_STEP_SUMMARY
+          echo "- **Aspirational Goal:** 85%" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          if [ "$COVERAGE" != "N/A" ]; then
+            MEETS_GOAL=$(python3 -c "import sys; sys.exit(0 if float('$COVERAGE') >= 85 else 1)" && echo "yes" || echo "no")
+            MEETS_MIN=$(python3 -c "import sys; sys.exit(0 if float('$COVERAGE') >= 70 else 1)" && echo "yes" || echo "no")
+            
+            if [ "$MEETS_GOAL" = "yes" ]; then
+              echo "✅ **Status:** Excellent - Meets aspirational goal!" >> $GITHUB_STEP_SUMMARY
+            elif [ "$MEETS_MIN" = "yes" ]; then
+              echo "✅ **Status:** Good - Meets minimum threshold" >> $GITHUB_STEP_SUMMARY
+            else
+              echo "⚠️ **Status:** Below minimum threshold - Please add tests" >> $GITHUB_STEP_SUMMARY
+            fi
+          fi
+          
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "📈 [View detailed coverage report in artifacts](../artifacts)" >> $GITHUB_STEP_SUMMARY
         continue-on-error: true
 
   lint:
@@ -126,8 +183,22 @@ jobs:
     steps:
       - name: Check test results
         run: |
-          echo "Test job status: ${{ needs.test.result }}"
-          echo "Lint job status: ${{ needs.lint.result }}"
+          echo "## 📋 Test Suite Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Job Status" >> $GITHUB_STEP_SUMMARY
+          echo "- **Tests:** ${{ needs.test.result }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Linting:** ${{ needs.lint.result }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
           if [ "${{ needs.test.result }}" == "failure" ]; then
+            echo "⚠️ **Action Required:** Some tests failed. Please review the test results." >> $GITHUB_STEP_SUMMARY
             echo "::warning::Some tests failed. Please review the test results."
+          elif [ "${{ needs.test.result }}" == "success" ]; then
+            echo "✅ All tests passed successfully!" >> $GITHUB_STEP_SUMMARY
           fi
+          
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### 📖 Documentation" >> $GITHUB_STEP_SUMMARY
+          echo "- [Test Documentation](../blob/main/tests/README.md)" >> $GITHUB_STEP_SUMMARY
+          echo "- [TODO Project Timeline](../blob/main/docs/TODO_PROJECT_TIMELINE.md)" >> $GITHUB_STEP_SUMMARY
+          echo "- [Contributing Guidelines](../blob/main/CONTRIBUTING.md)" >> $GITHUB_STEP_SUMMARY

@@ -48,20 +48,29 @@ cp .env.example .env
 
 ### Test-Driven Development (TDD)
 
-We follow a Test-Driven Development approach:
+**CRITICAL**: All TODO items and new features MUST follow Test-Driven Development practices.
 
-1. **Write failing tests first** that demonstrate the expected behavior
-2. **Implement the minimum code** needed to make the tests pass
-3. **Refactor** while keeping all tests passing
-4. **Document** what you've done
+**Quick TDD Process:**
+1. Write failing tests first (Red phase)
+2. Implement minimum code to pass tests (Green phase)
+3. Refactor while keeping tests passing (Refactor phase)
+4. Verify coverage improvement
 
-### Test Organization
+📚 **See detailed TDD workflow**: [docs/TDD_WORKFLOW.md](docs/TDD_WORKFLOW.md)
 
-Tests are organized into three categories:
+### Coverage Requirements
 
-- **Unit Tests** (`tests/unit/`): Fast, isolated tests with mocked dependencies
-- **Integration Tests** (`tests/integration/`): Tests that verify multiple components work together
-- **End-to-End Tests** (`tests/e2e/`): Full workflow tests
+- **Minimum**: 70% coverage on modified/new code
+- **Target**: 85% coverage on core modules
+- **Current Baseline**: ~14% overall (see [README.md](README.md))
+
+**Coverage Goals by Module:**
+| Module | Current | Target |
+|--------|---------|--------|
+| scrapper.py | 10% | 70%+ |
+| db.py | 20% | 70%+ |
+| ai_helper.py | 21% | 70%+ |
+| carousel_creator.py | 27% | 70%+ |
 
 ### Running Tests
 
@@ -69,24 +78,72 @@ Tests are organized into three categories:
 # Run all tests
 poetry run pytest
 
-# Run only unit tests
+# Run unit tests only
 poetry run pytest tests/unit -v
 
-# Run tests with coverage
+# Run with coverage
 poetry run pytest --cov=src/cqc_lem --cov-report=html --cov-report=term
 
-# Run specific test file
+# View coverage report
+open htmlcov/index.html  # macOS
+xdg-open htmlcov/index.html  # Linux
+
+# Run specific test
 poetry run pytest tests/unit/utilities/test_db.py -v
 
-# Run tests matching a pattern
-poetry run pytest -k "test_database" -v
-
-# Run with markers
-poetry run pytest -m "unit" -v
+# Run tests excluding slow tests
 poetry run pytest -m "not slow" -v
 ```
 
-### Test Markers
+### Writing Tests
+
+**Test Structure:**
+```python
+def test_function_name_with_specific_condition():
+    """Test description explaining what is being tested."""
+    # Arrange: Set up test data
+    input_data = {"key": "value"}
+    
+    # Act: Execute the function
+    result = function_to_test(input_data)
+    
+    # Assert: Verify the result
+    assert result == expected_value
+```
+
+**Test Organization:**
+- `tests/unit/` - Fast, isolated tests with mocked dependencies
+- `tests/integration/` - Tests with multiple components
+- `tests/e2e/` - End-to-end workflow tests
+
+**Best Practices:**
+- ✅ Write tests before implementing code (TDD)
+- ✅ Mock external dependencies (databases, APIs, file systems)
+- ✅ Test edge cases and error conditions
+- ✅ Use descriptive test names
+- ✅ Keep tests simple and focused
+- ❌ Don't test implementation details
+- ❌ Don't skip writing tests
+- ❌ Don't commit code with failing tests
+
+📚 **Detailed Testing Guide**: [tests/README.md](tests/README.md)
+
+### Test Naming
+
+Use descriptive names that explain what is being tested:
+
+```python
+# Good ✅
+def test_scraper_handles_empty_prefix_correctly():
+    """Test that scraper correctly handles empty prefix strings."""
+    pass
+
+# Bad ❌
+def test_scraper():
+    pass
+```
+
+### Mocking External Dependencies
 
 Use these markers to categorize your tests:
 
@@ -98,25 +155,7 @@ Use these markers to categorize your tests:
 - `@pytest.mark.requires_database` - Tests requiring database connection
 - `@pytest.mark.requires_selenium` - Tests requiring browser automation
 
-### Writing Good Tests
-
-#### Test Structure
-
-Follow the Arrange-Act-Assert pattern:
-
-```python
-def test_example_function():
-    # Arrange: Set up test data and mocks
-    mock_data = {"key": "value"}
-    
-    # Act: Execute the function being tested
-    result = example_function(mock_data)
-    
-    # Assert: Verify the expected outcome
-    assert result == expected_value
-```
-
-#### Test Naming
+### Test Naming
 
 Use descriptive test names that explain what is being tested:
 
