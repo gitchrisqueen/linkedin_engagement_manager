@@ -399,20 +399,27 @@ def update_db_post_video_url(post_id: int, video_url: str) -> bool:
 
 
 def update_db_post_status(post_id: int, post_status: PostStatus) -> bool:
+    """Update the status of a post in the database.
+    
+    Args:
+        post_id: The ID of the post to update
+        post_status: PostStatus enum value
+        
+    Returns:
+        bool: True if the post was successfully updated, False otherwise
+        
+    Note:
+        This function now uses post_status.value directly, consistent with other 
+        functions in this module. The previous try-catch workaround was unnecessary
+        since PostStatus is a StrEnum and .value access is guaranteed to work.
+    """
     connection = get_db_connection()
     cursor = connection.cursor()
-
-    # TODO: Why Enum doesnt work inside this function (have to convert to string first but why) ????
-    status_str = "posted"
-    try:
-        status_str = post_status.value
-    except Exception:
-        myprint(f"Error converting post_status to string: {post_status}")
 
     try:
         cursor.execute(
             """UPDATE posts SET status = %s WHERE id = %s""",
-            (status_str, post_id)
+            (post_status.value, post_id)
         )
 
         connection.commit()
