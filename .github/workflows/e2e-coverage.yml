@@ -1,0 +1,64 @@
+name: CI / E2E Test w/ Coverage
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  e2e-tests:
+    name: E2E Tests
+    runs-on: ubuntu-latest
+    # E2E is informational — does not block merge until tests are implemented
+    continue-on-error: true
+
+    services:
+      selenium-chrome:
+        image: selenium/standalone-chrome:latest
+        options: >-
+          --shm-size=2g
+          --health-cmd="curl -fsS http://localhost:4444/wd/hub/status | python3 -c \"import sys,json; d=json.load(sys.stdin); sys.exit(0 if d['value']['ready'] else 1)\""
+          --health-interval=15s
+          --health-timeout=10s
+          --health-retries=8
+          --health-start-period=20s
+        ports:
+          - 4444:4444
+          - 7900:7900
+        env:
+          SE_NODE_MAX_SESSIONS: 1
+          SE_NODE_SESSION_TIMEOUT: 300
+          SE_LOG_LEVEL: WARN
+
+    env:
+      SELENIUM_COMMAND_EXECUTOR: http://localhost:4444/wd/hub
+      OPENAI_API_KEY: test-key-not-real
+      LITELLM_BASE_URL: http://localhost:4000
+      LITELLM_MASTER_KEY: test-master-key
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Poetry and dependencies
+        uses: ./.github/actions/poetry_setup
+        with:
+          python-version: "3.12"
+          install-args: --with test
+
+      - name: Run E2E tests
+        run: |
+          poetry run pytest tests/e2e \
+            -v --tb=short \
+            -m e2e \
+            --cov=src/cqc_lem \
+            --cov-report=xml
+
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v4
+        with:
+          files: coverage.xml
+          flags: e2e
+          fail_ci_if_error: false
+        env:
+          CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
