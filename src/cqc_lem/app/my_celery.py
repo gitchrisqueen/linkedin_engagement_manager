@@ -33,7 +33,9 @@ app.autodiscover_tasks(['cqc_lem'])
 # Setup Celery Once for task that should only be queued once per parameters sent
 
 app.conf.ONCE = {
-    'backend': 'celery_once.backends.Redis',  # TODO: What should this be for AWS SQS
+    # celery-once uses Redis for deduplication lock tracking even when the Celery broker is SQS.
+    # On AWS, point CELERY_BROKER_URL at the ElastiCache Redis instance (not SQS) so celery-once works.
+    'backend': 'celery_once.backends.Redis',
     'settings': {
         'url': broker_url,
         'default_timeout': 60 * 60,
