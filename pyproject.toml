@@ -58,6 +58,7 @@ pexels-api = "^1.0.1"
 
 # Monitoring
 flower = "^2.0.1"  # Celery monitoring
+posthog = "^3.7"   # LLM usage + system observability
 
 # AWS
 boto3 = "^1.36.7"

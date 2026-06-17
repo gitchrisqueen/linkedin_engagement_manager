@@ -1,9 +1,7 @@
-
 services:
   web_app:
     build:
       context: .
-      #context: https://github.com/gitchrisqueen/linkedin_engagement_manager.git
       dockerfile: ./compose/local/Dockerfile
       args:
         - INSTALL_DEV_DEPS=${INSTALL_DEV_DEPS}
@@ -11,64 +9,53 @@ services:
     container_name: web_app
     command: /start-streamlit
     depends_on:
-      - mysql
-      - redis
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
     volumes:
-      #- ./src:/app/src
-      # Mount the assets folder (already done in current file structure)
-      #- ./src/cqc_lem/assets:/app/src/cqc_lem/assets
-      # mount test folder
       - ./tests:/app/tests
-      # Below used to override the start
-      #- ./compose/local/streamlit/start:/start-streamlit
-      # Mount the logs folder
       - ./logs:/app/logs
-      # Mount the ~/.aws credentials for boto3 inside container
-      #- ~/.aws:/root/.aws:ro
     environment:
       - DISPLAY=:99
-      #- AWS_PROFILE=default
     env_file:
       - .env
     ports:
-      #  - "5000:5000"  # For the web interface
-      - "${STREAMLIT_PORT}:${STREAMLIT_PORT}"  # For the streamlit app
+      - "${STREAMLIT_PORT}:${STREAMLIT_PORT}"
 
   api:
     image: ${DOCKER_IMAGE_NAME}
     container_name: api
     command: /start-fastapi
-    #restart: always
-    #volumes:
-      # Below used to override the start
-      #- ./compose/local/fastapi/start:/start-fastapi
     volumes_from:
       - web_app
-    #environment:
-    #   - AWS_PROFILE=default
     env_file:
       - .env
     depends_on:
-      - redis
-      - mysql
+      redis:
+        condition: service_healthy
+      mysql:
+        condition: service_healthy
     ports:
-      - "${API_PORT}:${API_PORT}"  # For API endpoints
-
+      - "${API_PORT}:${API_PORT}"
 
   redis:
-      image: redis:alpine
-      container_name: redis
-      #restart: always
-      volumes:
-        - redis_data:/data
-      ports:
+    image: redis:alpine
+    container_name: redis
+    volumes:
+      - redis_data:/data
+    ports:
       - "${REDIS_PORT}:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
   mysql:
     image: mysql:8.0
     container_name: ${MYSQL_HOST}
     hostname: ${MYSQL_HOST}
-    #restart: always
     environment:
       MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
       MYSQL_DATABASE: ${MYSQL_DATABASE}
@@ -80,6 +67,12 @@ services:
     volumes:
       - db_data:/var/lib/mysql
       - ./compose/local/database/setup.sql:/docker-entrypoint-initdb.d/setup.sql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
 
   flyway:
     image: redgate/flyway:latest-alpine
@@ -91,196 +84,138 @@ services:
       - ./compose/local/database/migrations:/flyway/sql
       - ./compose/local/database/flyway-entrypoint.sh:/flyway-entrypoint.sh
     depends_on:
-      - mysql
+      mysql:
+        condition: service_healthy
 
   celery_worker:
-    image:  ${DOCKER_IMAGE_NAME}
+    image: ${DOCKER_IMAGE_NAME}
     container_name: celery_worker
     hostname: ${CELERY_WORKER_HOST}
     command: /start-celeryworker
     deploy:
       resources:
         limits:
-          cpus: '4'   # Limit the container to use at most 4 CPUs
+          cpus: '4'
         reservations:
-          cpus: '2'   # Reserve at least 2 CPUs for this container
-    #restart: always
+          cpus: '2'
     volumes:
-      - ~/.aws:/home/celeryworker/.aws:ro  # read-only mount
-      # Below used to override the start
-      #- ./compose/local/celery/worker/start:/start-celeryworker
+      - ~/.aws:/home/celeryworker/.aws:ro
     volumes_from:
       - web_app
-    #environment:
-    #   - AWS_PROFILE=default
     env_file:
       - .env
     depends_on:
-      - redis
-      - mysql
-      - selenium_hub
+      redis:
+        condition: service_healthy
+      mysql:
+        condition: service_healthy
+      selenium-chrome:
+        condition: service_healthy
 
   celery_beat:
-    image:  ${DOCKER_IMAGE_NAME}
+    image: ${DOCKER_IMAGE_NAME}
     container_name: celery_beat
     command: /start-celerybeat
-    #restart: always
-    #volumes:
-      # Below used to override the start
-      #- ./compose/local/celery/beat/start:/start-celerybeat
     volumes_from:
-     - web_app
-    #environment:
-    #     - AWS_PROFILE=default
+      - web_app
     env_file:
       - .env
     depends_on:
-      - redis
-      - mysql
-      - selenium_hub
+      redis:
+        condition: service_healthy
+      mysql:
+        condition: service_healthy
+      selenium-chrome:
+        condition: service_healthy
 
   flower:
-    image:  ${DOCKER_IMAGE_NAME}
+    image: ${DOCKER_IMAGE_NAME}
     container_name: celery_flower
-    #command: /start-flower
     command: /start-flower-no-wait
-    #restart: always
     volumes:
       - ./logs:/app/logs
       - flower_db:/data
-      # Below used to override the start
-      #- ./compose/local/celery/flower/start:/start-flower
-      # Override the flower css with our own (Disabled for now)
-      #- ./compose/local/celery/flower/static/css/flower.css:/app/.venv/lib/python3.13/site-packages/flower/static/css/flower.css
-      #- ./compose/local/celery/flower/static/css/datatables-1.13.4.min.css:/app/.venv/lib/python3.13/site-packages/flower/static/css/datatables-1.13.4.min.css
     volumes_from:
       - web_app
     env_file:
       - .env
     environment:
-      #- AWS_PROFILE=default
       - FLOWER_UNAUTHENTICATED_API=True
       - FLOWER_PERSISTENT=True
       - FLOWER_SAVE_STATE_INTERVAL=${CELERY_FLOWER_STATE_SAVE_INTERVAL}
     ports:
       - "${CELERY_FLOWER_PORT}:5555"
     depends_on:
-      - redis
-      - mysql
+      redis:
+        condition: service_healthy
+      mysql:
+        condition: service_healthy
 
-  prometheus:
-    image: prom/prometheus:latest
-    container_name: prometheus
-    hostname: ${PROMETHEUS_HOST}
-    volumes:
-      - ./compose/local/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
+  selenium-chrome:
+    image: selenium/standalone-chrome:latest
+    container_name: selenium-chrome
+    hostname: selenium-chrome
+    shm_size: 2g
     ports:
-      - "${PROMETHEUS_PORT}:9090"
-
-  error_tracing:
-    image: jaegertracing/all-in-one:1.63.0
-    container_name: error_tracing
-    hostname: ${JAEGER_AGENT_HOST}
-    ports:
-      - "${JAEGER_UI_PORT}:16686" # Jaeger UI port
-      - "${JAEGER_SPANS_HTTP_PORT}:4318"  # Reporting Protobuf/JSON spans over HTTP
-      - "${JAEGER_SPANS_GRPC_PORT}:4317"  # Reporting Protobuf spans over gRPC
-      - "14268:14268" # HTTP/JSON Sampling Collector ports
-      - "${JAEGER_SAMPLE_COLLECTOR_GRPC_PORT}:14250" # gPRC Sampling Collector ports
-      - "${JAEGER_METRICS_COLLECTION_PORT}:14269" # Metrics collecting ports
-      - "9411:9411" # Zipkin collector ports
+      - "${SELENIUM_HUB_PORT}:4444"
+      - "7900:7900"
     environment:
-      # TODO: Review this url for monitoring configs : https://github.com/jaegertracing/jaeger/tree/main/docker-compose/monitor
-      - OTEL_TRACES_SAMPLER=always_off # Turn of tracing of Jaeger's own components
-      - COLLECTOR_ZIPKIN_HTTP_PORT=9411
-      - COLLECTOR_OTLP_ENABLED=true
-      - METRICS_STORAGE_TYPE=prometheus
-      - PROMETHEUS_SERVER_URL=http://${PROMETHEUS_HOST}:${PROMETHEUS_PORT}
-      - JAEGER_AGENT_HOST=${JAEGER_AGENT_HOST}
-      - LOG_LEVEL=debug # Used for debugging Metrics on Monitor Tab
-    depends_on:
-      - prometheus
-
-  node_docker:
-    image: selenium/node-docker:4.26.0-20241101
-    container_name: node_docker
+      - SE_NODE_MAX_SESSIONS=1
+      - SE_NODE_SESSION_TIMEOUT=600
+      - SE_LOG_LEVEL=WARN
+    volumes:
+      - chrome-profile:/home/seluser/chrome-profile
+    restart: unless-stopped
     deploy:
       resources:
         limits:
-          cpus: '4'   # Limit the container to use at most 4 CPUs
-        reservations:
-          cpus: '2'   # Reserve at least 2 CPUs for this container
-    shm_size: 2gb
+          cpus: '2.0'
+          memory: 4g
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:4444/wd/hub/status | python3 -c \"import sys,json; d=json.load(sys.stdin); sys.exit(0 if d['value']['ready'] else 1)\""]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 20s
+
+  litellm:
+    image: ghcr.io/berriai/litellm:main-latest
+    container_name: litellm
+    hostname: litellm
+    ports:
+      - "4000:4000"
     volumes:
-      #- chrome_profile:/tmp # to persist the chrome user Data dir
-      - ./src/cqc_lem/assets/selenium:/opt/selenium/assets
-      - ./compose/local/node_docker/config.toml:/opt/selenium/docker.toml
-      - /var/run/docker.sock:/var/run/docker.sock
+      - ./.litellm:/app/.litellm
+    command: ["--config", "/app/.litellm/config.yaml", "--port", "4000"]
+    environment:
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+      - OPENROUTER_API_KEY=${OPENROUTER_API_KEY}
+      - LITELLM_MASTER_KEY=${LITELLM_MASTER_KEY}
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:4000/health/liveliness >/dev/null || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
     depends_on:
-      - selenium_hub
-    environment:
-      - SE_EVENT_BUS_HOST=${SELENIUM_HUB_HOST}
-      - SE_EVENT_BUS_PUBLISH_PORT=4442
-      - SE_EVENT_BUS_SUBSCRIBE_PORT=4443
-      - SE_NODE_DOCKER_CONFIG_FILENAME=docker.toml
-      - SE_VIDEO_FILE_NAME=auto
-      #- SE_ENABLE_TRACING=false # Use this if bottom 3 are commented out
-      - SE_ENABLE_TRACING=true
-      - SE_OTEL_TRACES_EXPORTER=otlp
-      - SE_OTEL_EXPORTER_ENDPOINT=http://${JAEGER_AGENT_HOST}:${JAEGER_SPANS_GRPC_PORT}
-      - SE_VNC_NO_PASSWORD=true
-      - SE_NODE_MAX_SESSIONS=4 # This should not be more than the available CPUS
-      - SE_NODE_OVERRIDE_MAX_SESSIONS=false # To allow the override of the max sessions
-      #- SE_DRAIN_AFTER_SESSION_COUNT=0 # Drain the Node after N sessions (a value higher than zero enables the feature)
-      - SE_NODE_SESSION_TIMEOUT=420 # 7 minutes - Max time before session is terminated
-      #- SE_START_XVFB=false # This will kill selenium/standalone-chrome:latest
-    ports:
-      - "5555:5555"
+      redis:
+        condition: service_healthy
 
-
-  selenium_hub:
-    image: selenium/hub:4.26.0-20241101
-    container_name: selenium_hub
-    hostname: ${SELENIUM_HUB_HOST}
-    depends_on:
-      - error_tracing
-    environment:
-      #- SE_ENABLE_TRACING=false # Use this if bottom 3 are commented out
-      - SE_ENABLE_TRACING=true
-      - SE_OTEL_TRACES_EXPORTER=otlp
-      - SE_OTEL_EXPORTER_ENDPOINT=http://${JAEGER_AGENT_HOST}:${JAEGER_SPANS_GRPC_PORT}
-      - SE_VNC_NO_PASSWORD=1
-      - SE_ENABLE_BROWSER_LEFTOVERS_CLEANUP=true # Cleanup browser leftovers
-      - SE_BROWSER_LEFTOVERS_INTERVAL_SECS=600 # 10 Minutes
-      - SE_BROWSER_LEFTOVERS_TEMPFILES_DAYS=14 # 14 Days
+  ollama:
+    image: ollama/ollama:latest
+    container_name: ollama
+    hostname: ollama
     ports:
-      - "4442:4442"
-      - "4443:4443"
-      - "${SELENIUM_HUB_PORT}:4444"
-
-  linkedin-preview:
-    build:
-      #context: ./compose/local/linkedinpreview
-      context: https://github.com/gitchrisqueen/linkedinpreview.com.git
-      dockerfile: ./Dockerfile
-    image: ${DOCKER_IMAGE_NAME}_linkedinpreview
-    container_name: linkedin-preview
-    environment:
-      - NEXT_PUBLIC_GTM_MEASUREMENT_ID=replace_me # TODO: What should this be officially?
-    ports:
-      - "${LI_PREVIEW_PORT}:3000"  # For the web interface
+      - "11434:11434"
     volumes:
-      - ./compose/local/linkedinpreview/app:/usr/src/app/app
-      - ./compose/local/linkedinpreview/components:/usr/src/app/components
-      - ./compose/local/linkedinpreview/config:/usr/src/app/config
-      - ./compose/local/linkedinpreview/contents:/usr/src/app/contents
-      - ./compose/local/linkedinpreview/hooks:/usr/src/app/hooks
-      - ./compose/local/linkedinpreview/public:/usr/src/app/public
-      - ./compose/local/linkedinpreview/styles:/usr/src/app/styles
-      - ./compose/local/linkedinpreview/types:/usr/src/app/types
-      - ./compose/local/linkedinpreview/utils:/usr/src/app/utils
+      - ollama-data:/root/.ollama
+    restart: unless-stopped
 
 volumes:
   db_data:
   redis_data:
   flower_db:
+  chrome-profile:
+  ollama-data:

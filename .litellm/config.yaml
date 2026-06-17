@@ -1,0 +1,67 @@
+model_list:
+  # ── SIMPLE tier: fast, cheap, short outputs ──────────────────────────────
+  - model_name: lem-simple
+    litellm_params:
+      model: openai/gpt-4o-mini
+      api_key: os.environ/OPENAI_API_KEY
+
+  - model_name: lem-simple
+    litellm_params:
+      model: ollama/llama3.2:3b
+      api_base: http://ollama:11434
+
+  # ── MEDIUM tier: balanced capability ─────────────────────────────────────
+  - model_name: lem-medium
+    litellm_params:
+      model: openai/gpt-4o-mini
+      api_key: os.environ/OPENAI_API_KEY
+
+  - model_name: lem-medium
+    litellm_params:
+      model: openrouter/meta-llama/llama-3.1-70b-instruct
+      api_key: os.environ/OPENROUTER_API_KEY
+
+  # ── COMPLEX tier: long-form, high-quality content ─────────────────────────
+  - model_name: lem-complex
+    litellm_params:
+      model: anthropic/claude-sonnet-4-6
+      api_key: os.environ/ANTHROPIC_API_KEY
+
+  - model_name: lem-complex
+    litellm_params:
+      model: openai/gpt-4o
+      api_key: os.environ/OPENAI_API_KEY
+
+  # ── IMAGE generation ──────────────────────────────────────────────────────
+  - model_name: lem-image
+    litellm_params:
+      model: openai/dall-e-3
+      api_key: os.environ/OPENAI_API_KEY
+
+  # ── ROUTER: auto-routes by complexity (via complexity_router.py hook) ─────
+  - model_name: lem-router
+    litellm_params:
+      model: openai/gpt-4o-mini
+      api_key: os.environ/OPENAI_API_KEY
+
+router_settings:
+  routing_strategy: latency-based-routing
+  num_retries: 2
+  fallbacks:
+    - lem-complex:
+        - lem-medium
+        - lem-simple
+    - lem-medium:
+        - lem-simple
+
+litellm_settings:
+  cache: true
+  cache_params:
+    type: redis
+    host: redis
+    port: 6379
+  callbacks:
+    - /app/.litellm/complexity_router.py
+
+general_settings:
+  master_key: os.environ/LITELLM_MASTER_KEY
