@@ -824,14 +824,43 @@ def get_user_sitemap_url(user_id: int):
     return sitemap_url[0] if sitemap_url else None
 
 
+def update_user(user_id: int, email: str = None, blog_url: str = None, sitemap_url: str = None) -> bool:
+    if not any([email, blog_url, sitemap_url]):
+        return False
+    connection = get_db_connection()
+    cursor = connection.cursor()
+    fields, values = [], []
+    if email:
+        fields.append("email = %s")
+        values.append(email)
+    if blog_url:
+        fields.append("blog_url = %s")
+        values.append(blog_url)
+    if sitemap_url:
+        fields.append("sitemap_url = %s")
+        values.append(sitemap_url)
+    values.append(user_id)
+    try:
+        cursor.execute(f"UPDATE users SET {', '.join(fields)} WHERE id = %s", values)
+        connection.commit()
+        return cursor.rowcount > 0
+    except mysql.connector.Error as err:
+        myprint(f"Could not update user {user_id} | Error: {err}")
+        return False
+    finally:
+        cursor.close()
+        connection.close()
+
+
 def get_active_user_ids():
     """Query the database to get the user ids of active users."""
     connection = get_db_connection()
     cursor = connection.cursor()
 
     try:
-        # cursor.execute("SELECT id FROM users WHERE active = 1") # TODO:  Update this when you have a way to see who is active (timestamp of login or paid ???)
-        cursor.execute("SELECT id FROM users ")
+        cursor.execute(
+            "SELECT id FROM users WHERE last_login >= NOW() - INTERVAL 30 DAY OR subscription_status = 'active'"
+        )
         active_user_ids = [row[0] for row in cursor.fetchall()]
     except mysql.connector.Error as err:
         myprint(f"Could not get active user ids | Error: {err}")

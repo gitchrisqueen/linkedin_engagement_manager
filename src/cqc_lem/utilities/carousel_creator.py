@@ -164,49 +164,15 @@ def create_ppt(ppt_name, carousel_data: Union[
         prs = create_ppt_case_study_carousel(prs, carousel_data)
         pass
     elif isinstance(carousel_data, PersonalStoryCarousel):
-        # TODO: Handle PersonalStoryCarousel
-        pass
+        prs = create_ppt_personal_story_carousel(prs, carousel_data)
     elif isinstance(carousel_data, IndustryInsightsCarousel):
-        # TODO: Handle IndustryInsightsCarousel
-        pass
+        prs = create_ppt_industry_insights_carousel(prs, carousel_data)
     elif isinstance(carousel_data, EventRecapCarousel):
-        # TODO: Handle EventRecapCarousel
-        pass
+        prs = create_ppt_event_recap_carousel(prs, carousel_data)
     elif isinstance(carousel_data, TestimonialCarousel):
-        # TODO: Handle TestimonialCarousel
-
-        # Add the Cover slide
-        slide = prs.slides.add_slide(prs.slide_layouts[0])
-        title = slide.shapes.title
-        title.text = carousel_data.cover.title
-        body_shape = slide.shapes.placeholders[1]
-        tf = body_shape.text_frame
-        tf.text = carousel_data.cover.content
-
-        # Add the testimonials
-        for testimonial in carousel_data.testimonials:
-            slide = prs.slides.add_slide(prs.slide_layouts[14])
-            title = slide.shapes.title
-            title.text = "—" + testimonial.client_name
-            body_shape = slide.shapes.placeholders[1]
-            tf = body_shape.text_frame
-            tf.text = f'"{testimonial.content}"'
-
-        # Add the Call to Action
-        slide = prs.slides.add_slide(prs.slide_layouts[17])
-        debug_slide(slide)
-        title = slide.shapes.placeholders[0]
-        ttf = title.text_frame
-        ttf.text = carousel_data.call_to_action.title
-        # title.text = carousel_data.call_to_action.title
-        body_shape = slide.shapes.placeholders[1]
-        tf = body_shape.text_frame
-        tf.text = carousel_data.call_to_action.content
-
-        pass
+        prs = create_ppt_testimonial_carousel(prs, carousel_data)
     elif isinstance(carousel_data, ProductDemoCarousel):
-        # TODO: Handle ProductDemoCarousel
-        pass
+        prs = create_ppt_product_demo_carousel(prs, carousel_data)
 
     file_path = os.path.join(generated_dir, f"{ppt_name}.pptx")
     prs.save(file_path)
@@ -363,8 +329,131 @@ def create_ppt_case_study_carousel(prs: Presentation, case_study_carousel: CaseS
     return prs  # Return the presentation for further modifications or saving
 
 
+def create_ppt_personal_story_carousel(prs: Presentation, carousel: PersonalStoryCarousel) -> Presentation:
+    default_image = get_default_image_path()
+
+    cover_layouts = [create_title_layout_slide, create_section_header_layout_slide, create_title_only_layout_slide]
+    random.choice(cover_layouts)(
+        prs=prs, title=carousel.cover.title, subtitle=carousel.cover.content,
+        percentage="", body_text=carousel.cover.content
+    )
+
+    story_layouts = [create_title_and_body_layout_slide, create_one_column_text_layout_slide]
+    for slide_data in carousel.story_slides:
+        random.choice(story_layouts)(
+            prs=prs, title=slide_data.title, body_text=slide_data.content,
+            image_path=getattr(slide_data, "image_path", default_image)
+        )
+
+    create_title_and_body_1_layout_slide(
+        prs=prs, title=carousel.takeaway.title, body_text=carousel.takeaway.content
+    )
+
+    cta_layouts = [create_section_title_and_description_layout_slide, create_custom_3_1_layout_slide]
+    random.choice(cta_layouts)(
+        prs=prs, title=carousel.call_to_action.title,
+        description=carousel.call_to_action.content, subtitle=carousel.call_to_action.content
+    )
+    return prs
+
+
+def create_ppt_industry_insights_carousel(prs: Presentation, carousel: IndustryInsightsCarousel) -> Presentation:
+    default_image = get_default_image_path()
+
+    cover_layouts = [create_title_layout_slide, create_title_only_layout_slide]
+    random.choice(cover_layouts)(
+        prs=prs, title=carousel.cover.title, subtitle=carousel.cover.content
+    )
+
+    insight_layouts = [create_title_and_body_layout_slide, create_one_column_text_layout_slide]
+    for insight in carousel.insights:
+        random.choice(insight_layouts)(
+            prs=prs, title=insight.title, body_text=insight.content,
+            image_path=getattr(insight, "image_path", default_image)
+        )
+
+    cta_layouts = [create_section_title_and_description_layout_slide, create_custom_3_1_layout_slide]
+    random.choice(cta_layouts)(
+        prs=prs, title=carousel.call_to_action.title,
+        description=carousel.call_to_action.content, subtitle=carousel.call_to_action.content
+    )
+    return prs
+
+
+def create_ppt_event_recap_carousel(prs: Presentation, carousel: EventRecapCarousel) -> Presentation:
+    default_image = get_default_image_path()
+
+    cover_layouts = [create_title_layout_slide, create_section_header_layout_slide]
+    random.choice(cover_layouts)(
+        prs=prs, title=carousel.cover.title, subtitle=carousel.cover.content,
+        percentage=""
+    )
+
+    moment_layouts = [create_title_and_body_layout_slide, create_one_column_text_layout_slide]
+    for moment in carousel.key_moments:
+        random.choice(moment_layouts)(
+            prs=prs, title=moment.title, body_text=moment.content,
+            image_path=getattr(moment, "image_path", default_image)
+        )
+
+    cta_layouts = [create_section_title_and_description_layout_slide, create_custom_3_1_layout_slide]
+    random.choice(cta_layouts)(
+        prs=prs, title=carousel.call_to_action.title,
+        description=carousel.call_to_action.content, subtitle=carousel.call_to_action.content
+    )
+    return prs
+
+
+def create_ppt_testimonial_carousel(prs: Presentation, carousel: TestimonialCarousel) -> Presentation:
+    cover_layouts = [create_title_layout_slide, create_title_only_layout_slide]
+    random.choice(cover_layouts)(
+        prs=prs, title=carousel.cover.title, subtitle=carousel.cover.content
+    )
+
+    for testimonial in carousel.testimonials:
+        create_blank_1_1_layout_slide(
+            prs=prs,
+            quote=f'"{testimonial.content}"',
+            author=f"— {testimonial.client_name}"
+        )
+
+    cta_layouts = [create_section_title_and_description_layout_slide, create_custom_3_1_layout_slide]
+    random.choice(cta_layouts)(
+        prs=prs, title=carousel.call_to_action.title,
+        description=carousel.call_to_action.content, subtitle=carousel.call_to_action.content
+    )
+    return prs
+
+
+def create_ppt_product_demo_carousel(prs: Presentation, carousel: ProductDemoCarousel) -> Presentation:
+    default_image = get_default_image_path()
+
+    cover_layouts = [create_title_layout_slide, create_title_only_layout_slide]
+    random.choice(cover_layouts)(
+        prs=prs, title=carousel.cover.title, subtitle=carousel.cover.content
+    )
+
+    feature_layouts = [create_title_and_body_layout_slide, create_one_column_text_layout_slide]
+    random.choice(feature_layouts)(
+        prs=prs, title=carousel.main_feature.title, body_text=carousel.main_feature.content,
+        image_path=getattr(carousel.main_feature, "image_path", default_image)
+    )
+
+    for feature in carousel.additional_features:
+        random.choice(feature_layouts)(
+            prs=prs, title=feature.title, body_text=feature.content,
+            image_path=getattr(feature, "image_path", default_image)
+        )
+
+    cta_layouts = [create_section_title_and_description_layout_slide, create_custom_3_1_layout_slide]
+    random.choice(cta_layouts)(
+        prs=prs, title=carousel.call_to_action.title,
+        description=carousel.call_to_action.content, subtitle=carousel.call_to_action.content
+    )
+    return prs
+
+
 def debug_slide(slide):
-    """ Print the placeholder and their indexes in a slide"""
     for shape in slide.shapes:
         print(f"Shape: {shape.name}, Type: {shape.shape_type}, Placeholder: {shape.placeholder_format.idx}")
 

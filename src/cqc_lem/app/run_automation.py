@@ -1227,8 +1227,6 @@ def send_private_dm(self, user_id: int, profile_url: str, message: str):
 @shared_task.task(bind=True, base=QueueOnce, once={'graceful': True, 'keys': ['user_id', 'profile_url']},
                   reject_on_worker_lost=True, rate_limit='1/m')
 def invite_to_connect(self, user_id: int, profile_url: str, message: str = None):
-    # TODO: Add log entry for successful and failed invites to connect
-
     user_email, user_password = get_user_password_pair_by_id(user_id)
 
     driver, wait = get_driver_wait_pair(session_name='Invite to Connect')
@@ -1338,6 +1336,11 @@ def invite_to_connect(self, user_id: int, profile_url: str, message: str = None)
     except Exception as e:
         myprint(f"Error while inviting to connect: {e}")
         result = f"Error while inviting to connect: {e}"
+        insert_new_log(user_id=user_id, action_type=LogActionType.ENGAGED,
+                       result=LogResultType.FAILURE, post_url=profile_url, message=str(e))
+    else:
+        insert_new_log(user_id=user_id, action_type=LogActionType.ENGAGED,
+                       result=LogResultType.SUCCESS, post_url=profile_url, message=result)
     finally:
         quit_gracefully(driver)  # Close the driver
 
