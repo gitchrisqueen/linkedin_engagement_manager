@@ -341,12 +341,14 @@ def get_profile_experiences(driver, employee_link):
                 skills = row[si][:len(row[si]) // 2]
                 last_position['skills'] = skills.split(":")[1].split(" · ")
             else:
-                # TODO: Fix for when prefix is empty
-
-                # Using the first 10 characters of the row[si] details as prefix
                 prefix = row[si][:10]
-                # Details equals row[si] and stops at the second index of the prefix
-                details = prefix + row[si].split(prefix)[1]
+                if not prefix:
+                    continue
+                parts = row[si].split(prefix)
+                if len(parts) < 2:
+                    details = row[si]
+                else:
+                    details = prefix + parts[1]
 
                 # Strip white spaces
                 details = details.strip()

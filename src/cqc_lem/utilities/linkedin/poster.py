@@ -106,21 +106,14 @@ def upload_media(access_token, owner_sub_id: str, media_path, media_type: str = 
 
 
 def determine_media_type(media_path: str) -> str:
-    """Stub function to determine the type of media (image or video)."""
-
-    # Get the file extension and determine the media type
-    basename = os.path.basename(media_path)
-    file_name, file_extension = os.path.splitext(basename)
-
-    mime_type = get_file_mime_type(file_extension)
-
-    # Simple logic based on file extension, could be replaced with actual media inspection logic
-    if 'image' in media_path:
-        return 'IMAGE'
-    elif 'video' in media_path:
-        return 'VIDEO'
+    _, ext = os.path.splitext(os.path.basename(media_path))
+    mime = get_file_mime_type(ext)
+    if "image" in mime:
+        return "IMAGE"
+    elif "video" in mime:
+        return "VIDEO"
     else:
-        raise ValueError("Unsupported media type")
+        raise ValueError(f"Unsupported media type for extension '{ext}': {mime}")
 
 
 def share_on_linkedin(user_id: int, content: str,
@@ -207,16 +200,3 @@ def share_on_linkedin(user_id: int, content: str,
 
     return urn
 
-
-if __name__ == '__main__':
-    # Example usage
-    #media_path = '/app/src/app/assets/videos/runwayml/0bcc2063-aa61-4ee5-b672-49f2d4614373.mp4' # This one worked
-    media_path = 'https://cqc-lem-api.ngrok-free.dev/assets?file_name=videos/runwayml/71b68785-2b7e-48c6-aadd-822014a18b1d.mp4'
-    user_id = 60
-    content = "Video Post"
-    share_result = share_on_linkedin(user_id, content, media_path)
-    #content = "Regular Post"
-    # share_result = share_on_linkedin(user_id, content)
-    #content = "Image Post"
-    #media_path = '/app/src/app/assets/images/replicate/8JAFZaCQtV4VJFhuX1qNOJd1kwFre7gjfuzGdj7UreQ72mpnA/out-0.webp'
-    #share_result = share_on_linkedin(user_id, content, media_path)
