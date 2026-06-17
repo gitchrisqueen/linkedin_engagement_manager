@@ -190,4 +190,8 @@ package-lock.json
 .cdk.staging
 cdk.out
 
+# React UI build artifacts
+src/cqc_lem/ui/node_modules/
+src/cqc_lem/ui/dist/
+
 .qodo

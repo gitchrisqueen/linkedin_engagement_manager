@@ -1,7 +1,8 @@
 import os
+import time
 from datetime import datetime
 from enum import IntEnum
-from typing import BinaryIO, Union
+from typing import BinaryIO, Dict, Union
 from typing import Optional, Any
 from urllib.parse import urlparse, urlunparse
 
@@ -10,32 +11,43 @@ from cqc_lem.app.aws_test_celery_task import test_get_my_profile
 from cqc_lem.app.run_automation import automate_invites_to_company_page_for_user, automate_reply_commenting
 from cqc_lem.app.run_content_plan import auto_create_weekly_content
 from cqc_lem.utilities.db import insert_post, get_post_by_email, get_user_id, update_db_post, get_post_user_id, \
-    add_user_with_access_token, PostType, PostStatus
+    add_user_with_access_token, PostType, PostStatus, get_posts
 from cqc_lem.utilities.env_constants import CODE_TRACING, LI_CLIENT_ID, LI_CLIENT_SECRET, LI_REDIRECT_URL, LI_STATE_SALT
 from cqc_lem.utilities.jaeger_tracer_helper import get_jaeger_tracer
 from cqc_lem.utilities.logger import myprint, logger
 from cqc_lem.utilities.mime_type_helper import get_file_mime_type
+from cqc_lem.utilities.observability import track_api_call
 from cqc_lem.utilities.utils import get_file_extension_from_filepath
 from fastapi import FastAPI, HTTPException, Request, status
 from fastapi import Query
 from fastapi.responses import FileResponse
 from fastapi.responses import RedirectResponse
 from fastapi.responses import StreamingResponse
+from fastapi.staticfiles import StaticFiles
 from linkedin_api.clients.auth.client import AuthClient
 from linkedin_api.clients.restli.client import RestliClient
 from pydantic import BaseModel, computed_field
 
 app = FastAPI()
 
-if CODE_TRACING:
-    try:
-        tracer = get_jaeger_tracer("api", __name__)
-        # Instrument FastAPI
-        from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
 
-        FastAPIInstrumentor.instrument_app(app)
-    except ImportError:
-        logger.debug("OpenTelemetry tracing dependencies not found. Tracing Disabled")
+@app.middleware("http")
+async def observability_middleware(request: Request, call_next):
+    start = time.time()
+    response = await call_next(request)
+    track_api_call(
+        route=request.url.path,
+        method=request.method,
+        status_code=response.status_code,
+        latency_ms=int((time.time() - start) * 1000),
+    )
+    return response
+
+
+# Serve the React SPA from ui/dist if it has been built
+_ui_dist = os.path.join(os.path.dirname(__file__), "..", "ui", "dist")
+if os.path.isdir(_ui_dist):
+    app.mount("/app", StaticFiles(directory=_ui_dist, html=True), name="spa")
 
 error_responses = {
     400: {"description": "Bad Request"},
@@ -86,6 +98,40 @@ class FutureForwardValues(IntEnum):
 @app.get("/health")
 def health_check():
     return {"status": "healthy"}
+
+
+@app.get("/dashboard/stats/", responses={
+    200: {"description": "Dashboard stats returned"},
+    **{k: v for k, v in error_responses.items() if k in [400, 403]}
+})
+def get_dashboard_stats(email: str) -> ResponseModel:
+    """Return aggregate stats for the dashboard."""
+    if not email:
+        raise HTTPException(status_code=400, detail="Email is required")
+
+    user_id = get_user_id(email)
+    if not user_id:
+        raise HTTPException(status_code=403, detail="User not found")
+
+    posts = get_posts(user_id) or []
+    now = datetime.now()
+    week_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
+    week_start = week_start.replace(day=week_start.day - week_start.weekday())
+
+    scheduled_this_week = sum(
+        1 for p in posts
+        if p.get("status") in (PostStatus.APPROVED, PostStatus.PENDING)
+        and p.get("scheduled_time") and p["scheduled_time"] >= week_start
+    )
+    pending_review = sum(1 for p in posts if p.get("status") == PostStatus.PENDING)
+    posted_total = sum(1 for p in posts if p.get("status") == PostStatus.POSTED)
+
+    stats: Dict[str, int] = {
+        "scheduled_this_week": scheduled_this_week,
+        "pending_review": pending_review,
+        "posted_total": posted_total,
+    }
+    return ResponseModel(status_code=200, detail=stats)
 
 
 @app.post("/automate_reply_commenting", responses={
