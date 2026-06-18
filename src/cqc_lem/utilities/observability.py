@@ -8,6 +8,9 @@ import posthog
 posthog.api_key = os.getenv("POSTHOG_API_KEY", "")
 posthog.host = os.getenv("POSTHOG_HOST", "https://us.i.posthog.com")
 
+# Suppress API errors (e.g. 401 from personal vs project key mismatch) silently
+posthog.on_error = lambda e, items: None
+
 # Disable PostHog when no key configured (local dev without key)
 if not posthog.api_key:
     posthog.disabled = True

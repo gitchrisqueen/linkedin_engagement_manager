@@ -351,6 +351,18 @@ def get_assets(file_name: str, content_type: Optional[str] = None,
         return FileResponse(status_code=200, path=file_path, media_type=mim_type, content_disposition_type=content_type)
 
 
+# LinkedIn OAuth initiation — builds the authorization URL and redirects user to LinkedIn
+@app.get("/auth/linkedin/", response_model=None, include_in_schema=False)
+@router.get("/auth/linkedin/", response_model=None, include_in_schema=False)
+def linkedin_auth_init(email: str = None) -> RedirectResponse:
+    client = AuthClient(LI_CLIENT_ID, LI_CLIENT_SECRET, LI_REDIRECT_URL)
+    auth_url = client.generate_member_auth_url(
+        state=LI_STATE_SALT,
+        scopes=["openid", "profile", "email", "w_member_social"]
+    )
+    return RedirectResponse(url=auth_url)
+
+
 # LinkedIn OAuth callback lives outside /api since LinkedIn redirects here
 @app.get("/auth/linkedin/callback", response_model=None)
 def linkedin_callback(code: str, state: str = None) -> Union[ResponseModel, RedirectResponse]:
@@ -390,7 +402,7 @@ def linkedin_callback(code: str, state: str = None) -> Union[ResponseModel, Redi
     final_redirect_url = urlunparse((parsed_url.scheme, netloc, '/account', '', '', ''))
 
     if os.environ.get('NGROK_CUSTOM_DOMAIN'):
-        final_redirect_url = "http://" + os.environ.get('NGROK_CUSTOM_DOMAIN') + '/account'
+        final_redirect_url = "https://" + os.environ.get('NGROK_CUSTOM_DOMAIN') + '/account'
 
     return RedirectResponse(url=final_redirect_url)
 
