@@ -284,22 +284,22 @@ typeguard = "2.13.3"
 
 [[package]]
 name = "aws-cdk-aws-lambda-python-alpha"
-version = "2.181.1a0"
+version = "2.260.0a0"
 description = "The CDK Construct Library for AWS Lambda in Python"
 optional = false
-python-versions = "~=3.8"
+python-versions = ">=3.10"
 groups = ["dev"]
 files = [
-    {file = "aws_cdk.aws_lambda_python_alpha-2.181.1a0-py3-none-any.whl", hash = "sha256:a0f93d428d83cf3462df8e59f203b0f83cba977619cb31fbd3d3aea254ea2a68"},
-    {file = "aws_cdk_aws_lambda_python_alpha-2.181.1a0.tar.gz", hash = "sha256:b9b53a87bfcfacb200cd43770c4c4861b6fc4c8aa7b4f495183171048ec3327c"},
+    {file = "aws_cdk_aws_lambda_python_alpha-2.260.0a0-py3-none-any.whl", hash = "sha256:143e8dee0fdb8c6d53e4607f0b6ecd85fe5b0b44fa86244ff59a51b9458f1ce2"},
+    {file = "aws_cdk_aws_lambda_python_alpha-2.260.0a0.tar.gz", hash = "sha256:198ac4636d79a362ae2a210306688621fb44188f5227b01689dd4eab3fd9b3a0"},
 ]
 
 [package.dependencies]
-aws-cdk-lib = ">=2.181.1,<3.0.0"
-constructs = ">=10.0.0,<11.0.0"
-jsii = ">=1.106.0,<2.0.0"
+aws-cdk-lib = ">=2.260.0,<3.0.0"
+constructs = ">=10.5.0,<11.0.0"
+jsii = ">=1.133.0,<2.0.0"
 publication = ">=0.0.3"
-typeguard = ">=2.13.3,<4.3.0"
+typeguard = "2.13.3"
 
 [[package]]
 name = "aws-cdk-cloud-assembly-schema"
