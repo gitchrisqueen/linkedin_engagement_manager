@@ -41,10 +41,11 @@ jobs:
           --health-retries=5
 
     env:
-      DB_HOST: 127.0.0.1
-      DB_USER: test_user
-      DB_PASSWORD: test_password
-      DB_NAME: test_lem
+      MYSQL_HOST: 127.0.0.1
+      MYSQL_USER: test_user
+      MYSQL_PASSWORD: test_password
+      MYSQL_DATABASE: test_lem
+      MYSQL_PORT: 3306
       CELERY_BROKER_URL: redis://127.0.0.1:6379/0
       CELERY_RESULT_BACKEND: redis://127.0.0.1:6379/0
       OPENAI_API_KEY: test-key-not-real

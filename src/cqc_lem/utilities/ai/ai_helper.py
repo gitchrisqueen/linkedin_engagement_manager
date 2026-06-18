@@ -507,10 +507,8 @@ def get_video_content_from_ai(linked_user_profile: LinkedInProfile, buyer_stage:
         # response_format={"type": "json_object"},
     )
 
-    # Extract and return the model's response
-    final_prompt = response.choices[0].message.content.strip()
-    video_url = create_video_from_prompt(final_prompt)
-    return video_url
+    # Return the AI-generated video script; pass to create_runway_video() to produce the video
+    return response.choices[0].message.content.strip()
 
 
 def summarize_recent_activity(recent_activity_profile: LinkedInProfile, main_profile: LinkedInProfile):
@@ -594,7 +592,6 @@ def create_video_from_prompt(prompt: str):
     raise NotImplementedError(
         "OpenAI video API is not available. Use create_runway_video() instead."
     )
-    return video_url
 
 
 def get_thought_leadership_post_from_ai(linked_user_profile: LinkedInProfile, buyer_stage: str):
@@ -1778,7 +1775,7 @@ def create_runway_video(image_path: str, prompt: str):
 
     return video_url
 
-def ai_check_message_history(message_history_json: str, main_focus: str, message:str):
+def ai_check_message_history(message_history_json: str, main_focus: str, message: str, user_name: str = "the recipient"):
     """Check if the message history contains sentiments of the message already. It will return it or try to generate a seamless new message that is tied to the main_focus"""
 
     """Here is the fully optimized and structured prompt based on your one-liner. This prompt includes a clearly defined identity, objective, and step-by-step logic tailored to maximize performance in ChatGPT:
