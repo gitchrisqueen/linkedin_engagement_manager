@@ -7,27 +7,14 @@ agent:
 
 tunnels:
   lem-app:
-    addr: ${STREAMLIT_PORT}
-    labels:
-      - hostname=app
-      - edge=${NGROK_EDGE_TOKEN}
-  lem-api:
     proto: http
     addr: ${API_PORT}
-    domain: ${NGROK_API_PREFIX}.${NGROK_FREE_DOMAIN}
+    domain: ${NGROK_CUSTOM_DOMAIN}
   lem-flower:
     proto: http
     addr: ${CELERY_FLOWER_PORT}
     domain: ${NGROK_FLOWER_PREFIX}.${NGROK_FREE_DOMAIN}
   lem-chrome:
     proto: http
-    addr: ${SELENIUM_HUB_PORT}
+    addr: 7900
     domain: ${NGROK_CHROME_PREFIX}.${NGROK_FREE_DOMAIN}
-  lem-lipreview:
-    proto: http
-    addr: ${LI_PREVIEW_PORT}
-    domain: ${NGROK_LIPREVIEW_PREFIX}.${NGROK_FREE_DOMAIN}
-  lem-jaeger:
-    proto: http
-    addr: ${JAEGER_UI_PORT}
-    domain: ${NGROK_JAEGER_PREFIX}.${NGROK_FREE_DOMAIN}
