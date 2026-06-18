@@ -40,12 +40,12 @@ runs:
       uses: actions/cache@v4
       with:
         path: ${{ inputs.working-directory }}/.venv
-        key: venv-${{ runner.os }}-${{ inputs.python-version }}-${{ hashFiles(format('{0}/poetry.lock', inputs.working-directory)) }}
+        key: venv-${{ runner.os }}-${{ inputs.python-version }}-${{ hashFiles(format('{0}/poetry.lock', inputs.working-directory)) }}-${{ inputs.install-args }}
         restore-keys: |
+          venv-${{ runner.os }}-${{ inputs.python-version }}-${{ hashFiles(format('{0}/poetry.lock', inputs.working-directory)) }}-
           venv-${{ runner.os }}-${{ inputs.python-version }}-
 
     - name: Install dependencies
-      if: steps.cache-venv.outputs.cache-hit != 'true'
       shell: bash
       working-directory: ${{ inputs.working-directory }}
       run: poetry install ${{ inputs.install-args }} --no-interaction

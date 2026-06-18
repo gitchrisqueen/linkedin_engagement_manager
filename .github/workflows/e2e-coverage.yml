@@ -51,11 +51,16 @@ jobs:
 
       - name: Run E2E tests
         run: |
+          set +e
           poetry run pytest tests/e2e \
             -v --tb=short \
             -m e2e \
             --cov=src/cqc_lem \
             --cov-report=xml
+          rc=$?
+          set -e
+          # Exit code 5 = no tests collected; treat as passing until E2E tests are written
+          [ $rc -eq 5 ] && echo "No E2E tests found yet — skipping" && exit 0 || exit $rc
 
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v4

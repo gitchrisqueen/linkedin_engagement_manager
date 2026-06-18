@@ -62,11 +62,16 @@ jobs:
 
       - name: Run integration tests
         run: |
+          set +e
           poetry run pytest tests/integration \
             -v --tb=short \
             --cov=src/cqc_lem \
             --cov-report=xml \
             --cov-report=term-missing
+          rc=$?
+          set -e
+          # Exit code 5 = no tests collected; treat as passing until tests are written
+          [ $rc -eq 5 ] && echo "No integration tests found yet — skipping" && exit 0 || exit $rc
 
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v4
