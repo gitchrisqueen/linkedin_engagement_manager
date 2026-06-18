@@ -4,7 +4,8 @@ import time
 from selenium.common import TimeoutException
 from selenium.webdriver import ActionChains
 
-from cqc_lem.utilities.db import get_user_password_pair_by_id, get_company_linked_in_url_for_user
+from cqc_lem.utilities.db import get_user_password_pair_by_id, get_company_linked_in_url_for_user, \
+    insert_new_log, LogActionType, LogResultType
 from cqc_lem.utilities.linkedin.helper import login_to_linkedin
 from cqc_lem.utilities.logger import myprint
 from cqc_lem.utilities.selenium_util import get_element_wait_retry, get_elements_as_list_wait_stale, getText, \
@@ -168,6 +169,9 @@ def automate_invitations(driver, wait, user_id):
     selected_count = select_connection_checkboxes(driver, wait, current_credits)
     if selected_count > 0:
         if invite_selected_connections(driver, wait):
+            insert_new_log(user_id, LogActionType.ENGAGED, LogResultType.SUCCESS,
+                           post_url=li_company_page_url,
+                           message=f"Invited {selected_count} connection(s) to company page")
             time.sleep(2)  # Delay to ensure the prompt appears before checking for it
             if dismiss_prompt(driver, wait):
                 myprint("Prompt handled")
@@ -179,6 +183,9 @@ def automate_invitations(driver, wait, user_id):
                 myprint("Continuing automate_invitations.")
                 selected_count += automate_invitations(driver, wait, user_id)
         else:
+            insert_new_log(user_id, LogActionType.ENGAGED, LogResultType.FAILURE,
+                           post_url=li_company_page_url,
+                           message="Failed to invite to company page: invite button not found")
             myprint("No invite button found, stopping automate_invitations.")
     else:
         myprint("No more connections to invite or already selected. Exiting automate_invitations.")

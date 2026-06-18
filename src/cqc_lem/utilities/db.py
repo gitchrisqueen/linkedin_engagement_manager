@@ -866,12 +866,27 @@ def get_active_user_ids():
         active_user_ids = [row[0] for row in cursor.fetchall()]
     except mysql.connector.Error as err:
         myprint(f"Could not get active user ids | Error: {err}")
-        active_user_ids = None
+        active_user_ids = []
     finally:
         cursor.close()
         connection.close()
 
     return active_user_ids
+
+
+def get_user_location(user_id: int) -> tuple[float, float] | None:
+    connection = get_db_connection()
+    cursor = connection.cursor()
+    try:
+        cursor.execute("SELECT latitude, longitude FROM users WHERE id = %s", (user_id,))
+        row = cursor.fetchone()
+    except mysql.connector.Error as err:
+        myprint(f"Could not get user location | Error: {err}")
+        row = None
+    finally:
+        cursor.close()
+        connection.close()
+    return (float(row[0]), float(row[1])) if row and row[0] and row[1] else None
 
 
 def insert_new_log(user_id: int, action_type: LogActionType, result: LogResultType, post_id: int = None,
