@@ -91,10 +91,13 @@ class TestSummarizeRecentActivity:
     def test_calls_api_for_profiles_with_activities(self, mock_openai_client, sample_linkedin_profile):
         with patch("cqc_lem.utilities.ai.ai_helper.client", mock_openai_client):
             from cqc_lem.utilities.ai.ai_helper import summarize_recent_activity
-            from cqc_lem.utilities.linkedin.profile import LinkedInProfile
+            from cqc_lem.utilities.linkedin.profile import LinkedInProfile, LinkedInActivity
 
             main_profile = LinkedInProfile(**sample_linkedin_profile)
-            active_data = {**sample_linkedin_profile, "recent_activities": ["Posted about AI"]}
+            active_data = {
+                **sample_linkedin_profile,
+                "recent_activities": [LinkedInActivity(text="Posted about AI")],
+            }
             activity_profile = LinkedInProfile(**active_data)
 
             result = summarize_recent_activity(activity_profile, main_profile)

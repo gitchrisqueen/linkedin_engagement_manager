@@ -195,7 +195,8 @@ class TestGetUserId:
 
         with patch("cqc_lem.utilities.db.get_db_connection") as mock_conn:
             mock_conn.return_value = mock_database_connection["connection"]
-            mock_database_connection["cursor"].fetchone.return_value = (42,)
+            # cursor uses dictionary=True so fetchone returns a dict
+            mock_database_connection["cursor"].fetchone.return_value = {"id": 42}
 
             result = get_user_id("test@example.com")
 

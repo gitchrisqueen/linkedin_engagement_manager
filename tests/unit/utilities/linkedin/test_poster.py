@@ -44,8 +44,10 @@ class TestValidatePostType:
 @pytest.mark.unit
 class TestDownloadMedia:
     def test_downloads_to_tmp_and_returns_path(self):
+        from unittest.mock import mock_open
+        m_open = mock_open()
         with patch("requests.get") as mock_get, \
-             patch("builtins.open", MagicMock()), \
+             patch("cqc_lem.utilities.linkedin.poster.open", m_open, create=True), \
              patch("os.makedirs", MagicMock()):
             from cqc_lem.utilities.linkedin.poster import download_media
 
