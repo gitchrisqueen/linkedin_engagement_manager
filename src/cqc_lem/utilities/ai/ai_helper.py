@@ -139,8 +139,8 @@ def generate_ai_response(post_content, profile: LinkedInProfile, post_img_url=No
         # max_tokens=150  # Set token limit as required
     )
 
-    comment = response.choices[0].message.content.strip()
-    return comment
+    content = response.choices[0].message.content
+    return content.strip() if content is not None else None
 
 
 def get_ai_description_of_profile(linked_in_profile: LinkedInProfile):
