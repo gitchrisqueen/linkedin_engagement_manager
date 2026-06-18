@@ -66,49 +66,51 @@ def get_available_session_driver_id(wait_for_available=True, wait_time=60, retry
     return session_id
 
 
-def get_docker_driver(headless=True, session_name: str = "ChromeTests", coordinates: dict = None) -> WebDriver:
-    options = getBaseOptions()
-    # options.headless = headless
-    if headless:
-        options = add_headless_options(options)
+def _wait_for_selenium_ready(host: str, port: str, timeout: int = 60) -> None:
+    """Poll standalone-chrome readiness endpoint until ready or timeout."""
+    status_url = f"http://{host}:{port}/wd/hub/status"
+    deadline = time.time() + timeout
+    while time.time() < deadline:
+        try:
+            resp = requests.get(status_url, timeout=3)
+            if resp.status_code == 200 and resp.json().get("value", {}).get("ready"):
+                myprint(f"Selenium ready at {status_url}")
+                myprint(f"VNC viewer available at http://{host}:7900")
+                return
+        except Exception:
+            pass
+        time.sleep(2)
+    raise TimeoutError(f"Selenium not ready at {status_url} after {timeout}s")
 
-    options.add_argument('--ignore-ssl-errors=yes')
-    options.add_argument('--ignore-certificate-errors')
 
-    # Enable recording video
-    options.set_capability('se:recordVideo', SELENIUM_RECORD_VIDEOS)
-    options.set_capability('se:timeZone', TZ)
-    options.set_capability('se:screenResolution', '1920x1080')
-    options.set_capability('se:name', 'CQC_LEM (' + session_name + ')')
-
-    # myprint(f"Options: {vars(options)}")
-
+def get_docker_driver(headless: bool = True, session_name: str = "ChromeTests", coordinates: dict = None) -> WebDriver:
     if DEVICE_FARM_PROJECT_ARN and TEST_GRID_PROJECT_ARN:
         remote_url = get_aws_device_farm_url(DEVICE_FARM_PROJECT_ARN, TEST_GRID_PROJECT_ARN)
     else:
+        _wait_for_selenium_ready(SELENIUM_HUB_HOST, SELENIUM_HUB_PORT)
         remote_url = f"http://{SELENIUM_HUB_HOST}:{SELENIUM_HUB_PORT}/wd/hub"
 
-    driver = webdriver.Remote(
-        command_executor=remote_url,  # Works
-        # command_executor=f'http://{SELENIUM_HUB_HOST}:4444',  # Works
-        options=options
-    )
+    options = getBaseOptions()
+    options.add_argument("--ignore-ssl-errors=yes")
+    options.add_argument("--ignore-certificate-errors")
+    if headless:
+        options = add_headless_options(options)
 
-    if not headless:
-        driver.maximize_window()
+    options.set_capability("se:timeZone", TZ)
+    options.set_capability("se:screenResolution", "1920x1080")
+    options.set_capability("se:name", f"CQC_LEM ({session_name})")
 
-    # TODO: Get this from function parameter
-    # Define geolocation coordinates for Jacksonville, FL
+    driver = webdriver.Remote(command_executor=remote_url, options=options)
+    driver.set_window_size(1920, 1080)
+
     if coordinates is None:
+        # TODO: pull from user's DB record (Issue #47)
         coordinates = {
-            "latitude": 30.3321,  # Jacksonville, FL latitude
-            "longitude": -81.6556,  # Jacksonville, FL longitude
-            "accuracy": 100  # Specify the accuracy
+            "latitude": 30.3321,
+            "longitude": -81.6556,
+            "accuracy": 100,
         }
-
-    # Emulate geolocation
-    if coordinates is not None:
-        driver.execute_cdp_cmd("Emulation.setGeolocationOverride", coordinates)
+    driver.execute_cdp_cmd("Emulation.setGeolocationOverride", coordinates)
 
     return driver
 

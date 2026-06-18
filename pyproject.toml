@@ -17,7 +17,7 @@ python-dotenv = "^1.0"
 openai = "^1.52.2"
 fastapi = "^0.115.4"
 linkedin-api-client = "^0.3.0"
-uvicorn = "^0.32.0"
+uvicorn = ">=0.32,<0.50"
 celery = {version = "^5.4.0", extras = ["redis"]}
 redis = "^5.2.0"
 bs4 = "^0.0.2"
@@ -58,6 +58,7 @@ pexels-api = "^1.0.1"
 
 # Monitoring
 flower = "^2.0.1"  # Celery monitoring
+posthog = "^3.7"   # LLM usage + system observability
 
 # AWS
 boto3 = "^1.36.7"
@@ -107,7 +108,7 @@ freezegun = "^1.2.2"
 pytest-mock = "^3.10.0"
 syrupy = "^4.0.2"
 pytest-watcher = "^0.3.4"
-pytest-asyncio = "^0.21.1"
+pytest-asyncio = ">=0.21.1,<0.24.0"
 grandalf = "^0.8"
 pytest-profiling = "^1.7.0"
 

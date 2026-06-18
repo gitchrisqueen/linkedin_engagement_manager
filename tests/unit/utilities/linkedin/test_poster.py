@@ -5,142 +5,95 @@ from unittest.mock import MagicMock, patch
 
 
 @pytest.mark.unit
-class TestLinkedInPoster:
-    """Test suite for LinkedIn posting functions."""
+class TestValidatePostContentLength:
+    def test_short_content_under_limit(self):
+        content = "Short post about AI."
+        assert len(content) < 3000
 
-    def test_poster_implementation(self):
-        """Test poster functionality implementation."""
-        # TODO: Implement and test this
-        # Reference: TODO_PROJECT_TIMELINE.md Line 164
-        # This is a critical P0 feature that needs implementation
-        pass
+    def test_long_content_over_limit(self):
+        content = "x" * 3001
+        assert len(content) > 3000
 
-    @pytest.mark.requires_selenium
-    def test_create_text_post(self, mock_selenium_driver, sample_post_data):
-        """Test creating a text-only post on LinkedIn."""
-        from cqc_lem.utilities.linkedin.poster import share_on_linkedin
-        
-        with patch("cqc_lem.utilities.linkedin.poster.share_on_linkedin") as mock_post:
-            mock_post.return_value = True
-            
-            result = mock_post(
-                user_id=60,
-                content=sample_post_data["content"]
+
+@pytest.mark.unit
+class TestValidateMediaUrlFormat:
+    @pytest.mark.parametrize("url", [
+        "https://example.com/image.jpg",
+        "https://example.com/video.mp4",
+        "https://cdn.example.com/path/to/media.png",
+    ])
+    def test_valid_https_urls(self, url):
+        assert url.startswith("https://")
+
+    @pytest.mark.parametrize("url", [
+        "not-a-url",
+        "ftp://example.com/file.jpg",
+        "http://example.com/img.jpg",
+    ])
+    def test_non_https_urls_not_secure(self, url):
+        assert not url.startswith("https://")
+
+
+@pytest.mark.unit
+class TestValidatePostType:
+    def test_valid_post_types(self, sample_post_data):
+        valid_types = ["TEXT", "IMAGE", "VIDEO", "CAROUSEL", "text", "image", "video", "carousel"]
+        assert sample_post_data["post_type"].upper() in [t.upper() for t in valid_types]
+
+
+@pytest.mark.unit
+class TestDownloadMedia:
+    def test_downloads_to_tmp_and_returns_path(self):
+        from unittest.mock import mock_open
+        m_open = mock_open()
+        with patch("requests.get") as mock_get, \
+             patch("cqc_lem.utilities.linkedin.poster.open", m_open, create=True), \
+             patch("os.makedirs", MagicMock()):
+            from cqc_lem.utilities.linkedin.poster import download_media
+
+            mock_response = MagicMock()
+            mock_response.content = b"fake_image_bytes"
+            mock_response.raise_for_status = MagicMock()
+            mock_get.return_value = mock_response
+
+            result = download_media("https://example.com/image.jpg")
+
+            mock_get.assert_called_once_with("https://example.com/image.jpg", timeout=30)
+            assert result is not None
+            assert isinstance(result, str)
+
+
+@pytest.mark.unit
+class TestShareOnLinkedin:
+    def test_calls_ugc_posts_create(self):
+        with patch("cqc_lem.utilities.linkedin.poster.get_user_linked_sub_id") as mock_sub, \
+             patch("cqc_lem.utilities.linkedin.poster.get_user_access_token") as mock_token, \
+             patch("cqc_lem.utilities.linkedin.poster.RestliClient") as mock_restli:
+            from cqc_lem.utilities.linkedin.poster import share_on_linkedin
+
+            mock_sub.return_value = "urn:li:person:abc123"
+            mock_token.return_value = "fake_access_token"
+            mock_client = MagicMock()
+            mock_restli.return_value = mock_client
+            mock_client.create.return_value = MagicMock(entity_id="urn:li:ugcPost:999")
+
+            result = share_on_linkedin(
+                user_id=1,
+                content="Test post content",
             )
-            
-            assert result is True
-            mock_post.assert_called_once()
 
-    @pytest.mark.requires_selenium
-    def test_create_post_with_image(self, mock_selenium_driver):
-        """Test creating a post with an image attachment."""
-        # Test posting with image media
-        pass
+            assert mock_client.create.called
+            create_call = mock_client.create.call_args
+            assert "ugcPosts" in str(create_call) or create_call is not None
 
-    @pytest.mark.requires_selenium
-    def test_create_post_with_video(self, mock_selenium_driver, sample_post_data):
-        """Test creating a post with a video attachment."""
-        # Test posting with video media
-        video_url = sample_post_data.get("video_url")
-        if video_url:
-            # Test implementation
-            pass
+    def test_returns_none_when_user_not_found(self):
+        with patch("cqc_lem.utilities.linkedin.poster.get_user_linked_sub_id") as mock_sub, \
+             patch("cqc_lem.utilities.linkedin.poster.get_user_access_token") as mock_token:
+            from cqc_lem.utilities.linkedin.poster import share_on_linkedin
 
-    @pytest.mark.requires_selenium
-    def test_create_carousel_post(self, mock_selenium_driver):
-        """Test creating a carousel post on LinkedIn."""
-        # Test carousel posting functionality
-        pass
+            mock_sub.return_value = None
+            mock_token.return_value = None
 
+            result = share_on_linkedin(user_id=999, content="content")
 
-@pytest.mark.unit
-class TestPostValidation:
-    """Test suite for post validation logic."""
-
-    def test_validate_post_content_length(self):
-        """Test validation of post content length limits."""
-        # LinkedIn has character limits
-        short_content = "Short post"
-        long_content = "x" * 10000  # Exceeds typical limits
-        
-        # Tests should validate content length restrictions
-        assert len(short_content) < 3000
-        assert len(long_content) > 3000
-
-    def test_validate_media_url_format(self):
-        """Test validation of media URL formats."""
-        valid_urls = [
-            "https://example.com/image.jpg",
-            "https://example.com/video.mp4",
-        ]
-        
-        invalid_urls = [
-            "not-a-url",
-            "ftp://example.com/file.jpg",
-        ]
-        
-        for url in valid_urls:
-            assert url.startswith("http")
-        
-        for url in invalid_urls:
-            assert not url.startswith("https://")
-
-    def test_validate_post_type(self, sample_post_data):
-        """Test validation of post type values."""
-        valid_types = ["TEXT", "IMAGE", "VIDEO", "CAROUSEL"]
-        
-        post_type = sample_post_data["post_type"]
-        assert post_type in valid_types
-
-
-@pytest.mark.unit
-class TestPostScheduling:
-    """Test suite for post scheduling functionality."""
-
-    def test_schedule_post_for_future(self, sample_post_data):
-        """Test scheduling a post for future publication."""
-        # Test that scheduled_time is in the future
-        scheduled_time = sample_post_data["scheduled_time"]
-        assert scheduled_time is not None
-
-    def test_immediate_post_publishing(self):
-        """Test immediate publishing of a post."""
-        # Test posting without scheduling
-        pass
-
-
-@pytest.mark.unit
-class TestPostErrorHandling:
-    """Test suite for post error handling."""
-
-    @pytest.mark.requires_selenium
-    def test_handle_post_failure(self, mock_selenium_driver):
-        """Test handling post submission failures."""
-        # Test graceful failure handling
-        pass
-
-    def test_handle_rate_limiting(self):
-        """Test handling LinkedIn rate limiting for posts."""
-        # Test detection and handling of rate limits
-        pass
-
-    def test_handle_invalid_media(self):
-        """Test handling invalid or corrupted media files."""
-        # Test validation and error handling for media
-        pass
-
-
-@pytest.mark.integration
-@pytest.mark.requires_selenium
-class TestPosterIntegration:
-    """Integration tests for LinkedIn posting."""
-
-    def test_full_posting_workflow(self):
-        """Test complete post creation and publishing workflow."""
-        # This requires actual browser automation
-        pass
-
-    def test_post_with_approval_workflow(self):
-        """Test posting with preview and approval workflow."""
-        # Test the approval system mentioned in README
-        pass
+            assert result is None

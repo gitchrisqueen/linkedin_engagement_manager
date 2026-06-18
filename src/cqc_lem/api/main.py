@@ -1,4 +1,5 @@
 import os
+import time
 from datetime import datetime
 from enum import IntEnum
 from typing import BinaryIO, Union
@@ -11,10 +12,10 @@ from cqc_lem.app.run_automation import automate_invites_to_company_page_for_user
 from cqc_lem.app.run_content_plan import auto_create_weekly_content
 from cqc_lem.utilities.db import insert_post, get_post_by_email, get_user_id, update_db_post, get_post_user_id, \
     add_user_with_access_token, update_user, PostType, PostStatus
-from cqc_lem.utilities.env_constants import CODE_TRACING, LI_CLIENT_ID, LI_CLIENT_SECRET, LI_REDIRECT_URL, LI_STATE_SALT
-from cqc_lem.utilities.jaeger_tracer_helper import get_jaeger_tracer
-from cqc_lem.utilities.logger import myprint, logger
+from cqc_lem.utilities.env_constants import LI_CLIENT_ID, LI_CLIENT_SECRET, LI_REDIRECT_URL, LI_STATE_SALT
+from cqc_lem.utilities.logger import myprint
 from cqc_lem.utilities.mime_type_helper import get_file_mime_type
+from cqc_lem.utilities.observability import track_api_call
 from cqc_lem.utilities.utils import get_file_extension_from_filepath
 from fastapi import FastAPI, HTTPException, Request, status
 from fastapi import Query
@@ -27,15 +28,18 @@ from pydantic import BaseModel, computed_field
 
 app = FastAPI()
 
-if CODE_TRACING:
-    try:
-        tracer = get_jaeger_tracer("api", __name__)
-        # Instrument FastAPI
-        from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
 
-        FastAPIInstrumentor.instrument_app(app)
-    except ImportError:
-        logger.debug("OpenTelemetry tracing dependencies not found. Tracing Disabled")
+@app.middleware("http")
+async def observability_middleware(request: Request, call_next):
+    start = time.time()
+    response = await call_next(request)
+    track_api_call(
+        route=request.url.path,
+        method=request.method,
+        status_code=response.status_code,
+        latency_ms=int((time.time() - start) * 1000),
+    )
+    return response
 
 error_responses = {
     400: {"description": "Bad Request"},
@@ -266,7 +270,7 @@ def get_posts(email: str) -> ResponseModel:
 def update_post(post_id: int, post: PostRequest) -> ResponseModel:
     """Endpoint to update a post."""
 
-    print(f"Received Post Request: {post}")
+    myprint(f"Received Post Request: {post}")
 
     if update_db_post(post.content, post.video_url, post.scheduled_datetime, post.post_type, post_id, post.status):
         return ResponseModel(status_code=200, detail="Post updated successful")
@@ -344,9 +348,8 @@ def get_assets(file_name: str, content_type: Optional[str] = None,
     # Check to see if file exists in the assets directory
     file_path = os.path.join(assets_dir, file_name)
 
-    print(f"File Path: {file_path}")
-
-    print(f"Content Type: {content_type}")
+    myprint(f"File Path: {file_path}")
+    myprint(f"Content Type: {content_type}")
 
     if not os.path.exists(file_path):
         raise HTTPException(status_code=404, detail="File not found")

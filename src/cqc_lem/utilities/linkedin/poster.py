@@ -33,18 +33,15 @@ class ShareContent(BaseModel):
     media: Optional[List[ShareMedia]] = None
 
 
-def download_media(media_path):
-    response = requests.get(media_path)
+def download_media(media_path: str) -> str:
+    response = requests.get(media_path, timeout=30)
+    response.raise_for_status()
     content = response.content
-    # Get the file exntension from the media path
     extension = get_file_extension_from_filepath(media_path)
-    # Store to local tmp path with uuid name
     tmp_path = f"/tmp/{uuid.uuid4()}{extension}"
     with open(tmp_path, "wb") as f:
         f.write(content)
-
-    print(f"Downloaded media to: {tmp_path}")
-
+    myprint(f"Downloaded media to: {tmp_path}")
     return tmp_path
 
 
@@ -132,6 +129,10 @@ def share_on_linkedin(user_id: int, content: str,
 
     linked_sub_id = get_user_linked_sub_id(user_id)
     access_token = get_user_access_token(user_id)
+
+    if not linked_sub_id or not access_token:
+        myprint(f"No LinkedIn credentials found for user {user_id} — cannot post")
+        return None
 
     media_objects = []
     share_media_category = "NONE"
