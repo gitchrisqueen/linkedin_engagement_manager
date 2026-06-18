@@ -14,7 +14,9 @@ broker_connection_timeout = 30
 redis_socket_connect_timeout = 30
 redis_socket_timeout = 30
 
-## Using the database to store task state and results.
+# AWS deployment decision: use SQS as the broker and ElastiCache Redis as the result backend.
+# Set CELERY_BROKER_URL=sqs:// and CELERY_RESULT_BACKEND=redis://<elasticache-host>:6379/1 in AWS secrets.
+# celery-once still requires CELERY_BROKER_URL to point at Redis for lock tracking (see my_celery.py).
 result_backend = os.getenv('CELERY_RESULT_BACKEND', f'redis://redis:{REDIS_PORT}/1')
 
 # The Redis backend visibility timout

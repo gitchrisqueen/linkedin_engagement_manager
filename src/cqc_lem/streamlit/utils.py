@@ -346,27 +346,8 @@ def read_file(file_path: str, convert_to_markdown: bool = False) -> str:
 
     if convert_to_markdown:
         with open(file_path, mode='rb') as f:
-            # results = mammoth.convert_to_markdown(f)
             results = mammoth.convert_to_html(f)
             contents = convert_content_to_markdown(results.value)
-        # contents = results.value
-        # TODO: Need to find alternative to textract as it conflicts with current/needed version of python-pptx
-        cant_use_with_this_project = """elif file_extension == ".docx":
-            # read in a document
-            my_doc = docx.Document(file_path)
-    
-            # Find any tables and replace with json strings
-            tmp_file = convert_tables_to_json_in_tmp__file(my_doc)
-    
-            # coerce to JSON using the standard options
-    
-            # contents = simplify(my_doc)
-    
-            # contents = textract.parsers.process(file_path)
-            # print("Extracting contents from: %s" % tmp_file)
-            contents = textract.process(tmp_file).decode('utf-8')
-            os.remove(tmp_file)
-        """
     else:
         with open(file_path, mode='r') as f:
             contents = f.read()
