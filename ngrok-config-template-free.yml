@@ -1,0 +1,19 @@
+# ngrok-config-template-free.yml
+# For use with ngrok Free plan (max 3 tunnels per session).
+# NGROK_CUSTOM_DOMAIN is the one free static domain for the main app.
+# lem-api and lem-flower receive dynamic random URLs — check the ngrok web UI to find them.
+# lem-chrome is excluded to stay within the 3-tunnel free-plan limit.
+version: 3
+
+agent:
+  authtoken: ${NGROK_AUTH_TOKEN}
+  web_addr: 0.0.0.0:${NGROK_UI_PORT}
+
+tunnels:
+  lem-app:
+    proto: http
+    addr: ${API_PORT}
+    domain: ${NGROK_CUSTOM_DOMAIN}
+  lem-flower:
+    proto: http
+    addr: ${CELERY_FLOWER_PORT}
