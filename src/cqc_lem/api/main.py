@@ -12,8 +12,8 @@ from cqc_lem.app.run_automation import automate_invites_to_company_page_for_user
 from cqc_lem.app.run_content_plan import auto_create_weekly_content
 from cqc_lem.utilities.db import (
     insert_post, get_post_by_email, get_user_id, update_db_post, get_post_user_id,
-    add_user_with_access_token, PostType, PostStatus, get_posts,
-    get_recent_logs, update_user_settings,
+    add_user_with_access_token, update_user, PostType, PostStatus, get_posts,
+    get_recent_logs,
 )
 from cqc_lem.utilities.env_constants import LI_CLIENT_ID, LI_CLIENT_SECRET, LI_REDIRECT_URL, LI_STATE_SALT
 from cqc_lem.utilities.logger import myprint
@@ -89,6 +89,7 @@ class PostRequest(BaseModel):
 
 class UserSettingsRequest(BaseModel):
     email: str
+    new_email: Optional[str] = None
     blog_url: Optional[str] = None
     sitemap_url: Optional[str] = None
 
@@ -170,9 +171,9 @@ def get_activity(email: str, limit: int = 20) -> ResponseModel:
 
 @router.put("/user/", responses={
     200: {"description": "User settings updated"},
-    **{k: v for k, v in error_responses.items() if k in [400, 403]}
+    **{k: v for k, v in error_responses.items() if k in [400, 403, 404]}
 })
-def update_user(settings: UserSettingsRequest) -> ResponseModel:
+def update_user_endpoint(settings: UserSettingsRequest) -> ResponseModel:
     if not settings.email:
         raise HTTPException(status_code=400, detail="Email is required")
 
@@ -180,8 +181,10 @@ def update_user(settings: UserSettingsRequest) -> ResponseModel:
     if not user_id:
         raise HTTPException(status_code=403, detail="User not found")
 
-    update_user_settings(user_id, blog_url=settings.blog_url, sitemap_url=settings.sitemap_url)
-    return ResponseModel(status_code=200, detail="User settings updated")
+    updated = update_user(user_id, email=settings.new_email, blog_url=settings.blog_url, sitemap_url=settings.sitemap_url)
+    if not updated:
+        raise HTTPException(status_code=404, detail="No fields to update or update failed")
+    return ResponseModel(status_code=200, detail="User updated successfully")
 
 
 @router.post("/automate_reply_commenting", responses={
