@@ -7,7 +7,7 @@ services:
         - INSTALL_DEV_DEPS=${INSTALL_DEV_DEPS}
     image: "${DOCKER_IMAGE_NAME}:latest"
     container_name: web_app
-    command: /start-streamlit
+    command: /start-fastapi
     depends_on:
       mysql:
         condition: service_healthy
@@ -16,26 +16,8 @@ services:
     volumes:
       - ./tests:/app/tests
       - ./logs:/app/logs
-    environment:
-      - DISPLAY=:99
     env_file:
       - .env
-    ports:
-      - "${STREAMLIT_PORT}:${STREAMLIT_PORT}"
-
-  api:
-    image: ${DOCKER_IMAGE_NAME}
-    container_name: api
-    command: /start-fastapi
-    volumes_from:
-      - web_app
-    env_file:
-      - .env
-    depends_on:
-      redis:
-        condition: service_healthy
-      mysql:
-        condition: service_healthy
     ports:
       - "${API_PORT}:${API_PORT}"
 

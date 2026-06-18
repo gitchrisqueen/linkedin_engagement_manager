@@ -2,7 +2,7 @@ import os
 import time
 from datetime import datetime
 from enum import IntEnum
-from typing import BinaryIO, Dict, Union
+from typing import BinaryIO, Dict, List, Union
 from typing import Optional, Any
 from urllib.parse import urlparse, urlunparse
 
@@ -10,16 +10,20 @@ from cqc_lem import assets_dir
 from cqc_lem.app.aws_test_celery_task import test_get_my_profile
 from cqc_lem.app.run_automation import automate_invites_to_company_page_for_user, automate_reply_commenting
 from cqc_lem.app.run_content_plan import auto_create_weekly_content
-from cqc_lem.utilities.db import insert_post, get_post_by_email, get_user_id, update_db_post, get_post_user_id, \
-    add_user_with_access_token, PostType, PostStatus, get_posts
+from cqc_lem.utilities.db import (
+    insert_post, get_post_by_email, get_user_id, update_db_post, get_post_user_id,
+    add_user_with_access_token, PostType, PostStatus, get_posts,
+    get_recent_logs, update_user_settings,
+)
 from cqc_lem.utilities.env_constants import LI_CLIENT_ID, LI_CLIENT_SECRET, LI_REDIRECT_URL, LI_STATE_SALT
 from cqc_lem.utilities.logger import myprint
 from cqc_lem.utilities.mime_type_helper import get_file_mime_type
 from cqc_lem.utilities.observability import track_api_call
 from cqc_lem.utilities.utils import get_file_extension_from_filepath
-from fastapi import FastAPI, HTTPException, Request, status
+from fastapi import FastAPI, HTTPException, Request, status, APIRouter
 from fastapi import Query
 from fastapi.responses import FileResponse
+from fastapi.responses import HTMLResponse
 from fastapi.responses import RedirectResponse
 from fastapi.responses import StreamingResponse
 from fastapi.staticfiles import StaticFiles
@@ -28,6 +32,9 @@ from linkedin_api.clients.restli.client import RestliClient
 from pydantic import BaseModel, computed_field
 
 app = FastAPI()
+
+# All API routes live under /api so the React client's baseURL: '/api' works
+router = APIRouter(prefix="/api")
 
 
 @app.middleware("http")
@@ -43,10 +50,7 @@ async def observability_middleware(request: Request, call_next):
     return response
 
 
-# Serve the React SPA from ui/dist if it has been built
 _ui_dist = os.path.join(os.path.dirname(__file__), "..", "ui", "dist")
-if os.path.isdir(_ui_dist):
-    app.mount("/app", StaticFiles(directory=_ui_dist, html=True), name="spa")
 
 error_responses = {
     400: {"description": "Bad Request"},
@@ -80,9 +84,13 @@ class PostRequest(BaseModel):
     @computed_field
     @property
     def scheduled_time(self) -> str:
-        # Dont Add Timezone to scheduled_datetime (expected function to convert to UTC or local accordingly)
-        # time.tzset()
         return self.scheduled_datetime.isoformat()
+
+
+class UserSettingsRequest(BaseModel):
+    email: str
+    blog_url: Optional[str] = None
+    sitemap_url: Optional[str] = None
 
 
 class FutureForwardValues(IntEnum):
@@ -99,12 +107,11 @@ def health_check():
     return {"status": "healthy"}
 
 
-@app.get("/dashboard/stats/", responses={
+@router.get("/dashboard/stats/", responses={
     200: {"description": "Dashboard stats returned"},
     **{k: v for k, v in error_responses.items() if k in [400, 403]}
 })
 def get_dashboard_stats(email: str) -> ResponseModel:
-    """Return aggregate stats for the dashboard."""
     if not email:
         raise HTTPException(status_code=400, detail="Email is required")
 
@@ -133,7 +140,51 @@ def get_dashboard_stats(email: str) -> ResponseModel:
     return ResponseModel(status_code=200, detail=stats)
 
 
-@app.post("/automate_reply_commenting", responses={
+@router.get("/activity/", responses={
+    200: {"description": "Recent activity log returned"},
+    **{k: v for k, v in error_responses.items() if k in [400, 403]}
+})
+def get_activity(email: str, limit: int = 20) -> ResponseModel:
+    if not email:
+        raise HTTPException(status_code=400, detail="Email is required")
+
+    user_id = get_user_id(email)
+    if not user_id:
+        raise HTTPException(status_code=403, detail="User not found")
+
+    logs = get_recent_logs(user_id, limit=limit)
+    serialized = [
+        {
+            "id": row["id"],
+            "action_type": row["action_type"],
+            "result": row["result"],
+            "post_id": row["post_id"],
+            "post_url": row["post_url"],
+            "message": row["message"],
+            "created_at": row["created_at"].isoformat() if row.get("created_at") else None,
+        }
+        for row in logs
+    ]
+    return ResponseModel(status_code=200, detail=serialized)
+
+
+@router.put("/user/", responses={
+    200: {"description": "User settings updated"},
+    **{k: v for k, v in error_responses.items() if k in [400, 403]}
+})
+def update_user(settings: UserSettingsRequest) -> ResponseModel:
+    if not settings.email:
+        raise HTTPException(status_code=400, detail="Email is required")
+
+    user_id = get_user_id(settings.email)
+    if not user_id:
+        raise HTTPException(status_code=403, detail="User not found")
+
+    update_user_settings(user_id, blog_url=settings.blog_url, sitemap_url=settings.sitemap_url)
+    return ResponseModel(status_code=200, detail="User settings updated")
+
+
+@router.post("/automate_reply_commenting", responses={
     200: {"description": "Post reply automation scheduled successfully"},
     **{k: v for k, v in error_responses.items() if k in [403, 404]}
 })
@@ -141,16 +192,13 @@ def automate_reply_commenting_for_post_id(post_id: int, loop_for_duration: int =
                                           future_forward: FutureForwardValues = Query(
                                               default=0,
                                               description="Forward index (0-5) to use for future calls",
-                                              examples=[0,1, 2, 3, 4, 5]
+                                              examples=[0, 1, 2, 3, 4, 5]
                                           )):
-    # Check if post_id exists in DB
     user_id = get_post_user_id(post_id)
-
     if not user_id:
         raise HTTPException(status_code=403, detail="User Id for Post not found")
 
     try:
-        # Schedule Reply to comments for 24 hours now that this has been posted
         base_kwargs = {
             'user_id': user_id,
             'post_id': post_id,
@@ -159,20 +207,16 @@ def automate_reply_commenting_for_post_id(post_id: int, loop_for_duration: int =
         }
         automate_reply_commenting.apply_async(kwargs=base_kwargs)
         return ResponseModel(status_code=200, detail="Post automation reply successfully scheduled")
-
     except Exception as e:
         raise HTTPException(status_code=404, detail=f"Could not schedule automation for post. Error: {e}")
 
 
-@app.post("/schedule_post/", responses={
+@router.post("/schedule_post/", responses={
     200: {"description": "Post scheduled successfully"},
     **{k: v for k, v in error_responses.items() if k in [403, 404]}
 })
 def schedule_post(post: PostRequest) -> ResponseModel:
-    """Endpoint to schedule a post."""
-
     user_id = get_user_id(post.email)
-
     if not user_id:
         raise HTTPException(status_code=403, detail="User not found")
 
@@ -182,89 +226,68 @@ def schedule_post(post: PostRequest) -> ResponseModel:
         raise HTTPException(status_code=404, detail="Could not schedule post")
 
 
-# app endpoint to create user weekly content using their user_id
-@app.post("/create_weekly_content/", responses={
+@router.post("/create_weekly_content/", responses={
     200: {"description": "Weekly content created successfully"},
     **{k: v for k, v in error_responses.items() if k in [400]}
 })
 def create_weekly_content(user_id: int) -> ResponseModel:
-    """Endpoint to create weekly content for a user."""
     if not user_id:
         raise HTTPException(status_code=400, detail="User ID is required")
 
     kwargs = {'user_id': user_id}
-    # Call the function to create the weekly content
     auto_create_weekly_content.apply_async(kwargs=kwargs, retry=True,
-                                           retry_policy={
-                                               'max_retries': 1,
-                                           })
-
+                                           retry_policy={'max_retries': 1})
     return ResponseModel(status_code=200, detail="Weekly content created successfully")
 
 
-@app.post("/invite_to_li_company_page/", responses={
+@router.post("/invite_to_li_company_page/", responses={
     200: {"description": "Invite Users to LinkedIn Company Page"},
     **{k: v for k, v in error_responses.items() if k in [400]}
 })
 def invite_to_li_company_page(user_id: int) -> ResponseModel:
-    """Endpoint to test get my profile on AWS."""
     if not user_id:
         raise HTTPException(status_code=400, detail="User ID is required")
 
-    # Call the function to create the weekly content
-    automate_invites_to_company_page_for_user.apply_async(kwargs={'user_id': user_id},
-                                                          retry=True,
-                                                          retry_policy={
-                                                              'max_retries': 3,
-                                                              'interval_start': 60,
-                                                              'interval_step': 30
-                                                          })
-
+    automate_invites_to_company_page_for_user.apply_async(
+        kwargs={'user_id': user_id}, retry=True,
+        retry_policy={'max_retries': 3, 'interval_start': 60, 'interval_step': 30}
+    )
     return ResponseModel(status_code=200, detail="Process to invite to LinkedIn Company Page Started")
 
 
-@app.post("/aws_test_get_my_profile/", responses={
+@router.post("/aws_test_get_my_profile/", responses={
     200: {"description": "Test Get My Profile on AWS"},
     **{k: v for k, v in error_responses.items() if k in [400]}
 })
 def aws_test_get_my_profile(user_id: int) -> ResponseModel:
-    """Endpoint to test get my profile on AWS."""
     if not user_id:
         raise HTTPException(status_code=400, detail="User ID is required")
 
-    kwargs = {'user_id': user_id}
-    # Call the function to create the weekly content
-    test_get_my_profile.apply_async(kwargs=kwargs, retry=True,
-                                    retry_policy={
-                                        'max_retries': 1,
-                                    })
-
+    test_get_my_profile.apply_async(kwargs={'user_id': user_id}, retry=True,
+                                    retry_policy={'max_retries': 1})
     return ResponseModel(status_code=200, detail="Test Get My Profile on AWS Message Sent to Celery Queue")
 
 
-@app.get('/user_id/', responses={
+@router.get('/user_id/', responses={
     200: {"description": "User ID retrieved successfully"},
     **{k: v for k, v in error_responses.items() if k in [400, 403]}
 })
 def get_user_id_from_email(email: str) -> ResponseModel:
-    """Endpoint to get user id by email."""
     if not email:
         raise HTTPException(status_code=400, detail="Email is required")
 
     user_id = get_user_id(email)
-
     if not user_id:
         raise HTTPException(status_code=403, detail="User not found")
 
     return ResponseModel(status_code=200, detail=user_id)
 
 
-@app.get("/posts/", responses={
-    200: {"description": "Post scheduled successfully"},
+@router.get("/posts/", responses={
+    200: {"description": "Posts retrieved successfully"},
     **{k: v for k, v in error_responses.items() if k in [400, 404]}
 })
-def get_posts(email: str) -> ResponseModel:
-    """Endpoint to get posts by email."""
+def get_posts_for_email(email: str) -> ResponseModel:
     if not email:
         raise HTTPException(status_code=400, detail="Email is required")
 
@@ -272,22 +295,25 @@ def get_posts(email: str) -> ResponseModel:
     if not posts:
         raise HTTPException(status_code=404, detail="No posts found for the given email")
 
-    # Convert posts to a list of dictionaries
-    posts_list = [{"post_id": post["id"], "content": post["content"], "video_url": post["video_url"],
-                   "scheduled_time": post["scheduled_time"],
-                   "post_type": post["post_type"], "status": post['status']} for post in posts]
-
+    posts_list = [
+        {
+            "post_id": post["id"],
+            "content": post["content"],
+            "video_url": post["video_url"],
+            "scheduled_time": post["scheduled_time"],
+            "post_type": post["post_type"],
+            "status": post['status'],
+        }
+        for post in posts
+    ]
     return ResponseModel(status_code=200, detail=posts_list)
 
 
-@app.post("/update_post/", responses={
+@router.post("/update_post/", responses={
     200: {"description": "Post updated successfully"},
     **{k: v for k, v in error_responses.items() if k in [405]}
-
 })
 def update_post(post_id: int, post: PostRequest) -> ResponseModel:
-    """Endpoint to update a post."""
-
     myprint(f"Received Post Request: {post}")
 
     if update_db_post(post.content, post.video_url, post.scheduled_datetime, post.post_type, post_id, post.status):
@@ -296,103 +322,94 @@ def update_post(post_id: int, post: PostRequest) -> ResponseModel:
         raise HTTPException(status_code=405, detail="Post could not be updated")
 
 
-@app.get("/auth/linkedin/callback", response_model=None)
-def linkedin_callback(code: str, state: str = None) -> Union[ResponseModel, RedirectResponse]:
-    """ Handle LinkedIn OAuth callback and retrieve user details"""
-
-    # Verify the state param matches the state from teh environment variable
-    if state is not None and state != LI_STATE_SALT:
-        raise HTTPException(status_code=400, detail="Invalid state parameter")
-    else:
-        # Get needed environment variables
-        resource_path = '/userinfo'
-
-        #  Exchange code for access token
-        client = AuthClient(LI_CLIENT_ID, LI_CLIENT_SECRET, LI_REDIRECT_URL)
-        access_token_response = client.exchange_auth_code_for_access_token(code)
-
-        myprint("Access token Response from api call")
-        for key, value in access_token_response.__dict__.items():
-            myprint(f"{key}: {value}")
-
-        # Get the user email using access token
-
-        restli_client = RestliClient()
-
-        response = restli_client.get(
-            resource_path=resource_path,
-            access_token=access_token_response.access_token,
-            # query_params={"fields": "id,firstName:(localized),lastName, emailAddress"},
-        )
-
-        myprint(f"Response from {resource_path} api call:")
-        for key, value in response.__dict__.items():
-            myprint(f"{key}: {value}")
-
-        # Update the database with user email and access token
-        add_user_with_access_token(response.entity['email'],
-                                   response.entity['sub'],
-                                   access_token_response.access_token,
-                                   access_token_response.expires_in,
-                                   access_token_response.refresh_token,
-                                   access_token_response.refresh_token_expires_in)
-
-        # Redirect the user to a final url using the base of the LI_REDIRECT_URL and append /My_Account
-        parsed_url = urlparse(LI_REDIRECT_URL)
-        # Split the netloc to remove port
-        netloc = parsed_url.netloc.split(':')[0]  # This will keep only the hostname part
-        final_redirect_url = urlunparse((parsed_url.scheme, netloc, '/My_Account', '', '', ''))
-
-        # If ENV variable NGROK_CUSTOM_DOMAIN is set, use it as the final redirect URL
-        if os.environ.get('NGROK_CUSTOM_DOMAIN'):
-            final_redirect_url = "http://" + os.environ.get('NGROK_CUSTOM_DOMAIN') + '/My_Account'
-
-        # final_redirect_url = os.environ.get('NGROK_CUSTOM_DOMAIN')
-        return RedirectResponse(url=final_redirect_url)
-
-
-@app.get("/assets", response_model=None, responses={
+@router.get("/assets", response_model=None, responses={
     200: {"description": "Asset returned successfully"},
     206: {"description": "Asset returned successfully via stream"},
     **{k: v for k, v in error_responses.items() if k in [400, 404]}
-}
-         )
+})
 def get_assets(file_name: str, content_type: Optional[str] = None,
                request: Optional[Any] = None) -> Union[ResponseModel, FileResponse, StreamingResponse]:
-    """Endpoint to get video asset by file name."""
     if not file_name:
         raise HTTPException(status_code=400, detail="A File Name is required")
 
-    # Check to see if file exists in the assets directory
     file_path = os.path.join(assets_dir, file_name)
-
     myprint(f"File Path: {file_path}")
     myprint(f"Content Type: {content_type}")
 
     if not os.path.exists(file_path):
         raise HTTPException(status_code=404, detail="File not found")
 
-    # Get the file extension form the file_path
     file_extension = get_file_extension_from_filepath(file_path)
-
-    # Get the mime type for the file
     mim_type = get_file_mime_type(file_extension)
 
     if request:
-        return range_requests_response(
-            request, file_path=file_path, content_type=mim_type
-        )
+        return range_requests_response(request, file_path=file_path, content_type=mim_type)
     else:
         return FileResponse(status_code=200, path=file_path, media_type=mim_type, content_disposition_type=content_type)
+
+
+# LinkedIn OAuth callback lives outside /api since LinkedIn redirects here
+@app.get("/auth/linkedin/callback", response_model=None)
+def linkedin_callback(code: str, state: str = None) -> Union[ResponseModel, RedirectResponse]:
+    if state is not None and state != LI_STATE_SALT:
+        raise HTTPException(status_code=400, detail="Invalid state parameter")
+
+    resource_path = '/userinfo'
+    client = AuthClient(LI_CLIENT_ID, LI_CLIENT_SECRET, LI_REDIRECT_URL)
+    access_token_response = client.exchange_auth_code_for_access_token(code)
+
+    myprint("Access token Response from api call")
+    for key, value in access_token_response.__dict__.items():
+        myprint(f"{key}: {value}")
+
+    restli_client = RestliClient()
+    response = restli_client.get(
+        resource_path=resource_path,
+        access_token=access_token_response.access_token,
+    )
+
+    myprint(f"Response from {resource_path} api call:")
+    for key, value in response.__dict__.items():
+        myprint(f"{key}: {value}")
+
+    add_user_with_access_token(
+        response.entity['email'],
+        response.entity['sub'],
+        access_token_response.access_token,
+        access_token_response.expires_in,
+        access_token_response.refresh_token,
+        access_token_response.refresh_token_expires_in,
+    )
+
+    # Redirect to React account page (React Router path)
+    parsed_url = urlparse(LI_REDIRECT_URL)
+    netloc = parsed_url.netloc.split(':')[0]
+    final_redirect_url = urlunparse((parsed_url.scheme, netloc, '/account', '', '', ''))
+
+    if os.environ.get('NGROK_CUSTOM_DOMAIN'):
+        final_redirect_url = "http://" + os.environ.get('NGROK_CUSTOM_DOMAIN') + '/account'
+
+    return RedirectResponse(url=final_redirect_url)
+
+
+# Register the /api router
+app.include_router(router)
+
+# Serve the React SPA for all non-API routes (must come after include_router)
+if os.path.isdir(_ui_dist):
+    _spa_index = os.path.join(_ui_dist, "index.html")
+
+    # Serve static assets (JS/CSS/icons) from the dist root
+    app.mount("/assets", StaticFiles(directory=os.path.join(_ui_dist, "assets")), name="spa-assets")
+
+    @app.get("/{full_path:path}", response_class=HTMLResponse, include_in_schema=False)
+    def serve_spa(full_path: str):
+        return HTMLResponse(content=open(_spa_index).read())
 
 
 def send_bytes_range_requests(
         file_obj: BinaryIO, start: int, end: int, chunk_size: int = 10_000
 ):
-    """Send a file in chunks using Range Requests specification RFC7233
-
-    `start` and `end` parameters are inclusive due to specification
-    """
     with file_obj as f:
         f.seek(start)
         while (pos := f.tell()) <= end:
@@ -422,8 +439,6 @@ def _get_range_header(range_header: str, file_size: int) -> tuple[int, int]:
 def range_requests_response(
         request: Request, file_path: str, content_type: str
 ) -> StreamingResponse:
-    """Returns StreamingResponse using Range Requests of a given file"""
-
     file_size = os.stat(file_path).st_size
     range_header = request.headers.get("range")
 

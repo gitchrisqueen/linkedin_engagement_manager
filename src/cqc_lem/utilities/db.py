@@ -963,3 +963,45 @@ def get_company_linked_in_url_for_user(user_id: int):
         connection.close()
 
     return company_linked_in_url[0] if company_linked_in_url else None
+
+
+def get_recent_logs(user_id: int, limit: int = 20) -> list:
+    connection = get_db_connection()
+    cursor = connection.cursor(dictionary=True)
+
+    try:
+        cursor.execute(
+            """SELECT id, action_type, result, post_id, post_url, message, created_at
+               FROM logs WHERE user_id = %s ORDER BY created_at DESC LIMIT %s""",
+            (user_id, limit)
+        )
+        rows = cursor.fetchall()
+    except mysql.connector.Error as err:
+        myprint(f"Could not get recent logs | Error: {err}")
+        rows = []
+    finally:
+        cursor.close()
+        connection.close()
+
+    return rows
+
+
+def update_user_settings(user_id: int, blog_url: str = None, sitemap_url: str = None) -> bool:
+    connection = get_db_connection()
+    cursor = connection.cursor()
+
+    try:
+        cursor.execute(
+            "UPDATE users SET blog_url = %s, sitemap_url = %s WHERE id = %s",
+            (blog_url, sitemap_url, user_id)
+        )
+        connection.commit()
+        success = cursor.rowcount >= 0
+    except mysql.connector.Error as err:
+        myprint(f"Could not update user settings | Error: {err}")
+        success = False
+    finally:
+        cursor.close()
+        connection.close()
+
+    return success
