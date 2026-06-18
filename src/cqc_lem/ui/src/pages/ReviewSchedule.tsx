@@ -62,7 +62,7 @@ export default function ReviewSchedule() {
           disabled={weeklyMutation.isPending}
           className="bg-green-600 text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-green-700 disabled:opacity-50 transition-colors"
         >
-          {weeklyMutation.isPending ? 'Generating…' : 'Generate Weekly Content'}
+          {weeklyMutation.isPending ? 'Generating content (this may take a minute)…' : 'Generate Weekly Content'}
         </button>
       </div>
 
@@ -87,8 +87,25 @@ export default function ReviewSchedule() {
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         <div className="space-y-3">
-          {filtered.length === 0 && !isLoading && (
-            <p className="text-sm text-gray-400 py-4">No posts found.</p>
+          {filtered.length === 0 && !isLoading && posts.length === 0 && (
+            <div className="flex flex-col items-center text-center py-12 px-4 bg-white rounded-lg border border-gray-200">
+              <div className="text-4xl mb-4">📅</div>
+              <p className="text-gray-600 text-sm mb-6 max-w-xs">
+                Your scheduled posts will appear here. Generate your first week of content to get started.
+              </p>
+              <button
+                onClick={() => weeklyMutation.mutate()}
+                disabled={weeklyMutation.isPending}
+                className="bg-green-600 text-white px-6 py-2.5 rounded-lg text-sm font-semibold hover:bg-green-700 disabled:opacity-50 transition-colors"
+              >
+                {weeklyMutation.isPending
+                  ? 'Generating content (this may take a minute)…'
+                  : 'Generate Weekly Content'}
+              </button>
+            </div>
+          )}
+          {filtered.length === 0 && !isLoading && posts.length > 0 && (
+            <p className="text-sm text-gray-400 py-4">No posts match this filter.</p>
           )}
           {filtered.map((post) => (
             <div

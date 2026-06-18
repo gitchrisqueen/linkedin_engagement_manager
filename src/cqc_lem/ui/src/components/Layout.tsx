@@ -1,13 +1,21 @@
-import { NavLink, Outlet } from 'react-router-dom'
+import { NavLink, Outlet, useNavigate } from 'react-router-dom'
 
 const navLinks = [
-  { to: '/', label: 'Dashboard', end: true },
+  { to: '/', label: 'Home', end: true },
   { to: '/account', label: 'Account' },
   { to: '/schedule', label: 'Schedule Post' },
   { to: '/review', label: 'Review Posts' },
 ]
 
 export default function Layout() {
+  const email = localStorage.getItem('lem_email') || ''
+  const navigate = useNavigate()
+
+  function handleLogout() {
+    localStorage.removeItem('lem_email')
+    window.location.reload()
+  }
+
   return (
     <div className="min-h-screen bg-gray-100">
       <nav className="bg-white border-b border-gray-200 sticky top-0 z-10">
@@ -29,6 +37,29 @@ export default function Layout() {
               {label}
             </NavLink>
           ))}
+          <div className="ml-auto flex items-center gap-3">
+            {email && (
+              <>
+                <span className="text-xs text-gray-500 hidden sm:inline">
+                  Logged in as: <span className="font-medium text-gray-700">{email}</span>
+                </span>
+                <button
+                  onClick={handleLogout}
+                  className="text-xs text-red-500 hover:text-red-700 font-medium border border-red-200 hover:border-red-400 px-2.5 py-1 rounded transition-colors"
+                >
+                  Log out
+                </button>
+              </>
+            )}
+            {!email && (
+              <button
+                onClick={() => navigate('/account')}
+                className="text-xs text-blue-600 hover:text-blue-800 font-medium border border-blue-200 hover:border-blue-400 px-2.5 py-1 rounded transition-colors"
+              >
+                Set up account
+              </button>
+            )}
+          </div>
         </div>
       </nav>
       <main className="max-w-5xl mx-auto px-4 py-6">
