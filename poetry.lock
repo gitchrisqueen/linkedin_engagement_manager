@@ -4606,14 +4606,14 @@ files = [
 
 [[package]]
 name = "replicate"
-version = "1.0.4"
+version = "1.0.7"
 description = "Python client for Replicate"
 optional = false
 python-versions = ">=3.8"
 groups = ["main"]
 files = [
-    {file = "replicate-1.0.4-py3-none-any.whl", hash = "sha256:f568f6271ff715067901b6094c23c37373bbcfd7de0ff9b85e9c9ead567e09e7"},
-    {file = "replicate-1.0.4.tar.gz", hash = "sha256:f718601863ef1f419aa7dcdab1ea8770ba5489b571b86edf840cd506d68758ef"},
+    {file = "replicate-1.0.7-py3-none-any.whl", hash = "sha256:667c50a9eb83be17de6278ff89483102b3b50f49a2c7fbcaa2e2b14df13816f9"},
+    {file = "replicate-1.0.7.tar.gz", hash = "sha256:d88cb2c37ba39fb370c87fc3291601c67aae64bb918a20a85b5ce399c23ee84c"},
 ]
 
 [package.dependencies]
