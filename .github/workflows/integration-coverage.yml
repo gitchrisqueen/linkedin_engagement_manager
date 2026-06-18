@@ -1,0 +1,83 @@
+name: CI / Integration Test w/ Coverage
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  integration-tests:
+    name: Integration Tests
+    runs-on: ubuntu-latest
+
+    services:
+      mysql:
+        image: mysql:8
+        env:
+          MYSQL_ROOT_PASSWORD: test_root
+          MYSQL_DATABASE: test_lem
+          MYSQL_USER: test_user
+          MYSQL_PASSWORD: test_password
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping -h localhost"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=5
+
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd="redis-cli ping"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=5
+
+    env:
+      DB_HOST: 127.0.0.1
+      DB_USER: test_user
+      DB_PASSWORD: test_password
+      DB_NAME: test_lem
+      CELERY_BROKER_URL: redis://127.0.0.1:6379/0
+      CELERY_RESULT_BACKEND: redis://127.0.0.1:6379/0
+      OPENAI_API_KEY: test-key-not-real
+      LITELLM_BASE_URL: http://localhost:4000
+      LITELLM_MASTER_KEY: test-master-key
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Poetry and dependencies
+        uses: ./.github/actions/poetry_setup
+        with:
+          python-version: "3.12"
+          install-args: --with test
+
+      - name: Run integration tests
+        run: |
+          set +e
+          poetry run pytest tests/integration \
+            -v --tb=short \
+            --cov=src/cqc_lem \
+            --cov-report=xml \
+            --cov-report=term-missing
+          rc=$?
+          set -e
+          # Exit code 5 = no tests collected; treat as passing until tests are written
+          [ $rc -eq 5 ] && echo "No integration tests found yet — skipping" && exit 0 || exit $rc
+
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v4
+        with:
+          files: coverage.xml
+          flags: integration
+          fail_ci_if_error: false
+        env:
+          CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}

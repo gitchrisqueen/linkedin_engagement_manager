@@ -125,7 +125,7 @@ def generate_ai_response(post_content, profile: LinkedInProfile, post_img_url=No
     }
 
     response = client.chat.completions.create(
-        model="gpt-4o-mini",
+        model="lem-medium",
         messages=[system_prompt, user_message],  # System prompt + current user prompt
         temperature=round(random.uniform(0.4, 0.6), 2),  # Rand temp between .5 and .7
 
@@ -139,8 +139,8 @@ def generate_ai_response(post_content, profile: LinkedInProfile, post_img_url=No
         # max_tokens=150  # Set token limit as required
     )
 
-    comment = response.choices[0].message.content.strip()
-    return comment
+    content = response.choices[0].message.content
+    return content.strip() if content is not None else None
 
 
 def get_ai_description_of_profile(linked_in_profile: LinkedInProfile):
@@ -179,7 +179,7 @@ def get_ai_description_of_profile(linked_in_profile: LinkedInProfile):
 
     # Call the API with the system and user prompt only (no memory of past prompts)
     response = client.chat.completions.create(
-        model="gpt-4o-mini",  # Specify the model you want to use
+        model="lem-simple",  # Specify the model you want to use
         messages=[system_prompt, user_message],  # System prompt + current user prompt
         # temperature=0.3,  # Adjust this parameter as per your needs
         # max_tokens=150  # Set token limit as required
@@ -263,7 +263,7 @@ def get_industries_of_profile_from_ai(linked_in_profile: LinkedInProfile, indust
 
     # Call the API with the system and user prompt only (no memory of past prompts)
     response = client.chat.completions.create(
-        model="gpt-4o-mini",  # Specify the model you want to use
+        model="lem-simple",  # Specify the model you want to use
         messages=[system_prompt, user_message],  # System prompt + current user prompt
         # temperature=0.3,  # Adjust this parameter as per your needs
         # max_tokens=150  # Set token limit as required
@@ -334,7 +334,7 @@ def get_ai_linked_post_refinement(original_message: str, character_limit: int = 
 
     # Call the API with the system and user prompt only (no memory of past prompts)
     response = client.chat.completions.create(
-        model="gpt-4o-mini",  # Specify the model you want to use
+        model="lem-medium",  # Specify the model you want to use
         messages=[system_prompt, user_message],  # System prompt + current user prompt
 
         # Emphasizes succinct, professional outputs over creative variance.
@@ -396,7 +396,7 @@ def get_ai_message_refinement(original_message: str, character_limit: int = 300)
 
     # Call the API with the system and user prompt only (no memory of past prompts)
     response = client.chat.completions.create(
-        model="gpt-4o-mini",  # Specify the model you want to use
+        model="lem-simple",  # Specify the model you want to use
         messages=[system_prompt, user_message],  # System prompt + current user prompt
 
         # Emphasizes succinct, professional outputs over creative variance.
@@ -500,7 +500,7 @@ def get_video_content_from_ai(linked_user_profile: LinkedInProfile, buyer_stage:
 
     # Call the API with the system and user prompt only (no memory of past prompts)
     response = client.chat.completions.create(
-        model="gpt-4o-mini",  # Specify the model you want to use
+        model="lem-complex",  # Specify the model you want to use
         messages=[system_prompt, user_message],  # System prompt + current user prompt
         # temperature=0.3,  # Adjust this parameter as per your needs
         # max_tokens=150  # Set token limit as required
@@ -577,7 +577,7 @@ def summarize_recent_activity(recent_activity_profile: LinkedInProfile, main_pro
 
     # Call the API with the system and user prompt only (no memory of past prompts)
     response = client.chat.completions.create(
-        model="gpt-4o-mini",  # Specify the model you want to use
+        model="lem-simple",  # Specify the model you want to use
         messages=[system_prompt, user_message],  # System prompt + current user prompt
         # temperature=0.3,  # Adjust this parameter as per your needs
         # max_tokens=150  # Set token limit as required
@@ -604,7 +604,7 @@ def get_thought_leadership_post_from_ai(linked_user_profile: LinkedInProfile, bu
     industry = trends.get("industry", "Technology")
     analysis = trends.get("analysis", "")
 
-    print(
+    myprint(
         f'Generating Thought Leadership AI Response for {buyer_stage} buyer stage about the {industry} industry.\n\nAnalysis: {analysis} ')
 
     # Use json to output to string
@@ -690,7 +690,7 @@ def get_thought_leadership_post_from_ai(linked_user_profile: LinkedInProfile, bu
 
     # Call the API with the system and user prompt only (no memory of past prompts)
     response = client.chat.completions.create(
-        model="gpt-4o-mini",  # Specify the model you want to use
+        model="lem-complex",  # Specify the model you want to use
         messages=[system_prompt, user_message],  # System prompt + current user prompt
         temperature=round(random.uniform(0.5, 0.7), 2),  # Rand temp between .5 and .7
 
@@ -826,7 +826,7 @@ def get_industry_news_post_from_ai(linked_user_profile: LinkedInProfile, buyer_s
 
     # Call the API with the system and user prompt only (no memory of past prompts)
     response = client.chat.completions.create(
-        model="gpt-4o-mini",  # Specify the model you want to use
+        model="lem-complex",  # Specify the model you want to use
         messages=[system_prompt, user_message],  # System prompt + current user prompt
         temperature=round(random.uniform(0.3, 0.5), 2),  # Rand temp between .3 and .5
 
@@ -904,7 +904,7 @@ def get_industry_trend_from_ai(industry: str, articles: list):
 
     # Call the API with the system and user prompt only (no memory of past prompts)
     response = client.chat.completions.create(
-        model="gpt-4o-mini",  # Specify the model you want to use
+        model="lem-medium",  # Specify the model you want to use
         messages=[system_prompt, user_message],  # System prompt + current user prompt
 
         temperature=round(random.uniform(0.6, 0.8), 2),  # Rand temp between .6 and .8
@@ -1012,7 +1012,7 @@ def get_personal_story_post_from_ai(linked_user_profile: LinkedInProfile, stage:
 
     # Call the API with the system and user prompt only (no memory of past prompts)
     response = client.chat.completions.create(
-        model="gpt-4o-mini",  # Specify the model you want to use
+        model="lem-complex",  # Specify the model you want to use
         messages=[system_prompt, user_message],  # System prompt + current user prompt
         temperature=round(random.uniform(0.6, 0.8), 2),  # Rand temp between .6 and .8
 
@@ -1116,7 +1116,7 @@ def generate_engagement_prompt_post(linked_user_profile: LinkedInProfile, stage:
 
     # Call the API with the system and user prompt only (no memory of past prompts)
     response = client.chat.completions.create(
-        model="gpt-4o-mini",  # Specify the model you want to use
+        model="lem-medium",  # Specify the model you want to use
         messages=[system_prompt, user_message],  # System prompt + current user prompt
         temperature=round(random.uniform(0.6, 0.9), 2),  # Rand temp between .6 and .9
 
@@ -1214,7 +1214,7 @@ def get_blog_summary_post_from_ai(blog_post_url: str, blog_post_content: str, li
 
     # Call the API with the system and user prompt only (no memory of past prompts)
     response = client.chat.completions.create(
-        model="gpt-4o-mini",  # Specify the model you want to use
+        model="lem-medium",  # Specify the model you want to use
         messages=[system_prompt, user_message],  # System prompt + current user prompt
         temperature=round(random.uniform(0.5, 0.7), 2),  # Rand temp between .5 and .7
 
@@ -1313,7 +1313,7 @@ def get_website_content_post_from_ai(content: str, url: str, linked_user_profile
 
     # Call the API with the system and user prompt only (no memory of past prompts)
     response = client.chat.completions.create(
-        model="gpt-4o-mini",  # Specify the model you want to use
+        model="lem-medium",  # Specify the model you want to use
         messages=[system_prompt, user_message],  # System prompt + current user prompt
         temperature=round(random.uniform(0.5, 0.7), 2),  # Rand temp between .5 and .7
 
@@ -1439,7 +1439,7 @@ def get_dall_e_image_prompt_from_ai(post_content: str):
 
     # Call the API with the system and user prompt only (no memory of past prompts)
     response = client.chat.completions.create(
-        model="gpt-4o-mini",  # Specify the model you want to use
+        model="lem-simple",  # Specify the model you want to use
         messages=[system_prompt, user_message],  # System prompt + current user prompt
         temperature=round(random.uniform(0.4, 0.6), 2),
         # Ensure logical and structured prompts but allow some creativity for DALL-E descriptions. Slightly tighter control avoids over-creativity that might make outputs unfocused.
@@ -1545,7 +1545,7 @@ def get_flux_image_prompt_from_ai(post_content: str):
 
     # Call the API with the system and user prompt only (no memory of past prompts)
     response = client.chat.completions.create(
-        model="gpt-4o-mini",  # Specify the model you want to use
+        model="lem-simple",  # Specify the model you want to use
         messages=[system_prompt, user_message],  # System prompt + current user prompt
         temperature=round(random.uniform(0.7, 1), 2),
         # Ensure logical and structured prompts but allow some creativity for Flux1 descriptions. Slightly tighter control avoids over-creativity that might make outputs unfocused.
@@ -1726,7 +1726,7 @@ def get_runway_ml_video_prompt_from_ai(post_content: str, image_prompt: str):
 
     # Call the API with the system and user prompt only (no memory of past prompts)
     response = client.chat.completions.create(
-        model="gpt-4o-mini",  # Specify the model you want to use
+        model="lem-simple",  # Specify the model you want to use
         messages=[system_prompt, user_message],  # System prompt + current user prompt
         temperature=round(random.uniform(0.5, 0.7), 2),  # Encourage creative but logical outputs
         top_p=round(random.uniform(0.8, 0.9), 2),  # Prioritize high-probability tokens
@@ -1784,8 +1784,8 @@ def ai_check_message_history(message_history_json: str, main_focus: str, message
 
 """
 
-    print(
-        f'Generating message to {user_name} based on the given message history.')
+    myprint(
+        f'Generating message to the recipient based on the given message history.')
 
 
 
@@ -1844,7 +1844,7 @@ def ai_check_message_history(message_history_json: str, main_focus: str, message
 
     # Call the API with the system and user prompt only (no memory of past prompts)
     response = client.chat.completions.create(
-        model="gpt-4o-mini",  # Specify the model you want to use
+        model="lem-simple",  # Specify the model you want to use
         messages=[system_prompt, user_message],  # System prompt + current user prompt
         temperature=round(random.uniform(0.5, 0.7), 2),  # Rand temp between .5 and .7
 

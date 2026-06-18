@@ -1,0 +1,131 @@
+name: Claude Code Review
+
+on:
+  pull_request:
+    types: [opened, synchronize]
+    branches: [main]
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  claude-review:
+    name: Claude Code Review
+    runs-on: ubuntu-latest
+    # Skip Dependabot and bot PRs — they don't benefit from AI review
+    if: github.actor != 'dependabot[bot]' && github.actor != 'github-actions[bot]'
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Get PR diff
+        id: diff
+        run: |
+          git fetch origin ${{ github.base_ref }}
+          DIFF=$(git diff origin/${{ github.base_ref }}...HEAD -- \
+            '*.py' '*.ts' '*.tsx' '*.yml' '*.yaml' '*.toml' \
+            | head -c 28000)
+          echo "diff<<EOF_DIFF" >> "$GITHUB_OUTPUT"
+          echo "$DIFF" >> "$GITHUB_OUTPUT"
+          echo "EOF_DIFF" >> "$GITHUB_OUTPUT"
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install anthropic SDK
+        run: pip install anthropic==0.34.2
+
+      - name: Run Claude code review
+        id: review
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          PR_TITLE: ${{ github.event.pull_request.title }}
+          PR_BODY: ${{ github.event.pull_request.body }}
+          PR_DIFF: ${{ steps.diff.outputs.diff }}
+        run: |
+          python3 - <<'PYEOF'
+          import os, sys, anthropic
+
+          api_key = os.environ.get("ANTHROPIC_API_KEY", "")
+          if not api_key:
+              print("ANTHROPIC_API_KEY not set — skipping Claude review")
+              with open(os.environ["GITHUB_OUTPUT"], "a") as f:
+                  f.write("review=Claude review skipped: ANTHROPIC_API_KEY not configured as a GitHub secret.\n")
+              sys.exit(0)
+
+          client = anthropic.Anthropic(api_key=api_key)
+
+          system_prompt = """You are a senior code reviewer for the LinkedIn Engagement Manager (LEM) project.
+
+Stack: Python 3.12+, FastAPI, Celery/Redis, MySQL 8, Selenium 4, LiteLLM, React 18 + Vite + TailwindCSS v4.
+
+Project conventions (block merge if violated):
+- No print() — use myprint() from cqc_lem.utilities.logger
+- Type hints on every function signature
+- Enums for status fields (PostStatus, PostType, LogActionType) from db.py
+- No raw SQL outside utilities/db.py
+- All LLM calls via cqc_lem.utilities.ai.client using lem-simple/medium/complex/image/router aliases
+- Selenium always via get_docker_driver() in selenium_util.py
+- No hardcoded secrets — .env + load_dotenv() only
+- New logic needs unit tests in tests/unit/; new API endpoints need integration tests in tests/integration/
+- No pass-body test functions
+
+Format your review as:
+## Summary
+## Blocking Issues (must fix before merge)
+## Requested Changes (should fix)
+## Suggestions (optional)
+## Verdict: Approved / Approved with Changes / Changes Required"""
+
+          pr_title = os.environ.get("PR_TITLE", "")
+          pr_body = os.environ.get("PR_BODY", "")
+          diff = os.environ.get("PR_DIFF", "")
+
+          user_prompt = f"""Review this PR:
+
+**Title:** {pr_title}
+
+**Description:**
+{pr_body[:2000]}
+
+**Diff (truncated to 28k chars):**
+```diff
+{diff}
+```"""
+
+          message = client.messages.create(
+              model="claude-sonnet-4-6",
+              max_tokens=2048,
+              messages=[{"role": "user", "content": user_prompt}],
+              system=system_prompt,
+          )
+
+          review = message.content[0].text
+          print(review)
+
+          with open(os.environ["GITHUB_OUTPUT"], "a") as f:
+              f.write("review<<EOF_REVIEW\n")
+              f.write(review)
+              f.write("\nEOF_REVIEW\n")
+          PYEOF
+
+      - name: Post review comment
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const review = `${{ steps.review.outputs.review }}`;
+            if (!review || review.includes('skipped')) {
+              console.log('Skipping comment post:', review);
+              return;
+            }
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              body: `## 🤖 Claude Code Review\n\n${review}\n\n---\n*Automated review by [Claude Code](https://claude.ai/code) · [code-review agent](.github/agents/code-review.agent.md)*`,
+            });

@@ -15,12 +15,6 @@ from cqc_lem.utilities.env_constants import SELENIUM_KEEP_VIDEOS_X_DAYS, CQC_LEM
 from cqc_lem.utilities.logger import myprint
 
 
-@shared_task.task
-def test_error_tracing():
-    """Generates a traceable error to test the error tracing configs"""
-    myprint("Starting test_error_tracing")
-    raise NotImplementedError("test_error_tracing is a test stub; invoke a real task instead")
-
 
 @shared_task.task(bind=True, base=QueueOnce, once={'graceful': True, }, reject_on_worker_lost=True)
 def auto_check_scheduled_posts(self):
