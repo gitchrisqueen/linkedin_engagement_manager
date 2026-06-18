@@ -6,19 +6,12 @@ set -o nounset
 celery --app cqc_lem.app.my_celery \
   --broker="${CELERY_BROKER_URL}" \
   flower \
-  ---port="${CELERY_FLOWER_PORT}" \
+  --port="${CELERY_FLOWER_PORT}" \
   --broker-api="${CELERY_BROKER_URL}" \
   --logging="DEBUG" \
   --logfile="/app/logs" \
-  --state_save_interval="${CELERY_FLOWER_STATE_SAVE_INTERVAL}" \
-  --persistent=True \
-  --db=/data/flower.db \
   --debug=True &
 
-  # TODO: Get the db state working
-  #--persistent=True \
-  #--state_save_interval=180 \
-  #--db=/data/flower.db &
   #--basic_auth=admin:${CELERY_FLOWER_PASSWORD} \
 
   #-Q (your queue name)
