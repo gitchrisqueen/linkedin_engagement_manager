@@ -123,8 +123,7 @@ services:
       - .env
     environment:
       - FLOWER_UNAUTHENTICATED_API=True
-      - FLOWER_PERSISTENT=True
-      - FLOWER_SAVE_STATE_INTERVAL=${CELERY_FLOWER_STATE_SAVE_INTERVAL}
+      - FLOWER_PERSISTENT=False
     ports:
       - "${CELERY_FLOWER_PORT}:5555"
     depends_on:
