@@ -1,35 +1,46 @@
 model_list:
-  # ── SIMPLE tier: fast, lightweight — refine/summarize/list tasks ─────────────
-  # Pull: ollama pull qwen2.5:3b
+  # ── SIMPLE tier: fast, lightweight — refine/summarize/list tasks ──────────────
   - model_name: lem-simple
     litellm_params:
-      model: ollama/qwen2.5:3b
-      api_base: os.environ/OLLAMA_BASE_URL
+      model: openai/gpt-oss:20b
+      api_base: os.environ/OLLAMA_CLOUD_URL
+      api_key: os.environ/OLLAMA_CLOUD_API_KEY
+      max_parallel_requests: 8
+      request_timeout: 90
+      rpm: 100
 
-  # Pull: ollama pull llama3.2:3b  (fallback if qwen2.5:3b not pulled)
   - model_name: lem-simple
     litellm_params:
-      model: ollama/llama3.2:3b
-      api_base: os.environ/OLLAMA_BASE_URL
+      model: openai/ministral-3:8b
+      api_base: os.environ/OLLAMA_CLOUD_URL
+      api_key: os.environ/OLLAMA_CLOUD_API_KEY
+      max_parallel_requests: 8
+      request_timeout: 60
+      rpm: 120
 
-  # OpenAI fallback (when Ollama is unavailable)
+  # OpenAI fallback (when Ollama Cloud is unavailable)
   - model_name: lem-simple
     litellm_params:
       model: openai/gpt-4o-mini
       api_key: os.environ/OPENAI_API_KEY
 
   # ── MEDIUM tier: balanced capability ─────────────────────────────────────────
-  # Pull: ollama pull llama3.1:8b
   - model_name: lem-medium
     litellm_params:
-      model: ollama/llama3.1:8b
-      api_base: os.environ/OLLAMA_BASE_URL
+      model: openai/gpt-oss:120b
+      api_base: os.environ/OLLAMA_CLOUD_URL
+      api_key: os.environ/OLLAMA_CLOUD_API_KEY
+      max_parallel_requests: 4
+      request_timeout: 150
+      rpm: 50
 
-  # Pull: ollama pull mistral:7b  (fallback)
   - model_name: lem-medium
     litellm_params:
-      model: ollama/mistral:7b
-      api_base: os.environ/OLLAMA_BASE_URL
+      model: openai/minimax-m2.7
+      api_base: os.environ/OLLAMA_CLOUD_URL
+      api_key: os.environ/OLLAMA_CLOUD_API_KEY
+      max_parallel_requests: 4
+      request_timeout: 120
 
   # OpenAI fallback
   - model_name: lem-medium
@@ -37,18 +48,24 @@ model_list:
       model: openai/gpt-4o-mini
       api_key: os.environ/OPENAI_API_KEY
 
-  # ── COMPLEX tier: long-form, high-quality content ─────────────────────────────
-  # Pull: ollama pull qwen2.5:14b
+  # ── COMPLEX tier: long-form, high-quality content ────────────────────────────
   - model_name: lem-complex
     litellm_params:
-      model: ollama/qwen2.5:14b
-      api_base: os.environ/OLLAMA_BASE_URL
+      model: openai/kimi-k2:1t
+      api_base: os.environ/OLLAMA_CLOUD_URL
+      api_key: os.environ/OLLAMA_CLOUD_API_KEY
+      max_parallel_requests: 4
+      request_timeout: 300
+      rpm: 30
 
-  # Pull: ollama pull llama3.1:8b  (reused from medium, fallback)
   - model_name: lem-complex
     litellm_params:
-      model: ollama/llama3.1:8b
-      api_base: os.environ/OLLAMA_BASE_URL
+      model: openai/qwen3.5:397b
+      api_base: os.environ/OLLAMA_CLOUD_URL
+      api_key: os.environ/OLLAMA_CLOUD_API_KEY
+      max_parallel_requests: 3
+      request_timeout: 240
+      rpm: 30
 
   # OpenAI fallback
   - model_name: lem-complex
@@ -56,24 +73,26 @@ model_list:
       model: openai/gpt-4o
       api_key: os.environ/OPENAI_API_KEY
 
-  # Claude fallback — activated once ANTHROPIC_API_KEY is added
+  # Claude fallback — activated once ANTHROPIC_API_KEY is configured
   - model_name: lem-complex
     litellm_params:
       model: anthropic/claude-sonnet-4-6
       api_key: os.environ/ANTHROPIC_API_KEY
 
-  # ── IMAGE generation — Ollama has no generation equivalent; use OpenAI DALL-E ─
+  # ── IMAGE generation — no Ollama Cloud equivalent; use OpenAI DALL-E ─────────
   - model_name: lem-image
     litellm_params:
       model: openai/dall-e-3
       api_key: os.environ/OPENAI_API_KEY
 
   # ── ROUTER: auto-routes by prompt complexity via LEMComplexityRouter hook ─────
-  # Pull: ollama pull qwen2.5:3b  (same as lem-simple)
   - model_name: lem-router
     litellm_params:
-      model: ollama/qwen2.5:3b
-      api_base: os.environ/OLLAMA_BASE_URL
+      model: openai/gpt-oss:20b
+      api_base: os.environ/OLLAMA_CLOUD_URL
+      api_key: os.environ/OLLAMA_CLOUD_API_KEY
+      max_parallel_requests: 6
+      request_timeout: 90
 
   - model_name: lem-router
     litellm_params:
@@ -83,6 +102,7 @@ model_list:
 router_settings:
   routing_strategy: latency-based-routing
   num_retries: 2
+  retry_after: 5
   fallbacks:
     - lem-complex:
         - lem-medium
@@ -98,6 +118,8 @@ litellm_settings:
     port: 6379
   custom_callbacks:
     - /app/.litellm/complexity_router.py
+  drop_params: true
+  request_timeout: 180
 
 general_settings:
   master_key: os.environ/LITELLM_MASTER_KEY
