@@ -1,44 +1,80 @@
 model_list:
-  # ── SIMPLE tier: fast, cheap, short outputs ──────────────────────────────
+  # ── SIMPLE tier: fast, lightweight — refine/summarize/list tasks ─────────────
+  # Pull: ollama pull qwen2.5:3b
   - model_name: lem-simple
     litellm_params:
-      model: openai/gpt-4o-mini
-      api_key: os.environ/OPENAI_API_KEY
+      model: ollama/qwen2.5:3b
+      api_base: os.environ/OLLAMA_BASE_URL
 
+  # Pull: ollama pull llama3.2:3b  (fallback if qwen2.5:3b not pulled)
   - model_name: lem-simple
     litellm_params:
       model: ollama/llama3.2:3b
-      api_base: http://ollama:11434
+      api_base: os.environ/OLLAMA_BASE_URL
 
-  # ── MEDIUM tier: balanced capability ─────────────────────────────────────
+  # OpenAI fallback (when Ollama is unavailable)
+  - model_name: lem-simple
+    litellm_params:
+      model: openai/gpt-4o-mini
+      api_key: os.environ/OPENAI_API_KEY
+
+  # ── MEDIUM tier: balanced capability ─────────────────────────────────────────
+  # Pull: ollama pull llama3.1:8b
+  - model_name: lem-medium
+    litellm_params:
+      model: ollama/llama3.1:8b
+      api_base: os.environ/OLLAMA_BASE_URL
+
+  # Pull: ollama pull mistral:7b  (fallback)
+  - model_name: lem-medium
+    litellm_params:
+      model: ollama/mistral:7b
+      api_base: os.environ/OLLAMA_BASE_URL
+
+  # OpenAI fallback
   - model_name: lem-medium
     litellm_params:
       model: openai/gpt-4o-mini
       api_key: os.environ/OPENAI_API_KEY
 
-  - model_name: lem-medium
-    litellm_params:
-      model: openrouter/meta-llama/llama-3.1-70b-instruct
-      api_key: os.environ/OPENROUTER_API_KEY
-
-  # ── COMPLEX tier: long-form, high-quality content ─────────────────────────
+  # ── COMPLEX tier: long-form, high-quality content ─────────────────────────────
+  # Pull: ollama pull qwen2.5:14b
   - model_name: lem-complex
     litellm_params:
-      model: anthropic/claude-sonnet-4-6
-      api_key: os.environ/ANTHROPIC_API_KEY
+      model: ollama/qwen2.5:14b
+      api_base: os.environ/OLLAMA_BASE_URL
 
+  # Pull: ollama pull llama3.1:8b  (reused from medium, fallback)
+  - model_name: lem-complex
+    litellm_params:
+      model: ollama/llama3.1:8b
+      api_base: os.environ/OLLAMA_BASE_URL
+
+  # OpenAI fallback
   - model_name: lem-complex
     litellm_params:
       model: openai/gpt-4o
       api_key: os.environ/OPENAI_API_KEY
 
-  # ── IMAGE generation ──────────────────────────────────────────────────────
+  # Claude fallback — activated once ANTHROPIC_API_KEY is added
+  - model_name: lem-complex
+    litellm_params:
+      model: anthropic/claude-sonnet-4-6
+      api_key: os.environ/ANTHROPIC_API_KEY
+
+  # ── IMAGE generation — Ollama has no generation equivalent; use OpenAI DALL-E ─
   - model_name: lem-image
     litellm_params:
       model: openai/dall-e-3
       api_key: os.environ/OPENAI_API_KEY
 
-  # ── ROUTER: auto-routes by complexity (via complexity_router.py hook) ─────
+  # ── ROUTER: auto-routes by prompt complexity via LEMComplexityRouter hook ─────
+  # Pull: ollama pull qwen2.5:3b  (same as lem-simple)
+  - model_name: lem-router
+    litellm_params:
+      model: ollama/qwen2.5:3b
+      api_base: os.environ/OLLAMA_BASE_URL
+
   - model_name: lem-router
     litellm_params:
       model: openai/gpt-4o-mini
