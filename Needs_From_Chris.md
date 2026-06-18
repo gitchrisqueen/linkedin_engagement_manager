@@ -8,15 +8,15 @@ Items I need from you to proceed. Mark each `(complete)` when done and I'll cont
 
 These go in **GitHub → Settings → Secrets and variables → Actions → Repository secrets** (`https://github.com/gitchrisqueen/linkedin_engagement_manager/settings/secrets/actions`).
 
-- [ ] **`GITGUARDIAN_API_KEY`** — Required by `.github/workflows/gitguardian-scan.yml`. Get it from your GitGuardian dashboard at `https://dashboard.gitguardian.com/api/personal-access-tokens`. Create a token with "Incident" scope.
+- [x] **`GITGUARDIAN_API_KEY`** — Required by `.github/workflows/gitguardian-scan.yml`. _(complete)_
 
-- [ ] **`CODECOV_TOKEN`** — Required by all three test workflows for coverage upload. Get it from `https://app.codecov.io/gh/gitchrisqueen/linkedin_engagement_manager` after linking the repo (free for public repos, or connect via GitHub login).
+- [x] **`CODECOV_TOKEN`** — Required by all three test workflows for coverage upload. _(complete)_
 
-- [ ] **`ANTHROPIC_API_KEY`** — Required by LiteLLM to route `lem-complex` requests to Claude. Get from `https://console.anthropic.com/settings/keys`.
+- [ ] **`ANTHROPIC_API_KEY`** — Required by LiteLLM to route `lem-complex` requests to Claude. Get from `https://console.anthropic.com/settings/keys`. _(adding later)_
 
-- [ ] **`OPENROUTER_API_KEY`** — Required by LiteLLM for `lem-medium` fallback routing. Get from `https://openrouter.ai/settings/keys`.
+- [x] **`OPENROUTER_API_KEY`** — Required by LiteLLM for `lem-medium` fallback routing. _(complete)_
 
-- [ ] **`LITELLM_MASTER_KEY`** — A secret string you choose yourself (like a password) used to authenticate requests from the app to the LiteLLM proxy. Example: `sk-lem-localdev-abc123`. Set this same value in your `.env` file as `LITELLM_MASTER_KEY=<your-value>`.
+- [x] **`LITELLM_MASTER_KEY`** — Master key for LiteLLM proxy authentication. _(complete)_
 
 ---
 
@@ -44,7 +44,7 @@ POSTHOG_HOST=https://us.i.posthog.com
 
 ## PostHog Account
 
-- [ ] **`POSTHOG_API_KEY`** — Sign up at `https://us.posthog.com/signup` (free tier is generous). After signup, go to **Project Settings → Project API Key**. Copy the key and add it to your `.env` as shown above, and as a GitHub secret named `POSTHOG_API_KEY`.
+- [x] **`POSTHOG_API_KEY`** — _(complete)_
 
 ---
 
@@ -54,8 +54,22 @@ Ollama runs locally inside Docker. No API key needed, but the first run will dow
 
 ---
 
+## Deferred M5 Issues (Answered)
+
+**#26 — DM automation deduplication** (`run_automation.py`):
+Never send the same message twice. Need a follow-up message template system with `days_since_last_message` and `message_follow_up_index` to track which message in a sequence was sent. AI should use the template but customize it per individual — smart follow-up to progress conversations without being spammy or annoying. _Implementing in M5._
+
+**#27 — Profile scraping: awards & interests** (`scrapper.py`):
+Need a live E2E test against a real account. Can use Christopher's LinkedIn profile: https://www.linkedin.com/in/christopherqueen/. _Stub code first, then E2E test against live account._
+
+**#30 — Geolocation from database** (`selenium_util.py`):
+Migration can run once all prior dependent code is merged to main first. _Will create Flyway migration and implement after M1–M4 merge._
+
+---
+
 ## Notes
 
 - All secrets must be set in GitHub before CI workflows can pass (GitGuardian scan will fail without `GITGUARDIAN_API_KEY`; coverage upload will warn without `CODECOV_TOKEN`).
 - The `.env` changes are needed before running `docker compose up` locally with LiteLLM.
 - Existing secrets (`OPENAI_API_KEY`, `AWS_*`, etc.) are unchanged.
+- `ANTHROPIC_API_KEY` is the only remaining item — add it when ready and the `lem-complex` LLM tier will activate.

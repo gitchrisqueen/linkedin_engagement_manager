@@ -36,7 +36,7 @@ jobs:
         with:
           node-version: "22"
           cache: "npm"
-          cache-dependency-path: src/cqc_lem/ui/package-lock.json
+          cache-dependency-path: src/cqc_lem/ui/package.json
 
       - name: Build React UI
         working-directory: src/cqc_lem/ui

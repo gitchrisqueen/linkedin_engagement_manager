@@ -31,7 +31,7 @@ jobs:
         uses: ./.github/actions/poetry_setup
         with:
           python-version: "3.12"
-          install-args: --no-dev
+          install-args: --without test
 
       - name: Initialize CodeQL
         uses: github/codeql-action/init@v3
