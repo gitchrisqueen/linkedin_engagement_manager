@@ -17,9 +17,9 @@ from cqc_lem.utilities.logger import myprint
 
 @shared_task.task
 def test_error_tracing():
-    """Generates a traceable error to test the jaeger tracing configs"""
+    """Generates a traceable error to test the error tracing configs"""
     myprint("Starting test_error_tracing")
-    raise ValueError("This is a test error")
+    raise NotImplementedError("test_error_tracing is a test stub; invoke a real task instead")
 
 
 @shared_task.task(bind=True, base=QueueOnce, once={'graceful': True, }, reject_on_worker_lost=True)
