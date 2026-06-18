@@ -83,7 +83,8 @@ def _wait_for_selenium_ready(host: str, port: str, timeout: int = 60) -> None:
     raise TimeoutError(f"Selenium not ready at {status_url} after {timeout}s")
 
 
-def get_docker_driver(headless: bool = True, session_name: str = "ChromeTests", coordinates: dict = None) -> WebDriver:
+def get_docker_driver(headless: bool = True, session_name: str = "ChromeTests", coordinates: dict = None,
+                      user_id: int = None, lat: float = None, lng: float = None) -> webdriver.Remote:
     if DEVICE_FARM_PROJECT_ARN and TEST_GRID_PROJECT_ARN:
         remote_url = get_aws_device_farm_url(DEVICE_FARM_PROJECT_ARN, TEST_GRID_PROJECT_ARN)
     else:
@@ -104,10 +105,14 @@ def get_docker_driver(headless: bool = True, session_name: str = "ChromeTests", 
     driver.set_window_size(1920, 1080)
 
     if coordinates is None:
-        # TODO: pull from user's DB record (Issue #47)
+        if lat is None and user_id is not None:
+            from cqc_lem.utilities.db import get_user_location
+            location = get_user_location(user_id)
+            if location:
+                lat, lng = location
         coordinates = {
-            "latitude": 30.3321,
-            "longitude": -81.6556,
+            "latitude": lat if lat is not None else 30.3321,
+            "longitude": lng if lng is not None else -81.6556,
             "accuracy": 100,
         }
     driver.execute_cdp_cmd("Emulation.setGeolocationOverride", coordinates)

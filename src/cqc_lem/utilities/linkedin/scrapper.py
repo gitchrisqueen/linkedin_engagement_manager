@@ -112,8 +112,8 @@ def returnProfileInfo(driver: webdriver, profile_url, company_name=None, is_main
         ('certifications', lambda: get_profile_certifications(driver, profile_url)),
         ('skills', lambda: get_profile_skills(driver, profile_url)),
         ('recent_activities', lambda: get_profile_recent_activity(driver, profile_url)),
-        # TODO: Get the awards
-        # TODO: Get Interest (top voices, companies, groups, newsletters
+        ('awards', lambda: get_profile_awards(driver, profile_url)),
+        ('interests', lambda: get_profile_interests(driver, profile_url)),
     ]
 
     # Add mutual_connections function if not is_main_user
@@ -497,6 +497,59 @@ def get_profile_skills(driver, employee_link):
         profile_skills.append(skill_dict)
 
     return profile_skills
+
+
+def get_profile_awards(driver, employee_link):
+    go_to_base_employee_link(driver, employee_link)  # May need to redirect first
+
+    url = driver.current_url.rstrip('/') + '/details/honors/'
+    driver.get(url)
+    wait_for_ajax(driver)
+
+    source = get_page_source(driver, url, 2)
+    profile_awards = []
+    items = source.find_all('li')
+    for item in items:
+        row = source_as_row(item)
+        si = get_start_identifier(row)
+        if si == start_identifier_map.get('cert_name') and row:
+            name = row[si][:len(row[si]) // 2]
+            if name:
+                profile_awards.append({"name": name})
+
+    if not profile_awards:
+        myprint("Awards section not yet fully implemented — no honors found or section unavailable")
+
+    return profile_awards
+
+
+def get_profile_interests(driver, employee_link):
+    go_to_base_employee_link(driver, employee_link)  # May need to redirect first
+
+    url = driver.current_url.rstrip('/') + '/details/interests/'
+    driver.get(url)
+    wait_for_ajax(driver)
+
+    source = get_page_source(driver, url, 2)
+    profile_interests = []
+
+    # LinkedIn interests include top voices, companies, groups, and newsletters
+    interest_sections = source.find_all('section', attrs={'data-member-interests-type': True})
+    if not interest_sections:
+        interest_sections = source.find_all('div', class_=lambda c: c and 'interests' in c.lower())
+
+    for section in interest_sections:
+        section_type = section.get('data-member-interests-type', 'unknown')
+        items = section.find_all('span', attrs={'aria-hidden': 'true'})
+        for item in items:
+            text = item.get_text().strip()
+            if text:
+                profile_interests.append({"type": section_type, "name": text})
+
+    if not profile_interests:
+        myprint("Interests section not yet fully implemented — no interests found or section unavailable")
+
+    return profile_interests
 
 
 def record_search_word_frequency(row, si, search_words, search_word_frequency=None):

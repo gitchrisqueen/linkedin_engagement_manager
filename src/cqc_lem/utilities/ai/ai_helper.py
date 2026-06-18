@@ -590,7 +590,8 @@ def summarize_recent_activity(recent_activity_profile: LinkedInProfile, main_pro
 
 def create_video_from_prompt(prompt: str):
     raise NotImplementedError(
-        "OpenAI video API is not available. Use create_runway_video() instead."
+        "openai.Video.create() was removed in OpenAI SDK v1.x. "
+        "Use create_runway_video() or create_replicate_video() instead."
     )
 
 

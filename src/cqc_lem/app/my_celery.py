@@ -13,6 +13,11 @@ from cqc_lem.utilities.jaeger_tracer_helper import get_jaeger_tracer
 from cqc_lem.utilities.logger import myprint, logger
 from cqc_lem.utilities.utils import get_cloudwatch_client
 
+# AWS deployment: uses SQS as broker (see celeryconfig.py CELERY_BROKER_URL)
+# and Redis (ElastiCache) as result backend (CELERY_RESULT_BACKEND env var).
+# Do NOT use SQS as the result backend — SQS is fire-and-forget; Redis supports
+# task state queries and result retrieval required by the API layer.
+
 # Create default Celery app
 app = Celery(
     'cqc_lem',
