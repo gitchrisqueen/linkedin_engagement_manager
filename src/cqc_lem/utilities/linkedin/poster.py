@@ -155,9 +155,13 @@ def share_on_linkedin(user_id: int, content: str,
             ).model_dump()
         ]
     if article_url:
-        # TODO: Implement and test this
         share_media_category = 'ARTICLE'
-        pass
+        media_objects = [
+            ShareMedia(
+                status="READY",
+                originalUrl=article_url,
+            ).model_dump()
+        ]
 
     share_content = ShareContent(
         shareCommentary={"text": content},
