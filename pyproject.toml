@@ -17,7 +17,7 @@ python-dotenv = "^1.0"
 openai = "^1.52.2"
 fastapi = "^0.115.4"
 linkedin-api-client = "^0.3.0"
-uvicorn = "^0.32.0"
+uvicorn = ">=0.32,<0.50"
 celery = {version = "^5.4.0", extras = ["redis"]}
 redis = "^5.2.0"
 bs4 = "^0.0.2"
