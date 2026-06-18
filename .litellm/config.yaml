@@ -60,7 +60,7 @@ litellm_settings:
     type: redis
     host: redis
     port: 6379
-  callbacks:
+  custom_callbacks:
     - /app/.litellm/complexity_router.py
 
 general_settings:
