@@ -1,4 +1,5 @@
 import { useQuery } from '@tanstack/react-query'
+import { Link } from 'react-router-dom'
 import api from '../api/client'
 
 interface DashboardStats {
@@ -15,7 +16,31 @@ interface Post {
   status: string
 }
 
-const email = localStorage.getItem('lem_email') || ''
+interface ActivityEntry {
+  id: number
+  action_type: string
+  result: string
+  post_id: number | null
+  post_url: string | null
+  message: string | null
+  created_at: string
+}
+
+const ACTION_ICONS: Record<string, string> = {
+  post: '📝',
+  comment: '💬',
+  reply: '↩️',
+  dm: '✉️',
+  engaged: '👍',
+}
+
+const STATUS_COLORS: Record<string, string> = {
+  APPROVED: 'bg-green-100 text-green-700',
+  PENDING: 'bg-yellow-100 text-yellow-700',
+  SCHEDULED: 'bg-blue-100 text-blue-700',
+  POSTED: 'bg-purple-100 text-purple-700',
+  PLANNING: 'bg-gray-100 text-gray-600',
+}
 
 function StatCard({ label, value, color }: { label: string; value: number; color: string }) {
   return (
@@ -27,32 +52,54 @@ function StatCard({ label, value, color }: { label: string; value: number; color
 }
 
 export default function Dashboard() {
+  const email = localStorage.getItem('lem_email') || ''
+
   const { data: statsData } = useQuery<{ detail: DashboardStats }>({
     queryKey: ['dashboard-stats', email],
     queryFn: () => api.get(`/dashboard/stats/?email=${encodeURIComponent(email)}`).then((r) => r.data),
     enabled: !!email,
+    refetchInterval: 30_000,
   })
 
   const { data: postsData } = useQuery<{ detail: Post[] }>({
     queryKey: ['posts', email],
     queryFn: () => api.get(`/posts/?email=${encodeURIComponent(email)}`).then((r) => r.data),
     enabled: !!email,
+    refetchInterval: 30_000,
+  })
+
+  const { data: activityData } = useQuery<{ detail: ActivityEntry[] }>({
+    queryKey: ['activity', email],
+    queryFn: () => api.get(`/activity/?email=${encodeURIComponent(email)}&limit=15`).then((r) => r.data),
+    enabled: !!email,
+    refetchInterval: 30_000,
   })
 
   const stats = statsData?.detail ?? { scheduled_this_week: 0, pending_review: 0, posted_total: 0 }
-  const upcoming = (postsData?.detail ?? [])
+
+  const allPosts = postsData?.detail ?? []
+  const upcoming = allPosts
     .filter((p) => p.status !== 'POSTED')
     .sort((a, b) => new Date(a.scheduled_time).getTime() - new Date(b.scheduled_time).getTime())
     .slice(0, 5)
 
+  const activity = activityData?.detail ?? []
+
   if (!email) {
     return (
       <div className="text-center py-16">
-        <p className="text-gray-500 mb-4">Enter your email to get started.</p>
+        <p className="text-gray-500 mb-2">Enter your email to get started.</p>
+        <p className="text-xs text-gray-400 mb-4">
+          Then go to{' '}
+          <Link to="/account" className="text-blue-600 hover:underline">
+            Account Settings
+          </Link>{' '}
+          to connect LinkedIn.
+        </p>
         <input
           type="email"
           placeholder="your@email.com"
-          className="border border-gray-300 rounded-lg px-4 py-2 text-sm w-72"
+          className="border border-gray-300 rounded-lg px-4 py-2 text-sm w-72 focus:outline-none focus:ring-2 focus:ring-blue-500"
           onKeyDown={(e) => {
             if (e.key === 'Enter') {
               localStorage.setItem('lem_email', (e.target as HTMLInputElement).value)
@@ -66,50 +113,149 @@ export default function Dashboard() {
 
   return (
     <div className="space-y-6">
-      <h1 className="text-2xl font-bold text-gray-800">Dashboard</h1>
+      <div className="flex items-center justify-between">
+        <h1 className="text-2xl font-bold text-gray-800">Dashboard</h1>
+        <div className="flex gap-2">
+          <Link
+            to="/schedule"
+            className="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-blue-700 transition-colors"
+          >
+            + Schedule Post
+          </Link>
+          <Link
+            to="/review"
+            className="border border-gray-300 text-gray-600 px-4 py-2 rounded-lg text-sm font-semibold hover:bg-gray-50 transition-colors"
+          >
+            Review Posts
+          </Link>
+        </div>
+      </div>
 
+      {/* Stats */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <StatCard label="Scheduled this week" value={stats.scheduled_this_week} color="border-blue-500" />
         <StatCard label="Pending review" value={stats.pending_review} color="border-yellow-500" />
         <StatCard label="Total posted" value={stats.posted_total} color="border-green-500" />
       </div>
 
-      <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-5">
-        <h2 className="text-lg font-semibold text-gray-700 mb-4">Upcoming Posts</h2>
-        {upcoming.length === 0 ? (
-          <p className="text-sm text-gray-400">No upcoming posts.</p>
-        ) : (
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="text-left text-gray-500 border-b">
-                <th className="pb-2 font-medium">Scheduled</th>
-                <th className="pb-2 font-medium">Type</th>
-                <th className="pb-2 font-medium">Status</th>
-                <th className="pb-2 font-medium">Preview</th>
-              </tr>
-            </thead>
-            <tbody>
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Planned Tasks — upcoming posts queue */}
+        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-5">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-lg font-semibold text-gray-700">Planned Tasks</h2>
+            <Link to="/review" className="text-xs text-blue-600 hover:underline">
+              Manage all
+            </Link>
+          </div>
+          {upcoming.length === 0 ? (
+            <div className="text-center py-6">
+              <p className="text-sm text-gray-400">No upcoming tasks scheduled.</p>
+              <Link
+                to="/review"
+                className="text-xs text-blue-600 hover:underline mt-1 inline-block"
+              >
+                Generate weekly content →
+              </Link>
+            </div>
+          ) : (
+            <ul className="space-y-3">
               {upcoming.map((post) => (
-                <tr key={post.post_id} className="border-b last:border-0">
-                  <td className="py-2 text-gray-600">
-                    {new Date(post.scheduled_time).toLocaleString()}
-                  </td>
-                  <td className="py-2 text-gray-600">{post.post_type}</td>
-                  <td className="py-2">
-                    <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${
-                      post.status === 'APPROVED' ? 'bg-green-100 text-green-700' :
-                      post.status === 'PENDING' ? 'bg-yellow-100 text-yellow-700' :
-                      'bg-gray-100 text-gray-600'
-                    }`}>
-                      {post.status}
-                    </span>
-                  </td>
-                  <td className="py-2 text-gray-500 truncate max-w-xs">{post.content.slice(0, 60)}…</td>
-                </tr>
+                <li
+                  key={post.post_id}
+                  className="flex items-start gap-3 p-3 rounded-lg bg-gray-50 hover:bg-gray-100 transition-colors"
+                >
+                  <div className="mt-0.5 text-lg flex-shrink-0">
+                    {post.post_type === 'video'
+                      ? '🎬'
+                      : post.post_type === 'carousel'
+                      ? '🎠'
+                      : '📝'}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-xs text-gray-500 mb-0.5">
+                      {new Date(post.scheduled_time).toLocaleString(undefined, {
+                        month: 'short',
+                        day: 'numeric',
+                        hour: '2-digit',
+                        minute: '2-digit',
+                      })}
+                    </p>
+                    <p className="text-sm text-gray-700 line-clamp-2">{post.content}</p>
+                  </div>
+                  <span
+                    className={`flex-shrink-0 px-2 py-0.5 rounded-full text-xs font-medium ${
+                      STATUS_COLORS[post.status] ?? 'bg-gray-100 text-gray-600'
+                    }`}
+                  >
+                    {post.status}
+                  </span>
+                </li>
               ))}
-            </tbody>
-          </table>
-        )}
+            </ul>
+          )}
+        </div>
+
+        {/* Activity Feed — what has happened */}
+        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-5">
+          <h2 className="text-lg font-semibold text-gray-700 mb-4">Activity Feed</h2>
+          {activity.length === 0 ? (
+            <p className="text-sm text-gray-400 text-center py-6">
+              No activity yet. Posts, comments, DMs, and replies will appear here.
+            </p>
+          ) : (
+            <ul className="space-y-2 max-h-80 overflow-y-auto pr-1">
+              {activity.map((entry) => (
+                <li
+                  key={entry.id}
+                  className="flex items-start gap-3 py-2 border-b border-gray-100 last:border-0"
+                >
+                  <span className="text-base mt-0.5 flex-shrink-0">
+                    {ACTION_ICONS[entry.action_type] ?? '🔔'}
+                  </span>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs font-semibold text-gray-700 capitalize">
+                        {entry.action_type}
+                      </span>
+                      <span
+                        className={`text-xs px-1.5 py-0.5 rounded-full font-medium ${
+                          entry.result === 'success'
+                            ? 'bg-green-100 text-green-700'
+                            : 'bg-red-100 text-red-600'
+                        }`}
+                      >
+                        {entry.result}
+                      </span>
+                    </div>
+                    {entry.message && (
+                      <p className="text-xs text-gray-500 mt-0.5 line-clamp-1">{entry.message}</p>
+                    )}
+                    {entry.post_url && (
+                      <a
+                        href={entry.post_url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-xs text-blue-500 hover:underline truncate block"
+                      >
+                        {entry.post_url}
+                      </a>
+                    )}
+                  </div>
+                  <span className="text-xs text-gray-400 flex-shrink-0 whitespace-nowrap">
+                    {entry.created_at
+                      ? new Date(entry.created_at).toLocaleString(undefined, {
+                          month: 'short',
+                          day: 'numeric',
+                          hour: '2-digit',
+                          minute: '2-digit',
+                        })
+                      : ''}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
       </div>
     </div>
   )
