@@ -67,7 +67,7 @@ case "$NGROK_PLAN" in
   paid)
     urls=(
       "https://${NGROK_CUSTOM_DOMAIN}"
-      "https://${NGROK_API_PREFIX}.${NGROK_FREE_DOMAIN}/docs"
+      "https://${NGROK_CUSTOM_DOMAIN}/docs"
       "https://${NGROK_FLOWER_PREFIX}.${NGROK_FREE_DOMAIN}"
       "https://${NGROK_CHROME_PREFIX}.${NGROK_FREE_DOMAIN}"
     )
@@ -75,12 +75,12 @@ case "$NGROK_PLAN" in
     urls+=("http://localhost:${NGROK_UI_PORT}")
     ;;
   free)
-    # Free plan: 3 tunnels max (app=static, api+flower=dynamic, chrome=local only)
+    # Free plan: 2 tunnels (app=static domain, flower=dynamic; chrome=local only)
     urls=(
       "https://${NGROK_CUSTOM_DOMAIN}"
+      "https://${NGROK_CUSTOM_DOMAIN}/docs"
       "Dynamic — see http://localhost:${NGROK_UI_PORT}"
-      "Dynamic — see http://localhost:${NGROK_UI_PORT}"
-      "http://localhost:${SELENIUM_HUB_PORT} (local only)"
+      "http://localhost:7900 (local only)"
     )
     titles+=("Ngrok Web Interface")
     urls+=("http://localhost:${NGROK_UI_PORT}")
@@ -90,7 +90,7 @@ case "$NGROK_PLAN" in
       "http://localhost:${API_PORT}"
       "http://localhost:${API_PORT}/docs"
       "http://localhost:${CELERY_FLOWER_PORT}"
-      "http://localhost:${SELENIUM_HUB_PORT}"
+      "http://localhost:7900"
     )
     ;;
 esac
