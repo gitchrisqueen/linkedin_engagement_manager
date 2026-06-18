@@ -181,9 +181,12 @@ def update_user_endpoint(settings: UserSettingsRequest) -> ResponseModel:
     if not user_id:
         raise HTTPException(status_code=403, detail="User not found")
 
+    if not any([settings.new_email, settings.blog_url, settings.sitemap_url]):
+        return ResponseModel(status_code=200, detail="User settings unchanged")
+
     updated = update_user(user_id, email=settings.new_email, blog_url=settings.blog_url, sitemap_url=settings.sitemap_url)
     if not updated:
-        raise HTTPException(status_code=404, detail="No fields to update or update failed")
+        raise HTTPException(status_code=404, detail="Update failed")
     return ResponseModel(status_code=200, detail="User updated successfully")
 
 
@@ -396,13 +399,19 @@ def linkedin_callback(code: str, state: str = None) -> Union[ResponseModel, Redi
         access_token_response.refresh_token_expires_in,
     )
 
-    # Redirect to React account page (React Router path)
+    # Redirect to React account page, passing the authenticated email so the
+    # frontend can persist it to localStorage without requiring the user to re-type it.
+    user_email = response.entity.get('email', '')
+    from urllib.parse import quote, urlencode
+    qs = urlencode({'email': user_email, 'li_connected': '1'}) if user_email else 'li_connected=1'
+
     parsed_url = urlparse(LI_REDIRECT_URL)
-    netloc = parsed_url.netloc.split(':')[0]
-    final_redirect_url = urlunparse((parsed_url.scheme, netloc, '/account', '', '', ''))
+    base_host = f"{parsed_url.scheme}://{parsed_url.netloc.split(':')[0]}"
 
     if os.environ.get('NGROK_CUSTOM_DOMAIN'):
-        final_redirect_url = "https://" + os.environ.get('NGROK_CUSTOM_DOMAIN') + '/account'
+        base_host = "https://" + os.environ.get('NGROK_CUSTOM_DOMAIN')
+
+    final_redirect_url = f"{base_host}/account?{qs}"
 
     return RedirectResponse(url=final_redirect_url)
 

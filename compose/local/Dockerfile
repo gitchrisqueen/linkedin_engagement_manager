@@ -20,6 +20,18 @@ RUN python3 -m pip install --upgrade pip
 
 WORKDIR /app
 
+# ---------------------------------------------------------------------------
+# Stage: build the React SPA so the dist/ folder exists inside the image.
+# The dist/ directory is .gitignored, so it must be built here.
+# ---------------------------------------------------------------------------
+FROM node:22-slim AS ui-builder
+
+WORKDIR /ui
+COPY ./src/cqc_lem/ui/package.json ./src/cqc_lem/ui/package-lock.json ./
+RUN npm ci
+COPY ./src/cqc_lem/ui ./
+RUN npm run build
+
 FROM base AS builder
 
 # Create arg to install dev dependencies
@@ -43,8 +55,9 @@ ENV PIP_DEFAULT_TIMEOUT=100 \
     PIP_NO_CACHE_DIR=1
 
 
-# Install poetry and make sure the export plugin is included
-RUN pip install "poetry==$POETRY_VERSION" && poetry self add poetry-plugin-export
+# Install poetry and the export plugin into the same pip environment.
+# poetry self add does not work reliably when poetry is pip-installed (vs official installer).
+RUN pip install "poetry==$POETRY_VERSION" poetry-plugin-export
 
 # Copy the poetry.lock and pyproject.toml
 COPY ./pyproject.toml ./poetry.lock ./
@@ -70,6 +83,9 @@ ENV PATH="/app/.venv/bin:$PATH"
 COPY ./src ./src
 COPY ./README.md ./README.md
 
+# Inject the pre-built React SPA dist so FastAPI can serve it
+COPY --from=ui-builder /ui/dist ./src/cqc_lem/ui/dist
+
 # Install our package and clear the cache afterwards.
 #   This may save some MBs.
 RUN if [ "$INSTALL_DEV_DEPS" = "true" ]; then \
@@ -83,7 +99,6 @@ FROM my_app_code AS final
 # Copy and set permissions for entrypoint and other scripts
 COPY ./compose/local/entrypoint /entrypoint
 COPY ./compose/local/wait-for-it /wait-for-it
-COPY ./compose/local/streamlit/start /start-streamlit
 COPY ./compose/local/fastapi/start /start-fastapi
 COPY ./compose/local/fastapi/start-cloud /start-fastapi-cloud
 COPY ./compose/local/celery/worker/start /start-celeryworker
@@ -93,7 +108,7 @@ COPY ./compose/local/celery/flower/start /start-flower
 COPY ./compose/local/celery/flower/start-no-wait /start-flower-no-wait
 
 # Set permissions and create logs directory
-RUN chmod +x /entrypoint /wait-for-it /start-streamlit /start-fastapi \
+RUN chmod +x /entrypoint /wait-for-it /start-fastapi \
     /start-fastapi-cloud /start-celeryworker /start-celeryworker-solo \
     /start-celerybeat /start-flower /start-flower-no-wait && \
     mkdir -p /app/logs

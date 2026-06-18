@@ -1,4 +1,5 @@
 import inspect
+import json
 import random
 import sys
 import threading
@@ -9,11 +10,13 @@ from urllib.parse import urlparse
 
 from celery_once import QueueOnce
 from cqc_lem.app.my_celery import app as shared_task
-from cqc_lem.utilities.ai.ai_helper import generate_ai_response, get_ai_message_refinement, summarize_recent_activity
+from cqc_lem.utilities.ai.ai_helper import generate_ai_response, get_ai_message_refinement, summarize_recent_activity, \
+    ai_check_message_history
 from cqc_lem.utilities.date import convert_viewed_on_to_date
 from cqc_lem.utilities.db import get_user_password_pair_by_id, get_user_id, insert_new_log, LogActionType, \
     LogResultType, has_user_commented_on_post_url, get_post_url_from_log_for_user, get_post_message_from_log_for_user, \
-    has_engaged_url_with_x_days, get_post_content, get_post_video_url, update_db_post_status, PostStatus
+    has_engaged_url_with_x_days, get_post_content, get_post_video_url, update_db_post_status, PostStatus, \
+    get_dm_history_for_profile, get_post_status, get_user_blog_url
 from cqc_lem.utilities.linkedin.company_page_inviter import automate_invitations
 from cqc_lem.utilities.linkedin.helper import login_to_linkedin, get_my_profile, get_linkedin_profile_from_url
 from cqc_lem.utilities.linkedin.poster import share_on_linkedin
@@ -721,6 +724,24 @@ def accept_connection_request(user_id: int):
     return invitation_data
 
 
+def get_recent_recommendations(driver, wait) -> dict[str, str]:
+    """Return {profile_url: name} for users who recently recommended the current user.
+
+    Scrapin the LinkedIn Recommendations Received section is not yet implemented;
+    returns an empty dict until a scraper is added here.
+    """
+    return {}
+
+
+def get_recent_collaborators(driver, wait) -> dict[str, str]:
+    """Return {profile_url: name} for recent collaborators to thank.
+
+    No structured LinkedIn data source exists for this yet; returns an empty dict
+    until a notification-scraper is added here.
+    """
+    return {}
+
+
 @shared_task.task(bind=True, base=QueueOnce, once={'graceful': True, 'unlock_before_run': True, 'keys': ['user_id']},
                   reject_on_worker_lost=True,
                   rate_limit='2/m')
@@ -740,23 +761,32 @@ def automate_appreciation_dms_for_user(self, user_id: int, loop_for_duration: in
 
         # After Accepting a Connection Request:
         invitations_accepted = accept_connection_request(user_id)
-        # Send a private DM for each invitation
         for profile_url, name in invitations_accepted.items():
-            message = f"Hi {name}, I appreciate you connecting with me on LinkedIn. I look forward to learning more about you and your work."
+            first_name = name.split(" ")[0]
+            message = f"Hi {first_name}, I appreciate you connecting with me on LinkedIn. I look forward to learning more about you and your work."
             send_private_dm.apply_async(kwargs={"user_id": user_id, "profile_url": profile_url, "message": message})
 
-        # TODO: After Receiving a Recommendation:
+        # After Receiving a Recommendation — thank the recommender
+        recommendations_received = get_recent_recommendations(driver, wait)
+        for profile_url, name in recommendations_received.items():
+            first_name = name.split(" ")[0]
+            message = (
+                f"Hi {first_name}, thank you so much for the kind recommendation on LinkedIn! "
+                "I really appreciate you taking the time to share your experience working with me. "
+                "I hope we have the opportunity to collaborate again in the future."
+            )
+            send_private_dm.apply_async(kwargs={"user_id": user_id, "profile_url": profile_url, "message": message})
 
-        # TODO: After an Interview:
-
-        # TODO: For a Successful Collaboration:
-
-        # General Appreciation:
-        # "Hi [Name], I really appreciate your insights on [topic]. Your perspective helped me see things differently, and I'm grateful for the opportunity to learn from you."
-
-        # profile_url = '' # TODO: Update
-        # message = '' # TODO: Update
-        # TODO: Use this line #send_private_dm.apply_async(kwargs={"user_id": user_id, "profile_url": profile_url, "message": message})
+        # After a Successful Collaboration — express gratitude and offer to connect further
+        recent_collaborators = get_recent_collaborators(driver, wait)
+        for profile_url, name in recent_collaborators.items():
+            first_name = name.split(" ")[0]
+            message = (
+                f"Hi {first_name}, it was a pleasure collaborating with you! "
+                "Your contributions made a real difference and I'm grateful for the opportunity. "
+                "Let's stay in touch — I'd love to explore future opportunities to work together."
+            )
+            send_private_dm.apply_async(kwargs={"user_id": user_id, "profile_url": profile_url, "message": message})
 
         # Re-schedule the task in the queue for the future
         if loop_for_duration:
@@ -1071,30 +1101,36 @@ def engage_with_profile_viewer(self, user_id: int, viewer_url, viewer_name):
                     if not able_to_comment:
                         myprint("No activities, unable to or already left comment")
 
-                        # TODO: Send DM - offer something of value—whether it's insights, resources, or potential collaboration opportunities.
-                        # TODO: Generate something of value to offer
-
-                        # Get the first name from the view_name by splitting on space
                         first_name = viewer_name.split(" ")[0]
+                        profile_url_str = str(profile.profile_url)
+                        acting_user_id = get_user_id(my_profile.email)
 
-                        # TODO : Review/Retrieve previous messages with user first.
-                        message_history = []
+                        # Retrieve past DM history with this profile to avoid repeating messages
+                        past_dms = get_dm_history_for_profile(acting_user_id, profile_url_str)
+                        message_history_json = json.dumps(past_dms)
 
-                        # TODO: Check user profile to find what type of focus the message should have to then send.
-                        main_focus = "I'd like to connect with LinkedIn users to discuss my project and see if they would be interested in it."
+                        # Use user's blog URL to personalise the focus when available
+                        blog_url = get_user_blog_url(acting_user_id)
+                        if blog_url:
+                            main_focus = f"Offer insights from my blog at {blog_url} and invite the viewer to discuss topics relevant to their work."
+                        else:
+                            main_focus = "Offer something of value—insights, resources, or potential collaboration—to the viewer and start a genuine conversation."
 
-                        # TODO: Get initial message from user profile
-                        message = f"Hi {first_name}, I noticed we're connected on LinkedIn and wanted to reach out. I'm currently working on a project that I think you might find interesting. Would you be open to a quick chat to discuss it further?"
+                        message = (
+                            f"Hi {first_name}, I noticed you viewed my LinkedIn profile and wanted to reach out. "
+                            f"I share insights on {my_profile.headline or 'my professional field'} and thought there might be synergy between our work. "
+                            "Would love to connect more directly — feel free to share what you're working on!"
+                        )
 
-                        # If message was already sent do not send again
-                        message = ai_check_message_history(message_history, main_focus, message)
+                        # Skip if an equivalent message has already been sent to this person
+                        message = ai_check_message_history(message_history_json, main_focus, message, user_name=first_name)
 
 
                         if message:
 
                             # Send actual DM
-                            kwargs = {'user_id': get_user_id(my_profile.email),
-                                      'profile_url': str(profile.profile_url),
+                            kwargs = {'user_id': acting_user_id,
+                                      'profile_url': profile_url_str,
                                       'message': message}
                             send_private_dm.apply_async(kwargs=kwargs)
                             result = f"Profile Viewer Engagement Completed. Sent DM to {viewer_name}"
@@ -1415,11 +1451,13 @@ if __name__ == "__main__":
 def post_to_linkedin(self, user_id: int, post_id: int):
     """Posts to LinkedIn using the LinkedIn API - https://learn.microsoft.com/en-us/linkedin/consumer/integrations/self-serve/share-on-linkedin#creating-a-share-on-linkedin"""
 
-    # TODO: If this is still running 4 times then add de-duplication logic
     task_id = f"{self.request.id}-{user_id}-{post_id}"
     myprint(f"Post To LinkedIn | Task ID: {task_id}")
-    # Mark the task as executed
-    # TaskExecution.objects.create(task_id=task_id)
+
+    # Skip if already posted — prevents duplicate posts when the task is re-queued
+    if get_post_status(post_id) == PostStatus.POSTED.value:
+        myprint(f"Post {post_id} already posted. Skipping duplicate execution.")
+        return f"Post {post_id} already posted — skipped"
 
     # Login and publish post to LinkedIn
     user_email, user_password = get_user_password_pair_by_id(user_id)

@@ -992,6 +992,41 @@ def has_engaged_url_with_x_days(user_id: int, post_url: str, days: int):
     return count > 0
 
 
+def get_dm_history_for_profile(user_id: int, profile_url: str) -> list[str]:
+    """Return all DM messages previously sent by user_id to profile_url, oldest first."""
+    connection = get_db_connection()
+    cursor = connection.cursor()
+    try:
+        cursor.execute(
+            "SELECT message FROM logs WHERE user_id = %s AND post_url = %s AND action_type = %s ORDER BY created_at ASC",
+            (user_id, profile_url, LogActionType.DM.value),
+        )
+        rows = cursor.fetchall()
+    except mysql.connector.Error as err:
+        myprint(f"Could not get DM history for profile | Error: {err}")
+        rows = []
+    finally:
+        cursor.close()
+        connection.close()
+    return [row[0] for row in rows if row[0]]
+
+
+def get_post_status(post_id: int) -> str | None:
+    """Return the current status string of a post, or None if not found."""
+    connection = get_db_connection()
+    cursor = connection.cursor()
+    try:
+        cursor.execute("SELECT status FROM posts WHERE id = %s", (post_id,))
+        row = cursor.fetchone()
+    except mysql.connector.Error as err:
+        myprint(f"Could not get post status | Error: {err}")
+        row = None
+    finally:
+        cursor.close()
+        connection.close()
+    return row[0] if row else None
+
+
 def get_company_linked_in_url_for_user(user_id: int):
     connection = get_db_connection()
     cursor = connection.cursor()

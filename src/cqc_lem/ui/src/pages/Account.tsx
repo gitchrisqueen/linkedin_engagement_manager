@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { useMutation, useQuery } from '@tanstack/react-query'
 import api from '../api/client'
 
@@ -21,10 +22,31 @@ function StepBadge({ n, active, done }: { n: number; active: boolean; done: bool
 }
 
 export default function Account() {
+  const [searchParams, setSearchParams] = useSearchParams()
   const [email, setEmail] = useState(localStorage.getItem('lem_email') || '')
   const [blogUrl, setBlogUrl] = useState(localStorage.getItem('lem_blog_url') || '')
   const [sitemapUrl, setSitemapUrl] = useState(localStorage.getItem('lem_sitemap_url') || '')
   const [savedMsg, setSavedMsg] = useState<string | null>(null)
+
+  // Persist OAuth callback params to localStorage and clear from URL
+  useEffect(() => {
+    const oauthEmail = searchParams.get('email')
+    const liConnected = searchParams.get('li_connected')
+    if (oauthEmail) {
+      localStorage.setItem('lem_email', oauthEmail)
+      setEmail(oauthEmail)
+    }
+    if (liConnected === '1') {
+      localStorage.setItem('lem_li_connected', '1')
+    }
+    if (oauthEmail || liConnected) {
+      setSearchParams({}, { replace: true })
+      setSavedMsg('LinkedIn connected! Your account has been set up.')
+      setTimeout(() => setSavedMsg(null), 5000)
+    }
+    setBlogUrl(localStorage.getItem('lem_blog_url') || '')
+    setSitemapUrl(localStorage.getItem('lem_sitemap_url') || '')
+  }, [])
 
   const { data: userIdData, refetch: refetchUser } = useQuery<{ detail: number }>({
     queryKey: ['user-id', email],
@@ -34,11 +56,6 @@ export default function Account() {
   })
 
   const userExists = !!userIdData?.detail
-
-  useEffect(() => {
-    setBlogUrl(localStorage.getItem('lem_blog_url') || '')
-    setSitemapUrl(localStorage.getItem('lem_sitemap_url') || '')
-  }, [])
 
   const saveMutation = useMutation({
     mutationFn: () =>
