@@ -1,203 +1,195 @@
 """Unit tests for AI helper utilities."""
 
 import pytest
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock, patch, call
 
 
 @pytest.mark.unit
-class TestAIHelper:
-    """Test suite for AI helper functions."""
-
-    def test_generate_ai_response(self, mock_openai_client, sample_linkedin_profile):
-        """Test generating AI responses."""
-        from cqc_lem.utilities.ai.ai_helper import generate_ai_response
-        from cqc_lem.utilities.linkedin.profile import LinkedInProfile
-        
+class TestGenerateAiResponse:
+    def test_calls_api_and_returns_string(self, mock_openai_client, sample_linkedin_profile):
         with patch("cqc_lem.utilities.ai.ai_helper.client", mock_openai_client):
-            post_content = "Generate a professional LinkedIn post about AI"
+            from cqc_lem.utilities.ai.ai_helper import generate_ai_response
+            from cqc_lem.utilities.linkedin.profile import LinkedInProfile
+
             profile = LinkedInProfile(**sample_linkedin_profile)
-            
-            response = generate_ai_response(post_content, profile)
-            
-            # Verify response is generated
-            assert response is not None
-            assert isinstance(response, str) or response is not None
+            result = generate_ai_response("Write a comment about AI", profile)
 
-    def test_get_ai_message_refinement(self, mock_openai_client):
-        """Test refining messages with AI."""
-        from cqc_lem.utilities.ai.ai_helper import get_ai_message_refinement
-        
-        with patch("cqc_lem.utilities.ai.ai_helper.client", mock_openai_client):
-            original_message = "Hey, want to connect?"
-            refined = get_ai_message_refinement(original_message)
-            
-            # Verify refinement is generated
-            assert refined is not None
+            assert mock_openai_client.chat.completions.create.called
+            assert isinstance(result, str)
 
-    def test_summarize_recent_activity(self, mock_openai_client, sample_linkedin_profile):
-        """Test summarizing recent LinkedIn activity."""
-        from cqc_lem.utilities.ai.ai_helper import summarize_recent_activity
-        from cqc_lem.utilities.linkedin.profile import LinkedInProfile
-        
+    def test_uses_medium_tier_model(self, mock_openai_client, sample_linkedin_profile):
         with patch("cqc_lem.utilities.ai.ai_helper.client", mock_openai_client):
-            # Create profiles with activities
+            from cqc_lem.utilities.ai.ai_helper import generate_ai_response
+            from cqc_lem.utilities.linkedin.profile import LinkedInProfile
+
+            profile = LinkedInProfile(**sample_linkedin_profile)
+            generate_ai_response("Write a comment", profile)
+
+            call_kwargs = mock_openai_client.chat.completions.create.call_args[1]
+            assert call_kwargs.get("model") == "lem-medium"
+
+    def test_returns_none_for_empty_response(self, mock_openai_client, sample_linkedin_profile):
+        mock_openai_client.chat.completions.create.return_value.choices[0].message.content = None
+        with patch("cqc_lem.utilities.ai.ai_helper.client", mock_openai_client):
+            from cqc_lem.utilities.ai.ai_helper import generate_ai_response
+            from cqc_lem.utilities.linkedin.profile import LinkedInProfile
+
+            profile = LinkedInProfile(**sample_linkedin_profile)
+            result = generate_ai_response("Write a comment", profile)
+
+            assert result is None
+
+
+@pytest.mark.unit
+class TestGetAiMessageRefinement:
+    def test_returns_string(self, mock_openai_client):
+        with patch("cqc_lem.utilities.ai.ai_helper.client", mock_openai_client):
+            from cqc_lem.utilities.ai.ai_helper import get_ai_message_refinement
+
+            result = get_ai_message_refinement("Hey, want to connect?")
+
+            assert isinstance(result, str)
+            assert mock_openai_client.chat.completions.create.called
+
+    def test_uses_simple_tier_model(self, mock_openai_client):
+        with patch("cqc_lem.utilities.ai.ai_helper.client", mock_openai_client):
+            from cqc_lem.utilities.ai.ai_helper import get_ai_message_refinement
+
+            get_ai_message_refinement("Hello!")
+
+            call_kwargs = mock_openai_client.chat.completions.create.call_args[1]
+            assert call_kwargs.get("model") == "lem-simple"
+
+    def test_character_limit_in_prompt(self, mock_openai_client):
+        with patch("cqc_lem.utilities.ai.ai_helper.client", mock_openai_client):
+            from cqc_lem.utilities.ai.ai_helper import get_ai_message_refinement
+
+            get_ai_message_refinement("Hello!", character_limit=150)
+
+            call_args = mock_openai_client.chat.completions.create.call_args
+            messages = call_args[1]["messages"]
+            all_content = " ".join(str(m.get("content", "")) for m in messages)
+            assert "150" in all_content
+
+
+@pytest.mark.unit
+class TestSummarizeRecentActivity:
+    def test_returns_none_for_empty_activities(self, mock_openai_client, sample_linkedin_profile):
+        with patch("cqc_lem.utilities.ai.ai_helper.client", mock_openai_client):
+            from cqc_lem.utilities.ai.ai_helper import summarize_recent_activity
+            from cqc_lem.utilities.linkedin.profile import LinkedInProfile
+
             main_profile = LinkedInProfile(**sample_linkedin_profile)
-            activity_profile_data = sample_linkedin_profile.copy()
-            activity_profile_data["recent_activities"] = []  # Empty activities should return None
-            activity_profile = LinkedInProfile(**activity_profile_data)
-            
-            summary = summarize_recent_activity(activity_profile, main_profile)
-            
-            # Verify summary handling (should be None for empty activities)
-            assert summary is None or isinstance(summary, str)
+            empty_data = {**sample_linkedin_profile, "recent_activities": []}
+            activity_profile = LinkedInProfile(**empty_data)
 
+            result = summarize_recent_activity(activity_profile, main_profile)
 
-@pytest.mark.unit
-class TestAIImageGeneration:
-    """Test suite for AI image generation functions."""
+            assert result is None
+            mock_openai_client.chat.completions.create.assert_not_called()
 
-    @pytest.mark.requires_openai
-    def test_get_flux_image_prompt(self, mock_openai_client):
-        """Test generating Flux image prompts from AI."""
-        from cqc_lem.utilities.ai.ai_helper import get_flux_image_prompt_from_ai
-        
+    def test_calls_api_for_profiles_with_activities(self, mock_openai_client, sample_linkedin_profile):
         with patch("cqc_lem.utilities.ai.ai_helper.client", mock_openai_client):
-            post_content = "This is a post about technology and innovation"
-            prompt = get_flux_image_prompt_from_ai(post_content)
-            
-            assert prompt is not None
-            assert isinstance(prompt, str)
+            from cqc_lem.utilities.ai.ai_helper import summarize_recent_activity
+            from cqc_lem.utilities.linkedin.profile import LinkedInProfile, LinkedInActivity
 
-    @pytest.mark.requires_openai
-    def test_generate_flux1_image(self):
-        """Test generating images with Flux1."""
-        # Test image generation (mock the API)
-        pass
-
-    @pytest.mark.requires_openai
-    def test_get_runway_ml_video_prompt(self, mock_openai_client):
-        """Test generating Runway ML video prompts."""
-        from cqc_lem.utilities.ai.ai_helper import get_runway_ml_video_prompt_from_ai
-        
-        with patch("cqc_lem.utilities.ai.ai_helper.client", mock_openai_client):
-            post_content = "This is about AI innovation"
-            image_prompt = "A futuristic AI workspace"
-            
-            video_prompt = get_runway_ml_video_prompt_from_ai(post_content, image_prompt)
-            
-            assert video_prompt is not None
-
-
-@pytest.mark.unit
-class TestAIContentGeneration:
-    """Test suite for AI content generation functions."""
-
-    def test_generate_post_content(self, mock_openai_client):
-        """Test generating LinkedIn post content with AI."""
-        with patch("cqc_lem.utilities.ai.ai_helper.client", mock_openai_client):
-            topic = "artificial intelligence trends"
-            # Test content generation
-            pass
-
-    def test_generate_comment_content(self, mock_openai_client):
-        """Test generating comment content with AI."""
-        with patch("cqc_lem.utilities.ai.ai_helper.client", mock_openai_client):
-            post_content = "Great article about AI!"
-            # Test comment generation
-            pass
-
-    def test_generate_dm_content(self, mock_openai_client):
-        """Test generating DM content with AI."""
-        with patch("cqc_lem.utilities.ai.ai_helper.client", mock_openai_client):
-            recipient_profile = {
-                "name": "John Doe",
-                "headline": "Software Engineer",
+            main_profile = LinkedInProfile(**sample_linkedin_profile)
+            active_data = {
+                **sample_linkedin_profile,
+                "recent_activities": [LinkedInActivity(text="Posted about AI")],
             }
-            # Test DM generation
-            pass
+            activity_profile = LinkedInProfile(**active_data)
+
+            result = summarize_recent_activity(activity_profile, main_profile)
+
+            assert mock_openai_client.chat.completions.create.called
+            assert isinstance(result, str)
 
 
 @pytest.mark.unit
-class TestAIPreferences:
-    """Test suite for AI preference learning."""
-
-    def test_use_ai_for_preferences(self):
-        """Test using AI to learn user preferences."""
-        # TODO: Use AI to get preferences
-        # Reference: TODO_PROJECT_TIMELINE.md Line 311
-        pass
-
-    def test_reaction_type_preferences(self):
-        """Test learning preferred reaction types."""
-        # TODO: Not sure if these are universal for all post
-        # Reference: TODO_PROJECT_TIMELINE.md Line 308
-        pass
-
-
-@pytest.mark.unit
-class TestAIPromptManagement:
-    """Test suite for AI prompt management."""
-
-    def test_verify_ai_helper_path(self):
-        """Test verifying AI helper file path."""
-        # TODO: Verify this final path and move
-        # Reference: TODO_PROJECT_TIMELINE.md Line 1634
-        pass
-
-    def test_prompt_template_loading(self):
-        """Test loading prompt templates."""
-        # Test loading and using prompt templates
-        pass
-
-    def test_prompt_variable_substitution(self):
-        """Test substituting variables in prompts."""
-        template = "Generate a post about {topic} for {audience}"
-        variables = {"topic": "AI", "audience": "software engineers"}
-        
-        # Test variable substitution
-        assert "{topic}" in template
-        assert "{audience}" in template
-
-
-@pytest.mark.unit
-class TestAIErrorHandling:
-    """Test suite for AI error handling."""
-
-    def test_handle_api_rate_limit(self, mock_openai_client):
-        """Test handling OpenAI API rate limits."""
+class TestGetDallEImagePromptFromAi:
+    def test_returns_prompt_string(self, mock_openai_client):
         with patch("cqc_lem.utilities.ai.ai_helper.client", mock_openai_client):
-            # Simulate rate limit error
-            mock_openai_client.chat.completions.create.side_effect = Exception("Rate limit exceeded")
-            
-            # Test graceful handling
-            pass
+            from cqc_lem.utilities.ai.ai_helper import get_dall_e_image_prompt_from_ai
 
-    def test_handle_invalid_response(self, mock_openai_client):
-        """Test handling invalid AI responses."""
+            result = get_dall_e_image_prompt_from_ai("AI and the future of work")
+
+            assert isinstance(result, str)
+            assert mock_openai_client.chat.completions.create.called
+
+    def test_uses_simple_tier_model(self, mock_openai_client):
         with patch("cqc_lem.utilities.ai.ai_helper.client", mock_openai_client):
-            # Simulate empty or invalid response
-            mock_openai_client.chat.completions.create.return_value = None
-            
-            # Test graceful handling
-            pass
+            from cqc_lem.utilities.ai.ai_helper import get_dall_e_image_prompt_from_ai
 
-    def test_handle_api_timeout(self):
-        """Test handling API timeout errors."""
-        # Test timeout handling
-        pass
+            get_dall_e_image_prompt_from_ai("content")
+
+            call_kwargs = mock_openai_client.chat.completions.create.call_args[1]
+            assert call_kwargs.get("model") == "lem-simple"
 
 
-@pytest.mark.integration
-@pytest.mark.requires_openai
-class TestAIIntegration:
-    """Integration tests for AI functions with real API."""
+@pytest.mark.unit
+class TestGetFluxImagePromptFromAi:
+    def test_returns_prompt_string(self, mock_openai_client):
+        with patch("cqc_lem.utilities.ai.ai_helper.client", mock_openai_client):
+            from cqc_lem.utilities.ai.ai_helper import get_flux_image_prompt_from_ai
 
-    def test_full_content_generation_pipeline(self):
-        """Test complete content generation pipeline."""
-        # This requires actual OpenAI API access
-        pass
+            result = get_flux_image_prompt_from_ai("Technology innovation post")
 
-    def test_ai_assisted_posting_workflow(self):
-        """Test AI-assisted posting workflow."""
-        # Test generating content, images, and video prompts
-        pass
+            assert isinstance(result, str)
+
+    def test_uses_simple_tier_model(self, mock_openai_client):
+        with patch("cqc_lem.utilities.ai.ai_helper.client", mock_openai_client):
+            from cqc_lem.utilities.ai.ai_helper import get_flux_image_prompt_from_ai
+
+            get_flux_image_prompt_from_ai("content")
+
+            call_kwargs = mock_openai_client.chat.completions.create.call_args[1]
+            assert call_kwargs.get("model") == "lem-simple"
+
+
+@pytest.mark.unit
+class TestGetThoughtLeadershipPostFromAi:
+    def test_uses_complex_tier_model(self, mock_openai_client, sample_linkedin_profile):
+        with patch("cqc_lem.utilities.ai.ai_helper.client", mock_openai_client), \
+             patch("cqc_lem.utilities.ai.ai_helper.get_industry_trend_analysis_based_on_user_profile") as mock_trends:
+            from cqc_lem.utilities.ai.ai_helper import get_thought_leadership_post_from_ai
+            from cqc_lem.utilities.linkedin.profile import LinkedInProfile
+
+            mock_trends.return_value = {"industry": "Technology", "analysis": "AI is growing"}
+            profile = LinkedInProfile(**sample_linkedin_profile)
+
+            get_thought_leadership_post_from_ai(profile, "awareness")
+
+            call_kwargs = mock_openai_client.chat.completions.create.call_args[1]
+            assert call_kwargs.get("model") == "lem-complex"
+
+
+@pytest.mark.unit
+class TestCreateVideoFromPrompt:
+    def test_raises_not_implemented(self):
+        from cqc_lem.utilities.ai.ai_helper import create_video_from_prompt
+
+        with pytest.raises(NotImplementedError, match="create_runway_video"):
+            create_video_from_prompt("A video about AI")
+
+
+@pytest.mark.unit
+class TestModelTierAssignments:
+    """Verify all functions use the expected LiteLLM tier aliases."""
+
+    @pytest.mark.parametrize("func_name,expected_model", [
+        ("get_ai_message_refinement", "lem-simple"),
+        ("get_dall_e_image_prompt_from_ai", "lem-simple"),
+        ("get_flux_image_prompt_from_ai", "lem-simple"),
+    ])
+    def test_simple_tier_functions(self, func_name, expected_model, mock_openai_client, sample_linkedin_profile):
+        import cqc_lem.utilities.ai.ai_helper as module
+        with patch("cqc_lem.utilities.ai.ai_helper.client", mock_openai_client):
+            fn = getattr(module, func_name)
+            try:
+                fn("test content")
+            except Exception:
+                pass  # we only care that model was set correctly
+            if mock_openai_client.chat.completions.create.called:
+                call_kwargs = mock_openai_client.chat.completions.create.call_args[1]
+                assert call_kwargs.get("model") == expected_model

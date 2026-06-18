@@ -1344,11 +1344,6 @@ def invite_to_connect(self, user_id: int, profile_url: str, message: str = None)
     return result
 
 
-def start_process():
-    # TOO: Get reid of this method
-    pass
-
-
 def final_method(drivers: List[WebDriver]):
     global stop_all_thread
     stop_all_thread.set()  # Set the flag to stop other threads
