@@ -65,8 +65,15 @@ AWS_ENV_TAG=get_constant_from_env('AWS_ENV_TAG', default_value='dev')
 AWS_REGION=get_constant_from_env('AWS_REGION')
 AWS_MYSQL_SECRET_NAME=get_constant_from_env('AWS_MYSQL_SECRET_NAME')
 
+NGROK_CUSTOM_DOMAIN=get_constant_from_env('NGROK_CUSTOM_DOMAIN')
 NGROK_FREE_DOMAIN=get_constant_from_env('NGROK_FREE_DOMAIN')
 NGROK_API_PREFIX=get_constant_from_env('NGROK_API_PREFIX')
+
+# Dynamic LinkedIn redirect URL: NGROK_CUSTOM_DOMAIN takes precedence over static LI_REDIRECT_URL
+# when running in a dev/ngrok environment (the ngrok domain is registered in the LinkedIn developer app)
+if NGROK_CUSTOM_DOMAIN:
+    LI_REDIRECT_URL = f"https://{NGROK_CUSTOM_DOMAIN}/auth/linkedin/callback"
+
 # If both NGROK_FREE_DOMAIN and NGROK_API_PREFIX are not None then set API_BASE_URL as the concatenation of both
 if NGROK_FREE_DOMAIN and NGROK_API_PREFIX:
     API_BASE_URL = f"https://{NGROK_API_PREFIX}.{NGROK_FREE_DOMAIN}"

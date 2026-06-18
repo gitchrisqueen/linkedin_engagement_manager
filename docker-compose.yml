@@ -178,7 +178,7 @@ services:
       - OLLAMA_CLOUD_API_KEY=${OLLAMA_CLOUD_API_KEY}
     restart: unless-stopped
     healthcheck:
-      test: ["CMD-SHELL", "curl -fsS http://localhost:4000/health/liveliness >/dev/null || exit 1"]
+      test: ["CMD-SHELL", "python3 -c \"import urllib.request; urllib.request.urlopen('http://localhost:4000/health/liveliness')\" 2>/dev/null || exit 1"]
       interval: 30s
       timeout: 10s
       retries: 5
