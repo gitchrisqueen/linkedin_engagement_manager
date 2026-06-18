@@ -225,8 +225,10 @@ def get_user_access_token(user_id: int):
     cursor = connection.cursor(dictionary=True)
 
     try:
-        cursor.execute("SELECT access_token FROM users WHERE id = %s", (user_id,))
-        # TODO: Add where clause to only return non-expired tokens ????
+        cursor.execute(
+            "SELECT access_token FROM users WHERE id = %s AND (token_expiry IS NULL OR token_expiry > NOW())",
+            (user_id,),
+        )
 
         access_token = cursor.fetchone()
     except mysql.connector.Error as err:
