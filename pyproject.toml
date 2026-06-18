@@ -45,7 +45,7 @@ docx = "^0.2.4"
 pycurl = "^7.45.4"
 typing-extensions = "^4.12.2"
 os-env = "^0.3"  # Redundant with python-dotenv
-datetime = "^5.5"  # Built-in module
+datetime = ">=5.5,<7.0"  # Built-in module
 
 
 # AI/ML Development Tools
