@@ -12,7 +12,7 @@ packages = [
 python = ">=3.12,<4.0"
 
 # --- Web / API ---
-fastapi = "^0.115.4"
+fastapi = ">=0.115.4,<0.138.0"
 uvicorn = ">=0.32,<0.50"
 pydantic-extra-types = "^2.10.0"
 python-dotenv = "^1.0"
@@ -21,7 +21,7 @@ typing-extensions = "^4.12.2"
 
 # --- Task queue ---
 celery = {version = "^5.4.0", extras = ["redis"]}
-redis = "^5.2.0"
+redis = ">=5.2,<7.0"
 celery-once = {git = "https://github.com/gitchrisqueen/celery-once.git"}
 flower = "^2.0.1"
 
@@ -83,9 +83,9 @@ optional = true
 [tool.poetry.group.dev.dependencies]
 # Development Tools
 jupyter = "^1.0.0"
-setuptools = "^67.6.1"
+setuptools = ">=67.6.1,<83.0.0"
 grandalf = "^0.8"
-watchdog = "^5.0.3"
+watchdog = ">=5.0.3,<7.0.0"
 
 #AWS
 aws-cdk-lib = "^2.177.0"
@@ -121,7 +121,7 @@ freezegun = "^1.2.2"
 pytest-mock = "^3.10.0"
 syrupy = "^4.0.2"
 pytest-watcher = "^0.3.4"
-pytest-asyncio = ">=0.21.1,<0.24.0"
+pytest-asyncio = ">=0.21.1,<1.5.0"
 grandalf = "^0.8"
 pytest-profiling = "^1.7.0"
 
