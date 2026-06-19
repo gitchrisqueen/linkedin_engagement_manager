@@ -366,7 +366,7 @@ export default function ReviewSchedule() {
         </div>
 
         {editingPost && (
-          <div className="space-y-4">
+          <div className="sticky top-4 self-start space-y-4 max-h-[calc(100vh-2rem)] overflow-y-auto">
             <div className="bg-white rounded-lg border border-gray-200 shadow-sm p-5 space-y-4">
               <h3 className="font-semibold text-gray-700">Edit Post #{editingPost.post_id}</h3>
 
@@ -376,6 +376,31 @@ export default function ReviewSchedule() {
                 onChange={(e) => setEditingPost({ ...editingPost, content: e.target.value })}
                 className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
               />
+
+              <div>
+                <label className="block text-xs font-medium text-gray-600 mb-1">Post Type</label>
+                <select
+                  value={editingPost.post_type}
+                  onChange={(e) => {
+                    const newType = e.target.value
+                    setEditingPost({
+                      ...editingPost,
+                      post_type: newType,
+                      video_url: newType === 'video' ? editingPost.video_url : null,
+                      carousel_slides: newType === 'carousel' ? editingPost.carousel_slides : null,
+                    })
+                  }}
+                  disabled={editingPost.status === 'posted'}
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-50 disabled:text-gray-400"
+                >
+                  {['text', 'video', 'carousel'].map((t) => (
+                    <option key={t} value={t}>{t.toUpperCase()}</option>
+                  ))}
+                </select>
+                {editingPost.status === 'posted' && (
+                  <p className="text-xs text-gray-400 mt-1">Post type cannot be changed after posting.</p>
+                )}
+              </div>
 
               {editingPost.post_type === 'video' && (
                 <div>

@@ -23,6 +23,10 @@ from cqc_lem.utilities.db import (
     update_subscription_from_stripe, update_user_linkedin_token,
     get_users_with_stripe_subscriptions,
     update_user_linkedin_password,
+    get_avatar_credit_balance, add_avatar_credits,
+    deduct_avatar_credit, insert_avatar_training,
+    update_avatar_training_status, set_active_avatar,
+    get_avatar_trainings, get_active_avatar,
 )
 from cqc_lem.utilities.email import generate_pin, hash_pin, send_pin_email
 from cqc_lem.utilities.linkedin.token_refresh import (
@@ -34,7 +38,7 @@ from cqc_lem.utilities.mime_type_helper import get_file_mime_type
 from cqc_lem.utilities.observability import track_api_call
 from cqc_lem.utilities.utils import get_file_extension_from_filepath
 from fastapi import FastAPI, HTTPException, Request, status, APIRouter
-from fastapi import Query
+from fastapi import File, Form, Query, UploadFile
 from fastapi.responses import FileResponse
 from fastapi.responses import HTMLResponse
 from fastapi.responses import RedirectResponse
@@ -105,6 +109,18 @@ class PostRequest(BaseModel):
     email: Optional[str] = None
     status: Optional[PostStatus] = PostStatus.PENDING
     carousel_slides: Optional[List[str]] = None
+    use_avatar: Optional[bool] = False
+
+
+class AvatarCreditCheckoutRequest(BaseModel):
+    session_token: str
+    package: str
+    success_url: str
+    cancel_url: str
+
+
+class AvatarActivateRequest(BaseModel):
+    session_token: str
 
     @property
     def post_json(self):
@@ -922,10 +938,170 @@ async def billing_webhook(request: Request) -> dict:
                 stripe_customer_id, "past_due", None, stripe_subscription_id
             )
 
+    elif event_type == "checkout.session.completed":
+        meta = data.get("metadata", {})
+        if meta.get("type") == "avatar_credits":
+            stripe_customer_id = data.get("customer")
+            stripe_session_id = data.get("id")
+            credits = int(meta.get("credits", 0))
+            package = meta.get("package", "unknown")
+            if stripe_customer_id and credits > 0:
+                users = get_users_with_stripe_subscriptions()
+                user_row = next(
+                    (u for u in users if u.get("stripe_customer_id") == stripe_customer_id), None
+                )
+                if user_row:
+                    add_avatar_credits(
+                        user_row["id"],
+                        credits,
+                        f"purchase_{package}",
+                        stripe_session_id,
+                    )
+                    myprint(
+                        f"Added {credits} avatar credit(s) for user_id={user_row['id']} "
+                        f"via session={stripe_session_id}"
+                    )
+                else:
+                    myprint(f"Avatar credits webhook: no user found for customer={stripe_customer_id}")
+
     else:
         myprint(f"Stripe webhook event ignored: {event_type}")
 
     return {"received": True}
+
+
+# ---------------------------------------------------------------------------
+# Avatar endpoints
+# ---------------------------------------------------------------------------
+
+@router.get("/avatar/credits", responses={
+    200: {"description": "Credit balance and active avatar returned"},
+    **{k: v for k, v in error_responses.items() if k in [401]}
+})
+def get_avatar_credits_endpoint(session_token: str) -> ResponseModel:
+    user_id = get_session_user_id(session_token)
+    if not user_id:
+        raise HTTPException(status_code=401, detail="Invalid or expired session")
+    balance = get_avatar_credit_balance(user_id)
+    active = get_active_avatar(user_id)
+    return ResponseModel(status_code=200, detail={"balance": balance, "active_avatar": active})
+
+
+@router.post("/avatar/credits/checkout", responses={
+    200: {"description": "Stripe checkout URL returned"},
+    **{k: v for k, v in error_responses.items() if k in [400, 401]}
+})
+def avatar_credits_checkout(request: AvatarCreditCheckoutRequest) -> ResponseModel:
+    user_id = get_session_user_id(request.session_token)
+    if not user_id:
+        raise HTTPException(status_code=401, detail="Invalid or expired session")
+
+    subscription = get_user_subscription_info(user_id)
+    stripe_customer_id = subscription.get("stripe_customer_id") if subscription else None
+    if not stripe_customer_id:
+        raise HTTPException(status_code=400, detail="No Stripe customer record — contact support")
+
+    from cqc_lem.utilities.stripe_util import create_avatar_credits_checkout, AVATAR_CREDIT_PACKAGES
+    if request.package not in AVATAR_CREDIT_PACKAGES:
+        raise HTTPException(status_code=400, detail=f"Unknown package '{request.package}'")
+
+    url = create_avatar_credits_checkout(
+        stripe_customer_id, request.package, request.success_url, request.cancel_url
+    )
+    if not url:
+        raise HTTPException(status_code=500, detail="Could not create Stripe checkout session")
+    return ResponseModel(status_code=200, detail={"checkout_url": url})
+
+
+@router.post("/avatar/training", responses={
+    200: {"description": "Training started"},
+    **{k: v for k, v in error_responses.items() if k in [400, 401, 402]}
+})
+async def start_avatar_training_endpoint(
+    session_token: str = Form(...),
+    trigger_word: str = Form(...),
+    photos: UploadFile = File(...),
+) -> ResponseModel:
+    user_id = get_session_user_id(session_token)
+    if not user_id:
+        raise HTTPException(status_code=401, detail="Invalid or expired session")
+
+    balance = get_avatar_credit_balance(user_id)
+    if balance < 1:
+        raise HTTPException(status_code=402, detail="Insufficient avatar credits. Purchase credits to train a new avatar.")
+
+    zip_bytes = await photos.read()
+    if not zip_bytes:
+        raise HTTPException(status_code=400, detail="No file data received")
+
+    from cqc_lem.utilities.avatar.replicate_avatar import start_avatar_training
+    try:
+        training_id = start_avatar_training(user_id, zip_bytes, trigger_word)
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"Could not start training: {exc}")
+
+    deduct_avatar_credit(user_id, training_id)
+    db_id = insert_avatar_training(user_id, training_id, trigger_word)
+    return ResponseModel(status_code=200, detail={"training_id": training_id, "db_id": db_id})
+
+
+@router.get("/avatar/trainings", responses={
+    200: {"description": "Avatar trainings listed"},
+    **{k: v for k, v in error_responses.items() if k in [401]}
+})
+def list_avatar_trainings(session_token: str) -> ResponseModel:
+    user_id = get_session_user_id(session_token)
+    if not user_id:
+        raise HTTPException(status_code=401, detail="Invalid or expired session")
+    trainings = get_avatar_trainings(user_id)
+    return ResponseModel(status_code=200, detail=trainings)
+
+
+@router.get("/avatar/training/{avatar_db_id}/status", responses={
+    200: {"description": "Training status synced"},
+    **{k: v for k, v in error_responses.items() if k in [401, 404]}
+})
+def sync_avatar_training_status(avatar_db_id: int, session_token: str) -> ResponseModel:
+    user_id = get_session_user_id(session_token)
+    if not user_id:
+        raise HTTPException(status_code=401, detail="Invalid or expired session")
+
+    trainings = get_avatar_trainings(user_id)
+    match = next((t for t in trainings if t["id"] == avatar_db_id), None)
+    if not match:
+        raise HTTPException(status_code=404, detail="Training not found")
+
+    if match["status"] in ("succeeded", "failed", "canceled"):
+        return ResponseModel(status_code=200, detail=match)
+
+    from cqc_lem.utilities.avatar.replicate_avatar import poll_training_status
+    new_status, model_ref = poll_training_status(match["training_id"])
+    update_avatar_training_status(match["training_id"], new_status, model_ref)
+    match["status"] = new_status
+    if model_ref:
+        match["model_ref"] = model_ref
+    return ResponseModel(status_code=200, detail=match)
+
+
+@router.put("/avatar/training/{avatar_db_id}/activate", responses={
+    200: {"description": "Avatar activated"},
+    **{k: v for k, v in error_responses.items() if k in [400, 401, 404]}
+})
+def activate_avatar(avatar_db_id: int, request: AvatarActivateRequest) -> ResponseModel:
+    user_id = get_session_user_id(request.session_token)
+    if not user_id:
+        raise HTTPException(status_code=401, detail="Invalid or expired session")
+
+    trainings = get_avatar_trainings(user_id)
+    match = next((t for t in trainings if t["id"] == avatar_db_id), None)
+    if not match:
+        raise HTTPException(status_code=404, detail="Training not found")
+    if match["status"] != "succeeded":
+        raise HTTPException(status_code=400, detail="Only succeeded trainings can be activated")
+
+    if set_active_avatar(user_id, avatar_db_id):
+        return ResponseModel(status_code=200, detail="Avatar activated")
+    raise HTTPException(status_code=500, detail="Could not activate avatar")
 
 
 # Register the /api router

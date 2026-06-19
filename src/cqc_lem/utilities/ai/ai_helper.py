@@ -1679,6 +1679,21 @@ def generate_flux1_image_from_prompt(prompt: str):
     return get_flux_image_via_replicate(prompt)
 
 
+def generate_post_image(prompt: str, user_id: int) -> str:
+    """Generate a LinkedIn post image, using the user's active avatar LoRA when available.
+
+    Falls back to the base Flux.1 model when the user has no active succeeded avatar.
+    """
+    from cqc_lem.utilities.db import get_active_avatar
+    from cqc_lem.utilities.avatar.replicate_avatar import generate_image_with_avatar
+
+    avatar = get_active_avatar(user_id)
+    if avatar and avatar.get("status") == "succeeded" and avatar.get("model_ref"):
+        full_prompt = f"{avatar['trigger_word']}, {prompt}"
+        return generate_image_with_avatar(full_prompt, avatar["model_ref"])
+    return generate_flux1_image_from_prompt(prompt)
+
+
 def get_runway_ml_video_prompt_from_ai(post_content: str, image_prompt: str):
     """
        Generate a RunwayMl video prompt from the provided post content and image prompt

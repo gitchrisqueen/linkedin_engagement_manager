@@ -124,6 +124,36 @@ def sample_message_data():
     }
 
 
+@pytest.fixture
+def mock_replicate_training():
+    """Mock Replicate training API for avatar tests."""
+    with patch("replicate.trainings.create") as mock_create, \
+         patch("replicate.trainings.get") as mock_get:
+        training = MagicMock()
+        training.id = "train-mock-abc123"
+        training.status = "starting"
+        training.output = None
+        mock_create.return_value = training
+        mock_get.return_value = training
+        yield {"create": mock_create, "get": mock_get, "training": training}
+
+
+def pytest_collection_modifyitems(config, items):
+    """Auto-skip requires_replicate tests when REPLICATE_API_TOKEN is not a real key."""
+    token = os.environ.get("REPLICATE_API_TOKEN", "")
+    is_placeholder = not token or token.startswith("your_") or token in ("test-key", "")
+    if is_placeholder:
+        skip_marker = pytest.mark.skip(
+            reason=(
+                "REPLICATE_API_TOKEN is not set or is a placeholder — "
+                "set a real token to run avatar E2E tests"
+            )
+        )
+        for item in items:
+            if "requires_replicate" in item.keywords:
+                item.add_marker(skip_marker)
+
+
 # Marker for skipping tests that require real external services
 def pytest_configure(config):
     """Configure custom pytest markers."""
@@ -135,6 +165,9 @@ def pytest_configure(config):
     )
     config.addinivalue_line(
         "markers", "requires_selenium: mark test as requiring real browser automation"
+    )
+    config.addinivalue_line(
+        "markers", "requires_replicate: mark test as requiring a real REPLICATE_API_TOKEN"
     )
     config.addinivalue_line(
         "markers", "slow: mark test as slow running"

@@ -6,6 +6,7 @@ import ProtectedRoute from './components/ProtectedRoute'
 import LoginModal from './components/LoginModal'
 import Dashboard from './pages/Dashboard'
 import Account from './pages/Account'
+import Avatars from './pages/Avatars'
 import ScheduleContent from './pages/ScheduleContent'
 import ReviewSchedule from './pages/ReviewSchedule'
 import Landing from './pages/Landing'
@@ -24,6 +25,10 @@ function AppRoutes() {
           <Route
             path="account"
             element={<ProtectedRoute><Account /></ProtectedRoute>}
+          />
+          <Route
+            path="avatars"
+            element={<ProtectedRoute><Avatars /></ProtectedRoute>}
           />
           <Route
             path="schedule"

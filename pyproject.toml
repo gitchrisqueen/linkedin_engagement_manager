@@ -16,6 +16,7 @@ fastapi = ">=0.115.4,<0.138.0"
 uvicorn = ">=0.32,<0.50"
 pydantic-extra-types = "^2.10.0"
 python-dotenv = "^1.0"
+python-multipart = ">=0.0.9,<1.0"
 requests = "^2.32.3"
 typing-extensions = "^4.12.2"
 
@@ -124,6 +125,7 @@ pytest-watcher = "^0.3.4"
 pytest-asyncio = ">=0.21.1,<1.5.0"
 grandalf = "^0.8"
 pytest-profiling = "^1.7.0"
+pytest-playwright = ">=0.4.0,<1.0.0"
 
 
 [tool.coverage.run]
@@ -183,5 +185,6 @@ markers = [
     "requires_openai: mark test as requiring real OpenAI API access",
     "requires_database: mark test as requiring real database connection",
     "requires_selenium: mark test as requiring real browser automation",
+    "requires_replicate: mark test as requiring a real REPLICATE_API_TOKEN",
 ]
 asyncio_mode = "auto"
