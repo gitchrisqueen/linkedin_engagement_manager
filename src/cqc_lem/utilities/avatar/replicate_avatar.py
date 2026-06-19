@@ -12,7 +12,7 @@ TRAINER_MODEL = "replicate/fast-flux-trainer"
 
 # Hardware SKU for the destination model (inference, not training).
 # Training hardware is determined by the trainer itself.
-_DESTINATION_HARDWARE = "gpu-a40-large"
+_DESTINATION_HARDWARE = "gpu-l40s"
 
 
 def _sanitize_model_name(trigger_word: str, user_id: int) -> str:
