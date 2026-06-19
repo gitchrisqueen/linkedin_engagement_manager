@@ -65,6 +65,9 @@ export default function Account() {
   const [savedMsg, setSavedMsg] = useState<string | null>(null)
   const [prefsSavedMsg, setPrefsSavedMsg] = useState<string | null>(null)
   const [checkoutMsg, setCheckoutMsg] = useState<{ ok: boolean; text: string } | null>(null)
+  const [liPassword, setLiPassword] = useState('')
+  const [showLiPassword, setShowLiPassword] = useState(false)
+  const [liPasswordMsg, setLiPasswordMsg] = useState<{ ok: boolean; text: string } | null>(null)
 
   // Preferences local state — initialised from query once loaded
   const [inactivateDelay, setInactivateDelay] = useState<number | null>(90)
@@ -217,6 +220,24 @@ export default function Account() {
     onError: () => {
       setCheckoutMsg({ ok: false, text: 'Could not start checkout — please try again.' })
       setTimeout(() => setCheckoutMsg(null), 6000)
+    },
+  })
+
+  // LinkedIn password save
+  const liPasswordMutation = useMutation({
+    mutationFn: () =>
+      api.put('/user/linkedin-password', {
+        session_token: sessionToken,
+        linkedin_password: liPassword,
+      }),
+    onSuccess: () => {
+      setLiPassword('')
+      setLiPasswordMsg({ ok: true, text: 'LinkedIn password saved.' })
+      setTimeout(() => setLiPasswordMsg(null), 4000)
+    },
+    onError: () => {
+      setLiPasswordMsg({ ok: false, text: 'Save failed — please try again.' })
+      setTimeout(() => setLiPasswordMsg(null), 5000)
     },
   })
 
@@ -384,6 +405,56 @@ export default function Account() {
           >
             {isLinkedInConnected ? 'Reconnect LinkedIn' : 'Connect LinkedIn'}
           </a>
+        </div>
+      )}
+
+      {/* LinkedIn Automation Password — always shown when LinkedIn is connected */}
+      {isLinkedInConnected && !tokenExpired && (
+        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 space-y-4">
+          <div>
+            <h2 className="text-base font-semibold text-gray-700">LinkedIn Automation Password</h2>
+            <p className="text-xs text-gray-500 mt-1">
+              LEM uses your LinkedIn password to log in via browser automation for actions like
+              profile scraping, post personalization, and DM engagement. It is stored securely and
+              never shared or displayed after saving.
+            </p>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">LinkedIn Password</label>
+            <div className="relative">
+              <input
+                type={showLiPassword ? 'text' : 'password'}
+                value={liPassword}
+                onChange={(e) => setLiPassword(e.target.value)}
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm pr-16 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                placeholder="Enter your LinkedIn password"
+                autoComplete="new-password"
+              />
+              <button
+                type="button"
+                onClick={() => setShowLiPassword((v) => !v)}
+                className="absolute inset-y-0 right-2 flex items-center px-2 text-xs text-gray-500 hover:text-gray-700"
+              >
+                {showLiPassword ? 'Hide' : 'Show'}
+              </button>
+            </div>
+          </div>
+
+          {liPasswordMsg && (
+            <p className={`text-sm font-medium ${liPasswordMsg.ok ? 'text-green-600' : 'text-red-600'}`}>
+              {liPasswordMsg.text}
+            </p>
+          )}
+
+          <button
+            type="button"
+            onClick={() => liPasswordMutation.mutate()}
+            disabled={liPasswordMutation.isPending || !liPassword}
+            className="w-full bg-blue-600 text-white py-2 rounded-lg text-sm font-semibold hover:bg-blue-700 disabled:opacity-50 transition-colors"
+          >
+            {liPasswordMutation.isPending ? 'Saving…' : 'Save Password'}
+          </button>
         </div>
       )}
 

@@ -117,7 +117,7 @@ services:
       selenium-chrome:
         condition: service_healthy
     healthcheck:
-      test: ["CMD-SHELL", "pgrep -f 'celery.*beat' || exit 1"]
+      test: ["CMD-SHELL", "python3 -c \"import os, sys; sys.exit(0 if any('celery' in l and 'beat' in l for l in open('/proc/%s/cmdline' % p).read().replace(chr(0),' ') for p in os.listdir('/proc') if p.isdigit() and os.path.exists('/proc/%s/cmdline' % p)) else 1)\""]
       interval: 30s
       timeout: 10s
       retries: 3

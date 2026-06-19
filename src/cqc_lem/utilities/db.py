@@ -1274,6 +1274,30 @@ def get_recent_logs(user_id: int, limit: int = 20) -> list:
     return rows
 
 
+def update_user_linkedin_password(user_id: int, password: str) -> bool:
+    """Store the user's LinkedIn login password for Selenium-driven automation.
+
+    The password must be stored reversibly (not hashed) because Selenium types
+    it directly into the LinkedIn login form. Only call this from authenticated
+    API endpoints — never expose the value in any response payload.
+    """
+    connection = get_db_connection()
+    cursor = connection.cursor()
+    try:
+        cursor.execute(
+            "UPDATE users SET password = %s WHERE id = %s",
+            (password, user_id),
+        )
+        connection.commit()
+        return cursor.rowcount >= 0
+    except mysql.connector.Error as err:
+        myprint(f"Could not update LinkedIn password for user_id {user_id} | Error: {err}")
+        return False
+    finally:
+        cursor.close()
+        connection.close()
+
+
 def update_user_settings(user_id: int, blog_url: str = None, sitemap_url: str = None) -> bool:
     connection = get_db_connection()
     cursor = connection.cursor()
