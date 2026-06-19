@@ -21,7 +21,7 @@ from cqc_lem.utilities.linkedin.company_page_inviter import automate_invitations
 from cqc_lem.utilities.linkedin.helper import login_to_linkedin, get_my_profile, get_linkedin_profile_from_url
 from cqc_lem.utilities.linkedin.poster import share_on_linkedin, share_carousel_on_linkedin
 from cqc_lem.utilities.linkedin.profile import LinkedInProfile
-from cqc_lem.utilities.logger import myprint
+from cqc_lem.utilities.logger import myprint, log_error, log_info, log_warning
 from cqc_lem.utilities.selenium_util import click_element_wait_retry, \
     get_element_wait_retry, get_elements_as_list_wait_stale, getText, close_tab, get_driver_wait_pair, quit_gracefully, \
     wait_for_ajax
@@ -93,7 +93,7 @@ def navigate_to_feed(driver, wait):
         myprint("Feed Sorted By Recent Items First")
 
     except Exception as e:
-        myprint("Error During Feed Sort |  Exception: " + str(e))
+        log_error("Error during feed sort", exc=e)
 
     # are_you_satisfied()
 
@@ -198,7 +198,7 @@ def simulate_typing(driver: WebDriver, editable_element: WebElement, text, allow
                 actions.send_keys(char)
                 # editable_element.send_keys(char)
         except Exception as e:
-            myprint("Error while sending char(" + char + "): " + str(e))
+            log_warning("Error while sending char during typing", exc=e)
 
         if allow_pauses:
             type_pause = random.uniform(0.05 * type_speed_reducer, 0.15 * type_speed_reducer)
@@ -216,7 +216,7 @@ def simulate_typing(driver: WebDriver, editable_element: WebElement, text, allow
             # Use JavaScript to set the value for characters outside the BMP
             driver.execute_script(script_pre, editable_element, key, char)
         except JavascriptException as e:
-            myprint("Error while replacing char(" + key + "): " + str(e))
+            log_warning("Error while replacing char via JS", exc=e)
             # Get the current text
             current_text = getText(editable_element)
             # Remove the key from the text
@@ -354,13 +354,13 @@ def comment_on_post(self, user_id: int, post_link: str, comment_text: str):
                         button_label_options.remove(button_to_click_key)
                         time.sleep(1)  # Wait a bit before retrying
                     else:
-                        myprint(f"Failed to click {button_to_click_key} Post Reaction: {e}")
+                        log_warning(f"Failed to click {button_to_click_key} post reaction", exc=e, user_id=user_id, post_id=post_link)
                         method_result += f" | Added Post Reaction | Error: {e}"
         except Exception as e:
-            myprint(f"Error while clicking post reaction: {e}")
+            log_warning("Error while clicking post reaction", exc=e, user_id=user_id, post_id=post_link)
             method_result += f"Could not add post reaction | Error: {e}"
     except Exception as e:
-        myprint(f"Error while posting comment: {e}")
+        log_error("Error while posting comment", exc=e, user_id=user_id, post_id=post_link, action_type="comment")
         method_result = f"Error while posting comment: {e}"
     finally:
         quit_gracefully(driver)  # Close the driver
@@ -475,7 +475,7 @@ def automate_commenting(self, user_id: int, loop_for_duration: int = None, futur
                 globals()[current_function_name].apply_async(kwargs=kwargs, countdown=future_forward)
 
     except Exception as e:
-        myprint(f"Error while automating commenting: {e}")
+        log_error("Error while automating commenting", exc=e, user_id=user_id, task_name="automate_commenting")
         result = f"Error while automating commenting: {e}"
     finally:
         quit_gracefully(driver)  # Close the driver
@@ -532,7 +532,7 @@ def automate_reply_commenting(self, user_id: int, post_id: int, loop_for_duratio
                                                            max_retry=0,
                                                            )
             except Exception as e:
-                myprint(f"Error while finding comments: {e}")
+                log_warning("Error while finding comments", exc=e, user_id=user_id)
                 comments = []
 
             # Print how many comments found
@@ -625,7 +625,7 @@ def automate_reply_commenting(self, user_id: int, post_id: int, loop_for_duratio
 
 
                     except Exception as e:
-                        myprint(f"Error while replying to comment: {e}")
+                        log_error("Error while replying to comment", exc=e, user_id=user_id, post_id=post_id, action_type="reply_comment")
                         # Update DB with log entry
                         insert_new_log(user_id=user_id, post_id=post_id, action_type=LogActionType.REPLY,
                                        result=LogResultType.FAILURE,
@@ -676,7 +676,7 @@ def automate_reply_commenting(self, user_id: int, post_id: int, loop_for_duratio
                 # Call self again in the future
                 globals()[current_function_name].apply_async(kwargs=kwargs, countdown=future_forward_time)
     except Exception as e:
-        myprint(f"Error while replying to comments: {e}")
+        log_error("Error while replying to comments", exc=e, user_id=user_id, post_id=post_id, task_name="automate_reply_commenting")
         result = f"Error while replying to comments: {e}"
     finally:
         quit_gracefully(driver)
@@ -715,7 +715,7 @@ def accept_connection_request(user_id: int):
             time.sleep(2)  # Wait for 2 seconds
 
     except Exception as e:
-        myprint(f"Error while accepting connection requests: {e}")
+        log_error("Error while accepting connection requests", exc=e, user_id=user_id, action_type="accept_connection")
         invitation_data = {}
     finally:
         quit_gracefully(driver)
@@ -812,7 +812,7 @@ def automate_appreciation_dms_for_user(self, user_id: int, loop_for_duration: in
                 globals()[current_function_name].apply_async(kwargs=kwargs, countdown=future_forward)
 
     except Exception as e:
-        myprint(f"Error while sending appreciation DMs: {e}")
+        log_error("Error while sending appreciation DMs", exc=e, user_id=user_id, task_name="automate_appreciation_dms_for_user", action_type="dm")
         result = f"Error while sending appreciation DMs: {e}"
     finally:
         quit_gracefully(driver)
@@ -842,7 +842,7 @@ def generate_and_post_comment(driver, wait, post_link, my_profile: LinkedInProfi
                                    '//div[contains(@class,"fie-impression-container")]//div[contains(@class,"feed-shared-inline-show-more-text")]',
                                    "Finding Post Text"))
     except Exception as wde:
-        myprint("Failed to get post content. Skipping.." + str(wde))
+        log_warning("Failed to get post content, skipping", exc=wde)
         return False  # Skip posts without content
 
     img_url = None
@@ -967,7 +967,7 @@ def automate_profile_viewer_engagement(self, user_id: int, loop_for_duration: in
             viewer_elements = [e for e in viewer_elements if (datetime.now() - convert_viewed_on_to_date(
                 getText(e.find_element(By.XPATH, viewed_on_xpath)))).days <= 1]
         except Exception as e:
-            myprint(f"Error filtering viewers by date: {e}")
+            log_warning("Error filtering viewers by date", exc=e, user_id=user_id)
 
         myprint(f"Filtered Viewers count: {len(viewer_elements)}")
 
@@ -1033,7 +1033,7 @@ def automate_profile_viewer_engagement(self, user_id: int, loop_for_duration: in
                 # Call self again in the future
                 globals()[current_function_name].apply_async(kwargs=kwargs, countdown=future_forward)
     except Exception as e:
-        myprint(f"Error while engaging with profile viewers: {e}")
+        log_error("Error while engaging with profile viewers", exc=e, user_id=user_id, task_name="automate_profile_viewer_engagement")
         result = f"Error while engaging with profile viewers: {e}"
     finally:
         quit_gracefully(driver)
@@ -1160,7 +1160,7 @@ def engage_with_profile_viewer(self, user_id: int, viewer_url, viewer_name):
                 result = f"Failed to get profile data for {viewer_name}"
 
         except Exception as e:
-            myprint(f"Error while engaging with profile viewer: {e}")
+            log_error("Error while engaging with profile viewer", exc=e, user_id=user_id, action_type="profile_engagement")
             result = f"Error while engaging with profile viewer: {e}"
         finally:
             # Log engagement efforts to the log
@@ -1307,7 +1307,7 @@ def invite_to_connect(self, user_id: int, profile_url: str, message: str = None)
 
                 myprint("Found Connect Button and clicked it")
             except Exception as e:
-                myprint(f"Failed to find more or connect button: Error: {str(e)}")
+                log_error("Failed to find more or connect button", exc=e, user_id=user_id, action_type="invite_connect")
                 result = f"Failed to find more or connect button: Error: {str(e)}"
 
         # If connection_message exist click the With note button
@@ -1355,7 +1355,7 @@ def invite_to_connect(self, user_id: int, profile_url: str, message: str = None)
                 myprint("Found Send Connection Button and clicked it")
                 result = "Connection Request Sent Successfully"
             except Exception as e:
-                myprint(f"Failed to Add a note. Error: {str(e)}")
+                log_error("Failed to add a note to connection request", exc=e, user_id=user_id, action_type="invite_connect")
                 result = f"Failed to Add a note. Error: {str(e)}"
         else:
             # Else click send connection
@@ -1367,10 +1367,10 @@ def invite_to_connect(self, user_id: int, profile_url: str, message: str = None)
                 myprint("Found Send Without a Note Button and clicked it")
                 result = "Connection Request Sent Successfully"
             except Exception as e:
-                myprint(f"Failed to find send without a note connection button. Error: {str(e)}")
+                log_error("Failed to find send-without-note connection button", exc=e, user_id=user_id, action_type="invite_connect")
                 result = f"Failed to find send without a note connection button. Error: {str(e)}"
     except Exception as e:
-        myprint(f"Error while inviting to connect: {e}")
+        log_error("Error while inviting to connect", exc=e, user_id=user_id, action_type="invite_connect")
         result = f"Error while inviting to connect: {e}"
         insert_new_log(user_id=user_id, action_type=LogActionType.ENGAGED,
                        result=LogResultType.FAILURE, post_url=profile_url, message=str(e))
@@ -1416,7 +1416,7 @@ def get_current_profile(user_id: int, session_name: str = "Get Current Profile")
         my_profile = get_my_profile(driver, wait, user_email, user_password, user_id=user_id)
 
     except Exception as e:
-        myprint(f"Error while getting updated profile: {e}")
+        log_error("Error while getting updated profile", exc=e, user_id=user_id)
         quit_gracefully(driver)  # Close the driver
         raise e
 
@@ -1506,7 +1506,7 @@ def post_to_linkedin(self, user_id: int, post_id: int):
         return f"Post successfully created"
 
     else:
-        myprint(f"Failed to create post using /posts API endpoint")
+        log_error("Failed to create post using /posts API endpoint", user_id=user_id, post_id=post_id, action_type="post", api_provider="linkedin")
         # Update DB with status=failed in the logs table
         insert_new_log(user_id=user_id, action_type=LogActionType.POST, result=LogResultType.FAILURE, post_id=post_id,
                        message="Failed to create post using /posts API endpoint.")
@@ -1526,7 +1526,7 @@ def automate_invites_to_company_page_for_user(self, user_id: int):
         invite_count = automate_invitations(driver, wait, user_id)
 
     except Exception as e:
-        myprint(f"Error while inviting to company page: {e}")
+        log_error("Error while inviting to company page", exc=e, user_id=user_id, task_name="automate_invites_to_company_page_for_user", action_type="company_invite")
         invite_count = 0
     finally:
         quit_gracefully(driver)

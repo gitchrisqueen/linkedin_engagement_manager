@@ -29,7 +29,7 @@ src/cqc_lem/
 │   ├── ai/        LiteLLM-backed AI helpers (ai_helper.py, client.py)
 │   ├── linkedin/  Selenium automation (scrapper.py, poster.py, commenter.py)
 │   ├── db.py      All database access (no raw SQL outside this file)
-│   ├── logger.py  myprint() — use this instead of print()
+│   ├── logger.py  Structured logger — log_info/log_error/etc. preferred over myprint()
 │   └── selenium_util.py  get_docker_driver() — always use this for WebDriver
 ├── ui/            React SPA (src/, dist/ is built output served by FastAPI)
 └── aws/           AWS CDK stacks
@@ -44,13 +44,36 @@ tests/
 
 ## Code Conventions
 
-- **Logging:** Never use `print()`. Use `myprint()` from `cqc_lem.utilities.logger`.
+- **Logging:** Never use `print()`. Use the structured logger from `cqc_lem.utilities.logger`. Prefer the typed helpers over the legacy `myprint()` shim:
+
+  | Function | Level | When to use |
+  |---|---|---|
+  | `log_debug(msg, **ctx)` | DEBUG | Verbose detail: LLM calls, Selenium steps, DB queries |
+  | `log_info(msg, **ctx)` | INFO | Normal task progress and state transitions |
+  | `log_warning(msg, exc=None, **ctx)` | WARNING | Recoverable failures, fallbacks, degraded paths |
+  | `log_error(msg, exc=None, **ctx)` | ERROR | Task-level failures — automatically sent to PostHog |
+  | `log_critical(msg, exc=None, **ctx)` | CRITICAL | Fatal conditions — automatically sent to PostHog |
+  | `myprint(msg, debug=False)` | INFO/DEBUG | Legacy shim — still works, avoid in new code |
+
+  Pass structured context as keyword args. Supported fields: `user_id`, `task_id`, `task_name`, `post_id`, `action_type`, `duration_ms`, `ai_model`, `api_provider`, `http_status`. `log_error` / `log_critical` accept `exc=` to capture the full exception and stack trace.
+
+  ```python
+  from cqc_lem.utilities.logger import log_info, log_warning, log_error
+
+  log_info("Scheduled post", post_id=post_id, user_id=user_id, task_name="auto_check_scheduled_posts")
+  log_warning("Perplexity unavailable, falling back to GoogleNews", exc=e, api_provider="perplexity")
+  log_error("Automation task failed", exc=e, user_id=user_id, task_name="automate_commenting")
+  ```
+
+  Log level and PostHog threshold are configurable via env vars:
+  - `LOG_LEVEL` — overall logging level (default: `INFO`)
+  - `POSTHOG_LOG_LEVEL` — minimum level forwarded to PostHog (default: `ERROR`)
+
 - **Type hints:** Required on all function signatures.
 - **Enums:** Use `PostStatus`, `PostType`, `LogActionType` from `db.py` — never raw strings.
 - **Imports:** Absolute from `cqc_lem.*` throughout.
 - **Database:** All DB access through functions in `utilities/db.py`. No raw SQL in other modules.
 - **Secrets:** Never hardcode. Use `.env` with `load_dotenv()`. See `.env.example` for required vars.
-- **No `print()`:** Always `myprint()`.
 - **Comments:** Only add when WHY is non-obvious.
 
 ## Files Copilot Must Never Modify

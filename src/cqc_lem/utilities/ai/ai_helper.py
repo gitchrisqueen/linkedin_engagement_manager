@@ -7,15 +7,54 @@ import openai
 import replicate
 from cqc_lem import assets_dir
 from cqc_lem.utilities.ai.client import client
-from cqc_lem.utilities.ai.tools import search_recent_news
+from cqc_lem.utilities.ai.tools import search_recent_news, search_with_perplexity
 from cqc_lem.utilities.linkedin.profile import LinkedInProfile
-from cqc_lem.utilities.logger import myprint
+from cqc_lem.utilities.logger import myprint, log_debug, log_error, log_warning
 from cqc_lem.utilities.utils import create_folder_if_not_exists, save_video_url_to_dir
 from dotenv import load_dotenv
 from runwayml import RunwayML
 
 # Load .env file
 load_dotenv()
+
+
+def _call_llm(**kwargs):
+    """Thin wrapper around client.chat.completions.create that logs model, latency, and token usage."""
+    model = kwargs.get("model", "unknown")
+    start = time.time()
+    log_debug(f"LLM call starting", ai_model=model)
+    try:
+        response = client.chat.completions.create(**kwargs)
+        duration_ms = int((time.time() - start) * 1000)
+        usage = getattr(response, "usage", None)
+        prompt_tokens = int(getattr(usage, "prompt_tokens", 0) or 0) if usage else 0
+        completion_tokens = int(getattr(usage, "completion_tokens", 0) or 0) if usage else 0
+        log_debug(
+            f"LLM call completed in {duration_ms}ms — {prompt_tokens}+{completion_tokens} tokens",
+            ai_model=model,
+            duration_ms=duration_ms,
+        )
+        try:
+            from cqc_lem.utilities.observability import track_llm_call
+            track_llm_call(
+                model=model,
+                prompt_tokens=prompt_tokens,
+                completion_tokens=completion_tokens,
+                latency_ms=duration_ms,
+                success=True,
+            )
+        except Exception:
+            pass
+        return response
+    except Exception as exc:
+        duration_ms = int((time.time() - start) * 1000)
+        log_error(f"LLM call failed after {duration_ms}ms", exc=exc, ai_model=model, duration_ms=duration_ms)
+        try:
+            from cqc_lem.utilities.observability import track_llm_call
+            track_llm_call(model=model, prompt_tokens=0, completion_tokens=0, latency_ms=duration_ms, success=False)
+        except Exception:
+            pass
+        raise
 
 
 # Retrieve OpenAI API key from environment variables
@@ -50,7 +89,7 @@ def generate_ai_response_test():
     }
 
     # Call the API with the system and user prompt only (no memory of past prompts)
-    response = client.chat.completions.create(
+    response = _call_llm(
         model="gpt-4o-mini",  # Specify the model you want to use
         messages=[system_prompt, user_message],  # System prompt + current user prompt
         # temperature=0.3,  # Adjust this parameter as per your needs
@@ -124,7 +163,7 @@ def generate_ai_response(post_content, profile: LinkedInProfile, post_img_url=No
         "content": content
     }
 
-    response = client.chat.completions.create(
+    response = _call_llm(
         model="lem-medium",
         messages=[system_prompt, user_message],  # System prompt + current user prompt
         temperature=round(random.uniform(0.4, 0.6), 2),  # Rand temp between .5 and .7
@@ -178,7 +217,7 @@ def get_ai_description_of_profile(linked_in_profile: LinkedInProfile):
     }
 
     # Call the API with the system and user prompt only (no memory of past prompts)
-    response = client.chat.completions.create(
+    response = _call_llm(
         model="lem-simple",  # Specify the model you want to use
         messages=[system_prompt, user_message],  # System prompt + current user prompt
         # temperature=0.3,  # Adjust this parameter as per your needs
@@ -262,7 +301,7 @@ def get_industries_of_profile_from_ai(linked_in_profile: LinkedInProfile, indust
     }
 
     # Call the API with the system and user prompt only (no memory of past prompts)
-    response = client.chat.completions.create(
+    response = _call_llm(
         model="lem-simple",  # Specify the model you want to use
         messages=[system_prompt, user_message],  # System prompt + current user prompt
         # temperature=0.3,  # Adjust this parameter as per your needs
@@ -333,7 +372,7 @@ def get_ai_linked_post_refinement(original_message: str, character_limit: int = 
     }
 
     # Call the API with the system and user prompt only (no memory of past prompts)
-    response = client.chat.completions.create(
+    response = _call_llm(
         model="lem-medium",  # Specify the model you want to use
         messages=[system_prompt, user_message],  # System prompt + current user prompt
 
@@ -395,7 +434,7 @@ def get_ai_message_refinement(original_message: str, character_limit: int = 300)
     }
 
     # Call the API with the system and user prompt only (no memory of past prompts)
-    response = client.chat.completions.create(
+    response = _call_llm(
         model="lem-simple",  # Specify the model you want to use
         messages=[system_prompt, user_message],  # System prompt + current user prompt
 
@@ -445,7 +484,7 @@ def get_video_content_from_ai(linked_user_profile: LinkedInProfile, buyer_stage:
 
     prompt = random.choice(prompts)
 
-    myprint(f"Pre-Prompt: {prompt}")
+    log_debug(f"Pre-Prompt: {prompt}")
 
     # Add the Linked JSon profile to end of prompt
     prompt += f"\n ### LinkedIn Profile: {linked_in_profile_json}"
@@ -499,7 +538,7 @@ def get_video_content_from_ai(linked_user_profile: LinkedInProfile, buyer_stage:
     }
 
     # Call the API with the system and user prompt only (no memory of past prompts)
-    response = client.chat.completions.create(
+    response = _call_llm(
         model="lem-complex",  # Specify the model you want to use
         messages=[system_prompt, user_message],  # System prompt + current user prompt
         # temperature=0.3,  # Adjust this parameter as per your needs
@@ -576,7 +615,7 @@ def summarize_recent_activity(recent_activity_profile: LinkedInProfile, main_pro
     }
 
     # Call the API with the system and user prompt only (no memory of past prompts)
-    response = client.chat.completions.create(
+    response = _call_llm(
         model="lem-simple",  # Specify the model you want to use
         messages=[system_prompt, user_message],  # System prompt + current user prompt
         # temperature=0.3,  # Adjust this parameter as per your needs
@@ -690,7 +729,7 @@ def get_thought_leadership_post_from_ai(linked_user_profile: LinkedInProfile, bu
     }
 
     # Call the API with the system and user prompt only (no memory of past prompts)
-    response = client.chat.completions.create(
+    response = _call_llm(
         model="lem-complex",  # Specify the model you want to use
         messages=[system_prompt, user_message],  # System prompt + current user prompt
         temperature=round(random.uniform(0.5, 0.7), 2),  # Rand temp between .5 and .7
@@ -724,10 +763,17 @@ def get_industry_trend_analysis_based_on_user_profile(linked_in_profile: LinkedI
 
     myprint(f"Chosen Industry: {industry}")
 
-    # Get Google News articles about that industry
-    articles_dict = search_recent_news(industry, 7)
-
-    articles = articles_dict.get('articles', [])
+    # Prefer Perplexity (online search with citations) over GoogleNews when available
+    try:
+        perplexity_result = search_with_perplexity(f"Recent trends and news in the {industry} industry")
+        articles = [{"title": perplexity_result["answer"][:200], "date": "", "link": s.get("url", "")}
+                    for s in perplexity_result["sources"]] or \
+                   [{"title": perplexity_result["answer"][:200], "date": "", "link": ""}]
+        myprint(f"Perplexity search returned {len(perplexity_result['sources'])} source(s)")
+    except Exception as e:
+        log_warning(f"Perplexity unavailable, falling back to GoogleNews", exc=e, api_provider="perplexity")
+        articles_dict = search_recent_news(industry, 7)
+        articles = articles_dict.get('articles', [])
 
     myprint(f"Articles Found: {len(articles)}")
 
@@ -826,7 +872,7 @@ def get_industry_news_post_from_ai(linked_user_profile: LinkedInProfile, buyer_s
     }
 
     # Call the API with the system and user prompt only (no memory of past prompts)
-    response = client.chat.completions.create(
+    response = _call_llm(
         model="lem-complex",  # Specify the model you want to use
         messages=[system_prompt, user_message],  # System prompt + current user prompt
         temperature=round(random.uniform(0.3, 0.5), 2),  # Rand temp between .3 and .5
@@ -904,7 +950,7 @@ def get_industry_trend_from_ai(industry: str, articles: list):
     }
 
     # Call the API with the system and user prompt only (no memory of past prompts)
-    response = client.chat.completions.create(
+    response = _call_llm(
         model="lem-medium",  # Specify the model you want to use
         messages=[system_prompt, user_message],  # System prompt + current user prompt
 
@@ -1012,7 +1058,7 @@ def get_personal_story_post_from_ai(linked_user_profile: LinkedInProfile, stage:
     }
 
     # Call the API with the system and user prompt only (no memory of past prompts)
-    response = client.chat.completions.create(
+    response = _call_llm(
         model="lem-complex",  # Specify the model you want to use
         messages=[system_prompt, user_message],  # System prompt + current user prompt
         temperature=round(random.uniform(0.6, 0.8), 2),  # Rand temp between .6 and .8
@@ -1116,7 +1162,7 @@ def generate_engagement_prompt_post(linked_user_profile: LinkedInProfile, stage:
     }
 
     # Call the API with the system and user prompt only (no memory of past prompts)
-    response = client.chat.completions.create(
+    response = _call_llm(
         model="lem-medium",  # Specify the model you want to use
         messages=[system_prompt, user_message],  # System prompt + current user prompt
         temperature=round(random.uniform(0.6, 0.9), 2),  # Rand temp between .6 and .9
@@ -1214,7 +1260,7 @@ def get_blog_summary_post_from_ai(blog_post_url: str, blog_post_content: str, li
     }
 
     # Call the API with the system and user prompt only (no memory of past prompts)
-    response = client.chat.completions.create(
+    response = _call_llm(
         model="lem-medium",  # Specify the model you want to use
         messages=[system_prompt, user_message],  # System prompt + current user prompt
         temperature=round(random.uniform(0.5, 0.7), 2),  # Rand temp between .5 and .7
@@ -1313,7 +1359,7 @@ def get_website_content_post_from_ai(content: str, url: str, linked_user_profile
     }
 
     # Call the API with the system and user prompt only (no memory of past prompts)
-    response = client.chat.completions.create(
+    response = _call_llm(
         model="lem-medium",  # Specify the model you want to use
         messages=[system_prompt, user_message],  # System prompt + current user prompt
         temperature=round(random.uniform(0.5, 0.7), 2),  # Rand temp between .5 and .7
@@ -1439,7 +1485,7 @@ def get_dall_e_image_prompt_from_ai(post_content: str):
     }
 
     # Call the API with the system and user prompt only (no memory of past prompts)
-    response = client.chat.completions.create(
+    response = _call_llm(
         model="lem-simple",  # Specify the model you want to use
         messages=[system_prompt, user_message],  # System prompt + current user prompt
         temperature=round(random.uniform(0.4, 0.6), 2),
@@ -1545,7 +1591,7 @@ def get_flux_image_prompt_from_ai(post_content: str):
     }
 
     # Call the API with the system and user prompt only (no memory of past prompts)
-    response = client.chat.completions.create(
+    response = _call_llm(
         model="lem-simple",  # Specify the model you want to use
         messages=[system_prompt, user_message],  # System prompt + current user prompt
         temperature=round(random.uniform(0.7, 1), 2),
@@ -1726,7 +1772,7 @@ def get_runway_ml_video_prompt_from_ai(post_content: str, image_prompt: str):
     }
 
     # Call the API with the system and user prompt only (no memory of past prompts)
-    response = client.chat.completions.create(
+    response = _call_llm(
         model="lem-simple",  # Specify the model you want to use
         messages=[system_prompt, user_message],  # System prompt + current user prompt
         temperature=round(random.uniform(0.5, 0.7), 2),  # Encourage creative but logical outputs
@@ -1844,7 +1890,7 @@ def ai_check_message_history(message_history_json: str, main_focus: str, message
     }
 
     # Call the API with the system and user prompt only (no memory of past prompts)
-    response = client.chat.completions.create(
+    response = _call_llm(
         model="lem-simple",  # Specify the model you want to use
         messages=[system_prompt, user_message],  # System prompt + current user prompt
         temperature=round(random.uniform(0.5, 0.7), 2),  # Rand temp between .5 and .7

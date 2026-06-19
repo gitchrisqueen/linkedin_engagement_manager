@@ -1,8 +1,49 @@
+import os
 from typing import Dict
 
+import requests
 from GoogleNews import GoogleNews
 
 from cqc_lem.utilities.ai.client import client
+
+
+def search_with_perplexity(query: str, max_sources: int = 5) -> dict:
+    """
+    Search for recent information using Perplexity Sonar (online search-augmented LLM).
+
+    Returns {query, answer, sources} where sources is a list of {url} dicts.
+    Raises RuntimeError if PERPLEXITY_API_KEY is not set.
+    """
+    # Read key at call time so dotenv-late-load scenarios still work
+    perplexity_key = os.environ.get("PERPLEXITY_API_KEY")
+    if not perplexity_key:
+        raise RuntimeError("PERPLEXITY_API_KEY is not set")
+
+    response = requests.post(
+        "https://api.perplexity.ai/chat/completions",
+        headers={
+            "Authorization": f"Bearer {perplexity_key}",
+            "Content-Type": "application/json",
+        },
+        json={
+            "model": "sonar",
+            "messages": [
+                {"role": "system", "content": "Be precise and concise. Cite your sources."},
+                {"role": "user", "content": query},
+            ],
+            "max_tokens": 512,
+            "return_citations": True,
+        },
+        timeout=30,
+    )
+    response.raise_for_status()
+    data = response.json()
+
+    answer = data["choices"][0]["message"]["content"]
+    raw_citations = data.get("citations", [])
+    sources = [{"url": url} for url in raw_citations[:max_sources]]
+
+    return {"query": query, "answer": answer, "sources": sources}
 
 
 # Define the tool for GoogleNews search

@@ -10,7 +10,8 @@ from urllib.parse import urlparse, urlunparse
 from cqc_lem import assets_dir
 from cqc_lem.app.aws_test_celery_task import test_get_my_profile
 from cqc_lem.app.run_automation import automate_invites_to_company_page_for_user, automate_reply_commenting
-from cqc_lem.app.run_content_plan import auto_create_weekly_content
+from celery import chain as celery_chain
+from cqc_lem.app.run_content_plan import auto_create_weekly_content, plan_content_for_user
 from cqc_lem.utilities.db import (
     insert_post, get_post_by_email, get_user_id, update_db_post, get_post_user_id,
     add_user_with_access_token, update_user, PostType, PostStatus, get_posts,
@@ -21,6 +22,7 @@ from cqc_lem.utilities.db import (
     get_user_subscription_info, get_user_preferences, update_user_preferences,
     update_subscription_from_stripe, update_user_linkedin_token,
     get_users_with_stripe_subscriptions,
+    update_user_linkedin_password,
 )
 from cqc_lem.utilities.email import generate_pin, hash_pin, send_pin_email
 from cqc_lem.utilities.linkedin.token_refresh import (
@@ -162,6 +164,11 @@ class UserPreferencesRequest(BaseModel):
     session_token: str
     last_login_inactivate_delay: Optional[int] = 90
     auto_schedule_posts: bool = False
+
+
+class LinkedInPasswordRequest(BaseModel):
+    session_token: str
+    linkedin_password: str
 
 
 class FutureForwardValues(IntEnum):
@@ -311,9 +318,12 @@ def create_weekly_content(user_id: int) -> ResponseModel:
     if not user_id:
         raise HTTPException(status_code=400, detail="User ID is required")
 
-    kwargs = {'user_id': user_id}
-    auto_create_weekly_content.apply_async(kwargs=kwargs, retry=True,
-                                           retry_policy={'max_retries': 1})
+    # Chain: plan posts for the rest of the month first, then fill content for this week.
+    # This ensures the user always has PLANNING rows before content generation runs.
+    celery_chain(
+        plan_content_for_user.si(user_id=user_id),
+        auto_create_weekly_content.si(user_id=user_id),
+    ).apply_async()
     return ResponseModel(status_code=200, detail="Weekly content created successfully")
 
 
@@ -733,6 +743,23 @@ def update_user_settings_endpoint(request: UserPreferencesRequest) -> ResponseMo
     if not updated:
         raise HTTPException(status_code=500, detail="Could not update preferences")
     return ResponseModel(status_code=200, detail="Preferences updated")
+
+
+@router.put("/user/linkedin-password")
+def update_linkedin_password(request: LinkedInPasswordRequest) -> ResponseModel:
+    """Store the user's LinkedIn password for Selenium-driven automation tasks.
+    The value is stored as-is because Selenium must type it into the browser.
+    It is never returned in any response payload.
+    """
+    user_id = get_session_user_id(request.session_token)
+    if not user_id:
+        raise HTTPException(status_code=401, detail="Invalid or expired session")
+    if not request.linkedin_password:
+        raise HTTPException(status_code=400, detail="Password cannot be empty")
+    saved = update_user_linkedin_password(user_id, request.linkedin_password)
+    if not saved:
+        raise HTTPException(status_code=500, detail="Could not save LinkedIn password")
+    return ResponseModel(status_code=200, detail="LinkedIn password saved")
 
 
 @router.post("/billing/create-checkout-session")

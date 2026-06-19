@@ -53,7 +53,11 @@ def plan_content_for_user(self, user_id: int):
 
     # Calculate the total posts and percentages of each type
     total_posts = sum(current_counts.values())
-    percentages = {post_type: (count / total_posts) * 100 for post_type, count in current_counts.items()}
+    if total_posts == 0:
+        # New user with no posts — treat all types as equally unrepresented
+        percentages = {post_type: 0.0 for post_type in current_counts}
+    else:
+        percentages = {post_type: (count / total_posts) * 100 for post_type, count in current_counts.items()}
 
     # Log the current representation for debugging
     # myprint(f"Current Content Percentages: {percentages}")
@@ -208,33 +212,39 @@ def create_content(user_id: int, post_type: str, stage: str):
 
 
 def create_video_content(user_id: int, stage: str) -> tuple[str, str | None]:
-    # user_email, user_password = get_user_password_pair_by_id(user_id)
-    # driver, wait = get_driver_wait_pair(session_name='Create Content')
-    # my_profile = get_my_profile(driver, wait, user_email, user_password)
-
     # Get Text Content
-    text_content = create_text_post(user_id, stage)  # TODO: Should we limit this to specific post_types ???
+    text_content = create_text_post(user_id, stage)
 
-    # Create an image prompt from the text content
-    image_prompt = get_flux_image_prompt_from_ai(text_content)
-    print(f"Generated AI Image Prompt: {image_prompt}")
+    try:
+        # Create an image prompt from the text content
+        image_prompt = get_flux_image_prompt_from_ai(text_content)
+        myprint(f"Generated AI Image Prompt: {image_prompt[:100]}...")
 
-    # Create the image from the image prompt using flux1
-    image_path = generate_flux1_image_from_prompt(image_prompt)
-    print(f"Generated Image From Prompt | Path: {image_path}")
+        # Create the image from the image prompt using flux1
+        image_path = generate_flux1_image_from_prompt(image_prompt)
+        myprint(f"Generated Image From Prompt | Path: {image_path}")
 
-    # Create a video prompt from the text content and image
-    video_prompt = get_runway_ml_video_prompt_from_ai(text_content, image_prompt)
-    print(f"Runway ML Video Prompt: {video_prompt}")
+        # Create a video prompt from the text content and image
+        video_prompt = get_runway_ml_video_prompt_from_ai(text_content, image_prompt)
+        video_prompt = video_prompt[:512]
 
-    # Make sure the video_prompt is less than 512 characters
-    video_prompt = video_prompt[:512]
-
-    # Create a video from the image url and video prompt using Runway ML
-    video_url = create_runway_video(image_path, video_prompt)
-    print(f"Generated Video URL: {video_url}")
-
-    # quit_gracefully(driver)
+        # Create a video from the image url and video prompt using Runway ML
+        video_url = create_runway_video(image_path, video_prompt)
+        myprint(f"Generated Video URL: {video_url}")
+    except Exception as e:
+        myprint(f"Video generation failed ({type(e).__name__}: {e}) — trying Pexels stock video")
+        try:
+            from cqc_lem.utilities.pexels_helper import download_pexels_video
+            videos_dir = os.path.join(assets_dir, 'videos', 'pexels')
+            create_folder_if_not_exists(videos_dir)
+            video_url = download_pexels_video(text_content[:50], videos_dir)
+            if video_url:
+                myprint(f"Pexels fallback video saved: {video_url}")
+            else:
+                myprint("Pexels returned no results — publishing text content without video")
+        except Exception as pe:
+            myprint(f"Pexels fallback also failed ({type(pe).__name__}: {pe}) — publishing text content without video")
+            video_url = None
 
     return text_content, video_url
 
@@ -703,8 +713,11 @@ def auto_create_weekly_content(user_id: int = None):
         post_type = post['post_type']
         stage = post['buyer_stage']
 
-        # For each content create it
-        content, video_url = create_content(user_id, post_type, stage)
+        try:
+            content, video_url = create_content(user_id, post_type, stage)
+        except Exception as e:
+            myprint(f"Skipping post_id {post_id}: content generation raised {type(e).__name__}: {e}")
+            continue
 
         if content is None:
             myprint(f"Skipping post_id {post_id}: content generation returned None")

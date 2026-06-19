@@ -10,6 +10,11 @@ This module provides:
 import pytest
 from unittest.mock import MagicMock, patch
 import os
+from dotenv import load_dotenv
+
+# Load .env at session start so integration tests can see real API keys.
+# os.environ.setdefault() calls below won't override values already present here.
+load_dotenv()
 
 
 @pytest.fixture(scope="session", autouse=True)
