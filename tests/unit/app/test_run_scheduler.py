@@ -1,0 +1,466 @@
+"""Unit tests for cqc_lem.app.run_scheduler Celery tasks."""
+
+import pytest
+from datetime import datetime, timezone
+from unittest.mock import MagicMock, patch
+
+pytestmark = pytest.mark.unit
+
+# ---------------------------------------------------------------------------
+# Module-level patch target strings
+# ---------------------------------------------------------------------------
+
+_MOD = "cqc_lem.app.run_scheduler"
+
+_PATCH_GET_USERS_STRIPE = f"{_MOD}.get_users_with_stripe_subscriptions"
+_PATCH_UPDATE_SUB = f"{_MOD}.update_subscription_from_stripe"
+# sync_stripe_subscriptions imports these lazily inside the function body, so
+# we must patch at the source module, not at run_scheduler.
+_PATCH_FETCH_SUB = "cqc_lem.utilities.stripe_util.fetch_subscription"
+_PATCH_GET_TIER = "cqc_lem.utilities.stripe_util.get_subscription_tier_from_price"
+_PATCH_STATUS_TO_DB = "cqc_lem.utilities.stripe_util.stripe_status_to_db"
+_PATCH_GET_ACTIVE = f"{_MOD}.get_active_user_ids"
+_PATCH_GET_POSTS = f"{_MOD}.get_ready_to_post_posts"
+_PATCH_UPDATE_POST_STATUS = f"{_MOD}.update_db_post_status"
+_PATCH_POST_TO_LINKEDIN = f"{_MOD}.post_to_linkedin"
+_PATCH_APPRECIATE = f"{_MOD}.automate_appreciation_dms_for_user"
+_PATCH_CLEAN_INVITES = f"{_MOD}.clean_stale_invites"
+_PATCH_UPDATE_STALE = f"{_MOD}.update_stale_profile"
+_PATCH_AUTOMATE_COMMENTING = f"{_MOD}.automate_commenting"
+_PATCH_AUTOMATE_PROFILE_VIEWER = f"{_MOD}.automate_profile_viewer_engagement"
+_PATCH_CONVERT_DT = f"{_MOD}.convert_datetime_to_local_tz"
+
+
+# ---------------------------------------------------------------------------
+# Helpers
+# ---------------------------------------------------------------------------
+
+def _async_task_mock() -> MagicMock:
+    """Return a MagicMock with an apply_async attribute."""
+    m = MagicMock()
+    m.apply_async = MagicMock()
+    return m
+
+
+# ---------------------------------------------------------------------------
+# sync_stripe_subscriptions
+# ---------------------------------------------------------------------------
+
+class TestSyncStripeSubscriptions:
+    """Tests for the sync_stripe_subscriptions Celery task."""
+
+    def test_no_subscribers_returns_early_without_fetching(self):
+        with patch(_PATCH_GET_USERS_STRIPE, return_value=[]) as mock_get, \
+             patch(_PATCH_FETCH_SUB) as mock_fetch:
+            from cqc_lem.app.run_scheduler import sync_stripe_subscriptions
+            sync_stripe_subscriptions.run()
+
+        mock_get.assert_called_once()
+        mock_fetch.assert_not_called()
+
+    def test_subscriber_with_up_to_date_status_is_not_updated(self):
+        """When DB status matches Stripe status and tier, update_subscription_from_stripe is NOT called."""
+        row = {
+            "id": 1,
+            "stripe_subscription_id": "sub_abc",
+            "stripe_customer_id": "cus_abc",
+            "subscription_status": "active",
+            "subscription_tier": "starter",
+        }
+        sub = {
+            "status": "active",
+            "items": {"data": [{"price": {"id": "price_starter"}}]},
+            "current_period_end": 1700000000,
+        }
+
+        # fetch_subscription / stripe_status_to_db / get_subscription_tier_from_price are
+        # imported inside sync_stripe_subscriptions's function body — patch at source module.
+        with patch(_PATCH_GET_USERS_STRIPE, return_value=[row]), \
+             patch(_PATCH_FETCH_SUB, return_value=sub), \
+             patch(_PATCH_STATUS_TO_DB, return_value="active"), \
+             patch(_PATCH_GET_TIER, return_value="starter"), \
+             patch(_PATCH_UPDATE_SUB) as mock_update:
+            from cqc_lem.app.run_scheduler import sync_stripe_subscriptions
+            sync_stripe_subscriptions.run()
+
+        mock_update.assert_not_called()
+
+    def test_subscriber_with_mismatched_status_calls_update(self):
+        """When Stripe status differs from DB status, update_subscription_from_stripe IS called."""
+        row = {
+            "id": 2,
+            "stripe_subscription_id": "sub_xyz",
+            "stripe_customer_id": "cus_xyz",
+            "subscription_status": "active",   # DB says active
+            "subscription_tier": "starter",
+        }
+        sub = {
+            "status": "past_due",               # Stripe says past_due
+            "items": {"data": [{"price": {"id": "price_starter"}}]},
+            "current_period_end": 1700000000,
+        }
+
+        with patch(_PATCH_GET_USERS_STRIPE, return_value=[row]), \
+             patch(_PATCH_FETCH_SUB, return_value=sub), \
+             patch(_PATCH_STATUS_TO_DB, return_value="past_due"), \
+             patch(_PATCH_GET_TIER, return_value="starter"), \
+             patch(_PATCH_UPDATE_SUB) as mock_update:
+            from cqc_lem.app.run_scheduler import sync_stripe_subscriptions
+            sync_stripe_subscriptions.run()
+
+        mock_update.assert_called_once()
+        call_args = mock_update.call_args[0]
+        assert call_args[0] == "cus_xyz"   # customer_id
+        assert call_args[1] == "past_due"  # new db_status
+
+    def test_subscriber_with_mismatched_tier_calls_update(self):
+        """When Stripe tier differs from DB tier, update_subscription_from_stripe IS called."""
+        row = {
+            "id": 3,
+            "stripe_subscription_id": "sub_tier",
+            "stripe_customer_id": "cus_tier",
+            "subscription_status": "active",
+            "subscription_tier": "starter",    # DB says starter
+        }
+        sub = {
+            "status": "active",
+            "items": {"data": [{"price": {"id": "price_pro"}}]},
+            "current_period_end": 1700000000,
+        }
+
+        with patch(_PATCH_GET_USERS_STRIPE, return_value=[row]), \
+             patch(_PATCH_FETCH_SUB, return_value=sub), \
+             patch(_PATCH_STATUS_TO_DB, return_value="active"), \
+             patch(_PATCH_GET_TIER, return_value="professional"), \
+             patch(_PATCH_UPDATE_SUB) as mock_update:
+            from cqc_lem.app.run_scheduler import sync_stripe_subscriptions
+            sync_stripe_subscriptions.run()
+
+        mock_update.assert_called_once()
+
+    def test_fetch_subscription_returns_none_skips_subscriber(self):
+        """When fetch_subscription returns None, that subscriber is skipped silently."""
+        row = {
+            "id": 4,
+            "stripe_subscription_id": "sub_gone",
+            "stripe_customer_id": "cus_gone",
+            "subscription_status": "active",
+            "subscription_tier": "starter",
+        }
+
+        with patch(_PATCH_GET_USERS_STRIPE, return_value=[row]), \
+             patch(_PATCH_FETCH_SUB, return_value=None), \
+             patch(_PATCH_UPDATE_SUB) as mock_update:
+            from cqc_lem.app.run_scheduler import sync_stripe_subscriptions
+            sync_stripe_subscriptions.run()
+
+        mock_update.assert_not_called()
+
+    def test_row_without_sub_id_is_skipped(self):
+        """Rows missing stripe_subscription_id are silently skipped."""
+        row = {
+            "id": 5,
+            "stripe_subscription_id": None,
+            "stripe_customer_id": "cus_no_sub",
+            "subscription_status": "trial",
+            "subscription_tier": None,
+        }
+
+        with patch(_PATCH_GET_USERS_STRIPE, return_value=[row]), \
+             patch(_PATCH_FETCH_SUB) as mock_fetch, \
+             patch(_PATCH_UPDATE_SUB) as mock_update:
+            from cqc_lem.app.run_scheduler import sync_stripe_subscriptions
+            sync_stripe_subscriptions.run()
+
+        mock_fetch.assert_not_called()
+        mock_update.assert_not_called()
+
+    def test_multiple_subscribers_processed_individually(self):
+        """Each subscriber row is checked independently."""
+        rows = [
+            {
+                "id": 10,
+                "stripe_subscription_id": "sub_a",
+                "stripe_customer_id": "cus_a",
+                "subscription_status": "active",
+                "subscription_tier": "starter",
+            },
+            {
+                "id": 11,
+                "stripe_subscription_id": "sub_b",
+                "stripe_customer_id": "cus_b",
+                "subscription_status": "active",
+                "subscription_tier": "starter",
+            },
+        ]
+        sub = {
+            "status": "past_due",
+            "items": {"data": [{"price": {"id": "price_starter"}}]},
+            "current_period_end": 1700000000,
+        }
+
+        with patch(_PATCH_GET_USERS_STRIPE, return_value=rows), \
+             patch(_PATCH_FETCH_SUB, return_value=sub), \
+             patch(_PATCH_STATUS_TO_DB, return_value="past_due"), \
+             patch(_PATCH_GET_TIER, return_value="starter"), \
+             patch(_PATCH_UPDATE_SUB) as mock_update:
+            from cqc_lem.app.run_scheduler import sync_stripe_subscriptions
+            sync_stripe_subscriptions.run()
+
+        # Both subscribers have mismatched status → update called twice
+        assert mock_update.call_count == 2
+
+
+# ---------------------------------------------------------------------------
+# auto_check_scheduled_posts
+# ---------------------------------------------------------------------------
+
+class TestAutoCheckScheduledPosts:
+    def test_no_posts_returns_no_post_to_schedule(self):
+        with patch(_PATCH_GET_POSTS, return_value=[]):
+            from cqc_lem.app.run_scheduler import auto_check_scheduled_posts
+            result = auto_check_scheduled_posts.run()
+
+        assert result == "No Post to Schedule"
+
+    def test_one_post_schedules_it_and_calls_apply_async(self):
+        scheduled_dt = datetime(2025, 6, 20, 14, 0, 0, tzinfo=timezone.utc)
+        posts = [(42, scheduled_dt, 7)]  # (post_id, scheduled_time, user_id)
+
+        mock_post_task = _async_task_mock()
+        mock_commenting_task = _async_task_mock()
+        mock_profile_task = _async_task_mock()
+
+        with patch(_PATCH_GET_POSTS, return_value=posts), \
+             patch(_PATCH_UPDATE_POST_STATUS) as mock_upd, \
+             patch(_PATCH_CONVERT_DT, return_value=scheduled_dt), \
+             patch(_PATCH_POST_TO_LINKEDIN, mock_post_task), \
+             patch(_PATCH_AUTOMATE_COMMENTING, mock_commenting_task), \
+             patch(_PATCH_AUTOMATE_PROFILE_VIEWER, mock_profile_task):
+            from cqc_lem.app.run_scheduler import auto_check_scheduled_posts
+            result = auto_check_scheduled_posts.run()
+
+        # post status updated to SCHEDULED
+        mock_upd.assert_called_once()
+        status_arg = mock_upd.call_args[0][1]
+        from cqc_lem.utilities.db import PostStatus
+        assert status_arg == PostStatus.SCHEDULED
+
+        # post_to_linkedin.apply_async called with correct kwargs
+        mock_post_task.apply_async.assert_called_once()
+        post_call_kwargs = mock_post_task.apply_async.call_args[1]
+        assert post_call_kwargs["kwargs"] == {"user_id": 7, "post_id": 42}
+        assert post_call_kwargs["eta"] == scheduled_dt
+
+        # Commenting and profile viewer tasks also scheduled
+        mock_commenting_task.apply_async.assert_called_once()
+        mock_profile_task.apply_async.assert_called_once()
+
+        assert "1 post" in result
+
+    def test_multiple_posts_return_correct_count_message(self):
+        scheduled_dt = datetime(2025, 6, 20, 14, 0, 0, tzinfo=timezone.utc)
+        posts = [
+            (1, scheduled_dt, 7),
+            (2, scheduled_dt, 8),
+            (3, scheduled_dt, 9),
+        ]
+
+        mock_post_task = _async_task_mock()
+        mock_commenting_task = _async_task_mock()
+        mock_profile_task = _async_task_mock()
+
+        with patch(_PATCH_GET_POSTS, return_value=posts), \
+             patch(_PATCH_UPDATE_POST_STATUS), \
+             patch(_PATCH_CONVERT_DT, return_value=scheduled_dt), \
+             patch(_PATCH_POST_TO_LINKEDIN, mock_post_task), \
+             patch(_PATCH_AUTOMATE_COMMENTING, mock_commenting_task), \
+             patch(_PATCH_AUTOMATE_PROFILE_VIEWER, mock_profile_task):
+            from cqc_lem.app.run_scheduler import auto_check_scheduled_posts
+            result = auto_check_scheduled_posts.run()
+
+        assert "3 post" in result
+        assert mock_post_task.apply_async.call_count == 3
+
+    def test_update_db_post_status_called_before_apply_async(self):
+        """Status must be set to SCHEDULED before dispatching the Celery task."""
+        call_order = []
+        scheduled_dt = datetime(2025, 6, 20, 14, 0, 0, tzinfo=timezone.utc)
+        posts = [(99, scheduled_dt, 5)]
+
+        mock_post_task = _async_task_mock()
+        mock_commenting_task = _async_task_mock()
+        mock_profile_task = _async_task_mock()
+
+        def record_update(*args, **kwargs):
+            call_order.append("update_status")
+
+        def record_apply(*args, **kwargs):
+            call_order.append("apply_async")
+
+        mock_post_task.apply_async.side_effect = record_apply
+
+        with patch(_PATCH_GET_POSTS, return_value=posts), \
+             patch(_PATCH_UPDATE_POST_STATUS, side_effect=record_update), \
+             patch(_PATCH_CONVERT_DT, return_value=scheduled_dt), \
+             patch(_PATCH_POST_TO_LINKEDIN, mock_post_task), \
+             patch(_PATCH_AUTOMATE_COMMENTING, mock_commenting_task), \
+             patch(_PATCH_AUTOMATE_PROFILE_VIEWER, mock_profile_task):
+            from cqc_lem.app.run_scheduler import auto_check_scheduled_posts
+            auto_check_scheduled_posts.run()
+
+        assert call_order[0] == "update_status"
+        assert "apply_async" in call_order
+
+
+# ---------------------------------------------------------------------------
+# auto_appreciate_dms
+# ---------------------------------------------------------------------------
+
+class TestAutoAppreciateDms:
+    def test_no_users_returns_no_active_users(self):
+        with patch(_PATCH_GET_ACTIVE, return_value=[]):
+            from cqc_lem.app.run_scheduler import auto_appreciate_dms
+            result = auto_appreciate_dms.run()
+
+        assert result == "No Active Users"
+
+    def test_one_user_calls_apply_async_with_correct_kwargs(self):
+        mock_task = _async_task_mock()
+
+        with patch(_PATCH_GET_ACTIVE, return_value=[42]), \
+             patch(_PATCH_APPRECIATE, mock_task):
+            from cqc_lem.app.run_scheduler import auto_appreciate_dms
+            result = auto_appreciate_dms.run()
+
+        mock_task.apply_async.assert_called_once()
+        call_kwargs = mock_task.apply_async.call_args[1]
+        assert call_kwargs["kwargs"]["user_id"] == 42
+        assert call_kwargs["kwargs"]["loop_for_duration"] == 60 * 5
+        assert "1 user" in result
+
+    def test_multiple_users_calls_apply_async_for_each(self):
+        mock_task = _async_task_mock()
+        users = [1, 2, 3]
+
+        with patch(_PATCH_GET_ACTIVE, return_value=users), \
+             patch(_PATCH_APPRECIATE, mock_task):
+            from cqc_lem.app.run_scheduler import auto_appreciate_dms
+            result = auto_appreciate_dms.run()
+
+        assert mock_task.apply_async.call_count == 3
+        assert "3 user" in result
+
+    def test_apply_async_includes_retry_policy(self):
+        mock_task = _async_task_mock()
+
+        with patch(_PATCH_GET_ACTIVE, return_value=[10]), \
+             patch(_PATCH_APPRECIATE, mock_task):
+            from cqc_lem.app.run_scheduler import auto_appreciate_dms
+            auto_appreciate_dms.run()
+
+        call_kwargs = mock_task.apply_async.call_args[1]
+        assert call_kwargs.get("retry") is True
+        assert "retry_policy" in call_kwargs
+        assert call_kwargs["retry_policy"]["max_retries"] == 3
+
+
+# ---------------------------------------------------------------------------
+# auto_clean_stale_invites
+# ---------------------------------------------------------------------------
+
+class TestAutoCleanStaleInvites:
+    def test_no_users_returns_no_active_users(self):
+        with patch(_PATCH_GET_ACTIVE, return_value=[]):
+            from cqc_lem.app.run_scheduler import auto_clean_stale_invites
+            result = auto_clean_stale_invites.run()
+
+        assert result == "No Active Users"
+
+    def test_one_user_calls_clean_stale_invites_apply_async(self):
+        mock_task = _async_task_mock()
+
+        with patch(_PATCH_GET_ACTIVE, return_value=[7]), \
+             patch(_PATCH_CLEAN_INVITES, mock_task):
+            from cqc_lem.app.run_scheduler import auto_clean_stale_invites
+            result = auto_clean_stale_invites.run()
+
+        mock_task.apply_async.assert_called_once()
+        call_kwargs = mock_task.apply_async.call_args[1]
+        assert call_kwargs["kwargs"]["user_id"] == 7
+        assert "1 user" in result
+
+    def test_multiple_users_calls_apply_async_for_each(self):
+        mock_task = _async_task_mock()
+        users = [1, 2, 3, 4]
+
+        with patch(_PATCH_GET_ACTIVE, return_value=users), \
+             patch(_PATCH_CLEAN_INVITES, mock_task):
+            from cqc_lem.app.run_scheduler import auto_clean_stale_invites
+            result = auto_clean_stale_invites.run()
+
+        assert mock_task.apply_async.call_count == 4
+        assert "4 user" in result
+
+    def test_apply_async_includes_retry_policy(self):
+        mock_task = _async_task_mock()
+
+        with patch(_PATCH_GET_ACTIVE, return_value=[5]), \
+             patch(_PATCH_CLEAN_INVITES, mock_task):
+            from cqc_lem.app.run_scheduler import auto_clean_stale_invites
+            auto_clean_stale_invites.run()
+
+        call_kwargs = mock_task.apply_async.call_args[1]
+        assert call_kwargs.get("retry") is True
+        assert "retry_policy" in call_kwargs
+
+
+# ---------------------------------------------------------------------------
+# auto_clean_stale_profiles
+# ---------------------------------------------------------------------------
+
+class TestAutoCleanStaleProfiles:
+    def test_no_users_returns_no_active_users(self):
+        with patch(_PATCH_GET_ACTIVE, return_value=[]):
+            from cqc_lem.app.run_scheduler import auto_clean_stale_profiles
+            result = auto_clean_stale_profiles.run()
+
+        assert result == "No Active Users"
+
+    def test_one_user_calls_update_stale_profile_apply_async(self):
+        mock_task = _async_task_mock()
+
+        with patch(_PATCH_GET_ACTIVE, return_value=[15]), \
+             patch(_PATCH_UPDATE_STALE, mock_task):
+            from cqc_lem.app.run_scheduler import auto_clean_stale_profiles
+            result = auto_clean_stale_profiles.run()
+
+        mock_task.apply_async.assert_called_once()
+        call_kwargs = mock_task.apply_async.call_args[1]
+        assert call_kwargs["kwargs"]["user_id"] == 15
+        assert "1 user" in result
+
+    def test_multiple_users_calls_apply_async_for_each(self):
+        mock_task = _async_task_mock()
+        users = [10, 20, 30]
+
+        with patch(_PATCH_GET_ACTIVE, return_value=users), \
+             patch(_PATCH_UPDATE_STALE, mock_task):
+            from cqc_lem.app.run_scheduler import auto_clean_stale_profiles
+            result = auto_clean_stale_profiles.run()
+
+        assert mock_task.apply_async.call_count == 3
+        assert "3 user" in result
+
+    def test_apply_async_includes_retry_policy(self):
+        mock_task = _async_task_mock()
+
+        with patch(_PATCH_GET_ACTIVE, return_value=[99]), \
+             patch(_PATCH_UPDATE_STALE, mock_task):
+            from cqc_lem.app.run_scheduler import auto_clean_stale_profiles
+            auto_clean_stale_profiles.run()
+
+        call_kwargs = mock_task.apply_async.call_args[1]
+        assert call_kwargs.get("retry") is True
+        assert "retry_policy" in call_kwargs
+        assert call_kwargs["retry_policy"]["max_retries"] == 3

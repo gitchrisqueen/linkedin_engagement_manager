@@ -122,18 +122,59 @@ def validate_webhook(payload: bytes, sig_header: str) -> Optional[dict]:
     if not STRIPE_WEBHOOK_SECRET:
         myprint("STRIPE_WEBHOOK_SECRET not set — cannot validate webhook")
         return None
+    # Import stripe before the try block so it's in scope for the except clause.
+    # If the package is not installed, the ImportError propagates immediately rather
+    # than masking it as a NameError inside the except handler.
     stripe = _get_stripe()
+    SignatureVerificationError = stripe.error.SignatureVerificationError
     try:
         # Raises on invalid signature — this is the only thing we need the SDK for here
         stripe.Webhook.construct_event(payload, sig_header, STRIPE_WEBHOOK_SECRET)
         # Return the raw payload as a plain dict for consistent .get() access
         return json.loads(payload.decode("utf-8"))
-    except stripe.error.SignatureVerificationError as e:
+    except SignatureVerificationError as e:
         myprint(f"Stripe webhook signature invalid: {e}")
         return None
     except Exception as e:
         myprint(f"Stripe webhook validation failed: {e}")
         return None
+
+
+def upgrade_subscription(stripe_subscription_id: str, tier: str) -> bool:
+    """Modify an existing Stripe subscription to a new price/tier in-place.
+
+    This prevents duplicate subscriptions when an existing subscriber upgrades
+    or downgrades — instead of opening a new Checkout session, we update the
+    single existing subscription's line item to the new price. Stripe handles
+    proration automatically.
+
+    Returns True on success, False on any failure (caller falls back to checkout).
+    """
+    price_id = TIER_PRICE_MAP.get(tier)
+    if not price_id:
+        myprint(f"No Stripe price ID configured for tier '{tier}' — cannot upgrade")
+        return False
+    if not STRIPE_API_KEY:
+        myprint("STRIPE_API_KEY not set — cannot upgrade subscription")
+        return False
+    stripe = _get_stripe()
+    try:
+        sub = stripe.Subscription.retrieve(stripe_subscription_id)
+        items = sub.get("items", {}).get("data", [])
+        if not items:
+            myprint(f"Subscription {stripe_subscription_id} has no line items — cannot upgrade")
+            return False
+        item_id = items[0].get("id")
+        stripe.Subscription.modify(
+            stripe_subscription_id,
+            items=[{"id": item_id, "price": price_id}],
+            proration_behavior="create_prorations",
+        )
+        myprint(f"Subscription {stripe_subscription_id} upgraded to tier '{tier}'")
+        return True
+    except Exception as e:
+        myprint(f"Could not upgrade subscription {stripe_subscription_id} to '{tier}': {e}")
+        return False
 
 
 def get_subscription_tier_from_price(price_id: str) -> Optional[str]:
