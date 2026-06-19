@@ -5231,14 +5231,14 @@ sql = ["SQLAlchemy (>=2.0.0)"]
 
 [[package]]
 name = "streamlit-aggrid"
-version = "1.1.0"
+version = "1.2.1.post2"
 description = "Streamlit component implementation of ag-grid"
 optional = false
 python-versions = ">=3.10"
 groups = ["streamlit"]
 files = [
-    {file = "streamlit_aggrid-1.1.0-py3-none-any.whl", hash = "sha256:216b3880a325f1e900b3a43d840503a33031e9ef9d94178c2d22628ada17f946"},
-    {file = "streamlit_aggrid-1.1.0.tar.gz", hash = "sha256:4541d135de98acc5796676bc1ed9564612ef6a88ec0cd99a0875f20c0f1fecc8"},
+    {file = "streamlit_aggrid-1.2.1.post2-py3-none-any.whl", hash = "sha256:a812274e69bc6dcdebdd390c2eca7d0502e90420b869d4abf9d74ca3af47bc51"},
+    {file = "streamlit_aggrid-1.2.1.post2.tar.gz", hash = "sha256:ad186998894af9356d7fa1d6de9f324a376714583cccc31d87c8c003334089fc"},
 ]
 
 [package.dependencies]
