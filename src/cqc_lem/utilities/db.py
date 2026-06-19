@@ -155,9 +155,9 @@ def add_user(email: str, password: str):
         connection.commit()
     except mysql.connector.Error as e:
         if e.errno == errorcode.ER_DUP_ENTRY:
-            print(f"User with email {email} already exists.")
+            myprint(f"User with email {email} already exists.")
         else:
-            print(f"An error occurred: {e}")
+            myprint(f"An error occurred: {e}")
     finally:
         cursor.close()
         connection.close()
@@ -199,9 +199,9 @@ def add_user_with_access_token(email: str, linked_sub_id: str, access_token: str
         connection.commit()
     except mysql.connector.Error as e:
         if e.errno == errorcode.ER_DUP_ENTRY:
-            print(f"User with email {email} already exists.")
+            myprint(f"User with email {email} already exists.")
         else:
-            print(f"An error occurred: {e}")
+            myprint(f"An error occurred: {e}")
     finally:
         cursor.close()
         connection.close()
@@ -271,7 +271,7 @@ def insert_post(email: str, content: str, scheduled_time: datetime, post_type: P
     success = False
 
     if not user_id:
-        print(f"User with email {email} not found.")
+        myprint(f"User with email {email} not found.")
         return success
 
     connection = get_db_connection()
@@ -294,7 +294,7 @@ def insert_post(email: str, content: str, scheduled_time: datetime, post_type: P
         success = cursor.rowcount == 1
     except mysql.connector.Error as e:
         success = False
-        print(f"Count not insert post. An error occurred: {e}")
+        myprint(f"Count not insert post. An error occurred: {e}")
     finally:
         cursor.close()
         connection.close()
@@ -324,7 +324,7 @@ def insert_planned_post(user_id: int, scheduled_time: datetime, post_type: PostT
         success = cursor.rowcount == 1
     except mysql.connector.Error as e:
         success = False
-        print(f"Count not insert planned post. An error occurred: {e}")
+        myprint(f"Count not insert planned post. An error occurred: {e}")
     finally:
         cursor.close()
         connection.close()
@@ -355,7 +355,7 @@ def update_db_post(content: str, video_url: str, scheduled_time: datetime, post_
         success = cursor.rowcount == 1
     except mysql.connector.Error as e:
         success = False
-        print(f"Count not update post. An error occurred: {e}")
+        myprint(f"Count not update post. An error occurred: {e}")
     finally:
         cursor.close()
         connection.close()
@@ -377,7 +377,7 @@ def update_db_post_content(post_id: int, content: str) -> bool:
         success = cursor.rowcount == 1
     except mysql.connector.Error as e:
         success = False
-        print(f"Count not update post content. An error occurred: {e}")
+        myprint(f"Count not update post content. An error occurred: {e}")
     finally:
         cursor.close()
         connection.close()
@@ -399,7 +399,7 @@ def update_db_post_video_url(post_id: int, video_url: str) -> bool:
         success = cursor.rowcount == 1
     except mysql.connector.Error as e:
         success = False
-        print(f"Count not update post video url. An error occurred: {e}")
+        myprint(f"Count not update post video url. An error occurred: {e}")
     finally:
         cursor.close()
         connection.close()
@@ -428,7 +428,7 @@ def update_db_post_status(post_id: int, post_status: PostStatus) -> bool:
         success = cursor.rowcount == 1
     except mysql.connector.Error as e:
         success = False
-        print(f"Count not update post status. An error occurred: {e}")
+        myprint(f"Count not update post status. An error occurred: {e}")
     finally:
         cursor.close()
         connection.close()
@@ -498,7 +498,7 @@ def get_post_by_email(email: str, limit: int = 10, offset: int = 0,
     user_id = get_user_id(email)
 
     if not user_id:
-        print(f"User with email {email} not found.")
+        myprint(f"User with email {email} not found.")
         return [], 0
 
     return get_posts(user_id, limit=limit, offset=offset, sort_order=sort_order, status_filter=status_filter)
@@ -883,18 +883,24 @@ def get_post_type_counts(user_id: int):
     return post_counts
 
 
-def get_planned_posts_for_current_week(user_id: int = None):
-    """Query the database to get the planned content for the current week."""
+def get_planned_posts_for_current_week(user_id: int = None) -> list[dict]:
+    """Return status=planning posts scheduled in the current ISO week."""
     connection = get_db_connection()
     cursor = connection.cursor(dictionary=True)
-
-    where_clause = ''
-    if user_id:
-        where_clause = f"AND user_id = {user_id}"
-
     try:
-        cursor.execute(
-            f"SELECT user_id, id, post_type, buyer_stage FROM posts WHERE status = 'planning' {where_clause} AND YEARWEEK(scheduled_time, 1) = YEARWEEK(NOW(), 1)")
+        if user_id:
+            cursor.execute(
+                "SELECT user_id, id, post_type, buyer_stage FROM posts"
+                " WHERE status = 'planning' AND user_id = %s"
+                " AND YEARWEEK(scheduled_time, 1) = YEARWEEK(NOW(), 1)",
+                (user_id,),
+            )
+        else:
+            cursor.execute(
+                "SELECT user_id, id, post_type, buyer_stage FROM posts"
+                " WHERE status = 'planning'"
+                " AND YEARWEEK(scheduled_time, 1) = YEARWEEK(NOW(), 1)"
+            )
         planned_content = cursor.fetchall()
     except mysql.connector.Error as err:
         myprint(f"Could not get planned post for current week | Error: {err}")
@@ -906,18 +912,31 @@ def get_planned_posts_for_current_week(user_id: int = None):
     return planned_content
 
 
-def get_planned_posts_for_next_week(user_id: int = None):
-    """Query the database to get the planned content for the next week."""
+def get_planned_posts_for_next_week(user_id: int = None) -> list[dict]:
+    """Return status=planning posts scheduled in the next ISO week.
+
+    Uses NOW() + INTERVAL (7 - WEEKDAY(NOW())) DAY to always land on the
+    coming Monday regardless of what day today is, avoiding the +7-day
+    same-weekday pitfall.
+    """
     connection = get_db_connection()
     cursor = connection.cursor(dictionary=True)
-
-    where_clause = ''
-    if user_id:
-        where_clause = f"AND user_id = {user_id}"
-
     try:
-        cursor.execute(
-            f"SELECT user_id, id, post_type, buyer_stage FROM posts WHERE status = 'planning' {where_clause} AND YEARWEEK(scheduled_time, 1) = YEARWEEK(NOW() + INTERVAL 7 DAY, 1)")
+        if user_id:
+            cursor.execute(
+                "SELECT user_id, id, post_type, buyer_stage FROM posts"
+                " WHERE status = 'planning' AND user_id = %s"
+                " AND YEARWEEK(scheduled_time, 1)"
+                "   = YEARWEEK(NOW() + INTERVAL (7 - WEEKDAY(NOW())) DAY, 1)",
+                (user_id,),
+            )
+        else:
+            cursor.execute(
+                "SELECT user_id, id, post_type, buyer_stage FROM posts"
+                " WHERE status = 'planning'"
+                " AND YEARWEEK(scheduled_time, 1)"
+                "   = YEARWEEK(NOW() + INTERVAL (7 - WEEKDAY(NOW())) DAY, 1)"
+            )
         planned_content = cursor.fetchall()
     except mysql.connector.Error as err:
         myprint(f"Could not get planned post for next week | Error: {err}")
@@ -1044,13 +1063,13 @@ def get_active_user_ids():
                     )
                 )
 
-                -- Must have logged in within their configured inactivity window
+                -- Must have logged in within their configured inactivity window.
+                -- NULL last_login (pre-session-migration users) is treated as active
+                -- so existing connected users are not silently dropped.
                 AND (
                     last_login_inactivate_delay IS NULL
-                    OR (
-                        last_login IS NOT NULL
-                        AND last_login >= NOW() - INTERVAL last_login_inactivate_delay DAY
-                    )
+                    OR last_login IS NULL
+                    OR last_login >= NOW() - INTERVAL last_login_inactivate_delay DAY
                 )
         """)
         active_user_ids = [row[0] for row in cursor.fetchall()]
@@ -1295,6 +1314,20 @@ def create_pin_for_email(email: str, pin_hash: str) -> bool:
     except mysql.connector.Error as err:
         myprint(f"Could not create PIN for {email} | Error: {err}")
         return False
+    finally:
+        cursor.close()
+        connection.close()
+
+
+def delete_pin_for_email(email: str) -> None:
+    """Remove all unused PINs for an email — called when email send fails after DB write."""
+    connection = get_db_connection()
+    cursor = connection.cursor()
+    try:
+        cursor.execute("DELETE FROM email_pin_auth WHERE email = %s AND used = 0", (email,))
+        connection.commit()
+    except mysql.connector.Error as err:
+        myprint(f"Could not delete PIN for {email} | Error: {err}")
     finally:
         cursor.close()
         connection.close()
@@ -1668,8 +1701,13 @@ def get_users_with_stripe_subscriptions() -> list[dict]:
         connection.close()
 
 
-def get_user_preferences(user_id: int) -> Optional[dict]:
-    """Return user preference fields: last_login_inactivate_delay and auto_schedule_posts."""
+def get_user_preferences(user_id: int) -> dict:
+    """Return user preference fields with safe defaults.
+
+    Defaults auto_schedule_posts=True so new users' content is automatically
+    queued without requiring manual opt-in.
+    """
+    _defaults: dict = {"last_login_inactivate_delay": None, "auto_schedule_posts": True}
     connection = get_db_connection()
     cursor = connection.cursor(dictionary=True)
     try:
@@ -1677,10 +1715,11 @@ def get_user_preferences(user_id: int) -> Optional[dict]:
             "SELECT last_login_inactivate_delay, auto_schedule_posts FROM users WHERE id = %s",
             (user_id,),
         )
-        return cursor.fetchone()
+        row = cursor.fetchone()
+        return row if row is not None else _defaults
     except mysql.connector.Error as err:
         myprint(f"Could not get preferences for user_id {user_id} | Error: {err}")
-        return None
+        return _defaults
     finally:
         cursor.close()
         connection.close()
@@ -1703,7 +1742,8 @@ def update_user_preferences(
             (inactivate_delay, 1 if auto_schedule_posts else 0, user_id),
         )
         connection.commit()
-        return cursor.rowcount > 0
+        # rowcount==0 means the row existed but values were unchanged — still a success
+        return cursor.rowcount >= 0
     except mysql.connector.Error as err:
         myprint(f"Could not update preferences for user_id {user_id} | Error: {err}")
         return False

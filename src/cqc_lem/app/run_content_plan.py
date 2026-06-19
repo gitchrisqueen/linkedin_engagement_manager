@@ -694,6 +694,9 @@ def auto_create_weekly_content(user_id: int = None):
         myprint("No planned posts found for this period. Skipping content creation.")
         return
 
+    # Cache preferences per user so we don't hit the DB once per post
+    _prefs_cache: dict[int, dict] = {}
+
     for post in planned_posts:
         user_id = post['user_id']
         post_id = post['id']
@@ -728,10 +731,12 @@ def auto_create_weekly_content(user_id: int = None):
         myprint(f"Updating content for post_id: {post_id}")
         update_db_post_content(post_id, content)
 
-        # Respect the user's auto_schedule_posts preference:
+        # Respect the user's auto_schedule_posts preference (fetched once per user):
         # True → APPROVED (Celery will pick it up); False → PENDING (manual review required)
-        prefs = get_user_preferences(user_id)
-        auto_schedule = bool(prefs.get("auto_schedule_posts")) if prefs else False
+        if user_id not in _prefs_cache:
+            _prefs_cache[user_id] = get_user_preferences(user_id)
+        prefs = _prefs_cache[user_id]
+        auto_schedule = bool(prefs.get("auto_schedule_posts", True))
         new_status = PostStatus.APPROVED if auto_schedule else PostStatus.PENDING
         myprint(f"Updating post_id: {post_id} Status={new_status}")
         update_db_post_status(post_id, new_status)

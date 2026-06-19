@@ -478,7 +478,7 @@ class TestGetUserPreferences:
 
             assert result == expected
 
-    def test_returns_none_on_error(self, mock_database_connection):
+    def test_returns_defaults_on_error(self, mock_database_connection):
         from cqc_lem.utilities.db import get_user_preferences
         import mysql.connector
 
@@ -486,7 +486,19 @@ class TestGetUserPreferences:
             mock_conn.return_value = mock_database_connection["connection"]
             mock_database_connection["cursor"].execute.side_effect = mysql.connector.Error("err")
 
-            assert get_user_preferences(5) is None
+            result = get_user_preferences(5)
+            # On DB error, safe defaults are returned so automation is not silently broken
+            assert result == {"last_login_inactivate_delay": None, "auto_schedule_posts": True}
+
+    def test_returns_defaults_when_row_missing(self, mock_database_connection):
+        from cqc_lem.utilities.db import get_user_preferences
+
+        with patch("cqc_lem.utilities.db.get_db_connection") as mock_conn:
+            mock_conn.return_value = mock_database_connection["connection"]
+            mock_database_connection["cursor"].fetchone.return_value = None
+
+            result = get_user_preferences(99)
+            assert result["auto_schedule_posts"] is True
 
 
 @pytest.mark.unit

@@ -52,7 +52,7 @@ docx = "^0.2.4"
 dateparser = "^1.2.0"
 
 # --- Observability ---
-posthog = "^3.7"
+posthog = ">=3.7,<8.0"
 
 # --- AWS / payments ---
 boto3 = "^1.36.7"
