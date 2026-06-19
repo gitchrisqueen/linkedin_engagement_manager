@@ -203,8 +203,17 @@ export default function Account() {
           success_url: `${window.location.origin}/account?upgraded=1`,
           cancel_url: `${window.location.origin}/account`,
         })
-        .then((r) => r.data.detail.checkout_url as string),
-    onSuccess: (url) => { window.location.href = url },
+        .then((r) => r.data.detail as { checkout_url: string | null; upgraded?: boolean }),
+    onSuccess: (detail) => {
+      if (detail.upgraded || !detail.checkout_url) {
+        // In-place upgrade — no Stripe redirect needed. Refresh subscription data.
+        setCheckoutMsg({ ok: true, text: 'Plan updated successfully!' })
+        queryClient.invalidateQueries({ queryKey: ['userSettings'] })
+        setTimeout(() => setCheckoutMsg(null), 5000)
+      } else {
+        window.location.href = detail.checkout_url
+      }
+    },
     onError: () => {
       setCheckoutMsg({ ok: false, text: 'Could not start checkout — please try again.' })
       setTimeout(() => setCheckoutMsg(null), 6000)

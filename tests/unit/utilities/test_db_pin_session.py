@@ -1,0 +1,460 @@
+"""Unit tests for PIN auth, session management, and planned-posts DB functions."""
+
+import pytest
+from unittest.mock import MagicMock, patch, call
+import mysql.connector
+
+pytestmark = pytest.mark.unit
+
+
+# ---------------------------------------------------------------------------
+# Helpers
+# ---------------------------------------------------------------------------
+
+def _make_conn_and_cursor(dictionary: bool = False) -> tuple:
+    """Return a (connection_mock, cursor_mock) pair wired together."""
+    conn = MagicMock()
+    cursor = MagicMock()
+    conn.cursor.return_value = cursor
+    return conn, cursor
+
+
+def _patch_conn(conn):
+    """Return a context-manager patch for get_db_connection."""
+    return patch("cqc_lem.utilities.db.get_db_connection", return_value=conn)
+
+
+# ---------------------------------------------------------------------------
+# create_pin_for_email
+# ---------------------------------------------------------------------------
+
+class TestCreatePinForEmail:
+    def test_success_deletes_old_then_inserts_and_returns_true(self):
+        from cqc_lem.utilities.db import create_pin_for_email
+
+        conn, cursor = _make_conn_and_cursor()
+        cursor.rowcount = 1
+
+        with _patch_conn(conn):
+            result = create_pin_for_email("user@example.com", "hashed_pin")
+
+        assert result is True
+        # First execute: DELETE old unused PINs
+        first_call = cursor.execute.call_args_list[0]
+        assert "DELETE" in first_call[0][0].upper()
+        assert "user@example.com" in first_call[0][1]
+        # Second execute: INSERT new PIN
+        second_call = cursor.execute.call_args_list[1]
+        assert "INSERT" in second_call[0][0].upper()
+        assert "user@example.com" in second_call[0][1]
+        assert "hashed_pin" in second_call[0][1]
+        conn.commit.assert_called_once()
+        cursor.close.assert_called_once()
+        conn.close.assert_called_once()
+
+    def test_returns_false_when_rowcount_not_one(self):
+        from cqc_lem.utilities.db import create_pin_for_email
+
+        conn, cursor = _make_conn_and_cursor()
+        cursor.rowcount = 0
+
+        with _patch_conn(conn):
+            result = create_pin_for_email("user@example.com", "hashed_pin")
+
+        assert result is False
+
+    def test_returns_false_on_db_error(self):
+        from cqc_lem.utilities.db import create_pin_for_email
+
+        conn, cursor = _make_conn_and_cursor()
+        cursor.execute.side_effect = mysql.connector.Error("DB error")
+
+        with _patch_conn(conn):
+            result = create_pin_for_email("user@example.com", "hashed_pin")
+
+        assert result is False
+        # cleanup still happens
+        cursor.close.assert_called_once()
+        conn.close.assert_called_once()
+
+
+# ---------------------------------------------------------------------------
+# verify_pin_for_email
+# ---------------------------------------------------------------------------
+
+class TestVerifyPinForEmail:
+    def test_valid_row_marks_used_and_returns_true(self):
+        from cqc_lem.utilities.db import verify_pin_for_email
+
+        conn, cursor = _make_conn_and_cursor(dictionary=True)
+        cursor.fetchone.return_value = {"id": 5}
+
+        with _patch_conn(conn):
+            result = verify_pin_for_email("user@example.com", "correct_hash")
+
+        assert result is True
+        # Should UPDATE the row to used=1
+        update_calls = [
+            c for c in cursor.execute.call_args_list
+            if "UPDATE" in c[0][0].upper()
+        ]
+        assert len(update_calls) == 1
+        assert 5 in update_calls[0][0][1]
+        conn.commit.assert_called_once()
+
+    def test_no_row_found_returns_false(self):
+        from cqc_lem.utilities.db import verify_pin_for_email
+
+        conn, cursor = _make_conn_and_cursor(dictionary=True)
+        cursor.fetchone.return_value = None
+
+        with _patch_conn(conn):
+            result = verify_pin_for_email("user@example.com", "wrong_hash")
+
+        assert result is False
+        # No UPDATE should have been issued
+        update_calls = [
+            c for c in cursor.execute.call_args_list
+            if "UPDATE" in c[0][0].upper()
+        ]
+        assert len(update_calls) == 0
+        conn.commit.assert_not_called()
+
+    def test_db_error_returns_false(self):
+        from cqc_lem.utilities.db import verify_pin_for_email
+
+        conn, cursor = _make_conn_and_cursor(dictionary=True)
+        cursor.execute.side_effect = mysql.connector.Error("DB error")
+
+        with _patch_conn(conn):
+            result = verify_pin_for_email("user@example.com", "any_hash")
+
+        assert result is False
+        cursor.close.assert_called_once()
+        conn.close.assert_called_once()
+
+
+# ---------------------------------------------------------------------------
+# delete_pin_for_email
+# ---------------------------------------------------------------------------
+
+class TestDeletePinForEmail:
+    def test_executes_delete_and_commits(self):
+        from cqc_lem.utilities.db import delete_pin_for_email
+
+        conn, cursor = _make_conn_and_cursor()
+
+        with _patch_conn(conn):
+            delete_pin_for_email("user@example.com")
+
+        cursor.execute.assert_called_once()
+        sql, params = cursor.execute.call_args[0]
+        assert "DELETE" in sql.upper()
+        assert "user@example.com" in params
+        conn.commit.assert_called_once()
+
+    def test_db_error_is_logged_not_raised(self):
+        """A DB error during delete must not propagate — function returns None."""
+        from cqc_lem.utilities.db import delete_pin_for_email
+
+        conn, cursor = _make_conn_and_cursor()
+        cursor.execute.side_effect = mysql.connector.Error("DB error")
+
+        with _patch_conn(conn):
+            # Must not raise
+            result = delete_pin_for_email("user@example.com")
+
+        assert result is None
+        cursor.close.assert_called_once()
+        conn.close.assert_called_once()
+
+
+# ---------------------------------------------------------------------------
+# create_session
+# ---------------------------------------------------------------------------
+
+class TestCreateSession:
+    def test_success_returns_64_char_hex_token(self):
+        from cqc_lem.utilities.db import create_session
+
+        conn, cursor = _make_conn_and_cursor()
+
+        with _patch_conn(conn):
+            token = create_session(42)
+
+        assert token is not None
+        assert isinstance(token, str)
+        assert len(token) == 64
+        # Should be valid hex
+        int(token, 16)
+
+        # Verify INSERT into sessions was called with the token and user_id
+        insert_calls = [
+            c for c in cursor.execute.call_args_list
+            if "INSERT" in c[0][0].upper()
+        ]
+        assert len(insert_calls) == 1
+        insert_params = insert_calls[0][0][1]
+        assert token in insert_params
+        assert 42 in insert_params
+
+        # Verify last_login UPDATE was also called
+        update_calls = [
+            c for c in cursor.execute.call_args_list
+            if "UPDATE" in c[0][0].upper()
+        ]
+        assert len(update_calls) == 1
+        assert 42 in update_calls[0][0][1]
+
+        conn.commit.assert_called_once()
+
+    def test_db_error_returns_none(self):
+        from cqc_lem.utilities.db import create_session
+
+        conn, cursor = _make_conn_and_cursor()
+        cursor.execute.side_effect = mysql.connector.Error("DB error")
+
+        with _patch_conn(conn):
+            token = create_session(99)
+
+        assert token is None
+        cursor.close.assert_called_once()
+        conn.close.assert_called_once()
+
+    def test_each_call_produces_unique_token(self):
+        from cqc_lem.utilities.db import create_session
+
+        tokens = set()
+        for _ in range(5):
+            conn, cursor = _make_conn_and_cursor()
+            with _patch_conn(conn):
+                token = create_session(1)
+            tokens.add(token)
+
+        assert len(tokens) == 5
+
+
+# ---------------------------------------------------------------------------
+# get_session_user_id
+# ---------------------------------------------------------------------------
+
+class TestGetSessionUserId:
+    def test_valid_non_expired_token_returns_user_id(self):
+        from cqc_lem.utilities.db import get_session_user_id
+
+        conn, cursor = _make_conn_and_cursor(dictionary=True)
+        cursor.fetchone.return_value = {"user_id": 7}
+
+        with _patch_conn(conn):
+            uid = get_session_user_id("valid_token_string")
+
+        assert uid == 7
+
+    def test_expired_or_missing_token_returns_none(self):
+        from cqc_lem.utilities.db import get_session_user_id
+
+        conn, cursor = _make_conn_and_cursor(dictionary=True)
+        cursor.fetchone.return_value = None
+
+        with _patch_conn(conn):
+            uid = get_session_user_id("expired_or_bad_token")
+
+        assert uid is None
+
+    def test_db_error_returns_none(self):
+        from cqc_lem.utilities.db import get_session_user_id
+
+        conn, cursor = _make_conn_and_cursor(dictionary=True)
+        cursor.execute.side_effect = mysql.connector.Error("DB error")
+
+        with _patch_conn(conn):
+            uid = get_session_user_id("any_token")
+
+        assert uid is None
+        cursor.close.assert_called_once()
+        conn.close.assert_called_once()
+
+    def test_query_passes_token_and_now(self):
+        """Ensure the WHERE clause includes both the token and a datetime comparison."""
+        from cqc_lem.utilities.db import get_session_user_id
+
+        conn, cursor = _make_conn_and_cursor(dictionary=True)
+        cursor.fetchone.return_value = None
+
+        with _patch_conn(conn):
+            get_session_user_id("my_session_token")
+
+        sql, params = cursor.execute.call_args[0]
+        assert "expires_at" in sql
+        assert "my_session_token" in params
+
+
+# ---------------------------------------------------------------------------
+# delete_session
+# ---------------------------------------------------------------------------
+
+class TestDeleteSession:
+    def test_success_returns_true(self):
+        from cqc_lem.utilities.db import delete_session
+
+        conn, cursor = _make_conn_and_cursor()
+
+        with _patch_conn(conn):
+            result = delete_session("some_token")
+
+        assert result is True
+        sql, params = cursor.execute.call_args[0]
+        assert "DELETE" in sql.upper()
+        assert "some_token" in params
+        conn.commit.assert_called_once()
+
+    def test_db_error_returns_false_not_raised(self):
+        from cqc_lem.utilities.db import delete_session
+
+        conn, cursor = _make_conn_and_cursor()
+        cursor.execute.side_effect = mysql.connector.Error("DB error")
+
+        with _patch_conn(conn):
+            result = delete_session("bad_token")
+
+        assert result is False
+        cursor.close.assert_called_once()
+        conn.close.assert_called_once()
+
+
+# ---------------------------------------------------------------------------
+# get_planned_posts_for_current_week
+# ---------------------------------------------------------------------------
+
+class TestGetPlannedPostsForCurrentWeek:
+    def test_with_user_id_uses_parameterized_query(self):
+        from cqc_lem.utilities.db import get_planned_posts_for_current_week
+
+        rows = [
+            {"user_id": 1, "id": 10, "post_type": "text", "buyer_stage": "awareness"},
+            {"user_id": 1, "id": 11, "post_type": "carousel", "buyer_stage": "consideration"},
+        ]
+        conn, cursor = _make_conn_and_cursor(dictionary=True)
+        cursor.fetchall.return_value = rows
+
+        with _patch_conn(conn):
+            result = get_planned_posts_for_current_week(user_id=1)
+
+        assert result == rows
+        sql, params = cursor.execute.call_args[0]
+        assert "user_id" in sql
+        assert 1 in params
+
+    def test_without_user_id_fetches_all(self):
+        from cqc_lem.utilities.db import get_planned_posts_for_current_week
+
+        rows = [{"user_id": 2, "id": 20, "post_type": "text", "buyer_stage": "decision"}]
+        conn, cursor = _make_conn_and_cursor(dictionary=True)
+        cursor.fetchall.return_value = rows
+
+        with _patch_conn(conn):
+            result = get_planned_posts_for_current_week()
+
+        assert result == rows
+        # No params tuple should be passed (single-arg execute)
+        call_args = cursor.execute.call_args[0]
+        assert len(call_args) == 1  # only SQL, no params tuple
+
+    def test_returns_list_of_dicts(self):
+        from cqc_lem.utilities.db import get_planned_posts_for_current_week
+
+        conn, cursor = _make_conn_and_cursor(dictionary=True)
+        cursor.fetchall.return_value = []
+
+        with _patch_conn(conn):
+            result = get_planned_posts_for_current_week(user_id=5)
+
+        assert isinstance(result, list)
+
+    def test_db_error_returns_empty_list(self):
+        from cqc_lem.utilities.db import get_planned_posts_for_current_week
+
+        conn, cursor = _make_conn_and_cursor(dictionary=True)
+        cursor.execute.side_effect = mysql.connector.Error("DB error")
+
+        with _patch_conn(conn):
+            result = get_planned_posts_for_current_week(user_id=1)
+
+        assert result == []
+        cursor.close.assert_called_once()
+        conn.close.assert_called_once()
+
+
+# ---------------------------------------------------------------------------
+# get_planned_posts_for_next_week
+# ---------------------------------------------------------------------------
+
+class TestGetPlannedPostsForNextWeek:
+    def test_with_user_id_uses_parameterized_query(self):
+        from cqc_lem.utilities.db import get_planned_posts_for_next_week
+
+        rows = [{"user_id": 3, "id": 30, "post_type": "video", "buyer_stage": "awareness"}]
+        conn, cursor = _make_conn_and_cursor(dictionary=True)
+        cursor.fetchall.return_value = rows
+
+        with _patch_conn(conn):
+            result = get_planned_posts_for_next_week(user_id=3)
+
+        assert result == rows
+        sql, params = cursor.execute.call_args[0]
+        assert "user_id" in sql
+        assert 3 in params
+        # Verify the query targets next week not current week
+        assert "7 - WEEKDAY" in sql or "INTERVAL" in sql
+
+    def test_without_user_id_fetches_all(self):
+        from cqc_lem.utilities.db import get_planned_posts_for_next_week
+
+        rows = [{"user_id": 4, "id": 40, "post_type": "text", "buyer_stage": "consideration"}]
+        conn, cursor = _make_conn_and_cursor(dictionary=True)
+        cursor.fetchall.return_value = rows
+
+        with _patch_conn(conn):
+            result = get_planned_posts_for_next_week()
+
+        assert result == rows
+        call_args = cursor.execute.call_args[0]
+        assert len(call_args) == 1  # only SQL, no params tuple
+
+    def test_returns_empty_list_on_no_rows(self):
+        from cqc_lem.utilities.db import get_planned_posts_for_next_week
+
+        conn, cursor = _make_conn_and_cursor(dictionary=True)
+        cursor.fetchall.return_value = []
+
+        with _patch_conn(conn):
+            result = get_planned_posts_for_next_week(user_id=99)
+
+        assert result == []
+
+    def test_db_error_returns_empty_list(self):
+        from cqc_lem.utilities.db import get_planned_posts_for_next_week
+
+        conn, cursor = _make_conn_and_cursor(dictionary=True)
+        cursor.execute.side_effect = mysql.connector.Error("DB error")
+
+        with _patch_conn(conn):
+            result = get_planned_posts_for_next_week(user_id=1)
+
+        assert result == []
+        cursor.close.assert_called_once()
+        conn.close.assert_called_once()
+
+    def test_uses_interval_not_plus_7_days(self):
+        """Confirm the SQL uses the INTERVAL (7 - WEEKDAY) expression, not a naive +7."""
+        from cqc_lem.utilities.db import get_planned_posts_for_next_week
+
+        conn, cursor = _make_conn_and_cursor(dictionary=True)
+        cursor.fetchall.return_value = []
+
+        with _patch_conn(conn):
+            get_planned_posts_for_next_week(user_id=1)
+
+        sql = cursor.execute.call_args[0][0]
+        assert "INTERVAL" in sql.upper()
+        assert "WEEKDAY" in sql.upper()

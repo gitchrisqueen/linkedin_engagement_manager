@@ -746,7 +746,21 @@ def billing_create_checkout_session(request: CheckoutSessionRequest) -> Response
     if not stripe_customer_id:
         raise HTTPException(status_code=400, detail="No Stripe customer record — contact support")
 
-    from cqc_lem.utilities.stripe_util import create_checkout_session
+    from cqc_lem.utilities.stripe_util import create_checkout_session, upgrade_subscription
+
+    # If the user already has an active subscription, modify it in-place rather than
+    # creating a new Checkout session — which would register a second subscription.
+    existing_sub_id = subscription.get("stripe_subscription_id") if subscription else None
+    existing_status = subscription.get("subscription_status") if subscription else None
+    if existing_sub_id and existing_status in ("active", "trial"):
+        upgraded = upgrade_subscription(existing_sub_id, request.tier)
+        if upgraded:
+            # No redirect needed — Stripe webhook will fire subscription.updated and sync DB
+            return ResponseModel(status_code=200, detail={"checkout_url": None, "upgraded": True})
+        myprint(
+            f"In-place upgrade failed for sub={existing_sub_id}; falling back to checkout session"
+        )
+
     url = create_checkout_session(
         stripe_customer_id,
         request.tier,
@@ -755,7 +769,7 @@ def billing_create_checkout_session(request: CheckoutSessionRequest) -> Response
     )
     if not url:
         raise HTTPException(status_code=500, detail="Could not create Stripe checkout session")
-    return ResponseModel(status_code=200, detail={"checkout_url": url})
+    return ResponseModel(status_code=200, detail={"checkout_url": url, "upgraded": False})
 
 
 @router.post("/billing/create-portal-session")
