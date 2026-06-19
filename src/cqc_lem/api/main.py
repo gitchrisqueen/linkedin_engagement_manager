@@ -23,6 +23,7 @@ from cqc_lem.utilities.db import (
     update_subscription_from_stripe, update_user_linkedin_token,
     get_users_with_stripe_subscriptions,
     update_user_linkedin_password,
+    get_user_blog_url, get_user_sitemap_url,
     get_avatar_credit_balance, add_avatar_credits,
     deduct_avatar_credit, insert_avatar_training,
     update_avatar_training_status, set_active_avatar,
@@ -726,6 +727,8 @@ def get_user_settings(session_token: str) -> ResponseModel:
 
     subscription = get_user_subscription_info(user_id)
     preferences = get_user_preferences(user_id)
+    blog_url = get_user_blog_url(user_id)
+    sitemap_url = get_user_sitemap_url(user_id)
 
     def _iso(dt):
         return dt.isoformat() if dt else None
@@ -742,6 +745,8 @@ def get_user_settings(session_token: str) -> ResponseModel:
             "last_login_inactivate_delay": preferences.get("last_login_inactivate_delay") if preferences else 90,
             "auto_schedule_posts": bool(preferences.get("auto_schedule_posts")) if preferences else False,
         } if preferences else None,
+        "blog_url": blog_url,
+        "sitemap_url": sitemap_url,
     })
 
 

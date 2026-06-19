@@ -1781,7 +1781,8 @@ def update_user_preferences(
 # ---------------------------------------------------------------------------
 
 def get_avatar_credit_balance(user_id: int) -> int:
-    connection, cursor = get_db_connection()
+    connection = get_db_connection()
+    cursor = connection.cursor(dictionary=True)
     try:
         cursor.execute(
             "SELECT COALESCE(SUM(delta), 0) AS balance FROM avatar_credit_ledger WHERE user_id = %s",
@@ -1803,7 +1804,8 @@ def add_avatar_credits(
     reason: str,
     stripe_session_id: Optional[str] = None,
 ) -> bool:
-    connection, cursor = get_db_connection()
+    connection = get_db_connection()
+    cursor = connection.cursor(dictionary=True)
     try:
         cursor.execute(
             """INSERT INTO avatar_credit_ledger (user_id, delta, reason, stripe_session_id)
@@ -1821,7 +1823,8 @@ def add_avatar_credits(
 
 
 def deduct_avatar_credit(user_id: int, training_id: str) -> bool:
-    connection, cursor = get_db_connection()
+    connection = get_db_connection()
+    cursor = connection.cursor(dictionary=True)
     try:
         cursor.execute(
             """INSERT INTO avatar_credit_ledger (user_id, delta, reason, training_id)
@@ -1839,7 +1842,8 @@ def deduct_avatar_credit(user_id: int, training_id: str) -> bool:
 
 
 def refund_avatar_credit(user_id: int, training_id: str) -> bool:
-    connection, cursor = get_db_connection()
+    connection = get_db_connection()
+    cursor = connection.cursor(dictionary=True)
     try:
         cursor.execute(
             """INSERT INTO avatar_credit_ledger (user_id, delta, reason, training_id)
@@ -1861,7 +1865,8 @@ def refund_avatar_credit(user_id: int, training_id: str) -> bool:
 # ---------------------------------------------------------------------------
 
 def insert_avatar_training(user_id: int, training_id: str, trigger_word: str) -> Optional[int]:
-    connection, cursor = get_db_connection()
+    connection = get_db_connection()
+    cursor = connection.cursor(dictionary=True)
     try:
         cursor.execute(
             """INSERT INTO avatar_trainings (user_id, training_id, trigger_word)
@@ -1883,7 +1888,8 @@ def update_avatar_training_status(
     status: str,
     model_ref: Optional[str] = None,
 ) -> bool:
-    connection, cursor = get_db_connection()
+    connection = get_db_connection()
+    cursor = connection.cursor(dictionary=True)
     try:
         if model_ref:
             cursor.execute(
@@ -1919,7 +1925,8 @@ def update_avatar_training_status(
 
 
 def set_active_avatar(user_id: int, avatar_id: int) -> bool:
-    connection, cursor = get_db_connection()
+    connection = get_db_connection()
+    cursor = connection.cursor(dictionary=True)
     try:
         cursor.execute(
             "UPDATE avatar_trainings SET is_active = 0 WHERE user_id = %s",
@@ -1940,7 +1947,8 @@ def set_active_avatar(user_id: int, avatar_id: int) -> bool:
 
 
 def get_avatar_trainings(user_id: int) -> list[dict]:
-    connection, cursor = get_db_connection()
+    connection = get_db_connection()
+    cursor = connection.cursor(dictionary=True)
     try:
         cursor.execute(
             """SELECT id, training_id, model_ref, trigger_word, status, is_active,
@@ -1973,7 +1981,8 @@ def get_avatar_trainings(user_id: int) -> list[dict]:
 
 
 def get_active_avatar(user_id: int) -> Optional[dict]:
-    connection, cursor = get_db_connection()
+    connection = get_db_connection()
+    cursor = connection.cursor(dictionary=True)
     try:
         cursor.execute(
             """SELECT id, training_id, model_ref, trigger_word, status
