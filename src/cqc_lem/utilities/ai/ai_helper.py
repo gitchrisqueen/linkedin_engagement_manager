@@ -7,7 +7,7 @@ import openai
 import replicate
 from cqc_lem import assets_dir
 from cqc_lem.utilities.ai.client import client
-from cqc_lem.utilities.ai.tools import search_recent_news
+from cqc_lem.utilities.ai.tools import search_recent_news, search_with_perplexity
 from cqc_lem.utilities.linkedin.profile import LinkedInProfile
 from cqc_lem.utilities.logger import myprint
 from cqc_lem.utilities.utils import create_folder_if_not_exists, save_video_url_to_dir
@@ -724,10 +724,17 @@ def get_industry_trend_analysis_based_on_user_profile(linked_in_profile: LinkedI
 
     myprint(f"Chosen Industry: {industry}")
 
-    # Get Google News articles about that industry
-    articles_dict = search_recent_news(industry, 7)
-
-    articles = articles_dict.get('articles', [])
+    # Prefer Perplexity (online search with citations) over GoogleNews when available
+    try:
+        perplexity_result = search_with_perplexity(f"Recent trends and news in the {industry} industry")
+        articles = [{"title": perplexity_result["answer"][:200], "date": "", "link": s.get("url", "")}
+                    for s in perplexity_result["sources"]] or \
+                   [{"title": perplexity_result["answer"][:200], "date": "", "link": ""}]
+        myprint(f"Perplexity search returned {len(perplexity_result['sources'])} source(s)")
+    except Exception as e:
+        myprint(f"Perplexity unavailable ({type(e).__name__}: {e}) — falling back to GoogleNews")
+        articles_dict = search_recent_news(industry, 7)
+        articles = articles_dict.get('articles', [])
 
     myprint(f"Articles Found: {len(articles)}")
 
