@@ -122,13 +122,17 @@ def validate_webhook(payload: bytes, sig_header: str) -> Optional[dict]:
     if not STRIPE_WEBHOOK_SECRET:
         myprint("STRIPE_WEBHOOK_SECRET not set — cannot validate webhook")
         return None
+    # Import stripe before the try block so it's in scope for the except clause.
+    # If the package is not installed, the ImportError propagates immediately rather
+    # than masking it as a NameError inside the except handler.
     stripe = _get_stripe()
+    SignatureVerificationError = stripe.error.SignatureVerificationError
     try:
         # Raises on invalid signature — this is the only thing we need the SDK for here
         stripe.Webhook.construct_event(payload, sig_header, STRIPE_WEBHOOK_SECRET)
         # Return the raw payload as a plain dict for consistent .get() access
         return json.loads(payload.decode("utf-8"))
-    except stripe.error.SignatureVerificationError as e:
+    except SignatureVerificationError as e:
         myprint(f"Stripe webhook signature invalid: {e}")
         return None
     except Exception as e:

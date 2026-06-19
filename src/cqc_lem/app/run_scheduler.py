@@ -1,6 +1,6 @@
 import os
 import shutil
-from datetime import timedelta, datetime
+from datetime import timedelta, datetime, timezone
 
 from celery_once import QueueOnce
 
@@ -264,7 +264,7 @@ def sync_stripe_subscriptions(self):
         tier = get_subscription_tier_from_price(price_id) if price_id else None
 
         period_end_ts = sub.get("current_period_end")
-        period_end = datetime.fromtimestamp(period_end_ts) if period_end_ts else None
+        period_end = datetime.fromtimestamp(period_end_ts, tz=timezone.utc) if period_end_ts else None
 
         current_db_status = row.get("subscription_status")
         if current_db_status != db_status or (tier and tier != row.get("subscription_tier")):
