@@ -195,3 +195,4 @@ src/cqc_lem/ui/node_modules/
 src/cqc_lem/ui/dist/
 
 .qodo
+.vscode/mcp.json
