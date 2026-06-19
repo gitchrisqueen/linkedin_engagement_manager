@@ -15,11 +15,11 @@ from cqc_lem.utilities.ai.ai_helper import generate_ai_response, get_ai_message_
 from cqc_lem.utilities.date import convert_viewed_on_to_date
 from cqc_lem.utilities.db import get_user_password_pair_by_id, get_user_id, insert_new_log, LogActionType, \
     LogResultType, has_user_commented_on_post_url, get_post_url_from_log_for_user, get_post_message_from_log_for_user, \
-    has_engaged_url_with_x_days, get_post_content, get_post_video_url, update_db_post_status, PostStatus, \
-    get_dm_history_for_profile, get_post_status, get_user_blog_url
+    has_engaged_url_with_x_days, get_post_content, get_post_video_url, update_db_post_status, PostStatus, PostType, \
+    get_dm_history_for_profile, get_post_status, get_user_blog_url, get_post_type, get_carousel_slides
 from cqc_lem.utilities.linkedin.company_page_inviter import automate_invitations
 from cqc_lem.utilities.linkedin.helper import login_to_linkedin, get_my_profile, get_linkedin_profile_from_url
-from cqc_lem.utilities.linkedin.poster import share_on_linkedin
+from cqc_lem.utilities.linkedin.poster import share_on_linkedin, share_carousel_on_linkedin
 from cqc_lem.utilities.linkedin.profile import LinkedInProfile
 from cqc_lem.utilities.logger import myprint
 from cqc_lem.utilities.selenium_util import click_element_wait_retry, \
@@ -1413,7 +1413,7 @@ def get_current_profile(user_id: int, session_name: str = "Get Current Profile")
     try:
 
         login_to_linkedin(driver, wait, user_email, user_password)
-        my_profile = get_my_profile(driver, wait, user_email, user_password)
+        my_profile = get_my_profile(driver, wait, user_email, user_password, user_id=user_id)
 
     except Exception as e:
         myprint(f"Error while getting updated profile: {e}")
@@ -1467,14 +1467,20 @@ def post_to_linkedin(self, user_id: int, post_id: int):
     content = get_post_content(post_id)
     myprint(f"Posting to LinkedIn: {content}")
 
-    # Get the post video url
-    video_url = get_post_video_url(post_id)
+    post_type = get_post_type(post_id)
+    myprint(f"Post type: {post_type}")
 
-    # Add the query param content_type to the url
-    if video_url:
-        myprint(f"Adding to Post | Video URL: {video_url}")
-
-    urn = share_on_linkedin(user_id, content, video_url)
+    if post_type == PostType.CAROUSEL:
+        slides = get_carousel_slides(post_id)
+        myprint(f"Carousel slides ({len(slides)}): {slides}")
+        urn = share_carousel_on_linkedin(user_id, content, slides)
+    elif post_type == PostType.VIDEO:
+        video_url = get_post_video_url(post_id)
+        if video_url:
+            myprint(f"Adding to Post | Video URL: {video_url}")
+        urn = share_on_linkedin(user_id, content, video_url)
+    else:
+        urn = share_on_linkedin(user_id, content)
 
     if urn:
         post_url = f"https://www.linkedin.com/feed/update/{urn}/"

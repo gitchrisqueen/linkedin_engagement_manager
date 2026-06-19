@@ -59,14 +59,27 @@ LinkedIn Engagement Manager (LEM) is an automated solution for managing engageme
 3. (Optional) Configure ngrok by setting `NGROK_AUTH_TOKEN`, `NGROK_CUSTOM_DOMAIN`,
    `NGROK_EDGE_TOKEN`, and the `NGROK_*_PREFIX` variables in your `.env` file.
 
-4. Build and run the Docker containers:
+4. Set up Stripe for subscription billing — see **[docs/stripe-setup-guide.md](docs/stripe-setup-guide.md)** for
+   the full walkthrough. At minimum you need:
+   ```env
+   STRIPE_API_KEY=sk_test_...
+   STRIPE_PRICE_ID_STARTER=price_...
+   STRIPE_PRICE_ID_PROFESSIONAL=price_...
+   STRIPE_PRICE_ID_ENTERPRISE=price_...
+   STRIPE_WEBHOOK_SECRET=whsec_...
+   ```
+   The webhook secret comes from registering your ngrok URL as a Stripe webhook endpoint
+   (same pattern as the LinkedIn OAuth redirect URL). Do **not** use `stripe listen` inside
+   Docker — it generates an ephemeral secret that breaks on every restart.
+
+5. Build and run the Docker containers:
    ```bash
    ./run.sh
    ```
    The script will prompt whether to build and push the Docker image, then start all
    services and print a table of local (or ngrok) URLs.
 
-5. Access the services at the URLs printed in the console.
+6. Access the services at the URLs printed in the console.
 
 ### Docker Image
 

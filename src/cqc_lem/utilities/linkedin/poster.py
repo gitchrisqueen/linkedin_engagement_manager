@@ -205,3 +205,67 @@ def share_on_linkedin(user_id: int, content: str,
 
     return urn
 
+
+def share_carousel_on_linkedin(user_id: int, content: str, slide_texts: list[str]) -> Optional[str]:
+    """Post a multi-image carousel to LinkedIn.
+
+    Each slide text is used to fetch a contextual image from Pexels. All images
+    are uploaded individually and included as a multi-image ugcPost.
+    """
+    import os
+    from cqc_lem.utilities.carousel_creator import get_pexels_image_path
+
+    restli_client = RestliClient()
+    restli_client.session.hooks["response"].append(lambda r: r.raise_for_status())
+
+    linked_sub_id = get_user_linked_sub_id(user_id)
+    access_token = get_user_access_token(user_id)
+
+    if not linked_sub_id or not access_token:
+        myprint(f"No LinkedIn credentials found for user {user_id} — cannot post carousel")
+        return None
+
+    file_dir = os.path.dirname(os.path.abspath(__file__))
+    default_image_path = os.path.join(file_dir, "..", "carousel_creator", "images", "image.png")
+
+    media_urns = []
+    for slide_text in slide_texts:
+        image_path = get_pexels_image_path(slide_text, default_image_path)
+        myprint(f"Carousel slide image: {image_path}")
+        urn = upload_media(access_token, linked_sub_id, image_path, "IMAGE")
+        if urn:
+            media_urns.append(urn)
+
+    if not media_urns:
+        myprint("No images uploaded for carousel — falling back to text-only post")
+        return share_on_linkedin(user_id, content)
+
+    media_objects = [ShareMedia(status="READY", media=urn).model_dump() for urn in media_urns]
+
+    share_content = ShareContent(
+        shareCommentary={"text": content},
+        shareMediaCategory="IMAGE",
+        media=media_objects,
+    ).model_dump()
+
+    posts_create_response = restli_client.create(
+        resource_path="/ugcPosts",
+        entity={
+            "author": f"urn:li:person:{linked_sub_id}",
+            "lifecycleState": "PUBLISHED",
+            "specificContent": {
+                "com.linkedin.ugc.ShareContent": {
+                    **share_content
+                }
+            },
+            "visibility": {
+                "com.linkedin.ugc.MemberNetworkVisibility": "PUBLIC"
+            },
+        },
+        access_token=access_token,
+    )
+
+    urn = posts_create_response.entity_id
+    myprint(f"Carousel shared on LinkedIn: https://www.linkedin.com/feed/update/{urn}")
+    return urn
+

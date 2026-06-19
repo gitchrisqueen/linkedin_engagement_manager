@@ -1,6 +1,8 @@
+import json
 import os
 from datetime import datetime, timedelta, timezone
 from enum import StrEnum
+from typing import Optional
 
 import mysql.connector
 from cqc_lem.utilities.env_constants import AWS_MYSQL_SECRET_NAME, AWS_REGION
@@ -175,8 +177,8 @@ def add_user_with_access_token(email: str, linked_sub_id: str, access_token: str
         refresh_token_created_at = None
 
     try:
-        cursor.execute("""INSERT INTO users (email, linked_sub_id, access_token, access_token_expires_in, access_token_created_at, refresh_token, refresh_token_expires_in, refresh_token_created_at) 
-        VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+        cursor.execute("""INSERT INTO users (email, linked_sub_id, access_token, access_token_expires_in, access_token_created_at, refresh_token, refresh_token_expires_in, refresh_token_created_at, last_login, linkedin_connection_status)
+        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, 'connected')
         ON DUPLICATE KEY UPDATE
                 linked_sub_id = VALUES(linked_sub_id),
                 access_token = VALUES(access_token),
@@ -184,13 +186,16 @@ def add_user_with_access_token(email: str, linked_sub_id: str, access_token: str
                 access_token_created_at = VALUES(access_token_created_at),
                 refresh_token = VALUES(refresh_token),
                 refresh_token_expires_in = VALUES(refresh_token_expires_in),
-                refresh_token_created_at = VALUES(refresh_token_created_at)
-                
+                refresh_token_created_at = VALUES(refresh_token_created_at),
+                last_login = VALUES(last_login),
+                linkedin_connection_status = 'connected'
+
         """, (
             email,
             linked_sub_id,
             access_token, access_token_expires_in, access_token_created_at,
-            refresh_token, refresh_token_expires_in, refresh_token_created_at))
+            refresh_token, refresh_token_expires_in, refresh_token_created_at,
+            datetime.now(timezone.utc)))
         connection.commit()
     except mysql.connector.Error as e:
         if e.errno == errorcode.ER_DUP_ENTRY:
@@ -259,7 +264,8 @@ def get_user_id(email: str):
     return user_id['id'] if user_id else None
 
 
-def insert_post(email: str, content: str, scheduled_time: datetime, post_type: PostType) -> bool:
+def insert_post(email: str, content: str, scheduled_time: datetime, post_type: PostType,
+                video_url: Optional[str] = None, carousel_slides: Optional[list[str]] = None) -> bool:
     user_id = get_user_id(email)
 
     success = False
@@ -272,16 +278,17 @@ def insert_post(email: str, content: str, scheduled_time: datetime, post_type: P
     cursor = connection.cursor()
 
     try:
-        # Convert scheduled_time to UTC
         if scheduled_time.tzinfo is None:
             scheduled_time = scheduled_time.replace(tzinfo=timezone.utc)
         else:
             scheduled_time = scheduled_time.astimezone(timezone.utc)
 
+        slides_json = json.dumps(carousel_slides) if carousel_slides else None
+
         cursor.execute("""
-            INSERT INTO posts (content, scheduled_time, post_type, user_id)
-            VALUES (%s, %s, %s, %s)
-        """, (content, scheduled_time, post_type.value, user_id))
+            INSERT INTO posts (content, scheduled_time, post_type, user_id, video_url, carousel_slides)
+            VALUES (%s, %s, %s, %s, %s, %s)
+        """, (content, scheduled_time, post_type.value, user_id, video_url, slides_json))
 
         connection.commit()
         success = cursor.rowcount == 1
@@ -429,23 +436,41 @@ def update_db_post_status(post_id: int, post_status: PostStatus) -> bool:
     return success
 
 
-def get_posts(user_id: int):
+def get_posts(user_id: int, limit: int = 10, offset: int = 0,
+              sort_order: str = 'asc', status_filter: Optional[str] = None) -> tuple[list, int]:
     connection = get_db_connection()
     cursor = connection.cursor(dictionary=True)
 
+    order = 'ASC' if sort_order.lower() != 'desc' else 'DESC'
+
     try:
+        where = "WHERE user_id = %s"
+        params: list = [user_id]
+        if status_filter:
+            where += " AND status = %s"
+            params.append(status_filter.lower())
+
         cursor.execute(
-            "SELECT id, content, video_url, scheduled_time, post_type, status FROM posts WHERE user_id = %s ORDER BY scheduled_time asc",
-            (user_id,))
+            f"SELECT COUNT(*) AS total FROM posts {where}",
+            params
+        )
+        total = cursor.fetchone()['total']
+
+        cursor.execute(
+            f"SELECT id, content, video_url, scheduled_time, post_type, status, carousel_slides "
+            f"FROM posts {where} ORDER BY scheduled_time {order} LIMIT %s OFFSET %s",
+            params + [limit, offset]
+        )
         posts = cursor.fetchall()
     except mysql.connector.Error as err:
         myprint(f"Could not get posts for user id: {user_id} | Error: {err}")
-        posts = None
+        posts = []
+        total = 0
     finally:
         cursor.close()
         connection.close()
 
-    return posts
+    return posts, total
 
 
 def get_posted_posts(user_id: int):
@@ -468,14 +493,15 @@ def get_posted_posts(user_id: int):
     return posts
 
 
-def get_post_by_email(email: str):
+def get_post_by_email(email: str, limit: int = 10, offset: int = 0,
+                      sort_order: str = 'asc', status_filter: Optional[str] = None) -> tuple[list, int]:
     user_id = get_user_id(email)
 
     if not user_id:
         print(f"User with email {email} not found.")
-        return
+        return [], 0
 
-    return get_posts(user_id)
+    return get_posts(user_id, limit=limit, offset=offset, sort_order=sort_order, status_filter=status_filter)
 
 
 def get_post_content(post_id: int):
@@ -530,6 +556,103 @@ def get_post_video_url(post_id: int):
         connection.close()
 
     return post['video_url'] if post else None
+
+
+def get_post_type(post_id: int) -> Optional[PostType]:
+    connection = get_db_connection()
+    cursor = connection.cursor(dictionary=True)
+
+    try:
+        cursor.execute("SELECT post_type FROM posts WHERE id = %s", (post_id,))
+        row = cursor.fetchone()
+    except mysql.connector.Error as err:
+        myprint(f"Could not get post_type for post id: {post_id} | Error: {err}")
+        row = None
+    finally:
+        cursor.close()
+        connection.close()
+
+    if row:
+        try:
+            return PostType(row['post_type'])
+        except ValueError:
+            return None
+    return None
+
+
+def get_carousel_slides(post_id: int) -> list[str]:
+    connection = get_db_connection()
+    cursor = connection.cursor(dictionary=True)
+
+    try:
+        cursor.execute("SELECT carousel_slides FROM posts WHERE id = %s", (post_id,))
+        row = cursor.fetchone()
+    except mysql.connector.Error as err:
+        myprint(f"Could not get carousel_slides for post id: {post_id} | Error: {err}")
+        row = None
+    finally:
+        cursor.close()
+        connection.close()
+
+    if row and row['carousel_slides']:
+        try:
+            slides = row['carousel_slides']
+            if isinstance(slides, str):
+                slides = json.loads(slides)
+            return slides if isinstance(slides, list) else []
+        except (json.JSONDecodeError, TypeError):
+            return []
+    return []
+
+
+def bulk_update_posts(post_ids: list[int], status: Optional[PostStatus] = None,
+                      scheduled_time: Optional[datetime] = None) -> bool:
+    if not post_ids:
+        return False
+
+    connection = get_db_connection()
+    cursor = connection.cursor()
+
+    success = False
+    try:
+        sets = []
+        params: list = []
+
+        if status is not None:
+            sets.append("status = %s")
+            params.append(status.value)
+        if scheduled_time is not None:
+            if scheduled_time.tzinfo is None:
+                scheduled_time = scheduled_time.replace(tzinfo=timezone.utc)
+            else:
+                scheduled_time = scheduled_time.astimezone(timezone.utc)
+            sets.append("scheduled_time = %s")
+            params.append(scheduled_time)
+
+        if not sets:
+            return False
+
+        placeholders = ', '.join(['%s'] * len(post_ids))
+        params.extend(post_ids)
+
+        cursor.execute(
+            f"UPDATE posts SET {', '.join(sets)} WHERE id IN ({placeholders})",
+            params
+        )
+        connection.commit()
+        success = cursor.rowcount > 0
+    except mysql.connector.Error as e:
+        myprint(f"Could not bulk update posts. An error occurred: {e}")
+        success = False
+    finally:
+        cursor.close()
+        connection.close()
+
+    return success
+
+
+def soft_delete_posts(post_ids: list[int]) -> bool:
+    return bulk_update_posts(post_ids, status=PostStatus.REJECTED)
 
 
 def get_ready_to_post_posts(pre_post_time: datetime = None, post_time_delta_minutes=20) -> list:
@@ -606,19 +729,20 @@ def get_active_user_password_pairs():
     return user_password_pairs
 
 
-def add_linkedin_profile(profile: LinkedInProfile):
+def add_linkedin_profile(profile: LinkedInProfile, user_id: Optional[int] = None):
     connection = get_db_connection()
     cursor = connection.cursor()
     try:
         cursor.execute("""
-            INSERT INTO profiles (profile_url, email, data) 
-            VALUES (%s, %s, %s)
+            INSERT INTO profiles (profile_url, email, data, user_id)
+            VALUES (%s, %s, %s, %s)
             ON DUPLICATE KEY UPDATE
                     profile_url = VALUES(profile_url),
                     email = VALUES(email),
-                    data = VALUES(data)
+                    data = VALUES(data),
+                    user_id = COALESCE(VALUES(user_id), user_id)
             """,
-                       (str(profile.profile_url), profile.email, profile.model_dump_json()))
+                       (str(profile.profile_url), profile.email, profile.model_dump_json(), user_id))
 
         connection.commit()
         success = True
@@ -669,6 +793,41 @@ def get_linked_in_profile_by_email(profile_email: str, updated_less_than_days_ag
         connection.close()
 
     return profile_data
+
+
+def get_linked_in_profile_by_user_id(user_id: int, updated_less_than_days_ago: int = 1):
+    connection = get_db_connection()
+    cursor = connection.cursor()
+
+    try:
+        cursor.execute("SELECT data FROM profiles WHERE user_id = %s AND updated_at > NOW() - INTERVAL %s DAY",
+                       (user_id, updated_less_than_days_ago))
+        profile_data = cursor.fetchone()
+    except mysql.connector.Error as err:
+        myprint(f"Could not get linkedin profile data by user_id | Error: {err}")
+        profile_data = None
+    finally:
+        cursor.close()
+        connection.close()
+
+    return profile_data
+
+
+def remove_linked_in_profile_by_user_id(user_id: int):
+    connection = get_db_connection()
+    cursor = connection.cursor()
+
+    try:
+        cursor.execute("DELETE FROM profiles WHERE user_id = %s", (user_id,))
+        connection.commit()
+        success = True
+    except mysql.connector.Error as err:
+        myprint(f"Could not remove linkedin profile by user_id | Error: {err}")
+        success = False
+    finally:
+        cursor.close()
+        connection.close()
+    return success
 
 
 def remove_linked_in_profile_by_url(profile_url: str):
@@ -735,11 +894,11 @@ def get_planned_posts_for_current_week(user_id: int = None):
 
     try:
         cursor.execute(
-            f"SELECT user_id, id, post_type, buyer_stage FROM posts WHERE status = 'planning' {where_clause} AND WEEK(scheduled_time) = WEEK(NOW())")
+            f"SELECT user_id, id, post_type, buyer_stage FROM posts WHERE status = 'planning' {where_clause} AND YEARWEEK(scheduled_time, 1) = YEARWEEK(NOW(), 1)")
         planned_content = cursor.fetchall()
     except mysql.connector.Error as err:
         myprint(f"Could not get planned post for current week | Error: {err}")
-        planned_content = None
+        planned_content = []
     finally:
         cursor.close()
         connection.close()
@@ -758,11 +917,11 @@ def get_planned_posts_for_next_week(user_id: int = None):
 
     try:
         cursor.execute(
-            f"SELECT user_id, id, post_type, buyer_stage FROM posts WHERE status = 'planning' {where_clause} AND WEEK(scheduled_time) = WEEK(NOW()) +1")
+            f"SELECT user_id, id, post_type, buyer_stage FROM posts WHERE status = 'planning' {where_clause} AND YEARWEEK(scheduled_time, 1) = YEARWEEK(NOW() + INTERVAL 7 DAY, 1)")
         planned_content = cursor.fetchall()
     except mysql.connector.Error as err:
         myprint(f"Could not get planned post for next week | Error: {err}")
-        planned_content = None
+        planned_content = []
     finally:
         cursor.close()
         connection.close()
@@ -855,14 +1014,45 @@ def update_user(user_id: int, email: str = None, blog_url: str = None, sitemap_u
 
 
 def get_active_user_ids():
-    """Query the database to get the user ids of active users."""
+    """Return user IDs eligible for automated posting/engagement.
+
+    A user is active when ALL of:
+      1. Has a valid LinkedIn connection (linkedin_connection_status = 'connected'
+         AND access_token not expired)
+      2. Has an active subscription OR an unexpired trial
+      3. Has logged in within their configured inactivate delay
+         (NULL delay = never auto-inactivate)
+    """
     connection = get_db_connection()
     cursor = connection.cursor()
-
     try:
-        cursor.execute(
-            "SELECT id FROM users WHERE last_login >= NOW() - INTERVAL 30 DAY OR subscription_status = 'active'"
-        )
+        cursor.execute("""
+            SELECT id FROM users
+            WHERE
+                -- Must have a live LinkedIn token
+                linkedin_connection_status = 'connected'
+                AND access_token IS NOT NULL
+                AND access_token_created_at IS NOT NULL
+                AND access_token_created_at + INTERVAL access_token_expires_in SECOND > NOW()
+
+                -- Must have an active or unexpired trial subscription
+                AND (
+                    subscription_status = 'active'
+                    OR (
+                        subscription_status = 'trial'
+                        AND (trial_ends_at IS NULL OR trial_ends_at > NOW())
+                    )
+                )
+
+                -- Must have logged in within their configured inactivity window
+                AND (
+                    last_login_inactivate_delay IS NULL
+                    OR (
+                        last_login IS NOT NULL
+                        AND last_login >= NOW() - INTERVAL last_login_inactivate_delay DAY
+                    )
+                )
+        """)
         active_user_ids = [row[0] for row in cursor.fetchall()]
     except mysql.connector.Error as err:
         myprint(f"Could not get active user ids | Error: {err}")
@@ -1084,3 +1274,439 @@ def update_user_settings(user_id: int, blog_url: str = None, sitemap_url: str = 
         connection.close()
 
     return success
+
+
+# ---------------------------------------------------------------------------
+# PIN authentication
+# ---------------------------------------------------------------------------
+
+def create_pin_for_email(email: str, pin_hash: str) -> bool:
+    connection = get_db_connection()
+    cursor = connection.cursor()
+    try:
+        cursor.execute("DELETE FROM email_pin_auth WHERE email = %s AND used = 0", (email,))
+        expires_at = datetime.now(timezone.utc) + timedelta(minutes=10)
+        cursor.execute(
+            "INSERT INTO email_pin_auth (email, pin, expires_at) VALUES (%s, %s, %s)",
+            (email, pin_hash, expires_at),
+        )
+        connection.commit()
+        return cursor.rowcount == 1
+    except mysql.connector.Error as err:
+        myprint(f"Could not create PIN for {email} | Error: {err}")
+        return False
+    finally:
+        cursor.close()
+        connection.close()
+
+
+def verify_pin_for_email(email: str, pin_hash: str) -> bool:
+    connection = get_db_connection()
+    cursor = connection.cursor(dictionary=True)
+    try:
+        cursor.execute(
+            """SELECT id FROM email_pin_auth
+               WHERE email = %s AND pin = %s AND used = 0 AND expires_at > %s
+               ORDER BY id DESC LIMIT 1""",
+            (email, pin_hash, datetime.now(timezone.utc)),
+        )
+        row = cursor.fetchone()
+        if row:
+            cursor.execute("UPDATE email_pin_auth SET used = 1 WHERE id = %s", (row['id'],))
+            connection.commit()
+            return True
+        return False
+    except mysql.connector.Error as err:
+        myprint(f"Could not verify PIN for {email} | Error: {err}")
+        return False
+    finally:
+        cursor.close()
+        connection.close()
+
+
+# ---------------------------------------------------------------------------
+# Session management
+# ---------------------------------------------------------------------------
+
+def create_session(user_id: int) -> Optional[str]:
+    import secrets
+    token = secrets.token_hex(32)
+    now = datetime.now(timezone.utc)
+    expires_at = now + timedelta(hours=24)
+    connection = get_db_connection()
+    cursor = connection.cursor()
+    try:
+        cursor.execute(
+            "INSERT INTO sessions (session_token, user_id, expires_at) VALUES (%s, %s, %s)",
+            (token, user_id, expires_at),
+        )
+        cursor.execute(
+            "UPDATE users SET last_login = %s WHERE id = %s",
+            (now, user_id),
+        )
+        connection.commit()
+        return token
+    except mysql.connector.Error as err:
+        myprint(f"Could not create session for user_id {user_id} | Error: {err}")
+        return None
+    finally:
+        cursor.close()
+        connection.close()
+
+
+def get_session_user_id(token: str) -> Optional[int]:
+    connection = get_db_connection()
+    cursor = connection.cursor(dictionary=True)
+    try:
+        cursor.execute(
+            "SELECT user_id FROM sessions WHERE session_token = %s AND expires_at > %s",
+            (token, datetime.now(timezone.utc)),
+        )
+        row = cursor.fetchone()
+        return row['user_id'] if row else None
+    except mysql.connector.Error as err:
+        myprint(f"Could not validate session token | Error: {err}")
+        return None
+    finally:
+        cursor.close()
+        connection.close()
+
+
+def delete_session(token: str) -> bool:
+    connection = get_db_connection()
+    cursor = connection.cursor()
+    try:
+        cursor.execute("DELETE FROM sessions WHERE session_token = %s", (token,))
+        connection.commit()
+        return True
+    except mysql.connector.Error as err:
+        myprint(f"Could not delete session | Error: {err}")
+        return False
+    finally:
+        cursor.close()
+        connection.close()
+
+
+# ---------------------------------------------------------------------------
+# User helpers
+# ---------------------------------------------------------------------------
+
+def add_user_by_email(email: str) -> Optional[int]:
+    from cqc_lem.utilities.env_constants import FREE_TRIAL_DAYS
+    now = datetime.now(timezone.utc)
+    trial_ends = now + timedelta(days=FREE_TRIAL_DAYS)
+    connection = get_db_connection()
+    cursor = connection.cursor()
+    try:
+        cursor.execute(
+            """INSERT INTO users
+               (email, subscription_status, subscription_tier, trial_started_at, trial_ends_at)
+               VALUES (%s, 'trial', 'free_trial', %s, %s)""",
+            (email, now, trial_ends),
+        )
+        connection.commit()
+        user_id = cursor.lastrowid
+        # Create a Stripe customer in the background (non-fatal if it fails)
+        try:
+            from cqc_lem.utilities.stripe_util import create_stripe_customer
+            stripe_cid = create_stripe_customer(email, user_id)
+            if stripe_cid:
+                cursor.execute(
+                    "UPDATE users SET stripe_customer_id = %s WHERE id = %s",
+                    (stripe_cid, user_id),
+                )
+                connection.commit()
+        except Exception as se:
+            myprint(f"Stripe customer creation non-fatal error for {email}: {se}")
+        return user_id
+    except mysql.connector.Error as err:
+        if err.errno == errorcode.ER_DUP_ENTRY:
+            return get_user_id(email)
+        myprint(f"Could not create user for {email} | Error: {err}")
+        return None
+    finally:
+        cursor.close()
+        connection.close()
+
+
+def get_user_email(user_id: int) -> Optional[str]:
+    connection = get_db_connection()
+    cursor = connection.cursor(dictionary=True)
+    try:
+        cursor.execute("SELECT email FROM users WHERE id = %s", (user_id,))
+        row = cursor.fetchone()
+        return row['email'] if row else None
+    except mysql.connector.Error as err:
+        myprint(f"Could not get email for user_id {user_id} | Error: {err}")
+        return None
+    finally:
+        cursor.close()
+        connection.close()
+
+
+def get_user_token_info(user_id: int) -> Optional[dict]:
+    connection = get_db_connection()
+    cursor = connection.cursor(dictionary=True)
+    try:
+        cursor.execute(
+            """SELECT access_token, access_token_expires_in, access_token_created_at,
+                      refresh_token, refresh_token_expires_in, refresh_token_created_at
+               FROM users WHERE id = %s""",
+            (user_id,),
+        )
+        return cursor.fetchone()
+    except mysql.connector.Error as err:
+        myprint(f"Could not get token info for user_id {user_id} | Error: {err}")
+        return None
+    finally:
+        cursor.close()
+        connection.close()
+
+
+def update_user_access_token(
+    user_id: int,
+    access_token: str,
+    expires_in: int,
+    refresh_token: Optional[str] = None,
+    refresh_token_expires_in: Optional[int] = None,
+) -> bool:
+    now = datetime.now(timezone.utc)
+    connection = get_db_connection()
+    cursor = connection.cursor()
+    try:
+        if refresh_token:
+            cursor.execute(
+                """UPDATE users SET
+                       access_token = %s,
+                       access_token_expires_in = %s,
+                       access_token_created_at = %s,
+                       refresh_token = %s,
+                       refresh_token_expires_in = %s,
+                       refresh_token_created_at = %s
+                   WHERE id = %s""",
+                (access_token, expires_in, now,
+                 refresh_token, refresh_token_expires_in, now, user_id),
+            )
+        else:
+            cursor.execute(
+                """UPDATE users SET
+                       access_token = %s,
+                       access_token_expires_in = %s,
+                       access_token_created_at = %s
+                   WHERE id = %s""",
+                (access_token, expires_in, now, user_id),
+            )
+        connection.commit()
+        return cursor.rowcount > 0
+    except mysql.connector.Error as err:
+        myprint(f"Could not update access token for user_id {user_id} | Error: {err}")
+        return False
+    finally:
+        cursor.close()
+        connection.close()
+
+
+def update_user_linkedin_token(
+    user_id: int,
+    linked_sub_id: str,
+    access_token: str,
+    expires_in: int,
+    refresh_token: Optional[str] = None,
+    refresh_token_expires_in: Optional[int] = None,
+    linkedin_email: Optional[str] = None,
+) -> bool:
+    """Write a fresh LinkedIn OAuth token to the user identified by user_id.
+
+    Called from the OAuth callback so the token is always attached to the
+    logged-in user, regardless of which email LinkedIn returns.
+    """
+    now = datetime.now(timezone.utc)
+    connection = get_db_connection()
+    cursor = connection.cursor()
+    try:
+        if refresh_token:
+            cursor.execute(
+                """UPDATE users SET
+                       linked_sub_id = %s,
+                       linkedin_email = %s,
+                       access_token = %s,
+                       access_token_expires_in = %s,
+                       access_token_created_at = %s,
+                       refresh_token = %s,
+                       refresh_token_expires_in = %s,
+                       refresh_token_created_at = %s,
+                       linkedin_connection_status = 'connected'
+                   WHERE id = %s""",
+                (linked_sub_id, linkedin_email or None, access_token, expires_in, now,
+                 refresh_token, refresh_token_expires_in, now, user_id),
+            )
+        else:
+            cursor.execute(
+                """UPDATE users SET
+                       linked_sub_id = %s,
+                       linkedin_email = %s,
+                       access_token = %s,
+                       access_token_expires_in = %s,
+                       access_token_created_at = %s,
+                       linkedin_connection_status = 'connected'
+                   WHERE id = %s""",
+                (linked_sub_id, linkedin_email or None, access_token, expires_in, now, user_id),
+            )
+        connection.commit()
+        return cursor.rowcount > 0
+    except mysql.connector.Error as err:
+        myprint(f"Could not update LinkedIn token for user_id {user_id} | Error: {err}")
+        return False
+    finally:
+        cursor.close()
+        connection.close()
+
+
+def update_linkedin_connection_status(user_id: int, status: str) -> bool:
+    """Set linkedin_connection_status to 'connected', 'expired', or 'disconnected'."""
+    connection = get_db_connection()
+    cursor = connection.cursor()
+    try:
+        cursor.execute(
+            "UPDATE users SET linkedin_connection_status = %s WHERE id = %s",
+            (status, user_id),
+        )
+        connection.commit()
+        return cursor.rowcount > 0
+    except mysql.connector.Error as err:
+        myprint(f"Could not update linkedin_connection_status for user_id {user_id} | Error: {err}")
+        return False
+    finally:
+        cursor.close()
+        connection.close()
+
+
+def get_user_subscription_info(user_id: int) -> Optional[dict]:
+    """Return subscription fields for the given user."""
+    connection = get_db_connection()
+    cursor = connection.cursor(dictionary=True)
+    try:
+        cursor.execute(
+            """SELECT subscription_status, subscription_tier,
+                      trial_started_at, trial_ends_at,
+                      stripe_customer_id, stripe_subscription_id
+               FROM users WHERE id = %s""",
+            (user_id,),
+        )
+        return cursor.fetchone()
+    except mysql.connector.Error as err:
+        myprint(f"Could not get subscription info for user_id {user_id} | Error: {err}")
+        return None
+    finally:
+        cursor.close()
+        connection.close()
+
+
+def update_subscription_from_stripe(
+    stripe_customer_id: str,
+    status: str,
+    tier: Optional[str],
+    subscription_id: Optional[str],
+    current_period_end: Optional[datetime] = None,
+) -> bool:
+    """Called from Stripe webhook handler to sync subscription state.
+
+    When tier is None (e.g. subscription deleted) we preserve the existing tier so
+    historical data is retained. Pass an explicit empty string to clear it.
+    """
+    connection = get_db_connection()
+    cursor = connection.cursor()
+    try:
+        if tier is not None:
+            cursor.execute(
+                """UPDATE users
+                   SET subscription_status = %s,
+                       subscription_tier = %s,
+                       stripe_subscription_id = %s,
+                       subscription_current_period_end = %s
+                   WHERE stripe_customer_id = %s""",
+                (status, tier, subscription_id, current_period_end, stripe_customer_id),
+            )
+        else:
+            # Don't overwrite the tier — preserve it for historical reference
+            cursor.execute(
+                """UPDATE users
+                   SET subscription_status = %s,
+                       stripe_subscription_id = %s,
+                       subscription_current_period_end = %s
+                   WHERE stripe_customer_id = %s""",
+                (status, subscription_id, current_period_end, stripe_customer_id),
+            )
+        connection.commit()
+        return cursor.rowcount > 0
+    except mysql.connector.Error as err:
+        myprint(f"Could not update subscription from Stripe for customer {stripe_customer_id} | Error: {err}")
+        return False
+    finally:
+        cursor.close()
+        connection.close()
+
+
+def get_users_with_stripe_subscriptions() -> list[dict]:
+    """Return all users that have a Stripe subscription ID (for periodic sync)."""
+    connection = get_db_connection()
+    cursor = connection.cursor(dictionary=True)
+    try:
+        cursor.execute(
+            """SELECT id, stripe_customer_id, stripe_subscription_id,
+                      subscription_status, subscription_tier
+               FROM users
+               WHERE stripe_subscription_id IS NOT NULL
+                 AND subscription_status IN ('active', 'past_due')"""
+        )
+        return cursor.fetchall() or []
+    except mysql.connector.Error as err:
+        myprint(f"Could not fetch Stripe subscribers | Error: {err}")
+        return []
+    finally:
+        cursor.close()
+        connection.close()
+
+
+def get_user_preferences(user_id: int) -> Optional[dict]:
+    """Return user preference fields: last_login_inactivate_delay and auto_schedule_posts."""
+    connection = get_db_connection()
+    cursor = connection.cursor(dictionary=True)
+    try:
+        cursor.execute(
+            "SELECT last_login_inactivate_delay, auto_schedule_posts FROM users WHERE id = %s",
+            (user_id,),
+        )
+        return cursor.fetchone()
+    except mysql.connector.Error as err:
+        myprint(f"Could not get preferences for user_id {user_id} | Error: {err}")
+        return None
+    finally:
+        cursor.close()
+        connection.close()
+
+
+def update_user_preferences(
+    user_id: int,
+    inactivate_delay: Optional[int],
+    auto_schedule_posts: bool,
+) -> bool:
+    """Persist user-configurable inactivity delay (None = never) and auto-schedule flag."""
+    connection = get_db_connection()
+    cursor = connection.cursor()
+    try:
+        cursor.execute(
+            """UPDATE users
+               SET last_login_inactivate_delay = %s,
+                   auto_schedule_posts = %s
+               WHERE id = %s""",
+            (inactivate_delay, 1 if auto_schedule_posts else 0, user_id),
+        )
+        connection.commit()
+        return cursor.rowcount > 0
+    except mysql.connector.Error as err:
+        myprint(f"Could not update preferences for user_id {user_id} | Error: {err}")
+        return False
+    finally:
+        cursor.close()
+        connection.close()

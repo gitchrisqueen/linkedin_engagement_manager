@@ -34,69 +34,55 @@ RUN npm run build
 
 FROM base AS builder
 
-# Create arg to install dev dependencies
 ARG INSTALL_DEV_DEPS=false
-# Set the env variable to use in the next stage
-ENV INSTALL_DEV_DEPS=${INSTALL_DEV_DEPS}
-
-# --- Install Poetry ---
 ARG POETRY_VERSION=2.0
 
 ENV POETRY_HOME=/opt/poetry \
     POETRY_NO_INTERACTION=1 \
     POETRY_VIRTUALENVS_IN_PROJECT=1 \
     POETRY_VIRTUALENVS_CREATE=1 \
-    # Tell Poetry where to place its cache and virtual environment
-    POETRY_CACHE_DIR=/opt/.cache
-
-# Pip Configuration
-ENV PIP_DEFAULT_TIMEOUT=100 \
+    POETRY_CACHE_DIR=/opt/.cache \
+    PIP_DEFAULT_TIMEOUT=100 \
     PIP_DISABLE_PIP_VERSION_CHECK=1 \
     PIP_NO_CACHE_DIR=1
 
-
-# Install poetry and the export plugin into the same pip environment.
-# poetry self add does not work reliably when poetry is pip-installed (vs official installer).
 RUN pip install "poetry==$POETRY_VERSION" poetry-plugin-export
 
-# Copy the poetry.lock and pyproject.toml
+# Install deps first (cached layer — only busts when pyproject.toml/poetry.lock change)
 COPY ./pyproject.toml ./poetry.lock ./
-
-# Install the dependencies and clear the cache afterwards.
-#   This may save some MBs.
 RUN if [ "$INSTALL_DEV_DEPS" = "true" ]; then \
-    poetry install --with dev --no-root  && rm -rf $POETRY_CACHE_DIR; \
+    poetry install --with dev --no-root && rm -rf $POETRY_CACHE_DIR; \
     else \
-    poetry install --only main --no-root  && rm -rf $POETRY_CACHE_DIR; \
+    poetry install --only main --no-root && rm -rf $POETRY_CACHE_DIR; \
     fi
 
-
-
-# Now let's build the runtime image from the builder.
-#   We'll just copy the env and the PATH reference.
-FROM builder AS my_app_code
-
-ENV VIRTUAL_ENV=/app/.venv
-ENV PATH="/app/.venv/bin:$PATH"
-
-# Copy app src files
-COPY ./src ./src
+# Copy source and install the project package (busts when src changes)
 COPY ./README.md ./README.md
-
-# Inject the pre-built React SPA dist so FastAPI can serve it
+COPY ./src ./src
 COPY --from=ui-builder /ui/dist ./src/cqc_lem/ui/dist
-
-# Install our package and clear the cache afterwards.
-#   This may save some MBs.
 RUN if [ "$INSTALL_DEV_DEPS" = "true" ]; then \
     poetry install --with dev && rm -rf $POETRY_CACHE_DIR; \
     else \
     poetry install --only main && rm -rf $POETRY_CACHE_DIR; \
     fi
 
-FROM my_app_code AS final
+# Clean runtime image — no Poetry, no pip build tools, just the venv and source
+FROM base AS final
 
-# Copy and set permissions for entrypoint and other scripts
+ENV VIRTUAL_ENV=/app/.venv \
+    PATH="/app/.venv/bin:$PATH"
+
+# Create user BEFORE any COPY so we can use --chown at copy time instead of
+# a separate RUN chown -R /app (which would duplicate every file in a new layer).
+RUN useradd -m -s /bin/bash celeryworker && \
+    mkdir -p /home/celeryworker/.aws /app/logs && \
+    chown celeryworker:celeryworker /home/celeryworker/.aws /app/logs && \
+    chmod 755 /app/logs
+
+COPY --chown=celeryworker:celeryworker --from=builder /app/.venv /app/.venv
+COPY --chown=celeryworker:celeryworker --from=builder /app/src /app/src
+
+# Start scripts live at / so they are not inside the chowned /app tree
 COPY ./compose/local/entrypoint /entrypoint
 COPY ./compose/local/wait-for-it /wait-for-it
 COPY ./compose/local/fastapi/start /start-fastapi
@@ -107,22 +93,8 @@ COPY ./compose/local/celery/beat/start /start-celerybeat
 COPY ./compose/local/celery/flower/start /start-flower
 COPY ./compose/local/celery/flower/start-no-wait /start-flower-no-wait
 
-# Set permissions and create logs directory
 RUN chmod +x /entrypoint /wait-for-it /start-fastapi \
     /start-fastapi-cloud /start-celeryworker /start-celeryworker-solo \
-    /start-celerybeat /start-flower /start-flower-no-wait && \
-    mkdir -p /app/logs
-
-
-# Create non-root user during build
-RUN useradd -m -s /bin/bash celeryworker
-
-# Create the .aws directory for the non-root user and set correct ownership during build
-RUN chown -R celeryworker:celeryworker /app && \
-    mkdir -p /home/celeryworker/.aws && \
-    chown -R celeryworker:celeryworker /home/celeryworker/.aws && \
-    mkdir -p /app/logs && \
-    chown -R celeryworker:celeryworker /app/logs && \
-    chmod 755 /app/logs
+    /start-celerybeat /start-flower /start-flower-no-wait
 
 ENTRYPOINT ["/entrypoint"]

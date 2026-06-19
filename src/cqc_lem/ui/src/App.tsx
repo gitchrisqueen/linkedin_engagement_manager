@@ -1,6 +1,9 @@
 import { BrowserRouter, Routes, Route } from 'react-router-dom'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import { AuthProvider, useAuth } from './contexts/AuthContext'
 import Layout from './components/Layout'
+import ProtectedRoute from './components/ProtectedRoute'
+import LoginModal from './components/LoginModal'
 import Dashboard from './pages/Dashboard'
 import Account from './pages/Account'
 import ScheduleContent from './pages/ScheduleContent'
@@ -9,23 +12,40 @@ import Landing from './pages/Landing'
 
 const queryClient = new QueryClient()
 
-function GuestOrDashboard() {
-  const email = localStorage.getItem('lem_email')
-  return email ? <Dashboard /> : <Landing />
+function AppRoutes() {
+  const { user, isLoginModalOpen } = useAuth()
+
+  return (
+    <>
+      {isLoginModalOpen && <LoginModal />}
+      <Routes>
+        <Route path="/" element={<Layout />}>
+          <Route index element={user ? <Dashboard /> : <Landing />} />
+          <Route
+            path="account"
+            element={<ProtectedRoute><Account /></ProtectedRoute>}
+          />
+          <Route
+            path="schedule"
+            element={<ProtectedRoute><ScheduleContent /></ProtectedRoute>}
+          />
+          <Route
+            path="review"
+            element={<ProtectedRoute><ReviewSchedule /></ProtectedRoute>}
+          />
+        </Route>
+      </Routes>
+    </>
+  )
 }
 
 export default function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <BrowserRouter>
-        <Routes>
-          <Route path="/" element={<Layout />}>
-            <Route index element={<GuestOrDashboard />} />
-            <Route path="account" element={<Account />} />
-            <Route path="schedule" element={<ScheduleContent />} />
-            <Route path="review" element={<ReviewSchedule />} />
-          </Route>
-        </Routes>
+        <AuthProvider>
+          <AppRoutes />
+        </AuthProvider>
       </BrowserRouter>
     </QueryClientProvider>
   )

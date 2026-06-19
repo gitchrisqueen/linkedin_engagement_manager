@@ -1,11 +1,22 @@
 #!/bin/bash
 
-# Load the .env file (optional, Docker Compose will load this automatically if the .env is in the root)
+# Load the .env file (Docker Compose also loads this automatically)
 export $(grep -v '^#' .env | xargs)
 
 NGROK_PLAN="${NGROK_PLAN:-off}"
+UI_SRC_DIR="src/cqc_lem/ui/src"
+UI_DIST_REF="src/cqc_lem/ui/dist/index.html"
 
-# Step 1: Prompt the user if they want to build the latest docker image
+# ─── Current container status ────────────────────────────────────────────────
+printf "Current container status:\n"
+if docker compose ps 2>/dev/null | grep -q "running\|Up\|healthy"; then
+    docker compose ps
+else
+    printf "  (no containers running)\n"
+fi
+printf "\n"
+
+# ─── Step 1: Build Docker image ──────────────────────────────────────────────
 read -p "Do you want to build the latest Docker image(s)? (y/n): " build_image
 if [ "$build_image" == "y" ]; then
     echo "Building Docker images (${DOCKER_IMAGE_NAME}:latest)..."
@@ -17,11 +28,67 @@ if [ "$build_image" == "y" ]; then
     fi
 fi
 
-# Step 2: Run the Docker containers
+# ─── Step 1b: React UI — rebuild if source changed since last build ──────────
+# dist/ is volume-mounted (./src:/app/src) so a local npm build is picked up
+# by the running container immediately — no Docker rebuild needed.
+NEEDS_UI_BUILD=false
+if [ ! -f "$UI_DIST_REF" ]; then
+    printf "\nWarning: React dist/ not found — the UI will be blank until it is built.\n"
+    NEEDS_UI_BUILD=true
+elif [ -d "$UI_SRC_DIR" ] && \
+     find "$UI_SRC_DIR" -newer "$UI_DIST_REF" \
+         \( -name "*.tsx" -o -name "*.ts" -o -name "*.css" -o -name "*.json" \) \
+         2>/dev/null | grep -q .; then
+    printf "\nReact UI source has changed since the last build.\n"
+    NEEDS_UI_BUILD=true
+fi
+
+if [ "$NEEDS_UI_BUILD" = "true" ]; then
+    read -p "Rebuild React UI now? (y/n): " rebuild_ui
+    if [ "$rebuild_ui" = "y" ]; then
+        printf "Building React UI...\n"
+        (cd src/cqc_lem/ui && npm run build)
+    fi
+fi
+
+# ─── Step 2: Start containers ────────────────────────────────────────────────
 echo "Starting Docker Containers..."
 docker compose up -d --remove-orphans
 
-# Step 3: Clean up old images and build cache
+# ─── Step 2b: Status after startup ───────────────────────────────────────────
+printf "\nContainer status:\n"
+docker compose ps
+printf "\n"
+
+# ─── Step 2c: Celery — restart if task files changed since worker started ────
+# Python API changes auto-reload via uvicorn --reload (no action needed).
+# Celery workers do NOT auto-reload; this detects stale task code and prompts.
+CELERY_RUNNING=$(docker ps -q -f "name=^celery_worker$" 2>/dev/null)
+if [ -n "$CELERY_RUNNING" ]; then
+    NEEDS_CELERY_RESTART=$(docker inspect --format='{{.State.StartedAt}}' celery_worker 2>/dev/null | \
+        python3 -c "
+import sys, os
+from datetime import datetime, timezone
+try:
+    ts = sys.stdin.read().strip()[:19]
+    start = datetime.strptime(ts, '%Y-%m-%dT%H:%M:%S').replace(tzinfo=timezone.utc).timestamp()
+    for root, _, files in os.walk('src/cqc_lem/app'):
+        for f in files:
+            if f.endswith('.py') and os.path.getmtime(os.path.join(root, f)) > start:
+                print('yes'); sys.exit(0)
+except Exception:
+    pass
+" 2>/dev/null)
+    if [ "$NEEDS_CELERY_RESTART" = "yes" ]; then
+        printf "Celery task files in src/cqc_lem/app/ changed since the worker last started.\n"
+        read -p "Restart celery_worker now? (y/n): " restart_celery
+        if [ "$restart_celery" = "y" ]; then
+            docker compose restart celery_worker
+        fi
+    fi
+fi
+
+# ─── Step 3: Clean up old images and build cache ─────────────────────────────
 echo "Cleaning up old Docker images older than 7 days..."
 docker image prune -a --filter "until=168h" -f
 
@@ -30,7 +97,7 @@ docker builder prune --filter "until=168h" -f
 
 printf "\nExecution completed!\n\n"
 
-# Step 4 and Step 5: Start NGrok Tunnels based on NGROK_PLAN
+# ─── Step 4 + 5: NGrok tunnels ───────────────────────────────────────────────
 if [ "$NGROK_PLAN" != "off" ]; then
     if [ -z "$NGROK_AUTH_TOKEN" ]; then
         printf "Warning: NGROK_PLAN=%s but NGROK_AUTH_TOKEN is not set — skipping NGrok.\n" "$NGROK_PLAN"
@@ -60,7 +127,26 @@ if [ "$NGROK_PLAN" != "off" ]; then
     fi
 fi
 
-# Step 6: Build URL display arrays based on NGROK_PLAN
+# ─── Step 6: Build URL display ───────────────────────────────────────────────
+
+# For the free plan, the Flower tunnel has no reserved domain so it gets a random URL.
+# Query the ngrok API to surface the actual live URL instead of sending users to the UI.
+FLOWER_NGROK_URL=""
+if [ "$NGROK_PLAN" = "free" ]; then
+    FLOWER_NGROK_URL=$(curl -sf "http://localhost:${NGROK_UI_PORT}/api/tunnels" 2>/dev/null | \
+        python3 -c "
+import sys, json
+try:
+    tunnels = json.load(sys.stdin).get('tunnels', [])
+    for t in tunnels:
+        if 'flower' in t.get('name', '').lower():
+            print(t['public_url'])
+            break
+except Exception:
+    pass
+" 2>/dev/null || echo "")
+fi
+
 titles=("React Web App" "API Docs" "Flower Celery Monitoring" "Docker Chrome VNC")
 
 case "$NGROK_PLAN" in
@@ -75,11 +161,12 @@ case "$NGROK_PLAN" in
     urls+=("http://localhost:${NGROK_UI_PORT}")
     ;;
   free)
-    # Free plan: 2 tunnels (app=static domain, flower=dynamic; chrome=local only)
+    # Free plan: lem-app uses static domain; lem-flower gets a dynamic URL (fetched above).
+    # lem-chrome is excluded to stay within the 3-tunnel free-plan limit.
     urls=(
       "https://${NGROK_CUSTOM_DOMAIN}"
       "https://${NGROK_CUSTOM_DOMAIN}/docs"
-      "Dynamic — see http://localhost:${NGROK_UI_PORT}"
+      "${FLOWER_NGROK_URL:-Dynamic — see http://localhost:${NGROK_UI_PORT}}"
       "http://localhost:7900 (local only)"
     )
     titles+=("Ngrok Web Interface")
@@ -143,6 +230,14 @@ print_urls() {
 }
 
 print_urls "titles[@]" "urls[@]"
+
+# ─── Dev workflow quick reference ────────────────────────────────────────────
+printf "Dev workflow (no Docker rebuild needed):\n"
+printf "  Python changes  → auto-reloaded by uvicorn  (no action needed)\n"
+printf "  React UI change → cd src/cqc_lem/ui && npm run build\n"
+printf "  Celery changes  → docker compose restart celery_worker\n"
+printf "  View logs       → docker compose logs -f <service>\n"
+printf "  Stop all        → docker compose down\n\n"
 
 # Remove Dangling Images
 docker image prune -f --filter "dangling=true"

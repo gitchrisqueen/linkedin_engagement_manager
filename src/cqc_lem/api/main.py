@@ -1,3 +1,4 @@
+import json
 import os
 import time
 from datetime import datetime
@@ -13,7 +14,17 @@ from cqc_lem.app.run_content_plan import auto_create_weekly_content
 from cqc_lem.utilities.db import (
     insert_post, get_post_by_email, get_user_id, update_db_post, get_post_user_id,
     add_user_with_access_token, update_user, PostType, PostStatus, get_posts,
-    get_recent_logs,
+    get_recent_logs, bulk_update_posts, soft_delete_posts,
+    create_pin_for_email, verify_pin_for_email,
+    create_session, get_session_user_id, delete_session,
+    add_user_by_email, get_user_email, get_user_token_info,
+    get_user_subscription_info, get_user_preferences, update_user_preferences,
+    update_subscription_from_stripe, update_user_linkedin_token,
+    get_users_with_stripe_subscriptions,
+)
+from cqc_lem.utilities.email import generate_pin, hash_pin, send_pin_email
+from cqc_lem.utilities.linkedin.token_refresh import (
+    get_token_expiry, is_token_expired, is_token_expiring_soon, attempt_token_refresh,
 )
 from cqc_lem.utilities.env_constants import LI_CLIENT_ID, LI_CLIENT_SECRET, LI_REDIRECT_URL, LI_STATE_SALT
 from cqc_lem.utilities.logger import myprint
@@ -29,6 +40,7 @@ from fastapi.responses import StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from linkedin_api.clients.auth.client import AuthClient
 from linkedin_api.clients.restli.client import RestliClient
+from linkedin_api.common.errors import ResponseFormattingError
 from pydantic import BaseModel, computed_field
 
 app = FastAPI()
@@ -40,14 +52,18 @@ router = APIRouter(prefix="/api")
 @app.middleware("http")
 async def observability_middleware(request: Request, call_next):
     start = time.time()
-    response = await call_next(request)
-    track_api_call(
-        route=request.url.path,
-        method=request.method,
-        status_code=response.status_code,
-        latency_ms=int((time.time() - start) * 1000),
-    )
-    return response
+    status_code = 500
+    try:
+        response = await call_next(request)
+        status_code = response.status_code
+        return response
+    finally:
+        track_api_call(
+            route=request.url.path,
+            method=request.method,
+            status_code=status_code,
+            latency_ms=int((time.time() - start) * 1000),
+        )
 
 
 _ui_dist = os.path.join(os.path.dirname(__file__), "..", "ui", "dist")
@@ -67,6 +83,18 @@ class ResponseModel(BaseModel):
     detail: Any
 
 
+def _parse_slides(raw) -> Optional[List[str]]:
+    if not raw:
+        return None
+    if isinstance(raw, list):
+        return raw
+    try:
+        result = json.loads(raw)
+        return result if isinstance(result, list) else None
+    except (json.JSONDecodeError, TypeError):
+        return None
+
+
 class PostRequest(BaseModel):
     content: str
     video_url: Optional[str] = None
@@ -74,6 +102,7 @@ class PostRequest(BaseModel):
     scheduled_datetime: datetime
     email: Optional[str] = None
     status: Optional[PostStatus] = PostStatus.PENDING
+    carousel_slides: Optional[List[str]] = None
 
     @property
     def post_json(self):
@@ -87,11 +116,52 @@ class PostRequest(BaseModel):
         return self.scheduled_datetime.isoformat()
 
 
+class BulkUpdateRequest(BaseModel):
+    post_ids: List[int]
+    status: Optional[PostStatus] = None
+    scheduled_datetime: Optional[datetime] = None
+
+
+class BulkDeleteRequest(BaseModel):
+    post_ids: List[int]
+
+
 class UserSettingsRequest(BaseModel):
     email: str
     new_email: Optional[str] = None
     blog_url: Optional[str] = None
     sitemap_url: Optional[str] = None
+
+
+class AuthInitRequest(BaseModel):
+    email: str
+
+
+class AuthVerifyRequest(BaseModel):
+    email: str
+    pin: str
+
+
+class LogoutRequest(BaseModel):
+    session_token: str
+
+
+class CheckoutSessionRequest(BaseModel):
+    session_token: str
+    tier: str
+    success_url: str
+    cancel_url: str
+
+
+class PortalSessionRequest(BaseModel):
+    session_token: str
+    return_url: str
+
+
+class UserPreferencesRequest(BaseModel):
+    session_token: str
+    last_login_inactivate_delay: Optional[int] = 90
+    auto_schedule_posts: bool = False
 
 
 class FutureForwardValues(IntEnum):
@@ -120,7 +190,7 @@ def get_dashboard_stats(email: str) -> ResponseModel:
     if not user_id:
         raise HTTPException(status_code=403, detail="User not found")
 
-    posts = get_posts(user_id) or []
+    posts, _ = get_posts(user_id)
     now = datetime.now()
     week_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
     week_start = week_start.replace(day=week_start.day - week_start.weekday())
@@ -226,7 +296,8 @@ def schedule_post(post: PostRequest) -> ResponseModel:
     if not user_id:
         raise HTTPException(status_code=403, detail="User not found")
 
-    if insert_post(post.email, post.content, post.scheduled_datetime, post.post_type):
+    if insert_post(post.email, post.content, post.scheduled_datetime, post.post_type,
+                   video_url=post.video_url, carousel_slides=post.carousel_slides):
         return ResponseModel(status_code=200, detail="Post scheduled successfully")
     else:
         raise HTTPException(status_code=404, detail="Could not schedule post")
@@ -293,13 +364,21 @@ def get_user_id_from_email(email: str) -> ResponseModel:
     200: {"description": "Posts retrieved successfully"},
     **{k: v for k, v in error_responses.items() if k in [400, 404]}
 })
-def get_posts_for_email(email: str) -> ResponseModel:
+def get_posts_for_email(
+    email: str,
+    page: int = Query(default=1, ge=1),
+    page_size: int = Query(default=10, ge=1, le=200),
+    sort_order: str = Query(default='asc', pattern='^(asc|desc)$'),
+    status_filter: Optional[str] = Query(default=None),
+) -> ResponseModel:
     if not email:
         raise HTTPException(status_code=400, detail="Email is required")
 
-    posts = get_post_by_email(email)
-    if not posts:
-        raise HTTPException(status_code=404, detail="No posts found for the given email")
+    offset = (page - 1) * page_size
+    posts, total = get_post_by_email(
+        email, limit=page_size, offset=offset,
+        sort_order=sort_order, status_filter=status_filter
+    )
 
     posts_list = [
         {
@@ -308,11 +387,45 @@ def get_posts_for_email(email: str) -> ResponseModel:
             "video_url": post["video_url"],
             "scheduled_time": post["scheduled_time"],
             "post_type": post["post_type"],
-            "status": post['status'],
+            "status": post["status"],
+            "carousel_slides": _parse_slides(post.get("carousel_slides")),
         }
         for post in posts
     ]
-    return ResponseModel(status_code=200, detail=posts_list)
+    return ResponseModel(status_code=200, detail={
+        "posts": posts_list,
+        "total": total,
+        "page": page,
+        "page_size": page_size,
+    })
+
+
+@router.post("/posts/bulk_update/", responses={
+    200: {"description": "Posts updated successfully"},
+    **{k: v for k, v in error_responses.items() if k in [400, 405]}
+})
+def bulk_update_posts_endpoint(request: BulkUpdateRequest) -> ResponseModel:
+    if not request.post_ids:
+        raise HTTPException(status_code=400, detail="post_ids is required")
+
+    if bulk_update_posts(request.post_ids, status=request.status, scheduled_time=request.scheduled_datetime):
+        return ResponseModel(status_code=200, detail="Posts updated successfully")
+    else:
+        raise HTTPException(status_code=405, detail="Posts could not be updated")
+
+
+@router.delete("/posts/", responses={
+    200: {"description": "Posts deleted (soft) successfully"},
+    **{k: v for k, v in error_responses.items() if k in [400, 405]}
+})
+def delete_posts_endpoint(request: BulkDeleteRequest) -> ResponseModel:
+    if not request.post_ids:
+        raise HTTPException(status_code=400, detail="post_ids is required")
+
+    if soft_delete_posts(request.post_ids):
+        return ResponseModel(status_code=200, detail="Posts deleted successfully")
+    else:
+        raise HTTPException(status_code=405, detail="Posts could not be deleted")
 
 
 @router.post("/update_post/", responses={
@@ -355,12 +468,136 @@ def get_assets(file_name: str, content_type: Optional[str] = None,
 
 
 # LinkedIn OAuth initiation — builds the authorization URL and redirects user to LinkedIn
+@router.post("/auth/email/init")
+def auth_email_init(request: AuthInitRequest) -> ResponseModel:
+    email = request.email.strip().lower()
+    if not email:
+        raise HTTPException(status_code=400, detail="Email is required")
+
+    user_exists = bool(get_user_id(email))
+    pin = generate_pin()
+    pin_hash = hash_pin(pin, email)
+
+    sent, bypassed = send_pin_email(email, pin, is_new_user=not user_exists)
+
+    if bypassed:
+        # No email provider configured — create user + session immediately, skip PIN step
+        user_id = get_user_id(email)
+        is_new_user = user_id is None
+        if is_new_user:
+            user_id = add_user_by_email(email)
+            if not user_id:
+                raise HTTPException(status_code=500, detail="Could not create user record")
+        session_token = create_session(user_id)
+        if not session_token:
+            raise HTTPException(status_code=500, detail="Could not create session")
+        return ResponseModel(status_code=200, detail={
+            "bypass": True,
+            "session_token": session_token,
+            "email": email,
+            "is_new_user": is_new_user,
+        })
+
+    if not sent:
+        raise HTTPException(status_code=500, detail="Could not send PIN email — check email provider settings")
+
+    if not create_pin_for_email(email, pin_hash):
+        raise HTTPException(status_code=500, detail="Could not create PIN")
+
+    return ResponseModel(status_code=200, detail={"bypass": False, "user_exists": user_exists, "message": "PIN sent to email"})
+
+
+@router.post("/auth/email/verify")
+def auth_email_verify(request: AuthVerifyRequest) -> ResponseModel:
+    email = request.email.strip().lower()
+    pin = request.pin.strip()
+    if not email or not pin:
+        raise HTTPException(status_code=400, detail="Email and PIN are required")
+
+    pin_hash = hash_pin(pin, email)
+    if not verify_pin_for_email(email, pin_hash):
+        raise HTTPException(status_code=401, detail="Invalid or expired PIN")
+
+    user_id = get_user_id(email)
+    is_new_user = user_id is None
+    if is_new_user:
+        user_id = add_user_by_email(email)
+        if not user_id:
+            raise HTTPException(status_code=500, detail="Could not create user record")
+
+    session_token = create_session(user_id)
+    if not session_token:
+        raise HTTPException(status_code=500, detail="Could not create session")
+
+    return ResponseModel(
+        status_code=200,
+        detail={"session_token": session_token, "email": email, "is_new_user": is_new_user},
+    )
+
+
+@router.post("/auth/logout")
+def auth_logout(request: LogoutRequest) -> ResponseModel:
+    delete_session(request.session_token)
+    return ResponseModel(status_code=200, detail="Logged out")
+
+
+@router.get("/auth/session")
+def auth_check_session(session_token: str) -> ResponseModel:
+    user_id = get_session_user_id(session_token)
+    if not user_id:
+        raise HTTPException(status_code=401, detail="Invalid or expired session")
+    email = get_user_email(user_id)
+    return ResponseModel(status_code=200, detail={"user_id": user_id, "email": email})
+
+
+@router.get("/user/token_status")
+def get_user_token_status(session_token: str) -> ResponseModel:
+    user_id = get_session_user_id(session_token)
+    if not user_id:
+        raise HTTPException(status_code=401, detail="Invalid or expired session")
+
+    token_info = get_user_token_info(user_id)
+    if not token_info or not token_info.get('access_token'):
+        return ResponseModel(status_code=200, detail={
+            "token_expiry_date": None,
+            "is_expiring_soon": True,
+            "is_expired": True,
+            "refresh_attempted": False,
+            "refresh_succeeded": False,
+        })
+
+    expiring_soon = is_token_expiring_soon(token_info)
+    expired = is_token_expired(token_info)
+    refresh_attempted = False
+    refresh_succeeded = False
+
+    if expiring_soon and token_info.get('refresh_token'):
+        refresh_attempted = True
+        refresh_succeeded, _ = attempt_token_refresh(user_id)
+        if refresh_succeeded:
+            token_info = get_user_token_info(user_id)
+            expiring_soon = is_token_expiring_soon(token_info)
+            expired = is_token_expired(token_info)
+
+    expiry = get_token_expiry(token_info)
+    return ResponseModel(status_code=200, detail={
+        "token_expiry_date": expiry.isoformat() if expiry else None,
+        "is_expiring_soon": expiring_soon,
+        "is_expired": expired,
+        "refresh_attempted": refresh_attempted,
+        "refresh_succeeded": refresh_succeeded,
+    })
+
+
 @app.get("/auth/linkedin/", response_model=None, include_in_schema=False)
 @router.get("/auth/linkedin/", response_model=None, include_in_schema=False)
-def linkedin_auth_init(email: str = None) -> RedirectResponse:
+def linkedin_auth_init(email: str = None, session_token: str = None) -> RedirectResponse:
     client = AuthClient(LI_CLIENT_ID, LI_CLIENT_SECRET, LI_REDIRECT_URL)
+    # Embed the session_token in state so the callback can find the right user,
+    # even when the LinkedIn account email differs from the login email.
+    state = f"{LI_STATE_SALT}:{session_token}" if session_token else LI_STATE_SALT
     auth_url = client.generate_member_auth_url(
-        state=LI_STATE_SALT,
+        state=state,
         scopes=["openid", "profile", "email", "w_member_social"]
     )
     return RedirectResponse(url=auth_url)
@@ -369,51 +606,268 @@ def linkedin_auth_init(email: str = None) -> RedirectResponse:
 # LinkedIn OAuth callback lives outside /api since LinkedIn redirects here
 @app.get("/auth/linkedin/callback", response_model=None)
 def linkedin_callback(code: str, state: str = None) -> Union[ResponseModel, RedirectResponse]:
-    if state is not None and state != LI_STATE_SALT:
-        raise HTTPException(status_code=400, detail="Invalid state parameter")
+    from urllib.parse import urlencode
 
-    resource_path = '/userinfo'
+    def _account_redirect(params: dict) -> RedirectResponse:
+        parsed_url = urlparse(LI_REDIRECT_URL)
+        base_host = f"{parsed_url.scheme}://{parsed_url.netloc.split(':')[0]}"
+        if os.environ.get('NGROK_CUSTOM_DOMAIN'):
+            base_host = "https://" + os.environ.get('NGROK_CUSTOM_DOMAIN')
+        return RedirectResponse(url=f"{base_host}/account?{urlencode(params)}")
+
+    # State format: "{LI_STATE_SALT}:{session_token}" or just "{LI_STATE_SALT}"
+    session_token_from_state: Optional[str] = None
+    if state is not None:
+        if ':' in state:
+            salt_part, session_token_from_state = state.split(':', 1)
+            if salt_part != LI_STATE_SALT:
+                raise HTTPException(status_code=400, detail="Invalid state parameter")
+        elif state != LI_STATE_SALT:
+            raise HTTPException(status_code=400, detail="Invalid state parameter")
+
     client = AuthClient(LI_CLIENT_ID, LI_CLIENT_SECRET, LI_REDIRECT_URL)
-    access_token_response = client.exchange_auth_code_for_access_token(code)
+    try:
+        access_token_response = client.exchange_auth_code_for_access_token(code)
+    except (ResponseFormattingError, Exception) as exc:
+        myprint(f"LinkedIn token exchange failed: {exc}")
+        return _account_redirect({'li_error': 'token_exchange_failed'})
 
     myprint("Access token Response from api call")
     for key, value in access_token_response.__dict__.items():
         myprint(f"{key}: {value}")
 
-    restli_client = RestliClient()
-    response = restli_client.get(
-        resource_path=resource_path,
-        access_token=access_token_response.access_token,
-    )
+    if not access_token_response.access_token:
+        myprint("LinkedIn token exchange returned no access_token")
+        return _account_redirect({'li_error': 'no_access_token'})
 
-    myprint(f"Response from {resource_path} api call:")
-    for key, value in response.__dict__.items():
-        myprint(f"{key}: {value}")
+    try:
+        restli_client = RestliClient()
+        response = restli_client.get(
+            resource_path='/userinfo',
+            access_token=access_token_response.access_token,
+        )
+        myprint("Response from /userinfo api call:")
+        for key, value in response.__dict__.items():
+            myprint(f"{key}: {value}")
+    except Exception as exc:
+        myprint(f"LinkedIn /userinfo call failed: {exc}")
+        return _account_redirect({'li_error': 'userinfo_failed'})
 
-    add_user_with_access_token(
-        response.entity['email'],
-        response.entity['sub'],
-        access_token_response.access_token,
-        access_token_response.expires_in,
-        access_token_response.refresh_token,
-        access_token_response.refresh_token_expires_in,
-    )
-
-    # Redirect to React account page, passing the authenticated email so the
-    # frontend can persist it to localStorage without requiring the user to re-type it.
     user_email = response.entity.get('email', '')
-    from urllib.parse import quote, urlencode
-    qs = urlencode({'email': user_email, 'li_connected': '1'}) if user_email else 'li_connected=1'
+    linked_sub_id = response.entity.get('sub', '')
 
-    parsed_url = urlparse(LI_REDIRECT_URL)
-    base_host = f"{parsed_url.scheme}://{parsed_url.netloc.split(':')[0]}"
+    # Prefer updating the logged-in user's record directly (handles the case where
+    # the LinkedIn account email differs from the app login email).
+    user_id = get_session_user_id(session_token_from_state) if session_token_from_state else None
+    if user_id:
+        myprint(f"Updating LinkedIn token for session user_id={user_id}")
+        update_user_linkedin_token(
+            user_id,
+            linked_sub_id,
+            access_token_response.access_token,
+            access_token_response.expires_in,
+            access_token_response.refresh_token,
+            access_token_response.refresh_token_expires_in,
+            linkedin_email=user_email or None,
+        )
+    else:
+        if not user_email:
+            myprint("LinkedIn /userinfo returned no email and no valid session")
+            return _account_redirect({'li_error': 'no_email'})
+        myprint(f"No session in state — upserting by LinkedIn email {user_email}")
+        add_user_with_access_token(
+            user_email,
+            linked_sub_id,
+            access_token_response.access_token,
+            access_token_response.expires_in,
+            access_token_response.refresh_token,
+            access_token_response.refresh_token_expires_in,
+        )
 
-    if os.environ.get('NGROK_CUSTOM_DOMAIN'):
-        base_host = "https://" + os.environ.get('NGROK_CUSTOM_DOMAIN')
+    return _account_redirect({'email': user_email, 'li_connected': '1'})
 
-    final_redirect_url = f"{base_host}/account?{qs}"
 
-    return RedirectResponse(url=final_redirect_url)
+@router.get("/user/settings")
+def get_user_settings(session_token: str) -> ResponseModel:
+    user_id = get_session_user_id(session_token)
+    if not user_id:
+        raise HTTPException(status_code=401, detail="Invalid or expired session")
+
+    subscription = get_user_subscription_info(user_id)
+    preferences = get_user_preferences(user_id)
+
+    def _iso(dt):
+        return dt.isoformat() if dt else None
+
+    return ResponseModel(status_code=200, detail={
+        "subscription": {
+            "status": subscription.get("subscription_status") if subscription else None,
+            "tier": subscription.get("subscription_tier") if subscription else None,
+            "trial_started_at": _iso(subscription.get("trial_started_at")) if subscription else None,
+            "trial_ends_at": _iso(subscription.get("trial_ends_at")) if subscription else None,
+            "stripe_customer_id": subscription.get("stripe_customer_id") if subscription else None,
+        } if subscription else None,
+        "preferences": {
+            "last_login_inactivate_delay": preferences.get("last_login_inactivate_delay") if preferences else 90,
+            "auto_schedule_posts": bool(preferences.get("auto_schedule_posts")) if preferences else False,
+        } if preferences else None,
+    })
+
+
+@router.put("/user/settings")
+def update_user_settings_endpoint(request: UserPreferencesRequest) -> ResponseModel:
+    user_id = get_session_user_id(request.session_token)
+    if not user_id:
+        raise HTTPException(status_code=401, detail="Invalid or expired session")
+
+    updated = update_user_preferences(
+        user_id,
+        inactivate_delay=request.last_login_inactivate_delay,
+        auto_schedule_posts=request.auto_schedule_posts,
+    )
+    if not updated:
+        raise HTTPException(status_code=500, detail="Could not update preferences")
+    return ResponseModel(status_code=200, detail="Preferences updated")
+
+
+@router.post("/billing/create-checkout-session")
+def billing_create_checkout_session(request: CheckoutSessionRequest) -> ResponseModel:
+    user_id = get_session_user_id(request.session_token)
+    if not user_id:
+        raise HTTPException(status_code=401, detail="Invalid or expired session")
+
+    subscription = get_user_subscription_info(user_id)
+    stripe_customer_id = subscription.get("stripe_customer_id") if subscription else None
+    if not stripe_customer_id:
+        raise HTTPException(status_code=400, detail="No Stripe customer record — contact support")
+
+    from cqc_lem.utilities.stripe_util import create_checkout_session
+    url = create_checkout_session(
+        stripe_customer_id,
+        request.tier,
+        request.success_url,
+        request.cancel_url,
+    )
+    if not url:
+        raise HTTPException(status_code=500, detail="Could not create Stripe checkout session")
+    return ResponseModel(status_code=200, detail={"checkout_url": url})
+
+
+@router.post("/billing/create-portal-session")
+def billing_create_portal_session(request: PortalSessionRequest) -> ResponseModel:
+    user_id = get_session_user_id(request.session_token)
+    if not user_id:
+        raise HTTPException(status_code=401, detail="Invalid or expired session")
+
+    subscription = get_user_subscription_info(user_id)
+    stripe_customer_id = subscription.get("stripe_customer_id") if subscription else None
+    if not stripe_customer_id:
+        raise HTTPException(status_code=400, detail="No Stripe customer record — contact support")
+
+    from cqc_lem.utilities.stripe_util import create_portal_session
+    url = create_portal_session(stripe_customer_id, request.return_url)
+    if not url:
+        raise HTTPException(status_code=500, detail="Could not create Stripe portal session")
+    return ResponseModel(status_code=200, detail={"portal_url": url})
+
+
+@router.post("/billing/webhook")
+async def billing_webhook(request: Request) -> dict:
+    payload = await request.body()
+    sig_header = request.headers.get("Stripe-Signature", "")
+
+    from cqc_lem.utilities.stripe_util import (
+        validate_webhook, get_subscription_tier_from_price, stripe_status_to_db,
+    )
+    event = validate_webhook(payload, sig_header)
+    if event is None:
+        raise HTTPException(status_code=400, detail="Invalid Stripe webhook signature")
+
+    event_type = event.get("type", "")
+    data = event.get("data", {}).get("object", {})
+    myprint(f"Stripe webhook received: {event_type}")
+
+    # --- Subscription lifecycle events ---
+    if event_type in (
+        "customer.subscription.created",
+        "customer.subscription.updated",
+    ):
+        stripe_customer_id = data.get("customer")
+        stripe_subscription_id = data.get("id")
+        sub_status = data.get("status", "")
+        db_status = stripe_status_to_db(sub_status)
+
+        # Determine tier from the first line item's price
+        price_id = None
+        items = data.get("items", {}).get("data", [])
+        if items:
+            price_id = items[0].get("price", {}).get("id")
+        tier = get_subscription_tier_from_price(price_id) if price_id else None
+
+        # Period end (Unix timestamp → datetime)
+        period_end_ts = data.get("current_period_end")
+        period_end = (
+            datetime.fromtimestamp(period_end_ts) if period_end_ts else None
+        )
+
+        myprint(
+            f"Subscription {stripe_subscription_id}: stripe_status={sub_status} "
+            f"→ db_status={db_status}, tier={tier}, period_end={period_end}"
+        )
+        update_subscription_from_stripe(
+            stripe_customer_id, db_status, tier, stripe_subscription_id, period_end
+        )
+
+    elif event_type == "customer.subscription.deleted":
+        stripe_customer_id = data.get("customer")
+        stripe_subscription_id = data.get("id")
+        myprint(f"Subscription {stripe_subscription_id} deleted for customer {stripe_customer_id}")
+        # tier=None preserves the historical tier in the DB
+        update_subscription_from_stripe(
+            stripe_customer_id, "cancelled", None, stripe_subscription_id
+        )
+
+    # --- Invoice / payment events (fired on every billing cycle renewal) ---
+    elif event_type == "invoice.payment_succeeded":
+        stripe_customer_id = data.get("customer")
+        stripe_subscription_id = data.get("subscription")
+        if stripe_subscription_id:
+            myprint(
+                f"Invoice payment succeeded for customer={stripe_customer_id}, "
+                f"subscription={stripe_subscription_id} — marking active"
+            )
+            # Re-fetch the subscription to get the current tier and period end
+            from cqc_lem.utilities.stripe_util import fetch_subscription
+            sub = fetch_subscription(stripe_subscription_id)
+            if sub:
+                price_id = None
+                items = sub.get("items", {}).get("data", [])
+                if items:
+                    price_id = items[0].get("price", {}).get("id")
+                tier = get_subscription_tier_from_price(price_id) if price_id else None
+                period_end_ts = sub.get("current_period_end")
+                period_end = datetime.fromtimestamp(period_end_ts) if period_end_ts else None
+                update_subscription_from_stripe(
+                    stripe_customer_id, "active", tier, stripe_subscription_id, period_end
+                )
+
+    elif event_type == "invoice.payment_failed":
+        stripe_customer_id = data.get("customer")
+        stripe_subscription_id = data.get("subscription")
+        if stripe_subscription_id:
+            myprint(
+                f"Invoice payment FAILED for customer={stripe_customer_id}, "
+                f"subscription={stripe_subscription_id} — marking past_due"
+            )
+            # tier=None preserves existing tier; status → past_due
+            update_subscription_from_stripe(
+                stripe_customer_id, "past_due", None, stripe_subscription_id
+            )
+
+    else:
+        myprint(f"Stripe webhook event ignored: {event_type}")
+
+    return {"received": True}
 
 
 # Register the /api router

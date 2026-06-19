@@ -1,9 +1,10 @@
+import time as _time
 from datetime import datetime, timedelta
 
 from celery import Celery
 from celery import current_app
 from celery.schedules import crontab
-from celery.signals import worker_process_init, task_received, task_success, task_sent
+from celery.signals import worker_process_init, task_received, task_success, task_sent, task_prerun, task_postrun
 from celery.app.control import Inspect
 
 from cqc_lem.app import celeryconfig
@@ -11,6 +12,7 @@ from cqc_lem.app.celeryconfig import broker_url
 from cqc_lem.utilities.env_constants import CODE_TRACING, AWS_REGION
 from cqc_lem.utilities.jaeger_tracer_helper import get_jaeger_tracer
 from cqc_lem.utilities.logger import myprint, logger
+from cqc_lem.utilities.observability import track_task
 from cqc_lem.utilities.utils import get_cloudwatch_client
 
 # AWS deployment: uses SQS as broker (see celeryconfig.py CELERY_BROKER_URL)
@@ -91,7 +93,11 @@ app.conf.update(
         'send-appreciation-dms': {
             'task': 'cqc_lem.app.run_scheduler.auto_appreciate_dms',
             'schedule': crontab(hour='8', minute='0')  # Run every day at 8:00 AM
-        }
+        },
+        'sync-stripe-subscriptions': {
+            'task': 'cqc_lem.app.run_scheduler.sync_stripe_subscriptions',
+            'schedule': crontab(hour='6', minute='0')  # Daily at 6:00 AM — safety-net for missed webhooks
+        },
 
     }
 )
@@ -156,6 +162,25 @@ def get_queue_metric(name_space: str = 'cqc-lem/celery_queue/celery', metric_nam
     except Exception as e:
         logger.error(f"Failed to get metric: {str(e)}")
         return 0
+
+
+_task_start_times: dict = {}
+
+
+@task_prerun.connect(weak=False)
+def on_task_prerun(task_id: str = None, task=None, **kwargs) -> None:
+    _task_start_times[task_id] = _time.time()
+
+
+@task_postrun.connect(weak=False)
+def on_task_postrun(task_id: str = None, task=None, state: str = None, **kwargs) -> None:
+    start = _task_start_times.pop(task_id, _time.time())
+    track_task(
+        task_name=task.name,
+        duration_ms=int((_time.time() - start) * 1000),
+        success=(state == "SUCCESS"),
+        state=state or "UNKNOWN",
+    )
 
 
 @task_sent.connect

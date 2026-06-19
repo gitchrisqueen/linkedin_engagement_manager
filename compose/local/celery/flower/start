@@ -18,7 +18,7 @@ celery --app cqc_lem.app.my_celery \
   flower \
   --broker-api="${CELERY_BROKER_URL}" \
   --logging="DEBUG" \
-  --logfile="/app/logs" \
+  --logfile="/app/logs/flower.log" \
   --debug=True \
   --state_save_interval="${CELERY_FLOWER_STATE_SAVE_INTERVAL}" \
   --persistent=True \

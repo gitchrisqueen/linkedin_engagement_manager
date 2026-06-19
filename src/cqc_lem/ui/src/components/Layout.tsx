@@ -1,4 +1,5 @@
 import { NavLink, Outlet, useNavigate } from 'react-router-dom'
+import { useAuth } from '../contexts/AuthContext'
 
 const navLinks = [
   { to: '/', label: 'Home', end: true },
@@ -8,12 +9,12 @@ const navLinks = [
 ]
 
 export default function Layout() {
-  const email = localStorage.getItem('lem_email') || ''
+  const { user, logout, openLoginModal } = useAuth()
   const navigate = useNavigate()
 
-  function handleLogout() {
-    localStorage.removeItem('lem_email')
-    window.location.reload()
+  async function handleLogout() {
+    await logout()
+    navigate('/')
   }
 
   return (
@@ -21,7 +22,7 @@ export default function Layout() {
       <nav className="bg-white border-b border-gray-200 sticky top-0 z-10">
         <div className="max-w-5xl mx-auto px-4 flex items-center gap-6 h-14">
           <span className="font-bold text-blue-600 text-lg">LEM</span>
-          {navLinks.map(({ to, label, end }) => (
+          {user && navLinks.map(({ to, label, end }) => (
             <NavLink
               key={to}
               to={to}
@@ -38,10 +39,10 @@ export default function Layout() {
             </NavLink>
           ))}
           <div className="ml-auto flex items-center gap-3">
-            {email && (
+            {user ? (
               <>
                 <span className="text-xs text-gray-500 hidden sm:inline">
-                  Logged in as: <span className="font-medium text-gray-700">{email}</span>
+                  Logged in as: <span className="font-medium text-gray-700">{user.email}</span>
                 </span>
                 <button
                   onClick={handleLogout}
@@ -50,13 +51,12 @@ export default function Layout() {
                   Log out
                 </button>
               </>
-            )}
-            {!email && (
+            ) : (
               <button
-                onClick={() => navigate('/account')}
+                onClick={openLoginModal}
                 className="text-xs text-blue-600 hover:text-blue-800 font-medium border border-blue-200 hover:border-blue-400 px-2.5 py-1 rounded transition-colors"
               >
-                Set up account
+                Login / Sign Up
               </button>
             )}
           </div>

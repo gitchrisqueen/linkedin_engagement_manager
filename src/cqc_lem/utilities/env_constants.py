@@ -33,7 +33,7 @@ LI_CLIENT_ID = get_constant_from_env('LI_CLIENT_ID')
 LI_CLIENT_SECRET = get_constant_from_env('LI_CLIENT_SECRET')
 LI_REDIRECT_URL = get_constant_from_env('LI_REDIRECT_URL')
 LI_STATE_SALT = get_constant_from_env('LI_STATE_SALT')
-LI_API_VERSION = get_constant_from_env('LI_API_VERSION', default_value='202401')
+LI_API_VERSION = get_constant_from_env('LI_API_VERSION', default_value='202501')
 PEXELS_API_KEY = get_constant_from_env('PEXELS_API_KEY')
 HF_TOKEN = get_constant_from_env('HF_TOKEN')
 REPLICATE_API_TOKEN = get_constant_from_env('REPLICATE_API_TOKEN')
@@ -81,6 +81,22 @@ if NGROK_FREE_DOMAIN and NGROK_API_PREFIX:
 else:
     API_BASE_URL = get_constant_from_env('API_BASE_URL', default_value='http://localhost')
     API_URL_FINAL = f"{API_BASE_URL}:{API_PORT}"
+
+SENDGRID_API_KEY     = get_constant_from_env('SENDGRID_API_KEY')
+SENDGRID_FROM_EMAIL  = get_constant_from_env('SENDGRID_FROM_EMAIL', default_value='noreply@example.com')
+
+# SMTP fallback (Gmail or any STARTTLS-capable server)
+SMTP_HOST     = get_constant_from_env('SMTP_HOST', default_value='smtp.gmail.com')
+SMTP_PORT     = int(get_constant_from_env('SMTP_PORT', default_value='587'))
+SMTP_USER     = get_constant_from_env('SMTP_USER')
+SMTP_PASSWORD = get_constant_from_env('SMTP_PASSWORD')
+
+STRIPE_API_KEY            = get_constant_from_env('STRIPE_API_KEY')
+STRIPE_WEBHOOK_SECRET     = get_constant_from_env('STRIPE_WEBHOOK_SECRET')
+STRIPE_PRICE_ID_STARTER       = get_constant_from_env('STRIPE_PRICE_ID_STARTER')
+STRIPE_PRICE_ID_PROFESSIONAL  = get_constant_from_env('STRIPE_PRICE_ID_PROFESSIONAL')
+STRIPE_PRICE_ID_ENTERPRISE    = get_constant_from_env('STRIPE_PRICE_ID_ENTERPRISE')
+FREE_TRIAL_DAYS           = int(get_constant_from_env('FREE_TRIAL_DAYS', default_value='14'))
 
 NGROK_LIPREVIEW_PREFIX=get_constant_from_env('NGROK_LIPREVIEW_PREFIX')
 if NGROK_FREE_DOMAIN and NGROK_LIPREVIEW_PREFIX:
