@@ -4930,14 +4930,14 @@ files = [
 
 [[package]]
 name = "runwayml"
-version = "2.3.3"
+version = "4.7.0"
 description = "The official Python library for the runwayml API"
 optional = false
-python-versions = ">=3.8"
+python-versions = ">=3.9"
 groups = ["main"]
 files = [
-    {file = "runwayml-2.3.3-py3-none-any.whl", hash = "sha256:a59e9edf3b9191b605247fdc731412ba803f2ca413454a46b4a4395cee9ee104"},
-    {file = "runwayml-2.3.3.tar.gz", hash = "sha256:86125371ebd7947d3ea952c3d41f93244f31816a5e3561fabf9e17b8a5bd2eea"},
+    {file = "runwayml-4.7.0-py3-none-any.whl", hash = "sha256:48538174732669b3bf8eaab2bcc3c18ae367252b34be00bf7f7935e4bbe34283"},
+    {file = "runwayml-4.7.0.tar.gz", hash = "sha256:79a93610b0782983f9956d2426abbbefa417b4b55d4c33568d42254dd464b85b"},
 ]
 
 [package.dependencies]
@@ -4947,6 +4947,9 @@ httpx = ">=0.23.0,<1"
 pydantic = ">=1.9.0,<3"
 sniffio = "*"
 typing-extensions = ">=4.10,<5"
+
+[package.extras]
+aiohttp = ["aiohttp", "httpx-aiohttp (>=0.1.9)"]
 
 [[package]]
 name = "s3transfer"
@@ -5929,4 +5932,4 @@ type = ["pytest-mypy"]
 [metadata]
 lock-version = "2.1"
 python-versions = ">=3.12,<4.0"
-content-hash = "1426378b7b873ca6a1ad2d0c81e15137b5ce53042e4ff63a0e6dde33d62812d6"
+content-hash = "e10c9751d4d029d7f1062c72355be2e12ec7d74099203c0fd062e85860b8f563"
