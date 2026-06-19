@@ -90,7 +90,7 @@ watchdog = "^5.0.3"
 #AWS
 aws-cdk-lib = "^2.177.0"
 constructs = "^10.4.2"
-cdk-ecr-deployment = "^3.1.8"
+cdk-ecr-deployment = ">=3.1.8,<5.0.0"
 aws-cdk-aws-amplify-alpha = "^2.177.0a0"
 aws-cdk-aws-lambda-python-alpha = "^2.177.0a0"
 
