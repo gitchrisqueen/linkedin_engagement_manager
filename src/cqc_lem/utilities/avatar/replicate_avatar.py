@@ -1,4 +1,4 @@
-import base64
+import io
 import re
 from typing import Optional
 
@@ -65,8 +65,15 @@ def start_avatar_training(user_id: int, zip_bytes: bytes, trigger_word: str) -> 
         raise RuntimeError(f"Could not resolve latest version of {TRAINER_MODEL}")
     trainer_version = trainer.latest_version
 
-    zip_b64 = base64.b64encode(zip_bytes).decode("utf-8")
-    zip_data_uri = f"data:application/zip;base64,{zip_b64}"
+    # Upload the ZIP as a Replicate file so the training input is a URL rather than
+    # a base64-encoded blob. Embedding large payloads directly in the JSON body
+    # causes TLS record MAC errors on the connection.
+    uploaded_file = replicate.files.create(
+        io.BytesIO(zip_bytes),
+        filename="photos.zip",
+        content_type="application/zip",
+    )
+    input_images_url = uploaded_file.urls["get"]
 
     log_info(
         "Starting avatar training",
@@ -78,7 +85,7 @@ def start_avatar_training(user_id: int, zip_bytes: bytes, trigger_word: str) -> 
         model=TRAINER_MODEL,
         version=trainer_version,
         input={
-            "input_images": zip_data_uri,
+            "input_images": input_images_url,
             "trigger_word": trigger_word,
             "steps": 1000,
         },

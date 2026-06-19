@@ -13,6 +13,11 @@ def mock_replicate():
         training.output = None
         m.trainings.create.return_value = training
         m.trainings.get.return_value = training
+
+        uploaded_file = MagicMock()
+        uploaded_file.urls = {"get": "https://replicate.delivery/files/photos.zip"}
+        m.files.create.return_value = uploaded_file
+
         yield m
 
 
@@ -52,14 +57,16 @@ class TestStartAvatarTraining:
             with pytest.raises(ValueError, match="REPLICATE_USERNAME"):
                 start_avatar_training(1, b"PK\x03\x04fakezip", "TOK")
 
-    def test_input_images_is_base64_data_uri(self, mock_replicate, mock_replicate_username):
+    def test_input_images_is_uploaded_file_url(self, mock_replicate, mock_replicate_username):
         from cqc_lem.utilities.avatar.replicate_avatar import start_avatar_training
 
         start_avatar_training(1, b"PK\x03\x04fakezip", "TOK")
 
+        # ZIP must be uploaded via replicate.files.create, not embedded as base64
+        mock_replicate.files.create.assert_called_once()
         call_kwargs = mock_replicate.trainings.create.call_args
         input_data = call_kwargs.kwargs.get("input") or call_kwargs[1].get("input")
-        assert input_data["input_images"].startswith("data:application/zip;base64,")
+        assert input_data["input_images"] == "https://replicate.delivery/files/photos.zip"
         assert input_data["trigger_word"] == "TOK"
 
 
