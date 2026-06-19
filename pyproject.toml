@@ -85,7 +85,7 @@ optional = true
 jupyter = "^1.0.0"
 setuptools = ">=67.6.1,<83.0.0"
 grandalf = "^0.8"
-watchdog = "^5.0.3"
+watchdog = ">=5.0.3,<7.0.0"
 
 #AWS
 aws-cdk-lib = "^2.177.0"
