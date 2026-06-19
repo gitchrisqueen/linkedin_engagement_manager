@@ -1,5 +1,7 @@
 import os
 import random
+import tempfile
+import urllib.request
 from datetime import datetime
 from typing import Optional, Union
 
@@ -189,6 +191,24 @@ def get_default_image_path() -> str:
     return default_image_path
 
 
+def get_pexels_image_path(query: str, default_path: str) -> str:
+    """Download a Pexels image matching *query* to a temp file and return its path.
+
+    Falls back to *default_path* when PEXELS_API_KEY is absent or the request
+    fails so that carousel creation never hard-crashes on a network error.
+    """
+    try:
+        from cqc_lem.utilities.pexels_helper import get_photo
+        photo = get_photo(query)
+        url = photo.medium  # medium-size JPEG is a good balance for slides
+        suffix = ".jpg"
+        tmp = tempfile.NamedTemporaryFile(delete=False, suffix=suffix)
+        urllib.request.urlretrieve(url, tmp.name)
+        return tmp.name
+    except Exception:
+        return default_path
+
+
 def create_ppt_educational_content_carousel(prs: Presentation, carousel: EducationalContentCarousel) -> Presentation:
     """
     Create a PowerPoint presentation for Educational Content Carousel.
@@ -226,8 +246,10 @@ def create_ppt_educational_content_carousel(prs: Presentation, carousel: Educati
     for content in carousel.contents:
         content_slide_args["title"] = content.title
         content_slide_args["body_text"] = content.content
-        content_slide_args["image_path"] = getattr(content, "image_path",
-                                                   default_image_path)  # TODO: Update this with something from pexels or other image grabber function
+        image_path = getattr(content, "image_path", None)
+        content_slide_args["image_path"] = image_path or get_pexels_image_path(
+            content.title or "professional", default_image_path
+        )
         content_slide = random.choice(content_layouts)(
             **content_slide_args
         )
@@ -235,14 +257,15 @@ def create_ppt_educational_content_carousel(prs: Presentation, carousel: Educati
     # Slide 6: Conclusion
     conclusion_layouts = [create_section_title_and_description_layout_slide, create_custom_3_1_layout_slide,
                           create_caption_only_layout_slide]
+    cta_image_path = getattr(carousel.call_to_action, "image_path", None) or get_pexels_image_path(
+        carousel.call_to_action.title or "success", default_image_path
+    )
     conclusion_slide_args = {
         "prs": prs,
         "title": carousel.call_to_action.title,
         "description": carousel.call_to_action.content,
         "subtitle": carousel.call_to_action.content,
-        "image_path": getattr(carousel.call_to_action, "image_path",
-                              default_image_path),
-        # TODO: Update this with something from pexels or other image grabber function
+        "image_path": cta_image_path,
     }
     conclusion_slide = random.choice(conclusion_layouts)(
         **conclusion_slide_args
@@ -276,7 +299,9 @@ def create_ppt_case_study_carousel(prs: Presentation, case_study_carousel: CaseS
         'prs': prs,
         'title': case_study_carousel.challenge.title,
         'body_text': case_study_carousel.challenge.content,
-        'image_path': getattr(case_study_carousel.challenge, 'image_path', get_default_image_path())
+        'image_path': getattr(case_study_carousel.challenge, 'image_path', None) or get_pexels_image_path(
+            case_study_carousel.challenge.title or "challenge", get_default_image_path()
+        ),
     }
     challenge_slide = random.choice(challenge_layouts)(**challenge_kwargs)
 
@@ -298,9 +323,11 @@ def create_ppt_case_study_carousel(prs: Presentation, case_study_carousel: CaseS
         'prs': prs,
         'title': case_study_carousel.results.title,
         'body_text': case_study_carousel.results.content,
-        'image_path': getattr(case_study_carousel.results, 'image_path', get_default_image_path()),
+        'image_path': getattr(case_study_carousel.results, 'image_path', None) or get_pexels_image_path(
+            case_study_carousel.results.title or "results", get_default_image_path()
+        ),
         'big_number': getattr(case_study_carousel.results, 'big_number', ''),
-        'subtitle': getattr(case_study_carousel.results, 'subtitle', case_study_carousel.results.content)
+        'subtitle': getattr(case_study_carousel.results, 'subtitle', case_study_carousel.results.content),
     }
     results_slide = random.choice(results_layouts)(**results_kwargs)
 
@@ -342,7 +369,9 @@ def create_ppt_personal_story_carousel(prs: Presentation, carousel: PersonalStor
     for slide_data in carousel.story_slides:
         random.choice(story_layouts)(
             prs=prs, title=slide_data.title, body_text=slide_data.content,
-            image_path=getattr(slide_data, "image_path", default_image)
+            image_path=getattr(slide_data, "image_path", None) or get_pexels_image_path(
+                slide_data.title or "story", default_image
+            ),
         )
 
     create_title_and_body_1_layout_slide(
@@ -369,7 +398,9 @@ def create_ppt_industry_insights_carousel(prs: Presentation, carousel: IndustryI
     for insight in carousel.insights:
         random.choice(insight_layouts)(
             prs=prs, title=insight.title, body_text=insight.content,
-            image_path=getattr(insight, "image_path", default_image)
+            image_path=getattr(insight, "image_path", None) or get_pexels_image_path(
+                insight.title or "industry", default_image
+            ),
         )
 
     cta_layouts = [create_section_title_and_description_layout_slide, create_custom_3_1_layout_slide]
@@ -393,7 +424,9 @@ def create_ppt_event_recap_carousel(prs: Presentation, carousel: EventRecapCarou
     for moment in carousel.key_moments:
         random.choice(moment_layouts)(
             prs=prs, title=moment.title, body_text=moment.content,
-            image_path=getattr(moment, "image_path", default_image)
+            image_path=getattr(moment, "image_path", None) or get_pexels_image_path(
+                moment.title or "event", default_image
+            ),
         )
 
     cta_layouts = [create_section_title_and_description_layout_slide, create_custom_3_1_layout_slide]
@@ -436,13 +469,17 @@ def create_ppt_product_demo_carousel(prs: Presentation, carousel: ProductDemoCar
     feature_layouts = [create_title_and_body_layout_slide, create_one_column_text_layout_slide]
     random.choice(feature_layouts)(
         prs=prs, title=carousel.main_feature.title, body_text=carousel.main_feature.content,
-        image_path=getattr(carousel.main_feature, "image_path", default_image)
+        image_path=getattr(carousel.main_feature, "image_path", None) or get_pexels_image_path(
+            carousel.main_feature.title or "product", default_image
+        ),
     )
 
     for feature in carousel.additional_features:
         random.choice(feature_layouts)(
             prs=prs, title=feature.title, body_text=feature.content,
-            image_path=getattr(feature, "image_path", default_image)
+            image_path=getattr(feature, "image_path", None) or get_pexels_image_path(
+                feature.title or "feature", default_image
+            ),
         )
 
     cta_layouts = [create_section_title_and_description_layout_slide, create_custom_3_1_layout_slide]

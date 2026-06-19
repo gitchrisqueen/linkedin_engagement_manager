@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query'
 import { Link } from 'react-router-dom'
 import api from '../api/client'
+import { useAuth } from '../contexts/AuthContext'
 
 interface DashboardStats {
   scheduled_this_week: number
@@ -52,7 +53,8 @@ function StatCard({ label, value, color }: { label: string; value: number; color
 }
 
 export default function Dashboard() {
-  const email = localStorage.getItem('lem_email') || ''
+  const { user } = useAuth()
+  const email = user?.email ?? ''
 
   const { data: statsData } = useQuery<{ detail: DashboardStats }>({
     queryKey: ['dashboard-stats', email],
@@ -61,9 +63,9 @@ export default function Dashboard() {
     refetchInterval: 30_000,
   })
 
-  const { data: postsData } = useQuery<{ detail: Post[] }>({
-    queryKey: ['posts', email],
-    queryFn: () => api.get(`/posts/?email=${encodeURIComponent(email)}`).then((r) => r.data),
+  const { data: postsData } = useQuery<{ detail: { posts: Post[]; total: number } }>({
+    queryKey: ['dashboard-posts', email],
+    queryFn: () => api.get(`/posts/?email=${encodeURIComponent(email)}&page_size=50`).then((r) => r.data),
     enabled: !!email,
     refetchInterval: 30_000,
   })
@@ -77,39 +79,13 @@ export default function Dashboard() {
 
   const stats = statsData?.detail ?? { scheduled_this_week: 0, pending_review: 0, posted_total: 0 }
 
-  const allPosts = postsData?.detail ?? []
+  const allPosts = postsData?.detail?.posts ?? []
   const upcoming = allPosts
     .filter((p) => p.status !== 'POSTED')
     .sort((a, b) => new Date(a.scheduled_time).getTime() - new Date(b.scheduled_time).getTime())
     .slice(0, 5)
 
   const activity = activityData?.detail ?? []
-
-  if (!email) {
-    return (
-      <div className="text-center py-16">
-        <p className="text-gray-500 mb-2">Enter your email to get started.</p>
-        <p className="text-xs text-gray-400 mb-4">
-          Then go to{' '}
-          <Link to="/account" className="text-blue-600 hover:underline">
-            Account Settings
-          </Link>{' '}
-          to connect LinkedIn.
-        </p>
-        <input
-          type="email"
-          placeholder="your@email.com"
-          className="border border-gray-300 rounded-lg px-4 py-2 text-sm w-72 focus:outline-none focus:ring-2 focus:ring-blue-500"
-          onKeyDown={(e) => {
-            if (e.key === 'Enter') {
-              localStorage.setItem('lem_email', (e.target as HTMLInputElement).value)
-              window.location.reload()
-            }
-          }}
-        />
-      </div>
-    )
-  }
 
   return (
     <div className="space-y-6">

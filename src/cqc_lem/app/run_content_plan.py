@@ -19,7 +19,7 @@ from cqc_lem.utilities.ai.ai_helper import get_thought_leadership_post_from_ai, 
 from cqc_lem.utilities.db import get_post_type_counts, insert_planned_post, update_db_post_content, \
     get_planned_posts_for_current_week, get_last_planned_post_date_for_user, get_user_password_pair_by_id, \
     get_user_blog_url, get_user_sitemap_url, get_active_user_ids, get_planned_posts_for_next_week, PostStatus, \
-    update_db_post_video_url, update_db_post_status, PostType
+    update_db_post_video_url, update_db_post_status, PostType, get_user_preferences
 from cqc_lem.utilities.env_constants import API_URL_FINAL
 from cqc_lem.utilities.linkedin.helper import get_my_profile
 from cqc_lem.utilities.linkedin.profile import LinkedInProfile
@@ -193,6 +193,7 @@ def create_content(user_id: int, post_type: str, stage: str):
     """Create content based on the specified post type and buyer journey stage."""
 
     video_url = None
+    content = None
 
     if post_type == "video":
         content, video_url = create_video_content(user_id, stage)
@@ -200,8 +201,8 @@ def create_content(user_id: int, post_type: str, stage: str):
         content = f"Content created for {post_type} in the {stage} stage. However, this is unfinished"
     else:
         content = create_text_post(user_id, stage)
-        # Strip leading and ending white spaces
-        content = content.strip()
+        if content:
+            content = content.strip()
 
     return content, video_url
 
@@ -265,7 +266,7 @@ def create_text_post(user_id: int, stage: str, post_type: str = None, user_profi
         user_email, user_password = get_user_password_pair_by_id(user_id)
         driver, wait = get_driver_wait_pair(session_name='Create Text Post')
         try:
-            user_profile = get_my_profile(driver, wait, user_email, user_password)
+            user_profile = get_my_profile(driver, wait, user_email, user_password, user_id=user_id)
         except Exception as e:
             myprint(f"Error getting user profile: {e}")
             # Create empty dummy user profile
@@ -689,6 +690,10 @@ def auto_create_weekly_content(user_id: int = None):
     else:
         planned_posts = get_planned_posts_for_current_week(user_id)
 
+    if not planned_posts:
+        myprint("No planned posts found for this period. Skipping content creation.")
+        return
+
     for post in planned_posts:
         user_id = post['user_id']
         post_id = post['id']
@@ -697,6 +702,10 @@ def auto_create_weekly_content(user_id: int = None):
 
         # For each content create it
         content, video_url = create_content(user_id, post_type, stage)
+
+        if content is None:
+            myprint(f"Skipping post_id {post_id}: content generation returned None")
+            continue
 
         # Copy the video from url to our assets/video folder and store it to the database for later retrieval via api call
         if video_url:
@@ -719,10 +728,13 @@ def auto_create_weekly_content(user_id: int = None):
         myprint(f"Updating content for post_id: {post_id}")
         update_db_post_content(post_id, content)
 
-        # Update the status of the post in the db to pending
-        myprint(f"Updating post_id: {post_id} Status={PostStatus.PENDING}")
-
-        update_db_post_status(post_id, PostStatus.PENDING)
+        # Respect the user's auto_schedule_posts preference:
+        # True → APPROVED (Celery will pick it up); False → PENDING (manual review required)
+        prefs = get_user_preferences(user_id)
+        auto_schedule = bool(prefs.get("auto_schedule_posts")) if prefs else False
+        new_status = PostStatus.APPROVED if auto_schedule else PostStatus.PENDING
+        myprint(f"Updating post_id: {post_id} Status={new_status}")
+        update_db_post_status(post_id, new_status)
 
 
 def is_blog_post(url):

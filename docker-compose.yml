@@ -14,6 +14,7 @@ services:
       redis:
         condition: service_healthy
     volumes:
+      - ./src:/app/src
       - ./tests:/app/tests
       - ./logs:/app/logs
     env_file:
@@ -93,6 +94,12 @@ services:
         condition: service_healthy
       selenium-chrome:
         condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "celery --app cqc_lem.app.my_celery inspect ping -t 5 || exit 1"]
+      interval: 30s
+      timeout: 15s
+      retries: 3
+      start_period: 30s
 
   celery_beat:
     image: ${DOCKER_IMAGE_NAME}
@@ -109,6 +116,12 @@ services:
         condition: service_healthy
       selenium-chrome:
         condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "pgrep -f 'celery.*beat' || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
 
   flower:
     image: ${DOCKER_IMAGE_NAME}
@@ -125,12 +138,18 @@ services:
       - FLOWER_UNAUTHENTICATED_API=True
       - FLOWER_PERSISTENT=False
     ports:
-      - "${CELERY_FLOWER_PORT}:5555"
+      - "${CELERY_FLOWER_PORT}:${CELERY_FLOWER_PORT}"
     depends_on:
       redis:
         condition: service_healthy
       mysql:
         condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:${CELERY_FLOWER_PORT}/metrics || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 20s
 
   selenium-chrome:
     image: selenium/standalone-chrome:latest

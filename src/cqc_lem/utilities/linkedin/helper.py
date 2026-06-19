@@ -1,8 +1,9 @@
 import time
+from typing import Optional
 
 from cqc_lem.utilities.ai.ai_helper import get_industries_of_profile_from_ai
 from cqc_lem.utilities.db import get_cookies, store_cookies, get_linked_in_profile_by_email, add_linkedin_profile, \
-    get_linked_in_profile_by_url
+    get_linked_in_profile_by_url, get_linked_in_profile_by_user_id
 from cqc_lem.utilities.linkedin.profile import LinkedInProfile
 from cqc_lem.utilities.linkedin.scrapper import returnProfileInfo
 from cqc_lem.utilities.logger import myprint
@@ -77,11 +78,14 @@ def login_to_linkedin(driver: WebDriver, wait: WebDriverWait, user_email: str, u
             # are_you_satisfied()
 
 
-def get_my_profile(driver, wait, user_email: str, user_password: str) -> LinkedInProfile:
+def get_my_profile(driver, wait, user_email: str, user_password: str, user_id: Optional[int] = None) -> LinkedInProfile:
     profile = None
 
-    # Check DB for serialized instance of profile
-    profile_json = get_linked_in_profile_by_email(user_email)
+    # Prefer user_id-based cache key; fall back to email for backward compat.
+    if user_id is not None:
+        profile_json = get_linked_in_profile_by_user_id(user_id)
+    else:
+        profile_json = get_linked_in_profile_by_email(user_email)
 
     if profile_json is None:
         myprint(f"Previous Profile not found (or stale) in DB: {user_email}")
@@ -102,7 +106,7 @@ def get_my_profile(driver, wait, user_email: str, user_password: str) -> LinkedI
             profile.password = user_password
 
             # Add profile to DB for faster future retrieval
-            if add_linkedin_profile(profile):
+            if add_linkedin_profile(profile, user_id=user_id):
                 myprint(f"Profile saved to DB: {profile.full_name}")
             else:
                 myprint(f"Failed to save profile to DB: {profile.full_name}")

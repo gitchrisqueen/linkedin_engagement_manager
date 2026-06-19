@@ -10,7 +10,10 @@ from cqc_lem.app.run_automation import automate_commenting, automate_profile_vie
     automate_appreciation_dms_for_user, clean_stale_invites, update_stale_profile, post_to_linkedin, \
     automate_invites_to_company_page_for_user
 from cqc_lem.utilities.date import convert_datetime_to_local_tz
-from cqc_lem.utilities.db import get_ready_to_post_posts, update_db_post_status, get_active_user_ids, PostStatus
+from cqc_lem.utilities.db import (
+    get_ready_to_post_posts, update_db_post_status, get_active_user_ids, PostStatus,
+    get_users_with_stripe_subscriptions, update_subscription_from_stripe,
+)
 from cqc_lem.utilities.env_constants import SELENIUM_KEEP_VIDEOS_X_DAYS, CQC_LEM_POST_TIME_DELTA_MINUTES
 from cqc_lem.utilities.logger import myprint
 
@@ -225,6 +228,53 @@ def organize_videos_by_name_and_timestamp():
             moved_videos += 1
 
     return moved_videos
+
+
+@shared_task.task(bind=True, base=QueueOnce, once={'graceful': True})
+def sync_stripe_subscriptions(self):
+    """Daily safety-net: fetch every active/past_due subscription from Stripe and
+    reconcile against our DB. Catches any webhook events that were missed due to
+    downtime, URL mismatches, or signature errors.
+    """
+    from cqc_lem.utilities.stripe_util import (
+        fetch_subscription, get_subscription_tier_from_price, stripe_status_to_db,
+    )
+
+    rows = get_users_with_stripe_subscriptions()
+    myprint(f"Stripe subscription sync: checking {len(rows)} subscriber(s)")
+
+    for row in rows:
+        sub_id = row.get("stripe_subscription_id")
+        customer_id = row.get("stripe_customer_id")
+        if not sub_id:
+            continue
+
+        sub = fetch_subscription(sub_id)
+        if not sub:
+            myprint(f"  Could not fetch subscription {sub_id} — skipping")
+            continue
+
+        stripe_status = sub.get("status", "")
+        db_status = stripe_status_to_db(stripe_status)
+
+        price_id = None
+        items = sub.get("items", {}).get("data", [])
+        if items:
+            price_id = items[0].get("price", {}).get("id")
+        tier = get_subscription_tier_from_price(price_id) if price_id else None
+
+        period_end_ts = sub.get("current_period_end")
+        period_end = datetime.fromtimestamp(period_end_ts) if period_end_ts else None
+
+        current_db_status = row.get("subscription_status")
+        if current_db_status != db_status or (tier and tier != row.get("subscription_tier")):
+            myprint(
+                f"  Syncing user {row['id']}: DB={current_db_status}/{row.get('subscription_tier')} "
+                f"→ Stripe={db_status}/{tier}"
+            )
+            update_subscription_from_stripe(customer_id, db_status, tier, sub_id, period_end)
+        else:
+            myprint(f"  User {row['id']} subscription up-to-date ({db_status}/{tier})")
 
 
 if __name__ == "__main__":

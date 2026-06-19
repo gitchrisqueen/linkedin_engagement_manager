@@ -3,10 +3,21 @@
 # Load environment variables from .env file
 export $(grep -v '^#' .env | xargs)
 
-# Get the directory of the current script
 SCRIPT_DIR=$(dirname "$0")
+NGROK_PLAN="${NGROK_PLAN:-off}"
 
-# Replace environment variables in the template and create ngrok-config.yml
-envsubst < "$SCRIPT_DIR/ngrok-config-template.yml" > "$SCRIPT_DIR/ngrok-config.yml"
+case "$NGROK_PLAN" in
+  free)
+    TEMPLATE="$SCRIPT_DIR/ngrok-config-template-free.yml"
+    ;;
+  paid)
+    TEMPLATE="$SCRIPT_DIR/ngrok-config-template.yml"
+    ;;
+  *)
+    echo "NGROK_PLAN=${NGROK_PLAN} — skipping ngrok config generation."
+    exit 0
+    ;;
+esac
 
-echo "Ngrok config file has been generated."
+envsubst < "$TEMPLATE" > "$SCRIPT_DIR/ngrok-config.yml"
+echo "Ngrok config generated from ${TEMPLATE} (plan: ${NGROK_PLAN})."

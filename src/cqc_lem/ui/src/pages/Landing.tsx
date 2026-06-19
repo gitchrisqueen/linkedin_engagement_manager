@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useAuth } from '../contexts/AuthContext'
 
 function FaqItem({ question, answer }: { question: string; answer: string }) {
   const [open, setOpen] = useState(false)
@@ -23,7 +23,7 @@ function FaqItem({ question, answer }: { question: string; answer: string }) {
 }
 
 export default function Landing() {
-  const navigate = useNavigate()
+  const { openLoginModal } = useAuth()
 
   function scrollToFeatures() {
     document.getElementById('features')?.scrollIntoView({ behavior: 'smooth' })
@@ -36,7 +36,7 @@ export default function Landing() {
         <div className="max-w-6xl mx-auto px-4 flex items-center justify-between h-14">
           <span className="font-bold text-blue-600 text-lg">LEM</span>
           <button
-            onClick={() => navigate('/account')}
+            onClick={() => openLoginModal()}
             className="bg-blue-600 text-white px-4 py-1.5 rounded-lg text-sm font-semibold hover:bg-blue-700 transition-colors"
           >
             Get Started Free
@@ -59,7 +59,7 @@ export default function Landing() {
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
             <button
-              onClick={() => navigate('/account')}
+              onClick={() => openLoginModal()}
               className="bg-white text-blue-700 px-8 py-3 rounded-lg font-bold text-base hover:bg-blue-50 transition-colors shadow-lg"
             >
               Get Started Free
@@ -158,7 +158,7 @@ export default function Landing() {
                 <li className="flex items-start gap-2"><span className="text-red-400">✗</span><span className="text-gray-400">Analytics dashboard</span></li>
               </ul>
               <button
-                onClick={() => navigate('/account')}
+                onClick={() => openLoginModal()}
                 className="mt-6 w-full border border-blue-600 text-blue-600 py-2 rounded-lg text-sm font-semibold hover:bg-blue-50 transition-colors"
               >
                 Get Started
@@ -183,7 +183,7 @@ export default function Landing() {
                 <li className="flex items-start gap-2"><span className="text-red-400">✗</span><span className="text-gray-400">Advanced analytics</span></li>
               </ul>
               <button
-                onClick={() => navigate('/account')}
+                onClick={() => openLoginModal()}
                 className="mt-6 w-full bg-green-600 text-white py-2 rounded-lg text-sm font-semibold hover:bg-green-700 transition-colors"
               >
                 Get Started
@@ -211,7 +211,7 @@ export default function Landing() {
                 <li className="flex items-start gap-2"><span className="text-green-500">✓</span><span>Priority support</span></li>
               </ul>
               <button
-                onClick={() => navigate('/account')}
+                onClick={() => openLoginModal()}
                 className="mt-6 w-full bg-yellow-400 text-black py-2 rounded-lg text-sm font-bold hover:bg-yellow-500 transition-colors"
               >
                 Get Started
@@ -236,7 +236,7 @@ export default function Landing() {
                 <li className="flex items-start gap-2"><span className="text-green-500">✓</span><span>Dedicated support</span></li>
               </ul>
               <button
-                onClick={() => navigate('/account')}
+                onClick={() => openLoginModal()}
                 className="mt-6 w-full bg-purple-600 text-white py-2 rounded-lg text-sm font-semibold hover:bg-purple-700 transition-colors"
               >
                 Get Started
@@ -279,7 +279,7 @@ export default function Landing() {
             Join thousands of professionals who are already automating their LinkedIn success.
           </p>
           <button
-            onClick={() => navigate('/account')}
+            onClick={() => openLoginModal()}
             className="bg-white text-blue-700 px-10 py-3 rounded-lg font-bold text-base hover:bg-blue-50 transition-colors shadow-lg"
           >
             Start Free Trial
