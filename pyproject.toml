@@ -35,7 +35,7 @@ bs4 = "^0.0.2"
 pycurl = "^7.45.4"
 
 # --- AI / external APIs ---
-openai = "^1.52.2"
+openai = ">=1.52.2,<3.0.0"
 googlenews = "^1.6.15"
 runwayml = ">=2.1,<5.0"
 replicate = "^1.0.4"
