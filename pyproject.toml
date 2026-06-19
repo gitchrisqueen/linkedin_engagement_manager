@@ -35,7 +35,7 @@ bs4 = "^0.0.2"
 pycurl = "^7.45.4"
 
 # --- AI / external APIs ---
-openai = "^1.52.2"
+openai = ">=1.52.2,<3.0.0"
 googlenews = "^1.6.15"
 runwayml = ">=2.1,<5.0"
 replicate = "^1.0.4"
@@ -116,7 +116,7 @@ optional = true
 # dependencies used for running tests (e.g., pytest, freezegun, response).
 # Any dependencies that do not meet that criteria will be removed.
 pytest = ">=7.3,<9.0"
-pytest-cov = "^4.1.0"
+pytest-cov = ">=4.1,<8.0"
 freezegun = "^1.2.2"
 pytest-mock = "^3.10.0"
 syrupy = "^4.0.2"
