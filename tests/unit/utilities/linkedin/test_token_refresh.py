@@ -41,7 +41,7 @@ class TestGetTokenExpiry:
         assert get_token_expiry({}) is None
 
     def test_handles_naive_datetime(self):
-        naive = datetime.utcnow()
+        naive = datetime.now(timezone.utc).replace(tzinfo=None)
         info = {'access_token_created_at': naive, 'access_token_expires_in': 3600}
         expiry = get_token_expiry(info)
         assert expiry is not None
