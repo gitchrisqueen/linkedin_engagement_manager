@@ -203,13 +203,14 @@ class TestActivateAvatar:
 @pytest.mark.integration
 class TestStripeWebhookAvatarCredits:
     def test_adds_credits_on_checkout_session_completed(self):
-        users = [{"id": USER_ID, "stripe_customer_id": "cus_test"}]
+        user_row = {"id": USER_ID, "stripe_customer_id": "cus_test"}
         with patch("cqc_lem.utilities.stripe_util.validate_webhook", return_value={
             "type": "checkout.session.completed",
             "data": {
                 "object": {
                     "customer": "cus_test",
                     "id": "cs_test_session",
+                    "payment_status": "paid",
                     "metadata": {
                         "type": "avatar_credits",
                         "package": "value",
@@ -217,7 +218,8 @@ class TestStripeWebhookAvatarCredits:
                     },
                 }
             },
-        }), patch("cqc_lem.api.main.get_users_with_stripe_subscriptions", return_value=users), \
+        }), patch("cqc_lem.api.main.get_user_by_stripe_customer_id", return_value=user_row), \
+             patch("cqc_lem.api.main.get_avatar_credit_ledger_entry_by_session", return_value=None), \
              patch("cqc_lem.api.main.add_avatar_credits", return_value=True) as mock_add:
             r = _client().post(
                 "/api/billing/webhook",
