@@ -1,7 +1,7 @@
 """Unit tests for PIN auth, session management, and planned-posts DB functions."""
 
 import pytest
-from unittest.mock import MagicMock, patch, call
+from unittest.mock import MagicMock, patch
 import mysql.connector
 
 pytestmark = pytest.mark.unit

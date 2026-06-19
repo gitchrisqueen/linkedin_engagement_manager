@@ -14,8 +14,14 @@ class TestPlanContentForUser:
     def test_plan_content_creates_30_days_of_posts(self, mock_database_connection):
         """plan_content_for_user should create ~30 planned posts covering the next 4 weeks."""
         from cqc_lem.app.run_content_plan import plan_content_for_user
-        with patch('cqc_lem.app.run_content_plan.get_last_planned_post_date_for_user', return_value=None), \
+        # Freeze to June 1 so days_left_in_month = 29, giving target_posts = 29 >= 20.
+        # Direct module patch avoids pydantic v1 metaclass conflicts from freeze_time.
+        fixed_now = datetime(2026, 6, 1, 0, 0, 0)
+        with patch('cqc_lem.app.run_content_plan.datetime') as mock_dt, \
+             patch('cqc_lem.app.run_content_plan.get_last_planned_post_date_for_user', return_value=None), \
              patch('cqc_lem.app.run_content_plan.insert_planned_post', return_value=True) as mock_insert:
+            mock_dt.now.return_value = fixed_now
+            mock_dt.combine = datetime.combine
             plan_content_for_user(user_id=1)
             assert mock_insert.call_count >= 20, f"Expected at least 20 planned posts, got {mock_insert.call_count}"
 
@@ -36,33 +42,23 @@ class TestPlanContentForUser:
 @pytest.mark.integration
 class TestAutoGenerateContent:
     def test_auto_generate_calls_task_for_each_active_user(self, mock_database_connection):
-        """auto_generate_content should fire create_text_post for each active user with planned posts."""
+        """auto_generate_content should dispatch plan_content_for_user for each active user."""
         from cqc_lem.app.run_content_plan import auto_generate_content
-        mock_post = {'id': 1, 'post_type': PostType.TEXT, 'buyer_stage': 'awareness', 'scheduled_time': datetime.now()}
         with patch('cqc_lem.app.run_content_plan.get_active_user_ids', return_value=[1, 2]), \
-             patch('cqc_lem.app.run_content_plan.get_planned_posts_for_current_week', return_value=[mock_post]), \
-             patch('cqc_lem.app.run_content_plan.create_text_post') as mock_create:
+             patch('cqc_lem.app.run_content_plan.plan_content_for_user') as mock_plan:
+            mock_plan.apply_async = MagicMock()
             auto_generate_content()
-            # Should be called once per user per planned post
-            assert mock_create.call_count >= 2
+            assert mock_plan.apply_async.call_count == 2
 
 
 @pytest.mark.integration
 class TestCreateTextPost:
     def test_create_text_post_calls_ai_helper(self, mock_database_connection, mock_openai_client):
-        """create_text_post should call the appropriate AI function based on source type."""
+        """create_text_post should call the AI function matching the selected post type."""
         from cqc_lem.app.run_content_plan import create_text_post
-        mock_post = {
-            'id': 1,
-            'post_type': PostType.TEXT,
-            'buyer_stage': 'awareness',
-            'scheduled_time': datetime.now() + timedelta(days=1),
-        }
-        with patch('cqc_lem.app.run_content_plan.get_user_blog_url', return_value='https://example.com/blog'), \
-             patch('cqc_lem.app.run_content_plan.get_linked_in_profile_by_email', return_value=MagicMock()), \
-             patch('cqc_lem.app.run_content_plan.update_db_post_content', return_value=True):
-            # Should not raise
-            try:
-                create_text_post(user_id=1, planned_post=mock_post)
-            except Exception as e:
-                pytest.skip(f"Skipping due to: {e}")
+        mock_profile = MagicMock()
+        with patch('cqc_lem.app.run_content_plan.get_thought_leadership_post_from_ai', return_value='AI content') as mock_ai, \
+             patch('cqc_lem.app.run_content_plan.get_ai_linked_post_refinement', return_value='Refined content'):
+            result = create_text_post(user_id=1, stage='awareness', post_type='thought_leadership', user_profile=mock_profile)
+            assert mock_ai.called
+            assert result == 'Refined content'

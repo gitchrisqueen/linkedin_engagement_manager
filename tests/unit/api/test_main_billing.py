@@ -1,7 +1,7 @@
 """Unit tests for FastAPI billing and auth endpoints in cqc_lem.api.main."""
 
 import pytest
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 from fastapi.testclient import TestClient
 
 pytestmark = pytest.mark.unit
@@ -23,7 +23,8 @@ def client():
         patch("cqc_lem.app.run_content_plan.auto_create_weekly_content"),
         patch("cqc_lem.app.aws_test_celery_task.test_get_my_profile"),
     ]
-    started = [p.start() for p in patches]
+    for p in patches:
+        p.start()
     try:
         from cqc_lem.api.main import app
         with TestClient(app, raise_server_exceptions=False) as tc:
