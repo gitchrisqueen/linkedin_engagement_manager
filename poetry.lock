@@ -3169,14 +3169,14 @@ files = [
 
 [[package]]
 name = "openai"
-version = "2.28.0"
+version = "2.43.0"
 description = "The official Python library for the openai API"
 optional = false
 python-versions = ">=3.9"
 groups = ["main"]
 files = [
-    {file = "openai-2.28.0-py3-none-any.whl", hash = "sha256:79aa5c45dba7fef84085701c235cf13ba88485e1ef4f8dfcedc44fc2a698fc1d"},
-    {file = "openai-2.28.0.tar.gz", hash = "sha256:bb7fdff384d2a787fa82e8822d1dd3c02e8cf901d60f1df523b7da03cbb6d48d"},
+    {file = "openai-2.43.0-py3-none-any.whl", hash = "sha256:65a670b54fadf2268c9e1330133373c963eb779ee969e5cbad419ec2c21dce97"},
+    {file = "openai-2.43.0.tar.gz", hash = "sha256:e74d238200a26868977002190fb6631613480a93dfe0c9c982e77021ed60a017"},
 ]
 
 [package.dependencies]
@@ -3187,7 +3187,7 @@ jiter = ">=0.10.0,<1"
 pydantic = ">=1.9.0,<3"
 sniffio = "*"
 tqdm = ">4"
-typing-extensions = ">=4.11,<5"
+typing-extensions = ">=4.14,<5"
 
 [package.extras]
 aiohttp = ["aiohttp", "httpx-aiohttp (>=0.1.9)"]
@@ -5147,14 +5147,14 @@ files = [
 
 [[package]]
 name = "runwayml"
-version = "4.7.0"
+version = "4.18.0"
 description = "The official Python library for the runwayml API"
 optional = false
 python-versions = ">=3.9"
 groups = ["main"]
 files = [
-    {file = "runwayml-4.7.0-py3-none-any.whl", hash = "sha256:48538174732669b3bf8eaab2bcc3c18ae367252b34be00bf7f7935e4bbe34283"},
-    {file = "runwayml-4.7.0.tar.gz", hash = "sha256:79a93610b0782983f9956d2426abbbefa417b4b55d4c33568d42254dd464b85b"},
+    {file = "runwayml-4.18.0-py3-none-any.whl", hash = "sha256:565158159062f188280a29a01beedd5587d8552ed58c95d582a893477afa35ee"},
+    {file = "runwayml-4.18.0.tar.gz", hash = "sha256:b969ba31e36be61e8b00848070062501fba5b755f8a5da395ab850c094d4404d"},
 ]
 
 [package.dependencies]
@@ -5163,7 +5163,7 @@ distro = ">=1.7.0,<2"
 httpx = ">=0.23.0,<1"
 pydantic = ">=1.9.0,<3"
 sniffio = "*"
-typing-extensions = ">=4.10,<5"
+typing-extensions = ">=4.14,<5"
 
 [package.extras]
 aiohttp = ["aiohttp", "httpx-aiohttp (>=0.1.9)"]
@@ -6152,4 +6152,4 @@ type = ["pytest-mypy (>=1.0.1) ; platform_python_implementation != \"PyPy\""]
 [metadata]
 lock-version = "2.1"
 python-versions = ">=3.12,<4.0"
-content-hash = "dd2b0b89ef151dbc78a6218b0247114f2e20bd109f4b11c94c86ea4423448cae"
+content-hash = "83e519204ade037bf0523e65df15c5e99d682f0fd1f745275a617f6543b92b53"
