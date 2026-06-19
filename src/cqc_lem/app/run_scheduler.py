@@ -15,7 +15,7 @@ from cqc_lem.utilities.db import (
     get_users_with_stripe_subscriptions, update_subscription_from_stripe,
 )
 from cqc_lem.utilities.env_constants import SELENIUM_KEEP_VIDEOS_X_DAYS, CQC_LEM_POST_TIME_DELTA_MINUTES
-from cqc_lem.utilities.logger import myprint
+from cqc_lem.utilities.logger import myprint, log_info, log_debug, log_warning
 
 
 
@@ -31,11 +31,11 @@ def auto_check_scheduled_posts(self):
 
         scheduled_time = convert_datetime_to_local_tz(scheduled_time)  # Must add timezone info to this
 
-        myprint(f"Ready to Post ID: {post_id}")
+        log_info(f"Post ready to schedule", post_id=post_id, user_id=user_id, task_name="auto_check_scheduled_posts")
 
         # Update the DB with post status = scheduled so it won't get processed again
         update_db_post_status(post_id, PostStatus.SCHEDULED)
-        myprint(f"Post ID: {post_id} Scheduled for: {scheduled_time}")
+        log_info(f"Post {post_id} queued for {scheduled_time}", post_id=post_id, user_id=user_id)
 
         # Schedule the post to be posted
         post_kwargs = {'user_id': user_id, 'post_id': post_id}
@@ -113,7 +113,7 @@ def auto_clean_stale_profiles():
     users = get_active_user_ids()
 
     for user_id in users:
-        myprint(f"Cleaning Stale Profiles for user: {user_id}")
+        log_info(f"Cleaning stale profiles", user_id=user_id, task_name="auto_clean_stale_profiles")
 
         # Clean up stale profiles for this user
         # update_stale_profile(user_id)
@@ -139,7 +139,7 @@ def auto_invite_to_company_pages():
     users = get_active_user_ids()
 
     for user_id in users:
-        myprint(f"Starting Company Page Invites for user: {user_id}")
+        log_info(f"Starting company page invites", user_id=user_id, task_name="auto_invite_to_company_pages")
 
 
         automate_invites_to_company_page_for_user.apply_async(kwargs={'user_id': user_id},
@@ -162,7 +162,7 @@ def auto_clean_old_videos():
     """Cleans up old videos in the selenium folder"""
 
     days_to_keep = SELENIUM_KEEP_VIDEOS_X_DAYS
-    myprint(f"Cleaning old videos older than {days_to_keep} days")
+    log_info(f"Cleaning old videos older than {days_to_keep} days", task_name="auto_clean_old_videos")
     expiration_date = datetime.now() - timedelta(days=days_to_keep)
     selenium_folder = os.path.join(assets_dir, 'selenium')
     delete_count = 0
@@ -170,7 +170,7 @@ def auto_clean_old_videos():
     for folder in os.listdir(selenium_folder):
         folder_path = os.path.join(selenium_folder, folder)
         if os.path.isdir(folder_path) and datetime.fromtimestamp(os.path.getmtime(folder_path)) < expiration_date:
-            myprint(f"Deleting folder: {folder_path}")
+            log_debug(f"Deleting expired video folder: {folder_path}")
             shutil.rmtree(folder_path)
             delete_count += 1
 
@@ -220,11 +220,11 @@ def organize_videos_by_name_and_timestamp():
             new_file_name = f"{file_timestamp}.mp4"
             new_file_path = os.path.join(name_folder, new_file_name)
             shutil.move(file_path, new_file_path)
-            print(f"Moved {file_path} to {new_file_path}")
+            log_debug(f"Moved video to organized location: {new_file_path}")
             # Delete the folder belonging to the file_path
             parent_folder = os.path.dirname(file_path)
             shutil.rmtree(parent_folder)
-            print(f"Deleted {parent_folder}")
+            log_debug(f"Deleted video source folder: {parent_folder}")
             moved_videos += 1
 
     return moved_videos
@@ -241,7 +241,7 @@ def sync_stripe_subscriptions(self):
     )
 
     rows = get_users_with_stripe_subscriptions()
-    myprint(f"Stripe subscription sync: checking {len(rows)} subscriber(s)")
+    log_info(f"Stripe subscription sync: checking {len(rows)} subscriber(s)", task_name="sync_stripe_subscriptions")
 
     for row in rows:
         sub_id = row.get("stripe_subscription_id")
@@ -251,7 +251,7 @@ def sync_stripe_subscriptions(self):
 
         sub = fetch_subscription(sub_id)
         if not sub:
-            myprint(f"  Could not fetch subscription {sub_id} — skipping")
+            log_warning(f"Could not fetch Stripe subscription {sub_id}, skipping", api_provider="stripe")
             continue
 
         stripe_status = sub.get("status", "")
@@ -268,13 +268,13 @@ def sync_stripe_subscriptions(self):
 
         current_db_status = row.get("subscription_status")
         if current_db_status != db_status or (tier and tier != row.get("subscription_tier")):
-            myprint(
-                f"  Syncing user {row['id']}: DB={current_db_status}/{row.get('subscription_tier')} "
-                f"→ Stripe={db_status}/{tier}"
+            log_info(
+                f"Syncing subscription: DB={current_db_status}/{row.get('subscription_tier')} → Stripe={db_status}/{tier}",
+                user_id=row["id"], api_provider="stripe",
             )
             update_subscription_from_stripe(customer_id, db_status, tier, sub_id, period_end)
         else:
-            myprint(f"  User {row['id']} subscription up-to-date ({db_status}/{tier})")
+            log_debug(f"Subscription up-to-date ({db_status}/{tier})", user_id=row["id"])
 
 
 if __name__ == "__main__":
