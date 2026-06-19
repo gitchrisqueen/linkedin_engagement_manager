@@ -280,3 +280,17 @@ def create_avatar_credits_checkout(
     except Exception as e:
         myprint(f"Avatar credits checkout failed for customer={stripe_customer_id}: {e}")
         return None
+
+
+def get_checkout_session_by_payment_intent(payment_intent_id: str) -> Optional[dict]:
+    """Return the first Checkout Session associated with a PaymentIntent, or None."""
+    if not STRIPE_API_KEY:
+        return None
+    stripe = _get_stripe()
+    try:
+        sessions = stripe.checkout.Session.list(payment_intent=payment_intent_id, limit=1)
+        data = sessions.get("data", [])
+        return data[0] if data else None
+    except Exception as e:
+        myprint(f"Could not look up checkout session for payment_intent={payment_intent_id}: {e}")
+        return None

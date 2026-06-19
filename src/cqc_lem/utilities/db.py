@@ -1780,6 +1780,42 @@ def update_user_preferences(
 # Avatar credit ledger
 # ---------------------------------------------------------------------------
 
+def get_user_by_stripe_customer_id(stripe_customer_id: str) -> Optional[dict]:
+    """Return the user row matching a Stripe customer ID, regardless of subscription status."""
+    connection = get_db_connection()
+    cursor = connection.cursor(dictionary=True)
+    try:
+        cursor.execute(
+            "SELECT id, stripe_customer_id FROM users WHERE stripe_customer_id = %s LIMIT 1",
+            (stripe_customer_id,),
+        )
+        return cursor.fetchone()
+    except mysql.connector.Error as err:
+        myprint(f"Could not look up user by stripe_customer_id={stripe_customer_id} | Error: {err}")
+        return None
+    finally:
+        cursor.close()
+        connection.close()
+
+
+def get_avatar_credit_ledger_entry_by_session(stripe_session_id: str) -> Optional[dict]:
+    """Return an existing credit ledger entry for a Stripe session (idempotency check)."""
+    connection = get_db_connection()
+    cursor = connection.cursor(dictionary=True)
+    try:
+        cursor.execute(
+            "SELECT id, user_id, delta FROM avatar_credit_ledger WHERE stripe_session_id = %s AND delta > 0 LIMIT 1",
+            (stripe_session_id,),
+        )
+        return cursor.fetchone()
+    except mysql.connector.Error as err:
+        myprint(f"Could not look up ledger entry for session={stripe_session_id} | Error: {err}")
+        return None
+    finally:
+        cursor.close()
+        connection.close()
+
+
 def get_avatar_credit_balance(user_id: int) -> int:
     connection = get_db_connection()
     cursor = connection.cursor(dictionary=True)

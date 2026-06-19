@@ -24,6 +24,7 @@ from cqc_lem.utilities.db import (
     get_users_with_stripe_subscriptions,
     update_user_linkedin_password,
     get_user_blog_url, get_user_sitemap_url,
+    get_user_by_stripe_customer_id, get_avatar_credit_ledger_entry_by_session,
     get_avatar_credit_balance, add_avatar_credits,
     deduct_avatar_credit, insert_avatar_training,
     update_avatar_training_status, set_active_avatar,
@@ -946,28 +947,97 @@ async def billing_webhook(request: Request) -> dict:
     elif event_type == "checkout.session.completed":
         meta = data.get("metadata", {})
         if meta.get("type") == "avatar_credits":
+            # Only credit on confirmed card payment — async methods (e.g. bank transfer)
+            # may fire this event before funds clear.
+            if data.get("payment_status") != "paid":
+                myprint(
+                    f"checkout.session.completed: payment_status={data.get('payment_status')} "
+                    f"— not yet paid, skipping credit grant"
+                )
+                return {"received": True}
+
             stripe_customer_id = data.get("customer")
             stripe_session_id = data.get("id")
             credits = int(meta.get("credits", 0))
             package = meta.get("package", "unknown")
-            if stripe_customer_id and credits > 0:
-                users = get_users_with_stripe_subscriptions()
-                user_row = next(
-                    (u for u in users if u.get("stripe_customer_id") == stripe_customer_id), None
+
+            if not stripe_customer_id or credits <= 0:
+                myprint(f"Avatar credits webhook: missing customer or zero credits — skipping")
+                return {"received": True}
+
+            # Idempotency: Stripe may retry — skip if credits already granted for this session.
+            if get_avatar_credit_ledger_entry_by_session(stripe_session_id):
+                myprint(f"Avatar credits already granted for session={stripe_session_id} — skipping duplicate")
+                return {"received": True}
+
+            user_row = get_user_by_stripe_customer_id(stripe_customer_id)
+            if user_row:
+                add_avatar_credits(
+                    user_row["id"],
+                    credits,
+                    f"purchase_{package}",
+                    stripe_session_id,
                 )
-                if user_row:
-                    add_avatar_credits(
-                        user_row["id"],
-                        credits,
-                        f"purchase_{package}",
-                        stripe_session_id,
-                    )
-                    myprint(
-                        f"Added {credits} avatar credit(s) for user_id={user_row['id']} "
-                        f"via session={stripe_session_id}"
-                    )
-                else:
-                    myprint(f"Avatar credits webhook: no user found for customer={stripe_customer_id}")
+                myprint(
+                    f"Added {credits} avatar credit(s) for user_id={user_row['id']} "
+                    f"via session={stripe_session_id}"
+                )
+            else:
+                myprint(f"Avatar credits webhook: no user found for customer={stripe_customer_id}")
+
+    elif event_type == "charge.refunded":
+        payment_intent_id = data.get("payment_intent")
+        stripe_customer_id = data.get("customer")
+        amount = data.get("amount", 0)
+        amount_refunded = data.get("amount_refunded", 0)
+
+        if not payment_intent_id or not stripe_customer_id:
+            myprint("charge.refunded: missing payment_intent or customer — skipping")
+            return {"received": True}
+
+        # Only deduct credits for a full refund — partial refunds don't map cleanly to credits.
+        if amount_refunded < amount:
+            myprint(
+                f"charge.refunded: partial refund ({amount_refunded}/{amount} cents) "
+                f"for customer={stripe_customer_id} — no credit adjustment"
+            )
+            return {"received": True}
+
+        # Find the checkout session that generated this charge to check its metadata.
+        from cqc_lem.utilities.stripe_util import get_checkout_session_by_payment_intent
+        session = get_checkout_session_by_payment_intent(payment_intent_id)
+        if not session:
+            myprint(f"charge.refunded: no checkout session found for payment_intent={payment_intent_id}")
+            return {"received": True}
+
+        session_meta = session.get("metadata", {})
+        if session_meta.get("type") != "avatar_credits":
+            myprint(f"charge.refunded: not an avatar credits charge — ignoring")
+            return {"received": True}
+
+        stripe_session_id = session.get("id")
+        original_entry = get_avatar_credit_ledger_entry_by_session(stripe_session_id)
+        if not original_entry:
+            myprint(f"charge.refunded: no credit ledger entry found for session={stripe_session_id} — nothing to deduct")
+            return {"received": True}
+
+        # Guard against double-refund: check if a refund entry already exists for this session.
+        user_row = get_user_by_stripe_customer_id(stripe_customer_id)
+        if not user_row:
+            myprint(f"charge.refunded: no user found for customer={stripe_customer_id}")
+            return {"received": True}
+
+        credits_to_deduct = original_entry["delta"]
+        add_avatar_credits(
+            user_row["id"],
+            -credits_to_deduct,
+            f"refund_{stripe_session_id}",
+            stripe_session_id=None,
+        )
+        myprint(
+            f"Deducted {credits_to_deduct} avatar credit(s) for user_id={user_row['id']} "
+            f"due to full refund of session={stripe_session_id}"
+        )
 
     else:
         myprint(f"Stripe webhook event ignored: {event_type}")
