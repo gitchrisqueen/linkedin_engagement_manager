@@ -479,9 +479,13 @@ def get_assets(file_name: str, content_type: Optional[str] = None,
     if not file_name:
         raise HTTPException(status_code=400, detail="A File Name is required")
 
-    file_path = os.path.join(assets_dir, file_name)
+    real_assets = os.path.realpath(assets_dir)
+    file_path = os.path.realpath(os.path.join(assets_dir, file_name))
     myprint(f"File Path: {file_path}")
     myprint(f"Content Type: {content_type}")
+
+    if not file_path.startswith(real_assets + os.sep):
+        raise HTTPException(status_code=400, detail="Invalid file name")
 
     if not os.path.exists(file_path):
         raise HTTPException(status_code=404, detail="File not found")
@@ -1109,6 +1113,20 @@ async def start_avatar_training_endpoint(
     if not zip_bytes:
         raise HTTPException(status_code=400, detail="No file data received")
 
+    _MAX_ZIP_BYTES = 50 * 1024 * 1024  # 50 MB compressed
+    _MAX_UNCOMPRESSED_BYTES = 200 * 1024 * 1024  # 200 MB uncompressed guard
+    if len(zip_bytes) > _MAX_ZIP_BYTES:
+        raise HTTPException(status_code=413, detail="ZIP file too large (max 50 MB)")
+    import io
+    import zipfile as _zipfile
+    try:
+        with _zipfile.ZipFile(io.BytesIO(zip_bytes)) as zf:
+            total_uncompressed = sum(entry.file_size for entry in zf.infolist())
+        if total_uncompressed > _MAX_UNCOMPRESSED_BYTES:
+            raise HTTPException(status_code=413, detail="ZIP contents too large (max 200 MB uncompressed)")
+    except _zipfile.BadZipFile:
+        raise HTTPException(status_code=400, detail="Uploaded file is not a valid ZIP")
+
     from cqc_lem.utilities.avatar.replicate_avatar import start_avatar_training
     try:
         training_id = start_avatar_training(user_id, zip_bytes, trigger_word)
@@ -1191,7 +1209,8 @@ if os.path.isdir(_ui_dist):
 
     @app.get("/{full_path:path}", response_class=HTMLResponse, include_in_schema=False)
     def serve_spa(full_path: str):
-        return HTMLResponse(content=open(_spa_index).read())
+        with open(_spa_index) as fh:
+            return HTMLResponse(content=fh.read())
 
 
 def send_bytes_range_requests(

@@ -28,7 +28,7 @@ jobs:
       REPLICATE_USERNAME: ${{ secrets.REPLICATE_USERNAME }}
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Set up Poetry and dependencies
         uses: ./.github/actions/poetry_setup
@@ -69,10 +69,9 @@ jobs:
           [ $rc -eq 5 ] && echo "No E2E tests collected — skipping" && exit 0 || exit $rc
 
       - name: Upload coverage to Codecov
-        uses: codecov/codecov-action@v4
+        uses: codecov/codecov-action@v5
         with:
           files: coverage.xml
           flags: e2e
+          token: ${{ secrets.CODECOV_TOKEN }}
           fail_ci_if_error: false
-        env:
-          CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}

@@ -605,6 +605,9 @@ def get_carousel_slides(post_id: int) -> list[str]:
     return []
 
 
+_ALLOWED_POST_CLAUSES = frozenset({"status = %s", "scheduled_time = %s"})
+
+
 def bulk_update_posts(post_ids: list[int], status: Optional[PostStatus] = None,
                       scheduled_time: Optional[datetime] = None) -> bool:
     if not post_ids:
@@ -631,6 +634,10 @@ def bulk_update_posts(post_ids: list[int], status: Optional[PostStatus] = None,
 
         if not sets:
             return False
+
+        for clause in sets:
+            if clause not in _ALLOWED_POST_CLAUSES:
+                raise ValueError(f"Disallowed SQL clause: {clause!r}")
 
         placeholders = ', '.join(['%s'] * len(post_ids))
         params.extend(post_ids)
@@ -1004,6 +1011,9 @@ def get_user_sitemap_url(user_id: int):
     return sitemap_url[0] if sitemap_url else None
 
 
+_ALLOWED_USER_CLAUSES = frozenset({"email = %s", "blog_url = %s", "sitemap_url = %s"})
+
+
 def update_user(user_id: int, email: str = None, blog_url: str = None, sitemap_url: str = None) -> bool:
     if not any([email, blog_url, sitemap_url]):
         return False
@@ -1019,6 +1029,9 @@ def update_user(user_id: int, email: str = None, blog_url: str = None, sitemap_u
     if sitemap_url:
         fields.append("sitemap_url = %s")
         values.append(sitemap_url)
+    for clause in fields:
+        if clause not in _ALLOWED_USER_CLAUSES:
+            raise ValueError(f"Disallowed SQL clause: {clause!r}")
     values.append(user_id)
     try:
         cursor.execute(f"UPDATE users SET {', '.join(fields)} WHERE id = %s", values)

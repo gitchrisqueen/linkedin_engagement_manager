@@ -23,7 +23,7 @@ runs:
   using: "composite"
   steps:
     - name: Set up Python ${{ inputs.python-version }}
-      uses: actions/setup-python@v5
+      uses: actions/setup-python@v6
       with:
         python-version: ${{ inputs.python-version }}
 
@@ -37,7 +37,7 @@ runs:
 
     - name: Cache Poetry virtual environment
       id: cache-venv
-      uses: actions/cache@v4
+      uses: actions/cache@v5
       with:
         path: ${{ inputs.working-directory }}/.venv
         key: venv-${{ runner.os }}-${{ inputs.python-version }}-${{ hashFiles(format('{0}/poetry.lock', inputs.working-directory)) }}-${{ inputs.install-args }}
