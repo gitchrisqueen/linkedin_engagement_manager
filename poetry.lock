@@ -1482,14 +1482,14 @@ grpc = ["grpcio (>=1.44.0,<2.0.0.dev0)"]
 
 [[package]]
 name = "googlenews"
-version = "1.6.15"
+version = "1.6.16"
 description = "Google News search for Python"
 optional = false
 python-versions = "*"
 groups = ["main"]
 files = [
-    {file = "GoogleNews-1.6.15-py3-none-any.whl", hash = "sha256:9d4d8b742a9631eebc94b63cb5b36673be60e113ddcfd277c8861f9650eeab2d"},
-    {file = "googlenews-1.6.15.tar.gz", hash = "sha256:e3e2a1c70c27e07efa573dbf468752b40ad45e74d2c0427280cbd1b451075f82"},
+    {file = "googlenews-1.6.16-py3-none-any.whl", hash = "sha256:415344868c6ac912c065ff9a215840e454cb94ae8427521b9a43b04fce74c32f"},
+    {file = "googlenews-1.6.16.tar.gz", hash = "sha256:4d5efc829e3c94099038c93da20f352d3fd6bafce1997bd6f340e7f04220b637"},
 ]
 
 [package.dependencies]
