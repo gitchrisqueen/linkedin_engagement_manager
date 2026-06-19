@@ -3,16 +3,45 @@ import re
 from typing import Optional
 
 import replicate
+from replicate.exceptions import ReplicateError
 
 from cqc_lem.utilities.env_constants import REPLICATE_USERNAME
 from cqc_lem.utilities.logger import log_info, log_error, log_warning
 
-TRAINER_VERSION = "replicate/fast-flux-trainer"
+TRAINER_MODEL = "replicate/fast-flux-trainer"
+
+# Hardware SKU for the destination model (inference, not training).
+# Training hardware is determined by the trainer itself.
+_DESTINATION_HARDWARE = "gpu-a40-large"
 
 
 def _sanitize_model_name(trigger_word: str, user_id: int) -> str:
     slug = re.sub(r"[^a-z0-9-]", "-", trigger_word.lower()).strip("-")
     return f"{slug}-avatar-{user_id}"
+
+
+def _ensure_destination_model(owner: str, name: str) -> None:
+    """Create the destination model on Replicate if it doesn't already exist.
+
+    Replicate requires the destination model to exist before a training can
+    push weights to it. A 409 (conflict) means it already exists — that's fine.
+    """
+    try:
+        replicate.models.get(f"{owner}/{name}")
+    except ReplicateError as get_err:
+        if get_err.status != 404:
+            raise
+        try:
+            replicate.models.create(
+                owner=owner,
+                name=name,
+                visibility="private",
+                hardware=_DESTINATION_HARDWARE,
+            )
+            log_info("Created destination model on Replicate", action_type="avatar_model_create")
+        except ReplicateError as create_err:
+            if create_err.status != 409:  # 409 = race-created between get and create
+                raise
 
 
 def start_avatar_training(user_id: int, zip_bytes: bytes, trigger_word: str) -> str:
@@ -26,6 +55,16 @@ def start_avatar_training(user_id: int, zip_bytes: bytes, trigger_word: str) -> 
 
     model_name = _sanitize_model_name(trigger_word, user_id)
     destination = f"{REPLICATE_USERNAME}/{model_name}"
+
+    # Replicate requires the destination model to pre-exist.
+    _ensure_destination_model(REPLICATE_USERNAME, model_name)
+
+    # Resolve the trainer's latest version — do not hardcode a version hash.
+    trainer = replicate.models.get(TRAINER_MODEL)
+    if not trainer.latest_version:
+        raise RuntimeError(f"Could not resolve latest version of {TRAINER_MODEL}")
+    trainer_version = trainer.latest_version
+
     zip_b64 = base64.b64encode(zip_bytes).decode("utf-8")
     zip_data_uri = f"data:application/zip;base64,{zip_b64}"
 
@@ -36,7 +75,8 @@ def start_avatar_training(user_id: int, zip_bytes: bytes, trigger_word: str) -> 
     )
 
     training = replicate.trainings.create(
-        version=TRAINER_VERSION,
+        model=TRAINER_MODEL,
+        version=trainer_version,
         input={
             "input_images": zip_data_uri,
             "trigger_word": trigger_word,
@@ -57,7 +97,6 @@ def poll_training_status(training_id: str) -> tuple[str, Optional[str]]:
     """Fetch current status from Replicate. Returns (status, model_ref).
 
     model_ref is only populated when status == 'succeeded'.
-    Maps Replicate statuses to our DB ENUM values.
     """
     try:
         training = replicate.trainings.get(training_id)
