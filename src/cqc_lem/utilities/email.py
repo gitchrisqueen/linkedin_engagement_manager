@@ -1,5 +1,5 @@
 import hashlib
-import random
+import secrets
 import smtplib
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
@@ -17,7 +17,7 @@ from cqc_lem.utilities.logger import myprint
 
 
 def generate_pin() -> str:
-    return str(random.randint(0, 999999)).zfill(6)
+    return str(secrets.randbelow(1_000_000)).zfill(6)
 
 
 def hash_pin(pin: str, email: str) -> str:
@@ -75,23 +75,34 @@ def _send_via_smtp(to_email: str, html_content: str) -> bool:
         return False
 
 
-def send_pin_email(to_email: str, pin: str, is_new_user: bool = False) -> Tuple[bool, bool]:
+def send_pin_email(
+    to_email: str,
+    pin: str,
+    is_new_user: bool = False,
+    probe_only: bool = False,
+) -> Tuple[bool, bool]:
     """Send a PIN email using the best available provider.
 
     Returns (success, bypassed):
       - (True, False)  — email was sent successfully
       - (False, False) — a provider is configured but the send failed
       - (True, True)   — no provider is configured; PIN step should be skipped
-    """
-    action = "create your account" if is_new_user else "sign in"
-    html = _build_html(pin, action)
 
+    probe_only=True skips the actual send and just returns whether bypass would occur.
+    Used to detect bypass mode before writing the PIN to the DB.
+    """
     has_sendgrid = bool(SENDGRID_API_KEY)
     has_smtp = bool(SMTP_USER) and bool(SMTP_PASSWORD)
 
     if not has_sendgrid and not has_smtp:
         myprint("No email provider configured — bypassing PIN verification")
         return True, True
+
+    if probe_only:
+        return False, False
+
+    action = "create your account" if is_new_user else "sign in"
+    html = _build_html(pin, action)
 
     if has_sendgrid:
         sent = _send_via_sendgrid(to_email, html)

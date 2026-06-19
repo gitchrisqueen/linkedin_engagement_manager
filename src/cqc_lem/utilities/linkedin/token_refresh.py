@@ -10,14 +10,24 @@ LINKEDIN_TOKEN_URL = "https://www.linkedin.com/oauth/v2/accessToken"
 EXPIRY_WARNING_DAYS = 30
 
 
+def _to_seconds(value: object) -> Optional[int]:
+    """Safely convert a DB or API value to an integer number of seconds."""
+    if value is None:
+        return None
+    try:
+        return int(float(value))
+    except (ValueError, TypeError):
+        return None
+
+
 def get_token_expiry(token_info: dict) -> Optional[datetime]:
     created_at = token_info.get('access_token_created_at')
-    expires_in = token_info.get('access_token_expires_in')
+    expires_in = _to_seconds(token_info.get('access_token_expires_in'))
     if not created_at or not expires_in:
         return None
     if created_at.tzinfo is None:
         created_at = created_at.replace(tzinfo=timezone.utc)
-    return created_at + timedelta(seconds=int(expires_in))
+    return created_at + timedelta(seconds=expires_in)
 
 
 def is_token_expired(token_info: dict) -> bool:
@@ -48,11 +58,11 @@ def attempt_token_refresh(user_id: int) -> Tuple[bool, Optional[str]]:
         return False, None
 
     refresh_created = token_info.get('refresh_token_created_at')
-    refresh_expires_in = token_info.get('refresh_token_expires_in')
+    refresh_expires_in = _to_seconds(token_info.get('refresh_token_expires_in'))
     if refresh_created and refresh_expires_in:
         if refresh_created.tzinfo is None:
             refresh_created = refresh_created.replace(tzinfo=timezone.utc)
-        refresh_expiry = refresh_created + timedelta(seconds=int(refresh_expires_in))
+        refresh_expiry = refresh_created + timedelta(seconds=refresh_expires_in)
         if refresh_expiry <= datetime.now(timezone.utc):
             myprint(f"refresh_token expired for user_id {user_id}")
             return False, None
@@ -84,13 +94,13 @@ def attempt_token_refresh(user_id: int) -> Tuple[bool, Optional[str]]:
         update_user_access_token(
             user_id,
             new_access_token,
-            expires_in,
+            _to_seconds(expires_in),
             refresh_token=new_refresh_token,
-            refresh_token_expires_in=new_refresh_expires_in,
+            refresh_token_expires_in=_to_seconds(new_refresh_expires_in),
         )
         myprint(f"Token refreshed for user_id {user_id}")
         return True, new_access_token
 
-    except requests.RequestException as e:
-        myprint(f"Token refresh request failed for user_id {user_id}: {e}")
+    except (requests.RequestException, ValueError, TypeError) as e:
+        myprint(f"Token refresh failed for user_id {user_id}: {e}")
         return False, None

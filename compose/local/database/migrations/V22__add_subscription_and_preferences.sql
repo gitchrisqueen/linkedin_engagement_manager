@@ -13,7 +13,7 @@ ALTER TABLE users
 -- User preferences
 ALTER TABLE users
     ADD COLUMN last_login_inactivate_delay INT NULL DEFAULT 90 AFTER linkedin_connection_status,
-    ADD COLUMN auto_schedule_posts TINYINT(1) NOT NULL DEFAULT 0 AFTER last_login_inactivate_delay;
+    ADD COLUMN auto_schedule_posts TINYINT(1) NOT NULL DEFAULT 1 AFTER last_login_inactivate_delay;
 
 -- Migrate existing connected users: give them an active trial starting now
 UPDATE users

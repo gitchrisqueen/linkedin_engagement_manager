@@ -30,7 +30,7 @@ class TestSchedulePostEndpoint:
             mock_insert.return_value = True
 
             client = TestClient(app)
-            response = client.post("/schedule_post/", json={
+            response = client.post("/api/schedule_post/", json={
                 "email": "test@example.com",
                 "content": "Test post content",
                 "scheduled_datetime": "2025-06-01T12:00:00",
@@ -49,7 +49,7 @@ class TestSchedulePostEndpoint:
             mock_user.return_value = None
 
             client = TestClient(app)
-            response = client.post("/schedule_post/", json={
+            response = client.post("/api/schedule_post/", json={
                 "email": "nobody@example.com",
                 "content": "Test post",
                 "scheduled_datetime": "2025-06-01T12:00:00",
@@ -67,39 +67,46 @@ class TestGetPostsEndpoint:
             from fastapi.testclient import TestClient
             from cqc_lem.api.main import app
 
-            mock_posts.return_value = [
-                {
-                    "id": 1, "content": "Hello world", "video_url": None,
-                    "scheduled_time": "2025-01-01T12:00:00", "post_type": "text", "status": "pending"
-                }
-            ]
+            mock_posts.return_value = (
+                [
+                    {
+                        "id": 1, "content": "Hello world", "video_url": None,
+                        "scheduled_time": "2025-01-01T12:00:00", "post_type": "text",
+                        "status": "pending", "carousel_slides": None,
+                    }
+                ],
+                1,
+            )
 
             client = TestClient(app)
-            response = client.get("/posts/?email=test@example.com")
+            response = client.get("/api/posts/?email=test@example.com")
 
             assert response.status_code == 200
             body = response.json()
             assert body["status_code"] == 200
-            assert len(body["detail"]) == 1
+            assert len(body["detail"]["posts"]) == 1
 
-    def test_get_posts_returns_404_when_no_posts(self):
+    def test_get_posts_returns_200_with_empty_list_when_no_posts(self):
         with patch("cqc_lem.api.main.get_post_by_email") as mock_posts:
             from fastapi.testclient import TestClient
             from cqc_lem.api.main import app
 
-            mock_posts.return_value = []
+            mock_posts.return_value = ([], 0)
 
             client = TestClient(app)
-            response = client.get("/posts/?email=test@example.com")
+            response = client.get("/api/posts/?email=test@example.com")
 
-            assert response.status_code == 404
+            assert response.status_code == 200
+            body = response.json()
+            assert body["detail"]["posts"] == []
+            assert body["detail"]["total"] == 0
 
     def test_get_posts_returns_400_without_email(self):
         from fastapi.testclient import TestClient
         from cqc_lem.api.main import app
 
         client = TestClient(app)
-        response = client.get("/posts/")
+        response = client.get("/api/posts/")
 
         assert response.status_code == 422
 
@@ -114,7 +121,7 @@ class TestUpdatePostEndpoint:
             mock_update.return_value = True
 
             client = TestClient(app)
-            response = client.post("/update_post/?post_id=1", json={
+            response = client.post("/api/update_post/?post_id=1", json={
                 "email": "test@example.com",
                 "content": "Updated content",
                 "scheduled_datetime": "2025-06-01T12:00:00",

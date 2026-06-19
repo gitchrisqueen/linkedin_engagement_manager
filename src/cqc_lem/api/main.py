@@ -1,7 +1,7 @@
 import json
 import os
 import time
-from datetime import datetime
+from datetime import datetime, timezone
 from enum import IntEnum
 from typing import BinaryIO, Dict, List, Union
 from typing import Optional, Any
@@ -15,7 +15,7 @@ from cqc_lem.utilities.db import (
     insert_post, get_post_by_email, get_user_id, update_db_post, get_post_user_id,
     add_user_with_access_token, update_user, PostType, PostStatus, get_posts,
     get_recent_logs, bulk_update_posts, soft_delete_posts,
-    create_pin_for_email, verify_pin_for_email,
+    create_pin_for_email, verify_pin_for_email, delete_pin_for_email,
     create_session, get_session_user_id, delete_session,
     add_user_by_email, get_user_email, get_user_token_info,
     get_user_subscription_info, get_user_preferences, update_user_preferences,
@@ -478,8 +478,8 @@ def auth_email_init(request: AuthInitRequest) -> ResponseModel:
     pin = generate_pin()
     pin_hash = hash_pin(pin, email)
 
-    sent, bypassed = send_pin_email(email, pin, is_new_user=not user_exists)
-
+    # Check bypass first so we skip DB + email entirely when no provider is configured
+    _, bypassed = send_pin_email(email, pin, is_new_user=not user_exists, probe_only=True)
     if bypassed:
         # No email provider configured — create user + session immediately, skip PIN step
         user_id = get_user_id(email)
@@ -498,11 +498,16 @@ def auth_email_init(request: AuthInitRequest) -> ResponseModel:
             "is_new_user": is_new_user,
         })
 
-    if not sent:
-        raise HTTPException(status_code=500, detail="Could not send PIN email — check email provider settings")
-
+    # Write PIN to DB BEFORE sending email — if send fails we can delete the row;
+    # the reverse order would leave users with an unverifiable PIN in their inbox.
     if not create_pin_for_email(email, pin_hash):
         raise HTTPException(status_code=500, detail="Could not create PIN")
+
+    sent, _ = send_pin_email(email, pin, is_new_user=not user_exists)
+    if not sent:
+        # Clean up the PIN row so the user can retry without waiting for expiry
+        delete_pin_for_email(email)
+        raise HTTPException(status_code=500, detail="Could not send PIN email — check email provider settings")
 
     return ResponseModel(status_code=200, detail={"bypass": False, "user_exists": user_exists, "message": "PIN sent to email"})
 
@@ -741,7 +746,21 @@ def billing_create_checkout_session(request: CheckoutSessionRequest) -> Response
     if not stripe_customer_id:
         raise HTTPException(status_code=400, detail="No Stripe customer record — contact support")
 
-    from cqc_lem.utilities.stripe_util import create_checkout_session
+    from cqc_lem.utilities.stripe_util import create_checkout_session, upgrade_subscription
+
+    # If the user already has an active subscription, modify it in-place rather than
+    # creating a new Checkout session — which would register a second subscription.
+    existing_sub_id = subscription.get("stripe_subscription_id") if subscription else None
+    existing_status = subscription.get("subscription_status") if subscription else None
+    if existing_sub_id and existing_status in ("active", "trial"):
+        upgraded = upgrade_subscription(existing_sub_id, request.tier)
+        if upgraded:
+            # No redirect needed — Stripe webhook will fire subscription.updated and sync DB
+            return ResponseModel(status_code=200, detail={"checkout_url": None, "upgraded": True})
+        myprint(
+            f"In-place upgrade failed for sub={existing_sub_id}; falling back to checkout session"
+        )
+
     url = create_checkout_session(
         stripe_customer_id,
         request.tier,
@@ -750,7 +769,7 @@ def billing_create_checkout_session(request: CheckoutSessionRequest) -> Response
     )
     if not url:
         raise HTTPException(status_code=500, detail="Could not create Stripe checkout session")
-    return ResponseModel(status_code=200, detail={"checkout_url": url})
+    return ResponseModel(status_code=200, detail={"checkout_url": url, "upgraded": False})
 
 
 @router.post("/billing/create-portal-session")
@@ -794,6 +813,9 @@ async def billing_webhook(request: Request) -> dict:
     ):
         stripe_customer_id = data.get("customer")
         stripe_subscription_id = data.get("id")
+        if not stripe_customer_id:
+            myprint(f"Webhook {event_type} missing customer field — skipping")
+            return {"received": True}
         sub_status = data.get("status", "")
         db_status = stripe_status_to_db(sub_status)
 
@@ -807,7 +829,7 @@ async def billing_webhook(request: Request) -> dict:
         # Period end (Unix timestamp → datetime)
         period_end_ts = data.get("current_period_end")
         period_end = (
-            datetime.fromtimestamp(period_end_ts) if period_end_ts else None
+            datetime.fromtimestamp(period_end_ts, tz=timezone.utc) if period_end_ts else None
         )
 
         myprint(
@@ -821,6 +843,9 @@ async def billing_webhook(request: Request) -> dict:
     elif event_type == "customer.subscription.deleted":
         stripe_customer_id = data.get("customer")
         stripe_subscription_id = data.get("id")
+        if not stripe_customer_id:
+            myprint(f"Webhook {event_type} missing customer field — skipping")
+            return {"received": True}
         myprint(f"Subscription {stripe_subscription_id} deleted for customer {stripe_customer_id}")
         # tier=None preserves the historical tier in the DB
         update_subscription_from_stripe(
@@ -831,6 +856,9 @@ async def billing_webhook(request: Request) -> dict:
     elif event_type == "invoice.payment_succeeded":
         stripe_customer_id = data.get("customer")
         stripe_subscription_id = data.get("subscription")
+        if not stripe_customer_id:
+            myprint(f"Webhook {event_type} missing customer field — skipping")
+            return {"received": True}
         if stripe_subscription_id:
             myprint(
                 f"Invoice payment succeeded for customer={stripe_customer_id}, "
@@ -846,7 +874,7 @@ async def billing_webhook(request: Request) -> dict:
                     price_id = items[0].get("price", {}).get("id")
                 tier = get_subscription_tier_from_price(price_id) if price_id else None
                 period_end_ts = sub.get("current_period_end")
-                period_end = datetime.fromtimestamp(period_end_ts) if period_end_ts else None
+                period_end = datetime.fromtimestamp(period_end_ts, tz=timezone.utc) if period_end_ts else None
                 update_subscription_from_stripe(
                     stripe_customer_id, "active", tier, stripe_subscription_id, period_end
                 )
@@ -854,6 +882,9 @@ async def billing_webhook(request: Request) -> dict:
     elif event_type == "invoice.payment_failed":
         stripe_customer_id = data.get("customer")
         stripe_subscription_id = data.get("subscription")
+        if not stripe_customer_id:
+            myprint(f"Webhook {event_type} missing customer field — skipping")
+            return {"received": True}
         if stripe_subscription_id:
             myprint(
                 f"Invoice payment FAILED for customer={stripe_customer_id}, "
