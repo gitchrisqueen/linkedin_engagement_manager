@@ -1302,18 +1302,18 @@ tests = ["asttokens (>=2.1.0)", "coverage", "coverage-enable-subprocess", "ipyth
 
 [[package]]
 name = "extra-streamlit-components"
-version = "0.1.71"
+version = "0.1.81"
 description = "An all-in-one place, to find complex or just natively unavailable components on streamlit."
 optional = false
 python-versions = ">=3.6"
 groups = ["streamlit"]
 files = [
-    {file = "extra_streamlit_components-0.1.71-py3-none-any.whl", hash = "sha256:c8e6f98446adecd3002756362e50d0669693b7673afaa89cebfced6415cc6bd3"},
-    {file = "extra_streamlit_components-0.1.71.tar.gz", hash = "sha256:d18314cf2ed009f95641882b50aa3bdb11b6a0eb6403fb43dbc8af1722419617"},
+    {file = "extra_streamlit_components-0.1.81-py3-none-any.whl", hash = "sha256:11a4651dbd03cac04edfbb8711757b1d10e3cdf280b8fa3a43f970d05e684619"},
+    {file = "extra_streamlit_components-0.1.81.tar.gz", hash = "sha256:eb9beb7bacfe8b3d238f1888a21c78ac6cfa569341be484bca08c3ea0b15f20d"},
 ]
 
 [package.dependencies]
-streamlit = ">=1.18.0"
+streamlit = ">=1.40.1"
 
 [[package]]
 name = "fastapi"
