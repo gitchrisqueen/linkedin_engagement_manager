@@ -248,7 +248,7 @@ def create_carousel_content(user_id: int, stage: str, post_id: int = None) -> st
             # Render slide images using Pillow
             image_paths = create_carousel_slide_images(carousel_obj, post_id)
             slide_urls = [
-                f"{API_URL_FINAL}/assets?file_name=images/carousel/{post_id}/{os.path.basename(p)}"
+                f"{API_URL_FINAL}/api/assets?file_name=images/carousel/{post_id}/{os.path.basename(p)}"
                 for p in image_paths
             ]
             update_db_post_carousel_slides(post_id, slide_urls)
@@ -815,7 +815,7 @@ def auto_create_weekly_content(user_id: int = None):
             video_file_name = os.path.basename(video_file_path)
 
             # The video url is our api prefix + 'assets?file=videos/runwayml' +  video_file_name
-            api_video_url = f"{API_URL_FINAL}/assets?file_name=videos/runwayml/{video_file_name}"
+            api_video_url = f"{API_URL_FINAL}/api/assets?file_name=videos/runwayml/{video_file_name}"
             myprint(f"Video URL: {api_video_url}")
 
             # Update the database with the video url

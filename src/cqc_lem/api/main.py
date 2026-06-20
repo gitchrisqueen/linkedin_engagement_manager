@@ -30,7 +30,7 @@ from cqc_lem.utilities.db import (
     update_avatar_training_status, set_active_avatar,
     get_avatar_trainings, get_active_avatar,
     get_user_timezone, update_user_timezone,
-    replace_video_url_base, get_post_type,
+    replace_video_url_base, get_post_type, get_post_buyer_stage,
     update_db_post_carousel_slides,
 )
 from cqc_lem.utilities.email import generate_pin, hash_pin, send_pin_email
@@ -1305,9 +1305,10 @@ def admin_regenerate_carousel(
     if post_type != PostType.CAROUSEL:
         raise HTTPException(status_code=404, detail="Post not found or not a carousel post")
 
+    stage = get_post_buyer_stage(request.post_id) or "awareness"
     from cqc_lem.app.run_content_plan import create_carousel_content
     try:
-        new_content = create_carousel_content(request.user_id, stage="awareness", post_id=request.post_id)
+        new_content = create_carousel_content(request.user_id, stage=stage, post_id=request.post_id)
         from cqc_lem.utilities.db import update_db_post_content
         update_db_post_content(request.post_id, new_content)
     except Exception as exc:
@@ -1320,6 +1321,14 @@ def admin_regenerate_carousel(
 
 # Register the /api router
 app.include_router(router)
+
+# Backward-compat redirect: /assets?file_name=... → /api/assets?file_name=...
+# Must be registered before the SPA StaticFiles mount so it takes priority.
+@app.get("/assets", include_in_schema=False)
+async def assets_compat_redirect(request: Request, file_name: Optional[str] = None):
+    if file_name:
+        return RedirectResponse(url=f"/api/assets?{request.url.query}", status_code=301)
+    raise HTTPException(status_code=404)
 
 # Serve the React SPA for all non-API routes (must come after include_router)
 if os.path.isdir(_ui_dist):

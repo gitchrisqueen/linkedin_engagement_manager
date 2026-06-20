@@ -563,6 +563,21 @@ def get_post_video_url(post_id: int):
     return post['video_url'] if post else None
 
 
+def get_post_buyer_stage(post_id: int) -> Optional[str]:
+    connection = get_db_connection()
+    cursor = connection.cursor(dictionary=True)
+    try:
+        cursor.execute("SELECT buyer_stage FROM posts WHERE id = %s", (post_id,))
+        row = cursor.fetchone()
+    except mysql.connector.Error as err:
+        myprint(f"Could not get buyer_stage for post id: {post_id} | Error: {err}")
+        row = None
+    finally:
+        cursor.close()
+        connection.close()
+    return row['buyer_stage'] if row else None
+
+
 def get_post_type(post_id: int) -> Optional[PostType]:
     connection = get_db_connection()
     cursor = connection.cursor(dictionary=True)
