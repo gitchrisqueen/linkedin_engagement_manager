@@ -139,11 +139,12 @@ def mock_replicate_training():
 
 
 def pytest_collection_modifyitems(config, items):
-    """Auto-skip requires_replicate tests when REPLICATE_API_TOKEN is not a real key."""
-    token = os.environ.get("REPLICATE_API_TOKEN", "")
-    is_placeholder = not token or token.startswith("your_") or token in ("test-key", "")
-    if is_placeholder:
-        skip_marker = pytest.mark.skip(
+    """Auto-skip tests whose external service keys are absent or placeholder."""
+    # --- REPLICATE_API_TOKEN ---
+    replicate_token = os.environ.get("REPLICATE_API_TOKEN", "")
+    replicate_missing = not replicate_token or replicate_token.startswith("your_") or replicate_token in ("test-key", "")
+    if replicate_missing:
+        skip_replicate = pytest.mark.skip(
             reason=(
                 "REPLICATE_API_TOKEN is not set or is a placeholder — "
                 "set a real token to run avatar E2E tests"
@@ -151,7 +152,21 @@ def pytest_collection_modifyitems(config, items):
         )
         for item in items:
             if "requires_replicate" in item.keywords:
-                item.add_marker(skip_marker)
+                item.add_marker(skip_replicate)
+
+    # --- CAPSOLVER_API_KEY ---
+    capsolver_key = os.environ.get("CAPSOLVER_API_KEY", "")
+    capsolver_missing = not capsolver_key or capsolver_key.startswith("your_") or capsolver_key in ("", "test-key")
+    if capsolver_missing:
+        skip_capsolver = pytest.mark.skip(
+            reason=(
+                "CAPSOLVER_API_KEY is not set or is a placeholder — "
+                "sign up at capsolver.com and add the key to .env to run CAPTCHA E2E tests"
+            )
+        )
+        for item in items:
+            if "requires_capsolver" in item.keywords:
+                item.add_marker(skip_capsolver)
 
 
 # Marker for skipping tests that require real external services
@@ -168,6 +183,9 @@ def pytest_configure(config):
     )
     config.addinivalue_line(
         "markers", "requires_replicate: mark test as requiring a real REPLICATE_API_TOKEN"
+    )
+    config.addinivalue_line(
+        "markers", "requires_capsolver: mark test as requiring a real CAPSOLVER_API_KEY"
     )
     config.addinivalue_line(
         "markers", "slow: mark test as slow running"

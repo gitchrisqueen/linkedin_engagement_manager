@@ -32,6 +32,7 @@ from cqc_lem.utilities.db import (
     get_user_timezone, update_user_timezone,
     replace_video_url_base, get_post_type, get_post_buyer_stage,
     update_db_post_carousel_slides,
+    get_post_url_from_log_for_user,
 )
 from cqc_lem.utilities.email import generate_pin, hash_pin, send_pin_email
 from cqc_lem.utilities.linkedin.token_refresh import (
@@ -480,6 +481,20 @@ def delete_posts_endpoint(request: BulkDeleteRequest) -> ResponseModel:
         return ResponseModel(status_code=200, detail="Posts deleted successfully")
     else:
         raise HTTPException(status_code=405, detail="Posts could not be deleted")
+
+
+@router.get("/post_url/", responses={
+    200: {"description": "LinkedIn post URL returned"},
+    **{k: v for k, v in error_responses.items() if k in [400, 403]}
+})
+def get_post_url(post_id: int, email: str) -> ResponseModel:
+    if not email:
+        raise HTTPException(status_code=400, detail="Email is required")
+    user_id = get_user_id(email)
+    if not user_id:
+        raise HTTPException(status_code=403, detail="User not found")
+    post_url = get_post_url_from_log_for_user(user_id, post_id)
+    return ResponseModel(status_code=200, detail={"post_url": post_url})
 
 
 @router.post("/update_post/", responses={

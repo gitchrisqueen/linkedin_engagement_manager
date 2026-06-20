@@ -26,6 +26,8 @@ jobs:
       # When unset, pytest_collection_modifyitems auto-skips requires_replicate tests.
       REPLICATE_API_TOKEN: ${{ secrets.REPLICATE_API_TOKEN }}
       REPLICATE_USERNAME: ${{ secrets.REPLICATE_USERNAME }}
+      # When unset, pytest_collection_modifyitems auto-skips requires_capsolver tests.
+      CAPSOLVER_API_KEY: ${{ secrets.CAPSOLVER_API_KEY }}
 
     steps:
       - uses: actions/checkout@v7

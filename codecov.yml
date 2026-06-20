@@ -1,0 +1,86 @@
+codecov:
+  # Don't block CI if Codecov itself is unreachable
+  require_ci_to_pass: false
+  # Wait for all three test-suite uploads before posting a combined status
+  notify:
+    after_n_builds: 3
+
+coverage:
+  precision: 2
+  round: down
+  range: "70...100"
+
+  status:
+    project:
+      default:
+        # Overall project coverage target
+        target: 80%
+        threshold: 2%
+        # Carry forward previous flag results so a single-suite run
+        # doesn't make project coverage look artificially low
+        carryforward_behavior: include
+    patch:
+      default:
+        # New code in a PR must be 80% covered; informational only (won't block merge)
+        target: 80%
+        threshold: 5%
+        informational: true
+
+flags:
+  unit:
+    # Python unit tests — run on every PR
+    paths:
+      - src/cqc_lem/
+    carryforward: true
+  integration:
+    # Integration tests with real MySQL + Redis
+    paths:
+      - src/cqc_lem/
+    carryforward: true
+  e2e:
+    # End-to-end tests (Playwright / Selenium); informational
+    paths:
+      - src/cqc_lem/
+    carryforward: true
+
+# Files/directories that are NOT our code and should be excluded from coverage
+ignore:
+  # React frontend — JS/TS, not tracked by Python coverage anyway,
+  # but ignore the directory to keep report clean
+  - "src/cqc_lem/ui/"
+  # AWS CDK infrastructure stacks — not application logic
+  - "src/cqc_lem/aws/"
+  # Docker / database setup scripts
+  - "compose/"
+  # Test code itself
+  - "tests/"
+  # GitHub Actions workflows
+  - ".github/"
+  # Documentation and config files
+  - "*.md"
+  - "*.toml"
+  - "*.yml"
+  - "*.yaml"
+
+component_management:
+  default_rules:
+    statuses:
+      - type: project
+        target: 80%
+  individual_components:
+    - component_id: api
+      name: FastAPI Endpoints
+      paths:
+        - src/cqc_lem/api/
+    - component_id: celery_tasks
+      name: Celery Tasks
+      paths:
+        - src/cqc_lem/app/
+    - component_id: utilities
+      name: Utilities
+      paths:
+        - src/cqc_lem/utilities/
+    - component_id: linkedin_automation
+      name: LinkedIn Automation
+      paths:
+        - src/cqc_lem/utilities/linkedin/

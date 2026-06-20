@@ -498,6 +498,21 @@ files = [
 ]
 
 [[package]]
+name = "capsolver"
+version = "1.0.7"
+description = "capsolver python libary"
+optional = false
+python-versions = ">=3.6.8"
+groups = ["main"]
+files = [
+    {file = "capsolver-1.0.7-py3-none-any.whl", hash = "sha256:c0497cc55398741a00c84c34bbad5698a7e76b73787b568622a6ec4d319c5773"},
+    {file = "capsolver-1.0.7.tar.gz", hash = "sha256:e3ec645c8752becb2c861d357bbc0cc23c5716bd9073e1b9b1cc5ecc5ba1d21f"},
+]
+
+[package.dependencies]
+requests = ">=2.26.0"
+
+[[package]]
 name = "cattrs"
 version = "26.1.0"
 description = "Composable complex class support for attrs and dataclasses."
@@ -4114,7 +4129,7 @@ files = [
     {file = "pycparser-3.0-py3-none-any.whl", hash = "sha256:b727414169a36b7d524c1c3e31839a521725078d7b2ff038656844266160a992"},
     {file = "pycparser-3.0.tar.gz", hash = "sha256:600f49d217304a5902ac3c37e1281c9fe94e4d0489de643a9504c5cdfdfc6b29"},
 ]
-markers = {main = "(os_name == \"nt\" or platform_python_implementation != \"PyPy\") and (implementation_name != \"pypy\" or platform_python_implementation != \"PyPy\") and implementation_name != \"PyPy\"", dev = "implementation_name != \"PyPy\""}
+markers = {main = "os_name == \"nt\" and implementation_name != \"pypy\" and implementation_name != \"PyPy\" or platform_python_implementation != \"PyPy\" and implementation_name != \"PyPy\"", dev = "implementation_name != \"PyPy\""}
 
 [[package]]
 name = "pycurl"
@@ -6372,4 +6387,4 @@ type = ["pytest-mypy (>=1.0.1) ; platform_python_implementation != \"PyPy\""]
 [metadata]
 lock-version = "2.1"
 python-versions = ">=3.12,<4.0"
-content-hash = "4fdb347fd82cd3e56fc0b2cdc590a33d242e78aeba6538289e69d1571d5bc557"
+content-hash = "b60085a5cfe9c5e543b6fb4594d20f42a6f6037a245490251df3840a861915b4"

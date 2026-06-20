@@ -1,3 +1,4 @@
+import os
 import time
 from typing import Optional
 
@@ -14,12 +15,114 @@ from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.support.wait import WebDriverWait
 
 
+def solve_arkose_challenge(driver: WebDriver, wait: WebDriverWait) -> bool:
+    """Attempt to solve an Arkose Labs (FunCaptcha) challenge on the current page.
+
+    Returns True if the challenge was solved and the browser moved past it.
+    Returns False for unsolvable challenge types (email/phone verification) or
+    when CAPSOLVER_API_KEY is not configured — caller should abort gracefully.
+    """
+    api_key = os.getenv("CAPSOLVER_API_KEY", "").strip()
+    if not api_key:
+        log_warning(
+            "CAPSOLVER_API_KEY not set — cannot auto-solve LinkedIn challenge",
+            action_type="login",
+        )
+        return False
+
+    # Detect Arkose Labs FunCaptcha iframe on the page
+    iframes = driver.find_elements(By.TAG_NAME, "iframe")
+    arkose_frame = next(
+        (f for f in iframes if "arkoselabs.com" in (f.get_attribute("src") or "")),
+        None,
+    )
+    if arkose_frame is None:
+        log_warning(
+            "LinkedIn challenge is not an Arkose Labs FunCaptcha — cannot auto-solve",
+            action_type="login",
+            error_message=f"Challenge URL: {driver.current_url}",
+        )
+        return False
+
+    try:
+        import capsolver  # type: ignore[import-untyped]
+
+        capsolver.api_key = api_key
+
+        # Extract publicKey and surl from the iframe src
+        src = arkose_frame.get_attribute("src") or ""
+        from urllib.parse import urlparse, parse_qs
+        parsed = urlparse(src)
+        qs = parse_qs(parsed.query)
+        public_key = qs.get("pk", qs.get("public_key", [""]))[0]
+        surl = f"{parsed.scheme}://{parsed.netloc}/"
+
+        if not public_key:
+            # Try extracting from page source as fallback
+            page = driver.page_source
+            import re
+            m = re.search(r'"public_key"\s*:\s*"([^"]+)"', page)
+            public_key = m.group(1) if m else ""
+
+        if not public_key:
+            log_warning(
+                "Could not extract Arkose publicKey from page — skipping CAPTCHA solve",
+                action_type="login",
+            )
+            return False
+
+        solution = capsolver.solve({
+            "type": "FunCaptchaTask",
+            "websiteURL": driver.current_url,
+            "websitePublicKey": public_key,
+            "funcaptchaApiJSSubdomain": surl,
+        })
+
+        token = solution.get("token", "")
+        if not token:
+            log_warning("CapSolver returned empty token for FunCaptcha", action_type="login")
+            return False
+
+        # Inject the token and submit
+        driver.execute_script(
+            "document.getElementById('FunCaptcha-Token') && "
+            "(document.getElementById('FunCaptcha-Token').value = arguments[0]);",
+            token,
+        )
+        driver.execute_script(
+            "var el = document.querySelector('[name=\"fc-token\"]');"
+            "if (el) el.value = arguments[0];",
+            token,
+        )
+        # Trigger form submission if a submit button is present
+        try:
+            submit = driver.find_element(By.CSS_SELECTOR, "button[type='submit'], input[type='submit']")
+            submit.click()
+            time.sleep(2)
+        except Exception:
+            pass
+
+        myprint("Arkose FunCaptcha solved via CapSolver")
+        return True
+
+    except Exception as e:
+        log_warning(
+            "CapSolver CAPTCHA solve failed",
+            exc=e,
+            action_type="login",
+        )
+        return False
+
+
 def login_to_linkedin(driver: WebDriver, wait: WebDriverWait, user_email: str, user_password: str):
     linked_url = "https://www.linkedin.com"
     feed_url = "https://www.linkedin.com/feed/"
     login_url = "https://www.linkedin.com/login"
 
-    _CHALLENGE_PATHS = ('/checkpoint/', '/authwall', '/uas/login', '/challenge/')
+    _CHALLENGE_PATHS = (
+        '/checkpoint/', '/authwall', '/uas/login', '/challenge/',
+        '/captcha/', '/security-verification', '/error',
+    )
     # LinkedIn can land on /home, /feed, /mynetwork, etc. when logged in
     _LOGGED_IN_PATHS = ('/feed', '/home', '/mynetwork', '/jobs', '/messaging',
                         '/notifications', '/in/', '/search')
@@ -29,6 +132,14 @@ def login_to_linkedin(driver: WebDriver, wait: WebDriverWait, user_email: str, u
 
     def _is_logged_in(url: str) -> bool:
         return any(p in url for p in _LOGGED_IN_PATHS)
+
+    def _handle_challenge(label: str) -> None:
+        """Try to solve an Arkose challenge; raise if unsolvable."""
+        if solve_arkose_challenge(driver, wait):
+            myprint(f"CAPTCHA solved at {label} — continuing login")
+            time.sleep(2)
+        else:
+            raise RuntimeError(f"Unsolvable LinkedIn challenge at {label}: {driver.current_url}")
 
     # Load base domain first so cookies can be set against the right origin
     driver.get(linked_url)
@@ -48,12 +159,7 @@ def login_to_linkedin(driver: WebDriver, wait: WebDriverWait, user_email: str, u
     time.sleep(2)
 
     if _is_challenge_url(driver.current_url):
-        log_error(
-            "LinkedIn security challenge detected after loading cookies — login blocked",
-            action_type="login",
-            error_message=f"Redirected to: {driver.current_url}",
-        )
-        raise RuntimeError(f"LinkedIn security challenge at {driver.current_url}")
+        _handle_challenge("post-cookie-load")
 
     if _is_logged_in(driver.current_url):
         myprint(f"Already logged in! (current URL: {driver.current_url})")
@@ -69,12 +175,7 @@ def login_to_linkedin(driver: WebDriver, wait: WebDriverWait, user_email: str, u
     time.sleep(1)
 
     if _is_challenge_url(driver.current_url):
-        log_error(
-            "LinkedIn security challenge detected on login page — login blocked",
-            action_type="login",
-            error_message=f"Redirected to: {driver.current_url}",
-        )
-        raise RuntimeError(f"LinkedIn security challenge at {driver.current_url}")
+        _handle_challenge("login-page")
 
     username_field = get_element_wait_retry(driver, wait, 'username', "Finding Username Field", By.ID)
     password_field = get_element_wait_retry(driver, wait, 'password', "Finding Password Field", By.ID)
@@ -82,6 +183,12 @@ def login_to_linkedin(driver: WebDriver, wait: WebDriverWait, user_email: str, u
     username_field.send_keys(user_email)
     password_field.send_keys(user_password)
     click_element_wait_retry(driver, wait, '//*[@type="submit"]', "Finding Login Button", use_action_chain=True)
+
+    # Allow the post-submit redirect to settle, then check for security challenges
+    # before waiting for the feed (avoids TimeoutException on 2FA/CAPTCHA pages)
+    time.sleep(2)
+    if _is_challenge_url(driver.current_url):
+        _handle_challenge("post-submit")
 
     wait.until(EC.title_contains("Feed"), "Waiting for Feed to load after login")
 
