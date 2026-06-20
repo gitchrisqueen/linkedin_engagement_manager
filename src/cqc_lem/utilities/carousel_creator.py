@@ -1219,6 +1219,211 @@ def test_caption_only_slide(design_number: int = 1):
     print(f"Created: {file_path}")
 
 
+def create_carousel_slide_images(
+    carousel_data: Union[
+        EducationalContentCarousel,
+        CaseStudyCarousel,
+        PersonalStoryCarousel,
+        IndustryInsightsCarousel,
+        EventRecapCarousel,
+        TestimonialCarousel,
+        ProductDemoCarousel,
+    ],
+    post_id: int,
+    output_dir: Optional[str] = None,
+    bg_color: tuple = (26, 86, 219),        # default: brand blue
+    accent_color: tuple = (255, 255, 255),  # default: white text
+    secondary_bg: tuple = (15, 52, 142),    # default: darker blue strip
+) -> list[str]:
+    """Render carousel slides as 1080x1080 PNG images using Pillow.
+
+    Creates one image per slide in output_dir (defaults to
+    assets/images/carousel/{post_id}/). Returns a list of absolute image paths.
+    Images are uploaded to LinkedIn directly — no PPTX conversion needed.
+    """
+    from PIL import Image, ImageDraw, ImageFont
+
+    SLIDE_SIZE = (1080, 1080)
+    PADDING = 60
+    TITLE_Y = 140
+    BODY_Y = 380
+    STRIP_H = 80
+
+    if output_dir is None:
+        current_dir = os.path.dirname(__file__)
+        assets_root = os.path.join(current_dir, "..", "assets", "images", "carousel", str(post_id))
+        output_dir = os.path.realpath(assets_root)
+    os.makedirs(output_dir, exist_ok=True)
+
+    def _load_font(size: int):
+        font_candidates = [
+            "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
+            "/usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf",
+            "/System/Library/Fonts/Helvetica.ttc",
+            "/Library/Fonts/Arial Bold.ttf",
+        ]
+        for path in font_candidates:
+            if os.path.exists(path):
+                try:
+                    return ImageFont.truetype(path, size)
+                except Exception:
+                    continue
+        return ImageFont.load_default()
+
+    def _load_body_font(size: int):
+        font_candidates = [
+            "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
+            "/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf",
+            "/System/Library/Fonts/Helvetica.ttc",
+            "/Library/Fonts/Arial.ttf",
+        ]
+        for path in font_candidates:
+            if os.path.exists(path):
+                try:
+                    return ImageFont.truetype(path, size)
+                except Exception:
+                    continue
+        return ImageFont.load_default()
+
+    title_font = _load_font(56)
+    body_font = _load_body_font(36)
+    label_font = _load_font(24)
+
+    def _wrap_text(text: str, font, max_width: int, draw: ImageDraw.ImageDraw) -> list[str]:
+        if not text:
+            return []
+        words = text.split()
+        lines, current = [], ""
+        for word in words:
+            test = (current + " " + word).strip()
+            bbox = draw.textbbox((0, 0), test, font=font)
+            if bbox[2] - bbox[0] <= max_width:
+                current = test
+            else:
+                if current:
+                    lines.append(current)
+                current = word
+        if current:
+            lines.append(current)
+        return lines
+
+    def _render_slide(
+        slide_number: int,
+        total_slides: int,
+        title: str,
+        body: str,
+        bg_image_path: Optional[str] = None,
+    ) -> str:
+        img = Image.new("RGB", SLIDE_SIZE, color=bg_color)
+        draw = ImageDraw.Draw(img)
+
+        # Optional background image with overlay
+        if bg_image_path and os.path.exists(bg_image_path):
+            try:
+                bg_img = Image.open(bg_image_path).convert("RGB").resize(SLIDE_SIZE)
+                overlay = Image.new("RGBA", SLIDE_SIZE, (*bg_color, 200))
+                img = Image.alpha_composite(bg_img.convert("RGBA"), overlay).convert("RGB")
+                draw = ImageDraw.Draw(img)
+            except Exception:
+                pass  # fall back to solid bg_color
+
+        # Top strip with slide counter
+        draw.rectangle([(0, 0), (SLIDE_SIZE[0], STRIP_H)], fill=secondary_bg)
+        label = f"{slide_number} / {total_slides}"
+        draw.text((PADDING, 22), label, font=label_font, fill=accent_color)
+
+        # Bottom strip / brand bar
+        draw.rectangle([(0, SLIDE_SIZE[1] - STRIP_H), (SLIDE_SIZE[0], SLIDE_SIZE[1])], fill=secondary_bg)
+
+        # Title
+        title_str = (title or "").strip()
+        title_lines = _wrap_text(title_str, title_font, SLIDE_SIZE[0] - PADDING * 2, draw)
+        y = TITLE_Y
+        for line in title_lines[:4]:
+            draw.text((PADDING, y), line, font=title_font, fill=accent_color)
+            bbox = draw.textbbox((0, 0), line, font=title_font)
+            y += (bbox[3] - bbox[1]) + 12
+
+        # Divider
+        draw.rectangle([(PADDING, y + 16), (SLIDE_SIZE[0] - PADDING, y + 20)], fill=(*accent_color, 120))
+
+        # Body text
+        body_str = (body or "").strip()
+        body_lines = _wrap_text(body_str, body_font, SLIDE_SIZE[0] - PADDING * 2, draw)
+        y = max(y + 40, BODY_Y)
+        for line in body_lines[:8]:
+            draw.text((PADDING, y), line, font=body_font, fill=accent_color)
+            bbox = draw.textbbox((0, 0), line, font=body_font)
+            y += (bbox[3] - bbox[1]) + 10
+
+        out_path = os.path.join(output_dir, f"slide_{slide_number:02d}.png")
+        img.save(out_path, "PNG")
+        return out_path
+
+    # Collect (title, body, bg_query) tuples from the carousel model
+    slides_data: list[tuple[str, str, str]] = []
+
+    def _add(title, content, query=None):
+        slides_data.append((title or "", content or "", query or title or ""))
+
+    if isinstance(carousel_data, EducationalContentCarousel):
+        _add(carousel_data.cover.title, carousel_data.cover.content)
+        for s in carousel_data.contents:
+            _add(s.title, s.content)
+        _add(carousel_data.call_to_action.title, carousel_data.call_to_action.content)
+
+    elif isinstance(carousel_data, CaseStudyCarousel):
+        _add(carousel_data.cover.title, carousel_data.cover.content)
+        _add(carousel_data.challenge.title, carousel_data.challenge.content, "challenge")
+        _add(carousel_data.solution.title, carousel_data.solution.content, "solution")
+        _add(carousel_data.results.title, carousel_data.results.content, "success results")
+        if carousel_data.testimonial:
+            _add(carousel_data.testimonial.title, carousel_data.testimonial.content, "testimonial")
+        _add(carousel_data.call_to_action.title, carousel_data.call_to_action.content)
+
+    elif isinstance(carousel_data, PersonalStoryCarousel):
+        _add(carousel_data.cover.title, carousel_data.cover.content)
+        for s in carousel_data.story_slides:
+            _add(s.title, s.content)
+        _add(carousel_data.takeaway.title, carousel_data.takeaway.content)
+        _add(carousel_data.call_to_action.title, carousel_data.call_to_action.content)
+
+    elif isinstance(carousel_data, IndustryInsightsCarousel):
+        _add(carousel_data.cover.title, carousel_data.cover.content)
+        for s in carousel_data.insights:
+            _add(s.title, s.content)
+        _add(carousel_data.call_to_action.title, carousel_data.call_to_action.content)
+
+    elif isinstance(carousel_data, EventRecapCarousel):
+        _add(carousel_data.cover.title, carousel_data.cover.content)
+        for s in carousel_data.key_moments:
+            _add(s.title, s.content)
+        _add(carousel_data.call_to_action.title, carousel_data.call_to_action.content)
+
+    elif isinstance(carousel_data, TestimonialCarousel):
+        _add(carousel_data.cover.title, carousel_data.cover.content)
+        for s in carousel_data.testimonials:
+            _add(s.title, s.content, "testimonial client")
+        _add(carousel_data.call_to_action.title, carousel_data.call_to_action.content)
+
+    elif isinstance(carousel_data, ProductDemoCarousel):
+        _add(carousel_data.cover.title, carousel_data.cover.content)
+        _add(carousel_data.main_feature.title, carousel_data.main_feature.content, "product feature")
+        for s in carousel_data.additional_features:
+            _add(s.title, s.content, "product feature")
+        _add(carousel_data.call_to_action.title, carousel_data.call_to_action.content)
+
+    default_image = get_default_image_path()
+    total = len(slides_data)
+    image_paths = []
+    for idx, (title, body, query) in enumerate(slides_data, start=1):
+        bg = get_pexels_image_path(query, default_image) if idx in (1, total) else None
+        path = _render_slide(idx, total, title, body, bg)
+        image_paths.append(path)
+
+    return image_paths
+
+
 if __name__ == "__main__":
     # Debug
     # debug_master_slide_placeholders_and_text()

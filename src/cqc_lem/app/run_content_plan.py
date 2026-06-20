@@ -19,9 +19,11 @@ from cqc_lem.utilities.ai.ai_helper import get_thought_leadership_post_from_ai, 
 from cqc_lem.utilities.db import get_post_type_counts, insert_planned_post, update_db_post_content, \
     get_planned_posts_for_current_week, get_last_planned_post_date_for_user, get_user_password_pair_by_id, \
     get_user_blog_url, get_user_sitemap_url, get_active_user_ids, get_planned_posts_for_next_week, PostStatus, \
-    update_db_post_video_url, update_db_post_status, PostType, get_user_preferences
+    update_db_post_video_url, update_db_post_status, PostType, get_user_preferences, \
+    update_db_post_carousel_slides
 from cqc_lem.utilities.env_constants import API_URL_FINAL
 from cqc_lem.utilities.linkedin.helper import get_my_profile
+from cqc_lem.utilities.linkedin_formatter import sanitize_for_linkedin
 from cqc_lem.utilities.linkedin.profile import LinkedInProfile
 from cqc_lem.utilities.logger import myprint
 from cqc_lem.utilities.selenium_util import get_driver_wait_pair, quit_gracefully
@@ -193,7 +195,7 @@ def get_min_key(d):
     return min(d, key=d.get)
 
 
-def create_content(user_id: int, post_type: str, stage: str):
+def create_content(user_id: int, post_type: str, stage: str, post_id: int = None):
     """Create content based on the specified post type and buyer journey stage."""
 
     video_url = None
@@ -202,13 +204,93 @@ def create_content(user_id: int, post_type: str, stage: str):
     if post_type == "video":
         content, video_url = create_video_content(user_id, stage)
     elif post_type == "carousel":
-        content = f"Content created for {post_type} in the {stage} stage. However, this is unfinished"
+        content = create_carousel_content(user_id, stage, post_id)
     else:
         content = create_text_post(user_id, stage)
         if content:
             content = content.strip()
 
     return content, video_url
+
+
+def create_carousel_content(user_id: int, stage: str, post_id: int = None) -> str:
+    """Generate AI carousel content, render slide images, update DB, and return the post text."""
+    from cqc_lem.utilities.ai.ai_helper import generate_carousel_content
+    from cqc_lem.utilities.carousel_creator import (
+        create_ppt, create_carousel_slide_images,
+        EducationalContentCarousel, CaseStudyCarousel, PersonalStoryCarousel,
+        IndustryInsightsCarousel, EventRecapCarousel, TestimonialCarousel, ProductDemoCarousel,
+    )
+
+    post_text, carousel_dict = generate_carousel_content(user_id, stage)
+    myprint(f"Carousel AI content generated for user_id={user_id} stage={stage}")
+
+    # Map stage to carousel model class
+    stage_lower = (stage or "").lower()
+    if "awareness" in stage_lower:
+        model_cls = EducationalContentCarousel
+    elif "consideration" in stage_lower:
+        model_cls = CaseStudyCarousel
+    elif "decision" in stage_lower:
+        model_cls = ProductDemoCarousel
+    else:
+        model_cls = IndustryInsightsCarousel
+
+    carousel_obj = None
+    try:
+        carousel_obj = model_cls(**carousel_dict)
+    except Exception as e:
+        myprint(f"Could not parse carousel dict into {model_cls.__name__}: {e} — using raw slide texts")
+
+    slide_urls = []
+    if carousel_obj is not None and post_id is not None:
+        try:
+            # Render slide images using Pillow
+            image_paths = create_carousel_slide_images(carousel_obj, post_id)
+            slide_urls = [
+                f"{API_URL_FINAL}/assets?file_name=images/carousel/{post_id}/{os.path.basename(p)}"
+                for p in image_paths
+            ]
+            update_db_post_carousel_slides(post_id, slide_urls)
+            myprint(f"Carousel slides saved: {len(slide_urls)} images for post_id={post_id}")
+
+            # Also generate PPTX for user download
+            try:
+                ppt_name = f"carousel_{post_id}"
+                create_ppt(ppt_name, carousel_obj)
+            except Exception as ppt_err:
+                myprint(f"PPTX generation failed (non-fatal): {ppt_err}")
+        except Exception as img_err:
+            myprint(f"Carousel image generation failed: {img_err}")
+            # Fall back to storing slide titles as text for Pexels lookup
+            slide_texts = _extract_slide_texts(carousel_obj)
+            if post_id is not None:
+                update_db_post_carousel_slides(post_id, slide_texts)
+
+    elif carousel_obj is None and post_id is not None:
+        # No valid carousel model; store empty list so posting can still proceed as text-only
+        update_db_post_carousel_slides(post_id, [])
+
+    return post_text
+
+
+def _extract_slide_texts(carousel_obj) -> list[str]:
+    """Return plain text titles from a carousel model as Pexels search fallback."""
+    texts = []
+    for field_name in carousel_obj.model_fields:
+        field_val = getattr(carousel_obj, field_name, None)
+        if field_val is None:
+            continue
+        if isinstance(field_val, list):
+            for item in field_val:
+                t = getattr(item, "title", None) or getattr(item, "content", None) or ""
+                if t:
+                    texts.append(str(t)[:100])
+        else:
+            t = getattr(field_val, "title", None) or getattr(field_val, "content", None) or ""
+            if t:
+                texts.append(str(t)[:100])
+    return texts
 
 
 def create_video_content(user_id: int, stage: str) -> tuple[str, str | None]:
@@ -329,8 +411,7 @@ def create_text_post(user_id: int, stage: str, post_type: str = None, user_profi
 
     if refine_final_post:
         final_content = get_ai_linked_post_refinement(final_content)
-
-        # Strip leading and ending white spaces
+        final_content = sanitize_for_linkedin(final_content)
         final_content = final_content.strip()
 
     return final_content
@@ -714,7 +795,7 @@ def auto_create_weekly_content(user_id: int = None):
         stage = post['buyer_stage']
 
         try:
-            content, video_url = create_content(user_id, post_type, stage)
+            content, video_url = create_content(user_id, post_type, stage, post_id=post_id)
         except Exception as e:
             myprint(f"Skipping post_id {post_id}: content generation raised {type(e).__name__}: {e}")
             continue

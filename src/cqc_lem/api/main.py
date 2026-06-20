@@ -30,17 +30,19 @@ from cqc_lem.utilities.db import (
     update_avatar_training_status, set_active_avatar,
     get_avatar_trainings, get_active_avatar,
     get_user_timezone, update_user_timezone,
+    replace_video_url_base, get_post_type,
+    update_db_post_carousel_slides,
 )
 from cqc_lem.utilities.email import generate_pin, hash_pin, send_pin_email
 from cqc_lem.utilities.linkedin.token_refresh import (
     get_token_expiry, is_token_expired, is_token_expiring_soon, attempt_token_refresh,
 )
-from cqc_lem.utilities.env_constants import LI_CLIENT_ID, LI_CLIENT_SECRET, LI_REDIRECT_URL, LI_STATE_SALT
+from cqc_lem.utilities.env_constants import LI_CLIENT_ID, LI_CLIENT_SECRET, LI_REDIRECT_URL, LI_STATE_SALT, ADMIN_SECRET
 from cqc_lem.utilities.logger import myprint
 from cqc_lem.utilities.mime_type_helper import get_file_mime_type
 from cqc_lem.utilities.observability import track_api_call
 from cqc_lem.utilities.utils import get_file_extension_from_filepath
-from fastapi import FastAPI, HTTPException, Request, status, APIRouter
+from fastapi import FastAPI, HTTPException, Request, status, APIRouter, Header
 from fastapi import File, Form, Query, UploadFile
 from fastapi.responses import FileResponse
 from fastapi.responses import HTMLResponse
@@ -193,6 +195,17 @@ class LinkedInPasswordRequest(BaseModel):
 class TimezoneRequest(BaseModel):
     session_token: str
     timezone: str
+
+
+class AdminFixVideoUrlsRequest(BaseModel):
+    old_base: str
+    new_base: str
+    user_id: Optional[int] = None
+
+
+class AdminRegenerateCarouselRequest(BaseModel):
+    post_id: int
+    user_id: int
 
 
 class FutureForwardValues(IntEnum):
@@ -1252,6 +1265,57 @@ def activate_avatar(avatar_db_id: int, request: AvatarActivateRequest) -> Respon
     if set_active_avatar(user_id, avatar_db_id):
         return ResponseModel(status_code=200, detail="Avatar activated")
     raise HTTPException(status_code=500, detail="Could not activate avatar")
+
+
+# ---------------------------------------------------------------------------
+# Admin endpoints — require X-Admin-Secret header matching ADMIN_SECRET env var
+# ---------------------------------------------------------------------------
+
+def _require_admin(x_admin_secret: Optional[str] = Header(default=None)) -> None:
+    if not ADMIN_SECRET or x_admin_secret != ADMIN_SECRET:
+        raise HTTPException(status_code=403, detail="Forbidden")
+
+
+@router.post("/admin/fix-video-urls", responses={
+    200: {"description": "Video URLs updated"},
+    403: {"description": "Forbidden"},
+})
+def admin_fix_video_urls(
+    request: AdminFixVideoUrlsRequest,
+    x_admin_secret: Optional[str] = Header(default=None),
+) -> ResponseModel:
+    _require_admin(x_admin_secret)
+    updated = replace_video_url_base(request.old_base, request.new_base, request.user_id)
+    myprint(f"admin/fix-video-urls: replaced {updated} row(s) — {request.old_base!r} → {request.new_base!r}")
+    return ResponseModel(status_code=200, detail={"updated_rows": updated})
+
+
+@router.post("/admin/regenerate-carousel", responses={
+    200: {"description": "Carousel regenerated"},
+    403: {"description": "Forbidden"},
+    404: {"description": "Post not found or not a carousel"},
+})
+def admin_regenerate_carousel(
+    request: AdminRegenerateCarouselRequest,
+    x_admin_secret: Optional[str] = Header(default=None),
+) -> ResponseModel:
+    _require_admin(x_admin_secret)
+
+    post_type = get_post_type(request.post_id)
+    if post_type != PostType.CAROUSEL:
+        raise HTTPException(status_code=404, detail="Post not found or not a carousel post")
+
+    from cqc_lem.app.run_content_plan import create_carousel_content
+    try:
+        new_content = create_carousel_content(request.user_id, stage="awareness", post_id=request.post_id)
+        from cqc_lem.utilities.db import update_db_post_content
+        update_db_post_content(request.post_id, new_content)
+    except Exception as exc:
+        myprint(f"admin/regenerate-carousel: failed for post_id={request.post_id} — {exc}")
+        raise HTTPException(status_code=500, detail=str(exc))
+
+    myprint(f"admin/regenerate-carousel: regenerated post_id={request.post_id}")
+    return ResponseModel(status_code=200, detail={"post_id": request.post_id, "content_preview": new_content[:120]})
 
 
 # Register the /api router

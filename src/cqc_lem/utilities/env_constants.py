@@ -76,10 +76,14 @@ NGROK_API_PREFIX=get_constant_from_env('NGROK_API_PREFIX')
 if NGROK_CUSTOM_DOMAIN:
     LI_REDIRECT_URL = f"https://{NGROK_CUSTOM_DOMAIN}/auth/linkedin/callback"
 
-# If both NGROK_FREE_DOMAIN and NGROK_API_PREFIX are not None then set API_BASE_URL as the concatenation of both
-if NGROK_FREE_DOMAIN and NGROK_API_PREFIX:
+# NGROK_CUSTOM_DOMAIN (full domain) takes precedence; fallback to PREFIX.FREE_DOMAIN form;
+# final fallback to API_BASE_URL env var with port.
+if NGROK_CUSTOM_DOMAIN:
+    API_BASE_URL = f"https://{NGROK_CUSTOM_DOMAIN}"
+    API_URL_FINAL = API_BASE_URL
+elif NGROK_FREE_DOMAIN and NGROK_API_PREFIX:
     API_BASE_URL = f"https://{NGROK_API_PREFIX}.{NGROK_FREE_DOMAIN}"
-    API_URL_FINAL = f"{API_BASE_URL}"
+    API_URL_FINAL = API_BASE_URL
 else:
     API_BASE_URL = get_constant_from_env('API_BASE_URL', default_value='http://localhost')
     API_URL_FINAL = f"{API_BASE_URL}:{API_PORT}"
@@ -105,6 +109,8 @@ if NGROK_FREE_DOMAIN and NGROK_LIPREVIEW_PREFIX:
     LINKEDIN_PREVIEW_URL = f"https://{NGROK_LIPREVIEW_PREFIX}.{NGROK_FREE_DOMAIN}"
 else:
     LINKEDIN_PREVIEW_URL = get_constant_from_env('LINKEDIN_PREVIEW_URL', default_value='http://localhost:8081')
+
+ADMIN_SECRET = get_constant_from_env('ADMIN_SECRET')
 
 # Set other constants here
 USE_DOCKER_BROWSER = isTrue(get_constant_from_env('USE_DOCKER_BROWSER', default_value='True'))
