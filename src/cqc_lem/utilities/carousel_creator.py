@@ -1231,7 +1231,7 @@ def create_carousel_slide_images(
     ],
     post_id: int,
     output_dir: Optional[str] = None,
-    bg_color: tuple = (26, 86, 219),        # default: brand blue
+    bg_color: tuple = (26, 86, 219),        # default: brand blue (unused — new design has own palette)
     accent_color: tuple = (255, 255, 255),  # default: white text
     secondary_bg: tuple = (15, 52, 142),    # default: darker blue strip
 ) -> list[str]:
@@ -1239,15 +1239,24 @@ def create_carousel_slide_images(
 
     Creates one image per slide in output_dir (defaults to
     assets/images/carousel/{post_id}/). Returns a list of absolute image paths.
-    Images are uploaded to LinkedIn directly — no PPTX conversion needed.
     """
     from PIL import Image, ImageDraw, ImageFont
 
-    SLIDE_SIZE = (1080, 1080)
-    PADDING = 60
-    TITLE_Y = 140
-    BODY_Y = 380
-    STRIP_H = 80
+    # ── Design constants ──────────────────────────────────────────────────────
+    W, H = 1080, 1080
+
+    # Palette
+    NAVY     = (10, 37, 64)       # deep navy — cover/CTA background
+    BLUE     = (26, 86, 219)      # brand blue — accents, badges
+    BLUE_LT  = (59, 130, 246)     # lighter blue — gradients, tag bg
+    WHITE    = (255, 255, 255)
+    OFF_WHITE = (248, 250, 252)   # near-white — content slide bg
+    DARK_TEXT = (15, 23, 42)      # near-black for body text on white
+    MID_TEXT  = (71, 85, 105)     # muted slate for secondary text
+    BADGE_COLORS = [
+        (26, 86, 219), (5, 150, 105), (220, 38, 38),
+        (124, 58, 237), (217, 119, 6), (14, 165, 233),
+    ]
 
     if output_dir is None:
         current_dir = os.path.dirname(__file__)
@@ -1255,116 +1264,267 @@ def create_carousel_slide_images(
         output_dir = os.path.realpath(assets_root)
     os.makedirs(output_dir, exist_ok=True)
 
-    def _load_font(size: int):
-        font_candidates = [
-            "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
-            "/usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf",
-            "/System/Library/Fonts/Helvetica.ttc",
-            "/Library/Fonts/Arial Bold.ttf",
-        ]
-        for path in font_candidates:
+    # ── Font loader ───────────────────────────────────────────────────────────
+    def _load_font(size: int, bold: bool = True) -> ImageFont.FreeTypeFont:
+        candidates = []
+        if bold:
+            candidates = [
+                "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
+                "/usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf",
+                "/usr/share/fonts/truetype/freefont/FreeSansBold.ttf",
+                "/System/Library/Fonts/Supplemental/Arial Bold.ttf",
+                "/Library/Fonts/Arial Bold.ttf",
+                "/System/Library/Fonts/Helvetica.ttc",
+            ]
+        else:
+            candidates = [
+                "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
+                "/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf",
+                "/usr/share/fonts/truetype/freefont/FreeSans.ttf",
+                "/System/Library/Fonts/Supplemental/Arial.ttf",
+                "/Library/Fonts/Arial.ttf",
+                "/System/Library/Fonts/Helvetica.ttc",
+            ]
+        for path in candidates:
             if os.path.exists(path):
                 try:
                     return ImageFont.truetype(path, size)
                 except Exception:
                     continue
-        return ImageFont.load_default()
+        # ImageFont.load_default() returns a bitmap font at ~10px; scale it
+        return ImageFont.load_default(size=size)
 
-    def _load_body_font(size: int):
-        font_candidates = [
-            "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
-            "/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf",
-            "/System/Library/Fonts/Helvetica.ttc",
-            "/Library/Fonts/Arial.ttf",
-        ]
-        for path in font_candidates:
-            if os.path.exists(path):
-                try:
-                    return ImageFont.truetype(path, size)
-                except Exception:
-                    continue
-        return ImageFont.load_default()
+    # Pre-load fonts at the sizes we need
+    font_cover_title  = _load_font(80, bold=True)
+    font_cover_sub    = _load_font(44, bold=False)
+    font_title        = _load_font(68, bold=True)
+    font_body         = _load_font(40, bold=False)
+    font_badge_num    = _load_font(52, bold=True)
+    font_label        = _load_font(28, bold=False)
+    font_cta_title    = _load_font(76, bold=True)
+    font_cta_sub      = _load_font(42, bold=False)
 
-    title_font = _load_font(56)
-    body_font = _load_body_font(36)
-    label_font = _load_font(24)
+    # ── Text normalizer (replace chars unsupported by DejaVu/Liberation) ─────
+    def _normalize(text: str) -> str:
+        replacements = {
+            "—": "-", "–": "-", "‒": "-",  # em/en dashes
+            "‘": "'", "’": "'",                   # curly single quotes
+            "“": '"', "”": '"',                   # curly double quotes
+            "…": "...",                                 # ellipsis
+            " ": " ",                                   # non-breaking space
+            "•": "*",                                   # bullet
+            "→": "->", "←": "<-", "↑": "^", "↓": "v",  # arrows
+            "©": "(c)", "®": "(R)", "™": "(TM)",
+        }
+        for src, dst in replacements.items():
+            text = text.replace(src, dst)
+        return text
 
-    def _wrap_text(text: str, font, max_width: int, draw: ImageDraw.ImageDraw) -> list[str]:
+    # ── Text wrapping ─────────────────────────────────────────────────────────
+    def _wrap(text: str, font, max_px: int, draw: ImageDraw.ImageDraw) -> list[str]:
         if not text:
             return []
         words = text.split()
-        lines, current = [], ""
+        lines, cur = [], ""
         for word in words:
-            test = (current + " " + word).strip()
-            bbox = draw.textbbox((0, 0), test, font=font)
-            if bbox[2] - bbox[0] <= max_width:
-                current = test
+            test = (cur + " " + word).strip()
+            w_px = draw.textlength(test, font=font)
+            if w_px <= max_px:
+                cur = test
             else:
-                if current:
-                    lines.append(current)
-                current = word
-        if current:
-            lines.append(current)
+                if cur:
+                    lines.append(cur)
+                cur = word
+        if cur:
+            lines.append(cur)
         return lines
 
-    def _render_slide(
-        slide_number: int,
-        total_slides: int,
-        title: str,
-        body: str,
-        bg_image_path: Optional[str] = None,
-    ) -> str:
-        img = Image.new("RGB", SLIDE_SIZE, color=bg_color)
-        draw = ImageDraw.Draw(img)
+    def _text_block_height(lines: list[str], font, line_spacing: int, draw) -> int:
+        total = 0
+        for line in lines:
+            bbox = draw.textbbox((0, 0), line, font=font)
+            total += (bbox[3] - bbox[1]) + line_spacing
+        return total
 
-        # Optional background image with overlay
+    def _draw_text_block(draw, lines: list[str], font, x: int, y: int,
+                         fill, line_spacing: int = 14, centered: bool = False,
+                         canvas_w: int = W) -> int:
+        for line in lines:
+            bbox = draw.textbbox((0, 0), line, font=font)
+            lw = bbox[2] - bbox[0]
+            lh = bbox[3] - bbox[1]
+            lx = (canvas_w - lw) // 2 if centered else x
+            draw.text((lx, y), line, font=font, fill=fill)
+            y += lh + line_spacing
+        return y
+
+    # ── Rounded rectangle helper ──────────────────────────────────────────────
+    def _rrect(draw: ImageDraw.ImageDraw, xy, radius: int, fill):
+        x0, y0, x1, y1 = xy
+        draw.rounded_rectangle([x0, y0, x1, y1], radius=radius, fill=fill)
+
+    # ── Cover slide renderer ──────────────────────────────────────────────────
+    def _render_cover(slide_number: int, total: int, title: str, subtitle: str,
+                      bg_image_path: Optional[str] = None) -> str:
+        title, subtitle = _normalize(title), _normalize(subtitle)
+        # Base: dark navy gradient simulation (two rectangles)
+        img = Image.new("RGB", (W, H), color=NAVY)
+        draw = ImageDraw.Draw(img, "RGBA")
+
+        # Gradient-like effect: lighter band at top
+        for row in range(H // 2):
+            alpha = int(40 * (1 - row / (H // 2)))
+            draw.line([(0, row), (W, row)], fill=(*BLUE_LT, alpha))
+
+        # Optional Pexels background with heavy dark overlay
         if bg_image_path and os.path.exists(bg_image_path):
             try:
-                bg_img = Image.open(bg_image_path).convert("RGB").resize(SLIDE_SIZE)
-                overlay = Image.new("RGBA", SLIDE_SIZE, (*bg_color, 200))
+                bg_img = Image.open(bg_image_path).convert("RGB").resize((W, H))
+                overlay = Image.new("RGBA", (W, H), (*NAVY, 210))
                 img = Image.alpha_composite(bg_img.convert("RGBA"), overlay).convert("RGB")
-                draw = ImageDraw.Draw(img)
+                draw = ImageDraw.Draw(img, "RGBA")
             except Exception:
-                pass  # fall back to solid bg_color
+                pass
 
-        # Top strip with slide counter
-        draw.rectangle([(0, 0), (SLIDE_SIZE[0], STRIP_H)], fill=secondary_bg)
-        label = f"{slide_number} / {total_slides}"
-        draw.text((PADDING, 22), label, font=label_font, fill=accent_color)
+        # Decorative left accent bar
+        draw.rectangle([(0, 0), (12, H)], fill=BLUE)
 
-        # Bottom strip / brand bar
-        draw.rectangle([(0, SLIDE_SIZE[1] - STRIP_H), (SLIDE_SIZE[0], SLIDE_SIZE[1])], fill=secondary_bg)
+        # Top tag: slide count
+        tag_text = f"{slide_number} of {total}"
+        tag_w = int(draw.textlength(tag_text, font=font_label)) + 40
+        _rrect(draw, (60, 60, 60 + tag_w, 108), radius=24, fill=(*BLUE, 200))
+        draw.text((80, 68), tag_text, font=font_label, fill=WHITE)
 
-        # Title
-        title_str = (title or "").strip()
-        title_lines = _wrap_text(title_str, title_font, SLIDE_SIZE[0] - PADDING * 2, draw)
-        y = TITLE_Y
-        for line in title_lines[:4]:
-            draw.text((PADDING, y), line, font=title_font, fill=accent_color)
-            bbox = draw.textbbox((0, 0), line, font=title_font)
-            y += (bbox[3] - bbox[1]) + 12
+        # Title — centered, vertically in upper half
+        title_lines = _wrap(title, font_cover_title, W - 160, draw)
+        title_h = _text_block_height(title_lines[:4], font_cover_title, 16, draw)
+        title_y = max(160, (H // 2) - title_h - 40)
+        _draw_text_block(draw, title_lines[:4], font_cover_title,
+                         x=80, y=title_y, fill=WHITE, line_spacing=16, centered=True)
+        y_after_title = title_y + title_h + 16
 
-        # Divider
-        draw.rectangle([(PADDING, y + 16), (SLIDE_SIZE[0] - PADDING, y + 20)], fill=(*accent_color, 120))
+        # Accent line
+        draw.rectangle([(W // 2 - 60, y_after_title + 10), (W // 2 + 60, y_after_title + 16)], fill=BLUE_LT)
 
-        # Body text
-        body_str = (body or "").strip()
-        body_lines = _wrap_text(body_str, body_font, SLIDE_SIZE[0] - PADDING * 2, draw)
-        y = max(y + 40, BODY_Y)
-        for line in body_lines[:8]:
-            draw.text((PADDING, y), line, font=body_font, fill=accent_color)
-            bbox = draw.textbbox((0, 0), line, font=body_font)
-            y += (bbox[3] - bbox[1]) + 10
+        # Subtitle
+        sub_lines = _wrap(subtitle, font_cover_sub, W - 200, draw)
+        _draw_text_block(draw, sub_lines[:3], font_cover_sub,
+                         x=100, y=y_after_title + 40, fill=(200, 220, 255), line_spacing=14, centered=True)
+
+        # Bottom CTA hint
+        hint = "Swipe to read  >"
+        draw.text((W // 2 - int(draw.textlength(hint, font=font_label)) // 2, H - 90),
+                  hint, font=font_label, fill=(150, 180, 220))
 
         out_path = os.path.join(output_dir, f"slide_{slide_number:02d}.png")
-        img.save(out_path, "PNG")
+        img.convert("RGB").save(out_path, "PNG", optimize=True)
         return out_path
 
-    # Collect (title, body, bg_query) tuples from the carousel model
-    slides_data: list[tuple[str, str, str]] = []
+    # ── Content slide renderer ────────────────────────────────────────────────
+    def _render_content(slide_number: int, total: int, title: str, body: str,
+                        badge_color: tuple) -> str:
+        title, body = _normalize(title), _normalize(body)
+        img = Image.new("RGB", (W, H), color=OFF_WHITE)
+        draw = ImageDraw.Draw(img, "RGBA")
 
-    def _add(title, content, query=None):
-        slides_data.append((title or "", content or "", query or title or ""))
+        # Subtle top gradient strip
+        draw.rectangle([(0, 0), (W, 8)], fill=badge_color)
+
+        # Large badge circle (top-left area)
+        cx, cy, cr = 120, 160, 72
+        draw.ellipse([(cx - cr, cy - cr), (cx + cr, cy + cr)], fill=badge_color)
+        num_str = str(slide_number - 1)  # content slides start at "1"
+        nw = int(draw.textlength(num_str, font=font_badge_num))
+        bbox = draw.textbbox((0, 0), num_str, font=font_badge_num)
+        nh = bbox[3] - bbox[1]
+        draw.text((cx - nw // 2, cy - nh // 2 - 4), num_str, font=font_badge_num, fill=WHITE)
+
+        # Title — starts to the right of badge, wraps to full width below
+        CONTENT_X = 60
+        title_lines = _wrap(title, font_title, W - CONTENT_X * 2, draw)
+        title_y = cy + cr + 36
+        y = _draw_text_block(draw, title_lines[:3], font_title,
+                              x=CONTENT_X, y=title_y, fill=DARK_TEXT, line_spacing=12)
+
+        # Accent underline beneath title
+        draw.rectangle([(CONTENT_X, y + 16), (CONTENT_X + 100, y + 22)], fill=badge_color)
+        y += 52
+
+        # Body text
+        body_lines = _wrap(body, font_body, W - CONTENT_X * 2, draw)
+        y = _draw_text_block(draw, body_lines[:7], font_body,
+                              x=CONTENT_X, y=y, fill=MID_TEXT, line_spacing=16)
+
+        # Bottom brand bar
+        BAR_H = 90
+        draw.rectangle([(0, H - BAR_H), (W, H)], fill=NAVY)
+        progress_w = int(W * slide_number / total)
+        draw.rectangle([(0, H - BAR_H), (progress_w, H - BAR_H + 5)], fill=badge_color)
+        prog_text = f"{slide_number} / {total}"
+        draw.text((W - int(draw.textlength(prog_text, font=font_label)) - 40, H - 60),
+                  prog_text, font=font_label, fill=(150, 180, 220))
+
+        out_path = os.path.join(output_dir, f"slide_{slide_number:02d}.png")
+        img.convert("RGB").save(out_path, "PNG", optimize=True)
+        return out_path
+
+    # ── CTA slide renderer ────────────────────────────────────────────────────
+    def _render_cta(slide_number: int, total: int, title: str, body: str,
+                    bg_image_path: Optional[str] = None) -> str:
+        title, body = _normalize(title), _normalize(body)
+        img = Image.new("RGB", (W, H), color=(5, 25, 50))
+        draw = ImageDraw.Draw(img, "RGBA")
+
+        # Gradient tint
+        for row in range(H):
+            alpha = int(60 * (row / H))
+            draw.line([(0, row), (W, row)], fill=(*BLUE, alpha))
+
+        if bg_image_path and os.path.exists(bg_image_path):
+            try:
+                bg_img = Image.open(bg_image_path).convert("RGB").resize((W, H))
+                overlay = Image.new("RGBA", (W, H), (5, 25, 50, 215))
+                img = Image.alpha_composite(bg_img.convert("RGBA"), overlay).convert("RGB")
+                draw = ImageDraw.Draw(img, "RGBA")
+            except Exception:
+                pass
+
+        # Right accent bar
+        draw.rectangle([(W - 12, 0), (W, H)], fill=BLUE_LT)
+
+        # Decorative diamond accent (top-left)
+        cx2, cy2 = 90, 100
+        sz = 22
+        draw.polygon([(cx2, cy2 - sz), (cx2 + sz, cy2), (cx2, cy2 + sz), (cx2 - sz, cy2)],
+                     fill=(*BLUE_LT, 180))
+
+        # CTA title — large, centered
+        cta_lines = _wrap(title, font_cta_title, W - 160, draw)
+        cta_h = _text_block_height(cta_lines[:3], font_cta_title, 20, draw)
+        cta_y = (H - cta_h) // 2 - 80
+        y = _draw_text_block(draw, cta_lines[:3], font_cta_title,
+                              x=80, y=cta_y, fill=WHITE, line_spacing=20, centered=True)
+
+        draw.rectangle([(W // 2 - 60, y + 20), (W // 2 + 60, y + 26)], fill=BLUE_LT)
+
+        # Body / engagement prompt
+        sub_lines = _wrap(body, font_cta_sub, W - 200, draw)
+        _draw_text_block(draw, sub_lines[:3], font_cta_sub,
+                         x=100, y=y + 50, fill=(200, 220, 255), line_spacing=18, centered=True)
+
+        # Slide counter
+        tag_text = f"{slide_number} / {total}"
+        draw.text((60, H - 80), tag_text, font=font_label, fill=(120, 160, 210))
+
+        out_path = os.path.join(output_dir, f"slide_{slide_number:02d}.png")
+        img.convert("RGB").save(out_path, "PNG", optimize=True)
+        return out_path
+
+    # ── Collect slide data from carousel model ────────────────────────────────
+    slides_data: list[tuple[str, str]] = []
+
+    def _add(title, content):
+        slides_data.append((title or "", content or ""))
 
     if isinstance(carousel_data, EducationalContentCarousel):
         _add(carousel_data.cover.title, carousel_data.cover.content)
@@ -1374,11 +1534,11 @@ def create_carousel_slide_images(
 
     elif isinstance(carousel_data, CaseStudyCarousel):
         _add(carousel_data.cover.title, carousel_data.cover.content)
-        _add(carousel_data.challenge.title, carousel_data.challenge.content, "challenge")
-        _add(carousel_data.solution.title, carousel_data.solution.content, "solution")
-        _add(carousel_data.results.title, carousel_data.results.content, "success results")
+        _add(carousel_data.challenge.title, carousel_data.challenge.content)
+        _add(carousel_data.solution.title, carousel_data.solution.content)
+        _add(carousel_data.results.title, carousel_data.results.content)
         if carousel_data.testimonial:
-            _add(carousel_data.testimonial.title, carousel_data.testimonial.content, "testimonial")
+            _add(carousel_data.testimonial.title, carousel_data.testimonial.content)
         _add(carousel_data.call_to_action.title, carousel_data.call_to_action.content)
 
     elif isinstance(carousel_data, PersonalStoryCarousel):
@@ -1403,22 +1563,29 @@ def create_carousel_slide_images(
     elif isinstance(carousel_data, TestimonialCarousel):
         _add(carousel_data.cover.title, carousel_data.cover.content)
         for s in carousel_data.testimonials:
-            _add(s.title, s.content, "testimonial client")
+            _add(s.title, s.content)
         _add(carousel_data.call_to_action.title, carousel_data.call_to_action.content)
 
     elif isinstance(carousel_data, ProductDemoCarousel):
         _add(carousel_data.cover.title, carousel_data.cover.content)
-        _add(carousel_data.main_feature.title, carousel_data.main_feature.content, "product feature")
+        _add(carousel_data.main_feature.title, carousel_data.main_feature.content)
         for s in carousel_data.additional_features:
-            _add(s.title, s.content, "product feature")
+            _add(s.title, s.content)
         _add(carousel_data.call_to_action.title, carousel_data.call_to_action.content)
 
-    default_image = get_default_image_path()
+    # ── Render each slide ─────────────────────────────────────────────────────
     total = len(slides_data)
+    # Cover and CTA use pure gradient — no Pexels background to avoid
+    # irrelevant/mismatched stock photos appearing on the slides.
     image_paths = []
-    for idx, (title, body, query) in enumerate(slides_data, start=1):
-        bg = get_pexels_image_path(query, default_image) if idx in (1, total) else None
-        path = _render_slide(idx, total, title, body, bg)
+    for idx, (title, body) in enumerate(slides_data, start=1):
+        if idx == 1:
+            path = _render_cover(idx, total, title, body)
+        elif idx == total:
+            path = _render_cta(idx, total, title, body)
+        else:
+            badge_color = BADGE_COLORS[(idx - 2) % len(BADGE_COLORS)]
+            path = _render_content(idx, total, title, body, badge_color)
         image_paths.append(path)
 
     return image_paths
