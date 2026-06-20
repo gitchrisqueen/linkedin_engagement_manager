@@ -1,11 +1,20 @@
 """Integration tests for the avatar endpoints."""
 
+import io
+import zipfile
 import pytest
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
 
 SESSION = "test-session-token"
 USER_ID = 42
+
+
+def _make_zip() -> bytes:
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w") as zf:
+        zf.writestr("photo_1.jpg", b"fake-image-data")
+    return buf.getvalue()
 
 
 def _client():
@@ -97,11 +106,10 @@ class TestAvatarTrainingEndpoint:
     def test_returns_402_when_no_credits(self):
         with patch("cqc_lem.api.main.get_session_user_id", return_value=USER_ID), \
              patch("cqc_lem.api.main.get_avatar_credit_balance", return_value=0):
-            from io import BytesIO
             r = _client().post(
                 "/api/avatar/training",
                 data={"session_token": SESSION, "trigger_word": "LEMAVTR42"},
-                files={"photos": ("photos.zip", BytesIO(b"PK\x03\x04fake"), "application/zip")},
+                files={"photos": ("photos.zip", _make_zip(), "application/zip")},
             )
 
         assert r.status_code == 402
@@ -109,11 +117,10 @@ class TestAvatarTrainingEndpoint:
 
     def test_returns_401_for_invalid_session(self):
         with patch("cqc_lem.api.main.get_session_user_id", return_value=None):
-            from io import BytesIO
             r = _client().post(
                 "/api/avatar/training",
                 data={"session_token": "bad", "trigger_word": "TOK"},
-                files={"photos": ("photos.zip", BytesIO(b"PK\x03\x04fake"), "application/zip")},
+                files={"photos": ("photos.zip", _make_zip(), "application/zip")},
             )
 
         assert r.status_code == 401
@@ -128,11 +135,10 @@ class TestAvatarTrainingEndpoint:
              ), \
              patch("cqc_lem.api.main.deduct_avatar_credit", return_value=True) as mock_deduct, \
              patch("cqc_lem.api.main.insert_avatar_training", return_value=5):
-            from io import BytesIO
             r = _client().post(
                 "/api/avatar/training",
                 data={"session_token": SESSION, "trigger_word": "LEMAVTR42"},
-                files={"photos": ("photos.zip", BytesIO(b"PK\x03\x04fake"), "application/zip")},
+                files={"photos": ("photos.zip", _make_zip(), "application/zip")},
             )
 
         assert r.status_code == 200

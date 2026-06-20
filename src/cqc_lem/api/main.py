@@ -3,7 +3,7 @@ import os
 import time
 from datetime import datetime, timezone
 from enum import IntEnum
-from typing import BinaryIO, Dict, List, Union
+from typing import Dict, List, Union
 from typing import Optional, Any
 from urllib.parse import urlparse, urlunparse
 
@@ -479,15 +479,16 @@ def get_assets(file_name: str, content_type: Optional[str] = None,
     if not file_name:
         raise HTTPException(status_code=400, detail="A File Name is required")
 
-    real_assets = os.path.realpath(assets_dir)
-    file_path = os.path.realpath(os.path.join(assets_dir, file_name))
+    # Strip all directory components to prevent path traversal (CWE-22)
+    safe_name = os.path.basename(file_name)
+    if not safe_name:
+        raise HTTPException(status_code=400, detail="Invalid file name")
+
+    file_path = os.path.join(assets_dir, safe_name)
     myprint(f"File Path: {file_path}")
     myprint(f"Content Type: {content_type}")
 
-    if not file_path.startswith(real_assets + os.sep):
-        raise HTTPException(status_code=400, detail="Invalid file name")
-
-    if not os.path.exists(file_path):
+    if not os.path.isfile(file_path):
         raise HTTPException(status_code=404, detail="File not found")
 
     file_extension = get_file_extension_from_filepath(file_path)
@@ -1214,9 +1215,9 @@ if os.path.isdir(_ui_dist):
 
 
 def send_bytes_range_requests(
-        file_obj: BinaryIO, start: int, end: int, chunk_size: int = 10_000
+        file_path: str, start: int, end: int, chunk_size: int = 10_000
 ):
-    with file_obj as f:
+    with open(file_path, "rb") as f:
         f.seek(start)
         while (pos := f.tell()) <= end:
             read_size = min(chunk_size, end + 1 - pos)
@@ -1270,7 +1271,7 @@ def range_requests_response(
         status_code = status.HTTP_206_PARTIAL_CONTENT
 
     return StreamingResponse(
-        send_bytes_range_requests(open(file_path, mode="rb"), start, end),
+        send_bytes_range_requests(file_path, start, end),
         headers=headers,
         status_code=status_code,
     )
