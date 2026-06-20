@@ -214,3 +214,83 @@ def fetch_subscription(stripe_subscription_id: str) -> Optional[dict]:
     except Exception as e:
         myprint(f"Could not fetch Stripe subscription {stripe_subscription_id}: {e}")
         return None
+
+
+# ---------------------------------------------------------------------------
+# Avatar credit packages (one-time payments)
+# ---------------------------------------------------------------------------
+
+AVATAR_CREDIT_PACKAGES: dict[str, dict] = {
+    "starter": {"credits": 1,  "amount_cents": 500,  "label": "1 training"},
+    "value":   {"credits": 3,  "amount_cents": 1000, "label": "3 trainings — save 33%"},
+    "pro":     {"credits": 8,  "amount_cents": 2500, "label": "8 trainings — save 37%"},
+    "max":     {"credits": 15, "amount_cents": 4000, "label": "15 trainings — save 47%"},
+}
+
+
+def create_avatar_credits_checkout(
+    stripe_customer_id: str,
+    package: str,
+    success_url: str,
+    cancel_url: str,
+) -> Optional[str]:
+    """Create a one-time Stripe Checkout session for avatar training credits.
+    Uses inline price_data so no Stripe products need to be pre-created.
+    Returns the checkout URL, or None on failure.
+    """
+    pkg = AVATAR_CREDIT_PACKAGES.get(package)
+    if not pkg:
+        myprint(f"Unknown avatar credit package '{package}'")
+        return None
+    if not STRIPE_API_KEY:
+        myprint("STRIPE_API_KEY not set — cannot create avatar credits checkout")
+        return None
+
+    stripe = _get_stripe()
+    try:
+        session = stripe.checkout.Session.create(
+            customer=stripe_customer_id,
+            payment_method_types=["card"],
+            line_items=[
+                {
+                    "price_data": {
+                        "currency": "usd",
+                        "unit_amount": pkg["amount_cents"],
+                        "product_data": {
+                            "name": f"Avatar Training Credits — {pkg['label']}",
+                            "description": (
+                                f"Use these credits to train a personalized AI avatar "
+                                f"on Replicate. Each credit = 1 training job."
+                            ),
+                        },
+                    },
+                    "quantity": 1,
+                }
+            ],
+            mode="payment",
+            success_url=success_url,
+            cancel_url=cancel_url,
+            metadata={
+                "type": "avatar_credits",
+                "package": package,
+                "credits": str(pkg["credits"]),
+            },
+        )
+        return session.url
+    except Exception as e:
+        myprint(f"Avatar credits checkout failed for customer={stripe_customer_id}: {e}")
+        return None
+
+
+def get_checkout_session_by_payment_intent(payment_intent_id: str) -> Optional[dict]:
+    """Return the first Checkout Session associated with a PaymentIntent, or None."""
+    if not STRIPE_API_KEY:
+        return None
+    stripe = _get_stripe()
+    try:
+        sessions = stripe.checkout.Session.list(payment_intent=payment_intent_id, limit=1)
+        data = sessions.get("data", [])
+        return data[0] if data else None
+    except Exception as e:
+        myprint(f"Could not look up checkout session for payment_intent={payment_intent_id}: {e}")
+        return None

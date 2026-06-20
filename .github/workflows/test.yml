@@ -16,15 +16,15 @@ jobs:
     
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Set up Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v6
         with:
           python-version: ${{ env.PYTHON_VERSION }}
 
       - name: Cache Poetry installation
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: |
             ~/.local/share/pypoetry
@@ -44,7 +44,7 @@ jobs:
           poetry config virtualenvs.in-project true
 
       - name: Cache dependencies
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: .venv
           key: ${{ runner.os }}-venv-${{ hashFiles('**/poetry.lock') }}
@@ -69,12 +69,13 @@ jobs:
         continue-on-error: true
 
       - name: Upload coverage reports
-        uses: codecov/codecov-action@v4
+        uses: codecov/codecov-action@v5
         if: always()
         with:
           file: ./coverage.xml
           flags: unittests
           name: codecov-umbrella
+          token: ${{ secrets.CODECOV_TOKEN }}
           fail_ci_if_error: false
         continue-on-error: true
 
@@ -93,10 +94,10 @@ jobs:
     
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Set up Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v6
         with:
           python-version: ${{ env.PYTHON_VERSION }}
 

@@ -605,6 +605,9 @@ def get_carousel_slides(post_id: int) -> list[str]:
     return []
 
 
+_ALLOWED_POST_CLAUSES = frozenset({"status = %s", "scheduled_time = %s"})
+
+
 def bulk_update_posts(post_ids: list[int], status: Optional[PostStatus] = None,
                       scheduled_time: Optional[datetime] = None) -> bool:
     if not post_ids:
@@ -631,6 +634,10 @@ def bulk_update_posts(post_ids: list[int], status: Optional[PostStatus] = None,
 
         if not sets:
             return False
+
+        for clause in sets:
+            if clause not in _ALLOWED_POST_CLAUSES:
+                raise ValueError(f"Disallowed SQL clause: {clause!r}")
 
         placeholders = ', '.join(['%s'] * len(post_ids))
         params.extend(post_ids)
@@ -1004,6 +1011,9 @@ def get_user_sitemap_url(user_id: int):
     return sitemap_url[0] if sitemap_url else None
 
 
+_ALLOWED_USER_CLAUSES = frozenset({"email = %s", "blog_url = %s", "sitemap_url = %s"})
+
+
 def update_user(user_id: int, email: str = None, blog_url: str = None, sitemap_url: str = None) -> bool:
     if not any([email, blog_url, sitemap_url]):
         return False
@@ -1019,6 +1029,9 @@ def update_user(user_id: int, email: str = None, blog_url: str = None, sitemap_u
     if sitemap_url:
         fields.append("sitemap_url = %s")
         values.append(sitemap_url)
+    for clause in fields:
+        if clause not in _ALLOWED_USER_CLAUSES:
+            raise ValueError(f"Disallowed SQL clause: {clause!r}")
     values.append(user_id)
     try:
         cursor.execute(f"UPDATE users SET {', '.join(fields)} WHERE id = %s", values)
@@ -1771,6 +1784,275 @@ def update_user_preferences(
     except mysql.connector.Error as err:
         myprint(f"Could not update preferences for user_id {user_id} | Error: {err}")
         return False
+    finally:
+        cursor.close()
+        connection.close()
+
+
+# ---------------------------------------------------------------------------
+# Avatar credit ledger
+# ---------------------------------------------------------------------------
+
+def get_user_by_stripe_customer_id(stripe_customer_id: str) -> Optional[dict]:
+    """Return the user row matching a Stripe customer ID, regardless of subscription status."""
+    connection = get_db_connection()
+    cursor = connection.cursor(dictionary=True)
+    try:
+        cursor.execute(
+            "SELECT id, stripe_customer_id FROM users WHERE stripe_customer_id = %s LIMIT 1",
+            (stripe_customer_id,),
+        )
+        return cursor.fetchone()
+    except mysql.connector.Error as err:
+        myprint(f"Could not look up user by stripe_customer_id={stripe_customer_id} | Error: {err}")
+        return None
+    finally:
+        cursor.close()
+        connection.close()
+
+
+def get_avatar_credit_ledger_entry_by_session(stripe_session_id: str) -> Optional[dict]:
+    """Return an existing credit ledger entry for a Stripe session (idempotency check)."""
+    connection = get_db_connection()
+    cursor = connection.cursor(dictionary=True)
+    try:
+        cursor.execute(
+            "SELECT id, user_id, delta FROM avatar_credit_ledger WHERE stripe_session_id = %s AND delta > 0 LIMIT 1",
+            (stripe_session_id,),
+        )
+        return cursor.fetchone()
+    except mysql.connector.Error as err:
+        myprint(f"Could not look up ledger entry for session={stripe_session_id} | Error: {err}")
+        return None
+    finally:
+        cursor.close()
+        connection.close()
+
+
+def get_avatar_credit_balance(user_id: int) -> int:
+    connection = get_db_connection()
+    cursor = connection.cursor(dictionary=True)
+    try:
+        cursor.execute(
+            "SELECT COALESCE(SUM(delta), 0) AS balance FROM avatar_credit_ledger WHERE user_id = %s",
+            (user_id,),
+        )
+        row = cursor.fetchone()
+        return int(row["balance"]) if row else 0
+    except mysql.connector.Error as err:
+        myprint(f"Could not fetch avatar credit balance for user_id {user_id} | Error: {err}")
+        return 0
+    finally:
+        cursor.close()
+        connection.close()
+
+
+def add_avatar_credits(
+    user_id: int,
+    amount: int,
+    reason: str,
+    stripe_session_id: Optional[str] = None,
+) -> bool:
+    connection = get_db_connection()
+    cursor = connection.cursor(dictionary=True)
+    try:
+        cursor.execute(
+            """INSERT INTO avatar_credit_ledger (user_id, delta, reason, stripe_session_id)
+               VALUES (%s, %s, %s, %s)""",
+            (user_id, amount, reason, stripe_session_id),
+        )
+        connection.commit()
+        return True
+    except mysql.connector.Error as err:
+        myprint(f"Could not add avatar credits for user_id {user_id} | Error: {err}")
+        return False
+    finally:
+        cursor.close()
+        connection.close()
+
+
+def deduct_avatar_credit(user_id: int, training_id: str) -> bool:
+    connection = get_db_connection()
+    cursor = connection.cursor(dictionary=True)
+    try:
+        cursor.execute(
+            """INSERT INTO avatar_credit_ledger (user_id, delta, reason, training_id)
+               VALUES (%s, -1, 'training_start', %s)""",
+            (user_id, training_id),
+        )
+        connection.commit()
+        return True
+    except mysql.connector.Error as err:
+        myprint(f"Could not deduct avatar credit for user_id {user_id} | Error: {err}")
+        return False
+    finally:
+        cursor.close()
+        connection.close()
+
+
+def refund_avatar_credit(user_id: int, training_id: str) -> bool:
+    connection = get_db_connection()
+    cursor = connection.cursor(dictionary=True)
+    try:
+        cursor.execute(
+            """INSERT INTO avatar_credit_ledger (user_id, delta, reason, training_id)
+               VALUES (%s, 1, 'training_refund', %s)""",
+            (user_id, training_id),
+        )
+        connection.commit()
+        return True
+    except mysql.connector.Error as err:
+        myprint(f"Could not refund avatar credit for user_id {user_id} | Error: {err}")
+        return False
+    finally:
+        cursor.close()
+        connection.close()
+
+
+# ---------------------------------------------------------------------------
+# Avatar training records
+# ---------------------------------------------------------------------------
+
+def insert_avatar_training(user_id: int, training_id: str, trigger_word: str) -> Optional[int]:
+    connection = get_db_connection()
+    cursor = connection.cursor(dictionary=True)
+    try:
+        cursor.execute(
+            """INSERT INTO avatar_trainings (user_id, training_id, trigger_word)
+               VALUES (%s, %s, %s)""",
+            (user_id, training_id, trigger_word),
+        )
+        connection.commit()
+        return cursor.lastrowid
+    except mysql.connector.Error as err:
+        myprint(f"Could not insert avatar training for user_id {user_id} | Error: {err}")
+        return None
+    finally:
+        cursor.close()
+        connection.close()
+
+
+def update_avatar_training_status(
+    training_id: str,
+    status: str,
+    model_ref: Optional[str] = None,
+) -> bool:
+    connection = get_db_connection()
+    cursor = connection.cursor(dictionary=True)
+    try:
+        if model_ref:
+            cursor.execute(
+                """UPDATE avatar_trainings
+                   SET status = %s, model_ref = %s
+                   WHERE training_id = %s""",
+                (status, model_ref, training_id),
+            )
+        else:
+            cursor.execute(
+                "UPDATE avatar_trainings SET status = %s WHERE training_id = %s",
+                (status, training_id),
+            )
+        connection.commit()
+
+        # Auto-refund credit if training failed or was canceled
+        if status in ("failed", "canceled"):
+            cursor.execute(
+                "SELECT user_id FROM avatar_trainings WHERE training_id = %s",
+                (training_id,),
+            )
+            row = cursor.fetchone()
+            if row:
+                refund_avatar_credit(row["user_id"], training_id)
+
+        return cursor.rowcount > 0
+    except mysql.connector.Error as err:
+        myprint(f"Could not update avatar training status for {training_id} | Error: {err}")
+        return False
+    finally:
+        cursor.close()
+        connection.close()
+
+
+def set_active_avatar(user_id: int, avatar_id: int) -> bool:
+    connection = get_db_connection()
+    cursor = connection.cursor(dictionary=True)
+    try:
+        cursor.execute(
+            "UPDATE avatar_trainings SET is_active = 0 WHERE user_id = %s",
+            (user_id,),
+        )
+        cursor.execute(
+            "UPDATE avatar_trainings SET is_active = 1 WHERE id = %s AND user_id = %s",
+            (avatar_id, user_id),
+        )
+        connection.commit()
+        return cursor.rowcount > 0
+    except mysql.connector.Error as err:
+        myprint(f"Could not set active avatar for user_id {user_id} | Error: {err}")
+        return False
+    finally:
+        cursor.close()
+        connection.close()
+
+
+def get_avatar_trainings(user_id: int) -> list[dict]:
+    connection = get_db_connection()
+    cursor = connection.cursor(dictionary=True)
+    try:
+        cursor.execute(
+            """SELECT id, training_id, model_ref, trigger_word, status, is_active,
+                      created_at, updated_at
+               FROM avatar_trainings
+               WHERE user_id = %s
+               ORDER BY created_at DESC""",
+            (user_id,),
+        )
+        rows = cursor.fetchall()
+        return [
+            {
+                "id": r["id"],
+                "training_id": r["training_id"],
+                "model_ref": r["model_ref"],
+                "trigger_word": r["trigger_word"],
+                "status": r["status"],
+                "is_active": bool(r["is_active"]),
+                "created_at": r["created_at"].isoformat() if r.get("created_at") else None,
+                "updated_at": r["updated_at"].isoformat() if r.get("updated_at") else None,
+            }
+            for r in rows
+        ]
+    except mysql.connector.Error as err:
+        myprint(f"Could not fetch avatar trainings for user_id {user_id} | Error: {err}")
+        return []
+    finally:
+        cursor.close()
+        connection.close()
+
+
+def get_active_avatar(user_id: int) -> Optional[dict]:
+    connection = get_db_connection()
+    cursor = connection.cursor(dictionary=True)
+    try:
+        cursor.execute(
+            """SELECT id, training_id, model_ref, trigger_word, status
+               FROM avatar_trainings
+               WHERE user_id = %s AND is_active = 1
+               LIMIT 1""",
+            (user_id,),
+        )
+        row = cursor.fetchone()
+        if not row:
+            return None
+        return {
+            "id": row["id"],
+            "training_id": row["training_id"],
+            "model_ref": row["model_ref"],
+            "trigger_word": row["trigger_word"],
+            "status": row["status"],
+        }
+    except mysql.connector.Error as err:
+        myprint(f"Could not fetch active avatar for user_id {user_id} | Error: {err}")
+        return None
     finally:
         cursor.close()
         connection.close()

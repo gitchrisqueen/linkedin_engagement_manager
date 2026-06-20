@@ -3,7 +3,7 @@ import os
 import time
 from datetime import datetime, timezone
 from enum import IntEnum
-from typing import BinaryIO, Dict, List, Union
+from typing import Dict, List, Union
 from typing import Optional, Any
 from urllib.parse import urlparse, urlunparse
 
@@ -23,6 +23,12 @@ from cqc_lem.utilities.db import (
     update_subscription_from_stripe, update_user_linkedin_token,
     get_users_with_stripe_subscriptions,
     update_user_linkedin_password,
+    get_user_blog_url, get_user_sitemap_url,
+    get_user_by_stripe_customer_id, get_avatar_credit_ledger_entry_by_session,
+    get_avatar_credit_balance, add_avatar_credits,
+    deduct_avatar_credit, insert_avatar_training,
+    update_avatar_training_status, set_active_avatar,
+    get_avatar_trainings, get_active_avatar,
 )
 from cqc_lem.utilities.email import generate_pin, hash_pin, send_pin_email
 from cqc_lem.utilities.linkedin.token_refresh import (
@@ -34,7 +40,7 @@ from cqc_lem.utilities.mime_type_helper import get_file_mime_type
 from cqc_lem.utilities.observability import track_api_call
 from cqc_lem.utilities.utils import get_file_extension_from_filepath
 from fastapi import FastAPI, HTTPException, Request, status, APIRouter
-from fastapi import Query
+from fastapi import File, Form, Query, UploadFile
 from fastapi.responses import FileResponse
 from fastapi.responses import HTMLResponse
 from fastapi.responses import RedirectResponse
@@ -105,6 +111,18 @@ class PostRequest(BaseModel):
     email: Optional[str] = None
     status: Optional[PostStatus] = PostStatus.PENDING
     carousel_slides: Optional[List[str]] = None
+    use_avatar: Optional[bool] = False
+
+
+class AvatarCreditCheckoutRequest(BaseModel):
+    session_token: str
+    package: str
+    success_url: str
+    cancel_url: str
+
+
+class AvatarActivateRequest(BaseModel):
+    session_token: str
 
     @property
     def post_json(self):
@@ -451,6 +469,36 @@ def update_post(post_id: int, post: PostRequest) -> ResponseModel:
         raise HTTPException(status_code=405, detail="Post could not be updated")
 
 
+def _find_asset_file(root: str, rel_path: str) -> str | None:
+    """Resolve rel_path within root using OS directory entries.
+
+    Each returned path comes from os.scandir() (server-controlled), so it is
+    never derived from user-supplied input.  Traversal components (.. / .) and
+    separator characters are rejected before any filesystem access.
+    """
+    parts = [p for p in rel_path.replace("\\", "/").split("/") if p]
+    if not parts:
+        return None
+    for part in parts:
+        if part in (".", "..") or os.sep in part:
+            return None
+    current = root
+    for i, part in enumerate(parts):
+        try:
+            matched = next((e for e in os.scandir(current) if e.name == part), None)
+        except OSError:
+            return None
+        if matched is None:
+            return None
+        is_last = i == len(parts) - 1
+        if is_last:
+            return matched.path if matched.is_file() else None
+        if not matched.is_dir():
+            return None
+        current = matched.path   # descend into subdirectory
+    return None
+
+
 @router.get("/assets", response_model=None, responses={
     200: {"description": "Asset returned successfully"},
     206: {"description": "Asset returned successfully via stream"},
@@ -461,12 +509,15 @@ def get_assets(file_name: str, content_type: Optional[str] = None,
     if not file_name:
         raise HTTPException(status_code=400, detail="A File Name is required")
 
-    file_path = os.path.join(assets_dir, file_name)
+    # Resolve the file via a filesystem scan of the trusted assets_dir (CWE-22).
+    # _find_asset_file returns OS-provided paths, never paths constructed from
+    # user input, so the taint chain from file_name is broken entirely.
+    file_path = _find_asset_file(assets_dir, file_name)
+    if file_path is None:
+        raise HTTPException(status_code=404, detail="File not found")
+
     myprint(f"File Path: {file_path}")
     myprint(f"Content Type: {content_type}")
-
-    if not os.path.exists(file_path):
-        raise HTTPException(status_code=404, detail="File not found")
 
     file_extension = get_file_extension_from_filepath(file_path)
     mim_type = get_file_mime_type(file_extension)
@@ -710,6 +761,8 @@ def get_user_settings(session_token: str) -> ResponseModel:
 
     subscription = get_user_subscription_info(user_id)
     preferences = get_user_preferences(user_id)
+    blog_url = get_user_blog_url(user_id)
+    sitemap_url = get_user_sitemap_url(user_id)
 
     def _iso(dt):
         return dt.isoformat() if dt else None
@@ -726,6 +779,8 @@ def get_user_settings(session_token: str) -> ResponseModel:
             "last_login_inactivate_delay": preferences.get("last_login_inactivate_delay") if preferences else 90,
             "auto_schedule_posts": bool(preferences.get("auto_schedule_posts")) if preferences else False,
         } if preferences else None,
+        "blog_url": blog_url,
+        "sitemap_url": sitemap_url,
     })
 
 
@@ -922,10 +977,253 @@ async def billing_webhook(request: Request) -> dict:
                 stripe_customer_id, "past_due", None, stripe_subscription_id
             )
 
+    elif event_type == "checkout.session.completed":
+        meta = data.get("metadata", {})
+        if meta.get("type") == "avatar_credits":
+            # Only credit on confirmed card payment — async methods (e.g. bank transfer)
+            # may fire this event before funds clear.
+            if data.get("payment_status") != "paid":
+                myprint(
+                    f"checkout.session.completed: payment_status={data.get('payment_status')} "
+                    f"— not yet paid, skipping credit grant"
+                )
+                return {"received": True}
+
+            stripe_customer_id = data.get("customer")
+            stripe_session_id = data.get("id")
+            credits = int(meta.get("credits", 0))
+            package = meta.get("package", "unknown")
+
+            if not stripe_customer_id or credits <= 0:
+                myprint(f"Avatar credits webhook: missing customer or zero credits — skipping")
+                return {"received": True}
+
+            # Idempotency: Stripe may retry — skip if credits already granted for this session.
+            if get_avatar_credit_ledger_entry_by_session(stripe_session_id):
+                myprint(f"Avatar credits already granted for session={stripe_session_id} — skipping duplicate")
+                return {"received": True}
+
+            user_row = get_user_by_stripe_customer_id(stripe_customer_id)
+            if user_row:
+                add_avatar_credits(
+                    user_row["id"],
+                    credits,
+                    f"purchase_{package}",
+                    stripe_session_id,
+                )
+                myprint(
+                    f"Added {credits} avatar credit(s) for user_id={user_row['id']} "
+                    f"via session={stripe_session_id}"
+                )
+            else:
+                myprint(f"Avatar credits webhook: no user found for customer={stripe_customer_id}")
+
+    elif event_type == "charge.refunded":
+        payment_intent_id = data.get("payment_intent")
+        stripe_customer_id = data.get("customer")
+        amount = data.get("amount", 0)
+        amount_refunded = data.get("amount_refunded", 0)
+
+        if not payment_intent_id or not stripe_customer_id:
+            myprint("charge.refunded: missing payment_intent or customer — skipping")
+            return {"received": True}
+
+        # Only deduct credits for a full refund — partial refunds don't map cleanly to credits.
+        if amount_refunded < amount:
+            myprint(
+                f"charge.refunded: partial refund ({amount_refunded}/{amount} cents) "
+                f"for customer={stripe_customer_id} — no credit adjustment"
+            )
+            return {"received": True}
+
+        # Find the checkout session that generated this charge to check its metadata.
+        from cqc_lem.utilities.stripe_util import get_checkout_session_by_payment_intent
+        session = get_checkout_session_by_payment_intent(payment_intent_id)
+        if not session:
+            myprint(f"charge.refunded: no checkout session found for payment_intent={payment_intent_id}")
+            return {"received": True}
+
+        session_meta = session.get("metadata", {})
+        if session_meta.get("type") != "avatar_credits":
+            myprint(f"charge.refunded: not an avatar credits charge — ignoring")
+            return {"received": True}
+
+        stripe_session_id = session.get("id")
+        original_entry = get_avatar_credit_ledger_entry_by_session(stripe_session_id)
+        if not original_entry:
+            myprint(f"charge.refunded: no credit ledger entry found for session={stripe_session_id} — nothing to deduct")
+            return {"received": True}
+
+        # Guard against double-refund: check if a refund entry already exists for this session.
+        user_row = get_user_by_stripe_customer_id(stripe_customer_id)
+        if not user_row:
+            myprint(f"charge.refunded: no user found for customer={stripe_customer_id}")
+            return {"received": True}
+
+        credits_to_deduct = original_entry["delta"]
+        add_avatar_credits(
+            user_row["id"],
+            -credits_to_deduct,
+            f"refund_{stripe_session_id}",
+            stripe_session_id=None,
+        )
+        myprint(
+            f"Deducted {credits_to_deduct} avatar credit(s) for user_id={user_row['id']} "
+            f"due to full refund of session={stripe_session_id}"
+        )
+
     else:
         myprint(f"Stripe webhook event ignored: {event_type}")
 
     return {"received": True}
+
+
+# ---------------------------------------------------------------------------
+# Avatar endpoints
+# ---------------------------------------------------------------------------
+
+@router.get("/avatar/credits", responses={
+    200: {"description": "Credit balance and active avatar returned"},
+    **{k: v for k, v in error_responses.items() if k in [401]}
+})
+def get_avatar_credits_endpoint(session_token: str) -> ResponseModel:
+    user_id = get_session_user_id(session_token)
+    if not user_id:
+        raise HTTPException(status_code=401, detail="Invalid or expired session")
+    balance = get_avatar_credit_balance(user_id)
+    active = get_active_avatar(user_id)
+    return ResponseModel(status_code=200, detail={"balance": balance, "active_avatar": active})
+
+
+@router.post("/avatar/credits/checkout", responses={
+    200: {"description": "Stripe checkout URL returned"},
+    **{k: v for k, v in error_responses.items() if k in [400, 401]}
+})
+def avatar_credits_checkout(request: AvatarCreditCheckoutRequest) -> ResponseModel:
+    user_id = get_session_user_id(request.session_token)
+    if not user_id:
+        raise HTTPException(status_code=401, detail="Invalid or expired session")
+
+    subscription = get_user_subscription_info(user_id)
+    stripe_customer_id = subscription.get("stripe_customer_id") if subscription else None
+    if not stripe_customer_id:
+        raise HTTPException(status_code=400, detail="No Stripe customer record — contact support")
+
+    from cqc_lem.utilities.stripe_util import create_avatar_credits_checkout, AVATAR_CREDIT_PACKAGES
+    if request.package not in AVATAR_CREDIT_PACKAGES:
+        raise HTTPException(status_code=400, detail=f"Unknown package '{request.package}'")
+
+    url = create_avatar_credits_checkout(
+        stripe_customer_id, request.package, request.success_url, request.cancel_url
+    )
+    if not url:
+        raise HTTPException(status_code=500, detail="Could not create Stripe checkout session")
+    return ResponseModel(status_code=200, detail={"checkout_url": url})
+
+
+@router.post("/avatar/training", responses={
+    200: {"description": "Training started"},
+    **{k: v for k, v in error_responses.items() if k in [400, 401, 402]}
+})
+async def start_avatar_training_endpoint(
+    session_token: str = Form(...),
+    trigger_word: str = Form(...),
+    photos: UploadFile = File(...),
+) -> ResponseModel:
+    user_id = get_session_user_id(session_token)
+    if not user_id:
+        raise HTTPException(status_code=401, detail="Invalid or expired session")
+
+    balance = get_avatar_credit_balance(user_id)
+    if balance < 1:
+        raise HTTPException(status_code=402, detail="Insufficient avatar credits. Purchase credits to train a new avatar.")
+
+    zip_bytes = await photos.read()
+    if not zip_bytes:
+        raise HTTPException(status_code=400, detail="No file data received")
+
+    _MAX_ZIP_BYTES = 50 * 1024 * 1024  # 50 MB compressed
+    _MAX_UNCOMPRESSED_BYTES = 200 * 1024 * 1024  # 200 MB uncompressed guard
+    if len(zip_bytes) > _MAX_ZIP_BYTES:
+        raise HTTPException(status_code=413, detail="ZIP file too large (max 50 MB)")
+    import io
+    import zipfile as _zipfile
+    try:
+        with _zipfile.ZipFile(io.BytesIO(zip_bytes)) as zf:
+            total_uncompressed = sum(entry.file_size for entry in zf.infolist())
+        if total_uncompressed > _MAX_UNCOMPRESSED_BYTES:
+            raise HTTPException(status_code=413, detail="ZIP contents too large (max 200 MB uncompressed)")
+    except _zipfile.BadZipFile:
+        raise HTTPException(status_code=400, detail="Uploaded file is not a valid ZIP")
+
+    from cqc_lem.utilities.avatar.replicate_avatar import start_avatar_training
+    try:
+        training_id = start_avatar_training(user_id, zip_bytes, trigger_word)
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"Could not start training: {exc}")
+
+    deduct_avatar_credit(user_id, training_id)
+    db_id = insert_avatar_training(user_id, training_id, trigger_word)
+    return ResponseModel(status_code=200, detail={"training_id": training_id, "db_id": db_id})
+
+
+@router.get("/avatar/trainings", responses={
+    200: {"description": "Avatar trainings listed"},
+    **{k: v for k, v in error_responses.items() if k in [401]}
+})
+def list_avatar_trainings(session_token: str) -> ResponseModel:
+    user_id = get_session_user_id(session_token)
+    if not user_id:
+        raise HTTPException(status_code=401, detail="Invalid or expired session")
+    trainings = get_avatar_trainings(user_id)
+    return ResponseModel(status_code=200, detail=trainings)
+
+
+@router.get("/avatar/training/{avatar_db_id}/status", responses={
+    200: {"description": "Training status synced"},
+    **{k: v for k, v in error_responses.items() if k in [401, 404]}
+})
+def sync_avatar_training_status(avatar_db_id: int, session_token: str) -> ResponseModel:
+    user_id = get_session_user_id(session_token)
+    if not user_id:
+        raise HTTPException(status_code=401, detail="Invalid or expired session")
+
+    trainings = get_avatar_trainings(user_id)
+    match = next((t for t in trainings if t["id"] == avatar_db_id), None)
+    if not match:
+        raise HTTPException(status_code=404, detail="Training not found")
+
+    if match["status"] in ("succeeded", "failed", "canceled"):
+        return ResponseModel(status_code=200, detail=match)
+
+    from cqc_lem.utilities.avatar.replicate_avatar import poll_training_status
+    new_status, model_ref = poll_training_status(match["training_id"])
+    update_avatar_training_status(match["training_id"], new_status, model_ref)
+    match["status"] = new_status
+    if model_ref:
+        match["model_ref"] = model_ref
+    return ResponseModel(status_code=200, detail=match)
+
+
+@router.put("/avatar/training/{avatar_db_id}/activate", responses={
+    200: {"description": "Avatar activated"},
+    **{k: v for k, v in error_responses.items() if k in [400, 401, 404]}
+})
+def activate_avatar(avatar_db_id: int, request: AvatarActivateRequest) -> ResponseModel:
+    user_id = get_session_user_id(request.session_token)
+    if not user_id:
+        raise HTTPException(status_code=401, detail="Invalid or expired session")
+
+    trainings = get_avatar_trainings(user_id)
+    match = next((t for t in trainings if t["id"] == avatar_db_id), None)
+    if not match:
+        raise HTTPException(status_code=404, detail="Training not found")
+    if match["status"] != "succeeded":
+        raise HTTPException(status_code=400, detail="Only succeeded trainings can be activated")
+
+    if set_active_avatar(user_id, avatar_db_id):
+        return ResponseModel(status_code=200, detail="Avatar activated")
+    raise HTTPException(status_code=500, detail="Could not activate avatar")
 
 
 # Register the /api router
@@ -940,13 +1238,14 @@ if os.path.isdir(_ui_dist):
 
     @app.get("/{full_path:path}", response_class=HTMLResponse, include_in_schema=False)
     def serve_spa(full_path: str):
-        return HTMLResponse(content=open(_spa_index).read())
+        with open(_spa_index) as fh:
+            return HTMLResponse(content=fh.read())
 
 
 def send_bytes_range_requests(
-        file_obj: BinaryIO, start: int, end: int, chunk_size: int = 10_000
+        file_path: str, start: int, end: int, chunk_size: int = 10_000
 ):
-    with file_obj as f:
+    with open(file_path, "rb") as f:
         f.seek(start)
         while (pos := f.tell()) <= end:
             read_size = min(chunk_size, end + 1 - pos)
@@ -1000,7 +1299,7 @@ def range_requests_response(
         status_code = status.HTTP_206_PARTIAL_CONTENT
 
     return StreamingResponse(
-        send_bytes_range_requests(open(file_path, mode="rb"), start, end),
+        send_bytes_range_requests(file_path, start, end),
         headers=headers,
         status_code=status_code,
     )

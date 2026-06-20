@@ -73,6 +73,7 @@ export default function Account() {
   const [inactivateDelay, setInactivateDelay] = useState<number | null>(90)
   const [autoSchedule, setAutoSchedule] = useState(false)
   const [prefsInitialised, setPrefsInitialised] = useState(false)
+  const [urlsInitialised, setUrlsInitialised] = useState(false)
 
   // Handle LinkedIn OAuth callback: ?li_connected=1 or ?li_error=... in URL
   useEffect(() => {
@@ -130,6 +131,8 @@ export default function Account() {
             last_login_inactivate_delay: number | null
             auto_schedule_posts: boolean
           } | null
+          blog_url: string | null
+          sitemap_url: string | null
         }),
     enabled: !!sessionToken,
     staleTime: 60 * 1000,
@@ -142,6 +145,23 @@ export default function Account() {
       setPrefsInitialised(true)
     }
   }, [settingsData, prefsInitialised])
+
+  // Seed blog/sitemap from DB on first load — DB is source of truth over localStorage
+  useEffect(() => {
+    if (settingsData && !urlsInitialised) {
+      const apiBlogUrl = settingsData.blog_url ?? ''
+      const apiSitemapUrl = settingsData.sitemap_url ?? ''
+      if (apiBlogUrl) {
+        setBlogUrl(apiBlogUrl)
+        localStorage.setItem('lem_blog_url', apiBlogUrl)
+      }
+      if (apiSitemapUrl) {
+        setSitemapUrl(apiSitemapUrl)
+        localStorage.setItem('lem_sitemap_url', apiSitemapUrl)
+      }
+      setUrlsInitialised(true)
+    }
+  }, [settingsData, urlsInitialised])
 
   const subscription = settingsData?.subscription
   const tier = subscription?.tier ?? 'free_trial'

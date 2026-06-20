@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
+import { useQuery } from '@tanstack/react-query'
 import api from '../api/client'
 import LinkedInPostPreview from '../components/LinkedInPostPreview'
 import { useAuth } from '../contexts/AuthContext'
@@ -26,7 +27,7 @@ function getBestPostingTime(date: Date): { time: string; display: string; dayNam
 }
 
 export default function ScheduleContent() {
-  const { user } = useAuth()
+  const { user, sessionToken } = useAuth()
   const email = user?.email ?? ''
 
   const [content, setContent] = useState('')
@@ -36,6 +37,18 @@ export default function ScheduleContent() {
   const [scheduledAt, setScheduledAt] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [result, setResult] = useState<{ ok: boolean; msg: string } | null>(null)
+  const [useAvatar, setUseAvatar] = useState(false)
+
+  const { data: avatarData } = useQuery({
+    queryKey: ['avatar-credits', sessionToken],
+    queryFn: async () => {
+      const r = await api.get('/avatar/credits', { params: { session_token: sessionToken } })
+      return r.data.detail as { balance: number; active_avatar: { trigger_word: string; status: string } | null }
+    },
+    enabled: !!sessionToken,
+  })
+  const activeAvatar = avatarData?.active_avatar
+  const hasActiveAvatar = activeAvatar?.status === 'succeeded'
   const MAX_CHARS = 3000
   const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone
 
@@ -78,6 +91,7 @@ export default function ScheduleContent() {
         scheduled_datetime: new Date(scheduledAt).toISOString(),
         email,
         status: 'pending',
+        use_avatar: postType !== 'TEXT' && useAvatar && hasActiveAvatar,
       }
       if (postType === 'VIDEO') {
         payload.video_url = videoUrl || null
@@ -213,6 +227,37 @@ export default function ScheduleContent() {
               >
                 + Add Slide
               </button>
+            </div>
+          )}
+
+          {/* Avatar toggle — only for image/video posts */}
+          {postType !== 'TEXT' && (
+            <div className="flex items-center justify-between border border-gray-200 rounded-lg px-4 py-3 bg-gray-50">
+              <div>
+                <p className="text-sm font-medium text-gray-700">Include my avatar</p>
+                {hasActiveAvatar ? (
+                  <p className="text-xs text-gray-500">
+                    Uses <span className="font-mono font-semibold">{activeAvatar?.trigger_word}</span> in the image prompt
+                  </p>
+                ) : (
+                  <p className="text-xs text-gray-400">
+                    No active avatar.{' '}
+                    <Link to="/avatars" className="text-blue-600 underline hover:text-blue-800">
+                      Train one on the Avatars page.
+                    </Link>
+                  </p>
+                )}
+              </div>
+              <label className="relative inline-flex items-center cursor-pointer">
+                <input
+                  type="checkbox"
+                  className="sr-only peer"
+                  checked={useAvatar && hasActiveAvatar}
+                  disabled={!hasActiveAvatar}
+                  onChange={(e) => setUseAvatar(e.target.checked)}
+                />
+                <div className="w-10 h-5 bg-gray-200 peer-focus:ring-2 peer-focus:ring-blue-400 rounded-full peer peer-checked:bg-blue-600 peer-disabled:opacity-40 transition-colors after:content-[''] after:absolute after:top-0.5 after:left-0.5 after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:after:translate-x-5" />
+              </label>
             </div>
           )}
 

@@ -1,10 +1,28 @@
+from datetime import datetime as _real_datetime
 from unittest.mock import patch, MagicMock
 
 import pytest
 
 
+class _MondayDatetime(_real_datetime):
+    """datetime subclass that returns a fixed Monday from .now()."""
+    @classmethod
+    def now(cls, tz=None):
+        return _real_datetime(2024, 1, 8, 12, 0)  # Monday, weekday() == 0
+
+
 class TestAutoCreateWeeklyContent:
     """Tests for auto_create_weekly_content — verifies None/empty guards and content-None skip."""
+
+    @pytest.fixture(autouse=True)
+    def pin_to_weekday(self, monkeypatch):
+        """Pin datetime.now() to a Monday so tests are day-of-week agnostic.
+
+        Without this, tests that only mock get_planned_posts_for_current_week fail on
+        weekends (weekday >= 5) because the production code calls the next-week variant
+        instead, which hits an unmocked DB call in CI.
+        """
+        monkeypatch.setattr('cqc_lem.app.run_content_plan.datetime', _MondayDatetime)
 
     @patch('cqc_lem.app.run_content_plan.get_planned_posts_for_next_week', return_value=None)
     @patch('cqc_lem.app.run_content_plan.get_planned_posts_for_current_week', return_value=None)
