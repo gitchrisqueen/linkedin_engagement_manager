@@ -177,7 +177,7 @@ services:
           cpus: '2.0'
           memory: 4g
     healthcheck:
-      test: ["CMD-SHELL", "curl -fsS http://localhost:4444/wd/hub/status | python3 -c \"import sys,json; d=json.load(sys.stdin); sys.exit(0 if d['value']['ready'] else 1)\""]
+      test: ["CMD-SHELL", "curl -fsS http://localhost:4444/status | python3 -c \"import sys,json; d=json.load(sys.stdin); sys.exit(0 if any(n.get('availability')=='UP' for n in d['value']['nodes']) else 1)\""]
       interval: 30s
       timeout: 10s
       retries: 5
