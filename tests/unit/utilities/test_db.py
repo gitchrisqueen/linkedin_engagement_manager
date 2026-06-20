@@ -579,3 +579,138 @@ class TestGetActiveUserIds:
             assert "linkedin_connection_status" in sql
             assert "subscription_status" in sql
             assert "last_login_inactivate_delay" in sql
+
+
+# ---------------------------------------------------------------------------
+# get_user_access_token — must use correct columns (not the old token_expiry)
+# ---------------------------------------------------------------------------
+
+@pytest.mark.unit
+class TestGetUserAccessToken:
+    def test_returns_token_when_not_expired(self, mock_database_connection):
+        from cqc_lem.utilities.db import get_user_access_token
+
+        with patch("cqc_lem.utilities.db.get_db_connection") as mock_conn:
+            mock_conn.return_value = mock_database_connection["connection"]
+            mock_database_connection["cursor"].fetchone.return_value = {
+                "access_token": "my-access-token"
+            }
+
+            result = get_user_access_token(60)
+
+        assert result == "my-access-token"
+
+    def test_returns_none_when_token_missing(self, mock_database_connection):
+        from cqc_lem.utilities.db import get_user_access_token
+
+        with patch("cqc_lem.utilities.db.get_db_connection") as mock_conn:
+            mock_conn.return_value = mock_database_connection["connection"]
+            mock_database_connection["cursor"].fetchone.return_value = None
+
+            result = get_user_access_token(99)
+
+        assert result is None
+
+    def test_sql_uses_access_token_created_at_not_token_expiry(self, mock_database_connection):
+        """Regression: query must reference access_token_created_at, not the non-existent token_expiry."""
+        from cqc_lem.utilities.db import get_user_access_token
+
+        with patch("cqc_lem.utilities.db.get_db_connection") as mock_conn:
+            mock_conn.return_value = mock_database_connection["connection"]
+            mock_database_connection["cursor"].fetchone.return_value = None
+
+            get_user_access_token(1)
+
+        sql = mock_database_connection["cursor"].execute.call_args[0][0]
+        assert "token_expiry" not in sql, (
+            "token_expiry column does not exist; query references a non-existent column"
+        )
+        assert "access_token_created_at" in sql
+
+    def test_returns_none_on_db_error(self, mock_database_connection):
+        from cqc_lem.utilities.db import get_user_access_token
+        import mysql.connector
+
+        with patch("cqc_lem.utilities.db.get_db_connection") as mock_conn:
+            mock_conn.return_value = mock_database_connection["connection"]
+            mock_database_connection["cursor"].execute.side_effect = mysql.connector.Error("err")
+
+            result = get_user_access_token(1)
+
+        assert result is None
+
+
+# ---------------------------------------------------------------------------
+# get_orphaned_scheduled_posts — recovery for tasks lost on container restart
+# ---------------------------------------------------------------------------
+
+@pytest.mark.unit
+class TestGetOrphanedScheduledPosts:
+    def test_returns_posts_in_scheduled_status_past_cutoff(self, mock_database_connection):
+        from cqc_lem.utilities.db import get_orphaned_scheduled_posts
+
+        rows = [
+            (1485, datetime(2026, 6, 19, 19, 45, 0, tzinfo=timezone.utc), 60),
+        ]
+        with patch("cqc_lem.utilities.db.get_db_connection") as mock_conn:
+            mock_conn.return_value = mock_database_connection["connection"]
+            mock_database_connection["cursor"].fetchall.return_value = rows
+
+            result = get_orphaned_scheduled_posts(lookback_hours=2)
+
+        assert result == rows
+
+    def test_returns_empty_list_when_none_orphaned(self, mock_database_connection):
+        from cqc_lem.utilities.db import get_orphaned_scheduled_posts
+
+        with patch("cqc_lem.utilities.db.get_db_connection") as mock_conn:
+            mock_conn.return_value = mock_database_connection["connection"]
+            mock_database_connection["cursor"].fetchall.return_value = []
+
+            result = get_orphaned_scheduled_posts()
+
+        assert result == []
+
+    def test_sql_filters_by_scheduled_status_and_cutoff(self, mock_database_connection):
+        from cqc_lem.utilities.db import get_orphaned_scheduled_posts
+
+        with patch("cqc_lem.utilities.db.get_db_connection") as mock_conn:
+            mock_conn.return_value = mock_database_connection["connection"]
+            mock_database_connection["cursor"].fetchall.return_value = []
+
+            get_orphaned_scheduled_posts(lookback_hours=3)
+
+        sql = mock_database_connection["cursor"].execute.call_args[0][0]
+        assert "scheduled" in sql.lower()
+        assert "scheduled_time" in sql
+
+    def test_cutoff_is_lookback_hours_before_now(self, mock_database_connection):
+        """The cutoff passed to the query must be approximately (now - lookback_hours)."""
+        from cqc_lem.utilities.db import get_orphaned_scheduled_posts
+        from datetime import timedelta
+
+        with patch("cqc_lem.utilities.db.get_db_connection") as mock_conn:
+            mock_conn.return_value = mock_database_connection["connection"]
+            mock_database_connection["cursor"].fetchall.return_value = []
+
+            before = datetime.now(timezone.utc)
+            get_orphaned_scheduled_posts(lookback_hours=2)
+            after = datetime.now(timezone.utc)
+
+        cutoff_arg = mock_database_connection["cursor"].execute.call_args[0][1][0]
+        # cutoff should be roughly (now - 2h)
+        expected_lo = before - timedelta(hours=2, seconds=5)
+        expected_hi = after - timedelta(hours=2) + timedelta(seconds=5)
+        assert expected_lo <= cutoff_arg <= expected_hi
+
+    def test_returns_empty_on_db_error(self, mock_database_connection):
+        from cqc_lem.utilities.db import get_orphaned_scheduled_posts
+        import mysql.connector
+
+        with patch("cqc_lem.utilities.db.get_db_connection") as mock_conn:
+            mock_conn.return_value = mock_database_connection["connection"]
+            mock_database_connection["cursor"].execute.side_effect = mysql.connector.Error("err")
+
+            result = get_orphaned_scheduled_posts()
+
+        assert result == []

@@ -18,117 +18,60 @@ def _fresh_logger_module():
 
 
 # ---------------------------------------------------------------------------
-# PostHogHandler
+# _build_posthog_handler (OTLP-based PostHog Logs integration)
 # ---------------------------------------------------------------------------
 
-class TestPostHogHandler:
-    def test_emit_sends_log_event_to_posthog(self):
-        from cqc_lem.utilities.logger import PostHogHandler
+class TestBuildPostHogHandler:
+    def test_returns_none_when_no_api_key(self):
+        from cqc_lem.utilities.logger import _build_posthog_handler
 
-        handler = PostHogHandler(level=logging.DEBUG)
+        with patch.dict(os.environ, {"POSTHOG_API_KEY": ""}, clear=False):
+            result = _build_posthog_handler(logging.ERROR)
 
-        record = logging.LogRecord(
-            name="cqc-lem", level=logging.ERROR, pathname="test.py",
-            lineno=1, msg="Something failed", args=(), exc_info=None,
-        )
+        assert result is None
 
-        with patch("posthog.capture") as mock_capture, \
-             patch("posthog.disabled", False):
-            handler.emit(record)
+    def test_returns_logging_handler_when_key_is_set(self):
+        from opentelemetry.sdk._logs import LoggingHandler
+        from cqc_lem.utilities.logger import _build_posthog_handler
 
-        mock_capture.assert_called_once()
-        _, kwargs = mock_capture.call_args
-        assert kwargs["event"] == "log_event"
-        props = kwargs["properties"]
-        assert props["level"] == "error"
-        assert props["message"] == "Something failed"
-        assert props["lineno"] == 1
+        env = {"POSTHOG_API_KEY": "phc_testtoken", "POSTHOG_HOST": "https://us.i.posthog.com"}
+        with patch.dict(os.environ, env, clear=False):
+            result = _build_posthog_handler(logging.ERROR)
 
-    def test_emit_skips_when_posthog_disabled(self):
-        from cqc_lem.utilities.logger import PostHogHandler
+        assert isinstance(result, LoggingHandler)
 
-        handler = PostHogHandler(level=logging.DEBUG)
-        record = logging.LogRecord(
-            name="cqc-lem", level=logging.ERROR, pathname="test.py",
-            lineno=1, msg="Failure", args=(), exc_info=None,
-        )
+    def test_handler_respects_requested_level(self):
+        from cqc_lem.utilities.logger import _build_posthog_handler
 
-        with patch("posthog.disabled", True), patch("posthog.capture") as mock_capture:
-            handler.emit(record)
+        env = {"POSTHOG_API_KEY": "phc_testtoken", "POSTHOG_HOST": "https://us.i.posthog.com"}
+        with patch.dict(os.environ, env, clear=False):
+            result = _build_posthog_handler(logging.WARNING)
 
-        mock_capture.assert_not_called()
+        assert result is not None
+        assert result.level == logging.WARNING
 
-    def test_emit_includes_user_id_as_distinct_id(self):
-        from cqc_lem.utilities.logger import PostHogHandler
+    def test_exporter_endpoint_uses_host_env_var(self):
+        from opentelemetry.exporter.otlp.proto.http._log_exporter import OTLPLogExporter
+        from cqc_lem.utilities.logger import _build_posthog_handler
 
-        handler = PostHogHandler(level=logging.DEBUG)
-        record = logging.LogRecord(
-            name="cqc-lem", level=logging.ERROR, pathname="test.py",
-            lineno=1, msg="Error", args=(), exc_info=None,
-        )
-        record.user_id = 42
+        env = {
+            "POSTHOG_API_KEY": "phc_testtoken",
+            "POSTHOG_HOST": "https://eu.i.posthog.com",
+        }
+        captured_exporter: list[OTLPLogExporter] = []
 
-        with patch("posthog.capture") as mock_capture, \
-             patch("posthog.disabled", False):
-            handler.emit(record)
+        original_init = OTLPLogExporter.__init__
 
-        _, kwargs = mock_capture.call_args
-        assert kwargs["distinct_id"] == "42"
-        assert kwargs["properties"]["user_id"] == 42
+        def capturing_init(self, *args, **kwargs):
+            captured_exporter.append(self)
+            original_init(self, *args, **kwargs)
 
-    def test_emit_captures_exc_info_fields(self):
-        from cqc_lem.utilities.logger import PostHogHandler
+        with patch.dict(os.environ, env, clear=False), \
+             patch.object(OTLPLogExporter, "__init__", capturing_init):
+            _build_posthog_handler(logging.ERROR)
 
-        handler = PostHogHandler(level=logging.DEBUG)
-
-        try:
-            raise ValueError("boom")
-        except ValueError:
-            import sys
-            exc_info = sys.exc_info()
-
-        record = logging.LogRecord(
-            name="cqc-lem", level=logging.ERROR, pathname="test.py",
-            lineno=5, msg="Caught exception", args=(), exc_info=exc_info,
-        )
-
-        with patch("posthog.capture") as mock_capture, \
-             patch("posthog.disabled", False):
-            handler.emit(record)
-
-        props = mock_capture.call_args[1]["properties"]
-        assert props["error_type"] == "ValueError"
-        assert "boom" in props["error_message"]
-        assert "ValueError" in props["stack_trace"]
-
-    def test_emit_uses_system_distinct_id_when_no_user_id(self):
-        from cqc_lem.utilities.logger import PostHogHandler
-
-        handler = PostHogHandler(level=logging.DEBUG)
-        record = logging.LogRecord(
-            name="cqc-lem", level=logging.ERROR, pathname="test.py",
-            lineno=1, msg="No user", args=(), exc_info=None,
-        )
-
-        with patch("posthog.capture") as mock_capture, \
-             patch("posthog.disabled", False):
-            handler.emit(record)
-
-        assert mock_capture.call_args[1]["distinct_id"] == "system"
-
-    def test_emit_handles_posthog_error_gracefully(self):
-        from cqc_lem.utilities.logger import PostHogHandler
-
-        handler = PostHogHandler(level=logging.DEBUG)
-        record = logging.LogRecord(
-            name="cqc-lem", level=logging.ERROR, pathname="test.py",
-            lineno=1, msg="Msg", args=(), exc_info=None,
-        )
-
-        with patch("posthog.disabled", False), \
-             patch("posthog.capture", side_effect=RuntimeError("network error")):
-            # Should not raise — handleError is called instead
-            handler.emit(record)
+        assert captured_exporter, "OTLPLogExporter was not instantiated"
+        assert captured_exporter[0]._endpoint == "https://eu.i.posthog.com/i/v1/logs"
 
 
 # ---------------------------------------------------------------------------
@@ -260,11 +203,16 @@ class TestLoggerConfiguration:
         handler_types = [type(h).__name__ for h in mod.logger.handlers]
         assert "RotatingFileHandler" in handler_types
 
-    def test_logger_has_posthog_handler(self):
+    def test_logger_has_posthog_handler_when_key_configured(self):
         from cqc_lem.utilities import logger as mod
 
+        # LoggingHandler is present when POSTHOG_API_KEY is set in environment
+        api_key = os.getenv("POSTHOG_API_KEY", "")
         handler_types = [type(h).__name__ for h in mod.logger.handlers]
-        assert "PostHogHandler" in handler_types
+        if api_key:
+            assert "LoggingHandler" in handler_types
+        else:
+            assert "LoggingHandler" not in handler_types
 
     def test_logger_has_stream_handler(self):
         from cqc_lem.utilities import logger as mod
@@ -277,9 +225,11 @@ class TestLoggerConfiguration:
 
         assert mod.logger.propagate is False
 
-    def test_posthog_handler_level_defaults_to_error(self):
+    def test_posthog_handler_level_matches_env(self):
         from cqc_lem.utilities import logger as mod
 
-        ph_handlers = [h for h in mod.logger.handlers if type(h).__name__ == "PostHogHandler"]
-        assert ph_handlers, "No PostHogHandler found"
-        assert ph_handlers[0].level == logging.ERROR
+        ph_handlers = [h for h in mod.logger.handlers if type(h).__name__ == "LoggingHandler"]
+        if not ph_handlers:
+            return  # no key configured — handler absent, nothing to assert
+        expected = getattr(logging, os.getenv("POSTHOG_LOG_LEVEL", "ERROR").upper(), logging.ERROR)
+        assert ph_handlers[0].level == expected

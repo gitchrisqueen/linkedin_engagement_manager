@@ -1,7 +1,6 @@
 import logging
 import os
 import sys
-import traceback
 import datetime as DT
 from logging.handlers import RotatingFileHandler
 from typing import Optional
@@ -14,52 +13,28 @@ _today = DT.date.today()
 LOGGING_FILENAME = "logs/cqc_lem_" + _today.strftime("%Y_%m_%d") + ".log"
 os.makedirs("logs", exist_ok=True)
 
-# Structured extra keys forwarded to PostHog when present on a LogRecord
-_POSTHOG_EXTRA_KEYS = (
-    "user_id", "task_id", "task_name", "post_id", "action_type",
-    "duration_ms", "ai_model", "api_provider", "http_status",
-    "error_type", "error_message", "stack_trace",
-)
 
+def _build_posthog_handler(level: int) -> Optional[logging.Handler]:
+    """Build an OTLP-backed LoggingHandler that ships logs to PostHog Logs."""
+    api_key = os.getenv("POSTHOG_API_KEY", "")
+    host = os.getenv("POSTHOG_HOST", "https://us.i.posthog.com").rstrip("/")
+    if not api_key:
+        return None
 
-class PostHogHandler(logging.Handler):
-    """Forwards log records to PostHog as `log_event` captures.
+    from opentelemetry._logs import set_logger_provider
+    from opentelemetry.exporter.otlp.proto.http._log_exporter import OTLPLogExporter
+    from opentelemetry.sdk._logs import LoggerProvider, LoggingHandler
+    from opentelemetry.sdk._logs.export import BatchLogRecordProcessor
 
-    Structured context is attached via `extra=` on the log call.
-    Exceptions are captured with their full traceback automatically.
-    """
+    exporter = OTLPLogExporter(
+        endpoint=f"{host}/i/v1/logs",
+        headers={"Authorization": f"Bearer {api_key}"},
+    )
+    provider = LoggerProvider()
+    provider.add_log_record_processor(BatchLogRecordProcessor(exporter))
+    set_logger_provider(provider)
 
-    def emit(self, record: logging.LogRecord) -> None:
-        try:
-            import posthog as _ph  # local import — avoids circular dep at module load
-
-            if _ph.disabled:
-                return
-
-            props: dict = {
-                "level": record.levelname.lower(),
-                "module": record.module,
-                "function": record.funcName,
-                "filename": record.filename,
-                "lineno": record.lineno,
-                "message": record.getMessage(),
-            }
-
-            for key in _POSTHOG_EXTRA_KEYS:
-                val = getattr(record, key, None)
-                if val is not None:
-                    props[key] = val
-
-            if record.exc_info and record.exc_info[0] is not None:
-                exc_cls, exc_val, exc_tb = record.exc_info
-                props.setdefault("error_type", exc_cls.__name__)
-                props.setdefault("error_message", str(exc_val))
-                props.setdefault("stack_trace", "".join(traceback.format_exception(exc_cls, exc_val, exc_tb)))
-
-            distinct_id = str(props.get("user_id") or "system")
-            _ph.capture(distinct_id=distinct_id, event="log_event", properties=props)
-        except Exception:
-            self.handleError(record)
+    return LoggingHandler(level=level, logger_provider=provider)
 
 
 class _LevelFormatter(logging.Formatter):
@@ -100,8 +75,9 @@ _console_handler.setFormatter(_formatter)
 _console_handler.setLevel(_LOG_LEVEL)
 logger.addHandler(_console_handler)
 
-_posthog_handler = PostHogHandler(level=_POSTHOG_MIN_LEVEL)
-logger.addHandler(_posthog_handler)
+_posthog_handler = _build_posthog_handler(_POSTHOG_MIN_LEVEL)
+if _posthog_handler is not None:
+    logger.addHandler(_posthog_handler)
 
 
 # ── Internal helpers ─────────────────────────────────────────────────────────

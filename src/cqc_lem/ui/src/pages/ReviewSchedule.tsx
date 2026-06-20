@@ -3,6 +3,8 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import api from '../api/client'
 import LinkedInPostPreview from '../components/LinkedInPostPreview'
 import { useAuth } from '../contexts/AuthContext'
+import { useUserTimezone } from '../hooks/useUserTimezone'
+import { formatInTimezone } from '../utils/datetime'
 
 type Status = 'ALL' | 'pending' | 'approved' | 'scheduled' | 'posted' | 'rejected'
 const STATUSES: { label: string; value: Status }[] = [
@@ -45,6 +47,7 @@ export default function ReviewSchedule() {
   const { user } = useAuth()
   const email = user?.email ?? ''
   const qc = useQueryClient()
+  const userTimezone = useUserTimezone()
 
   // Filter / sort / pagination state
   const [filterStatus, setFilterStatus] = useState<Status>('ALL')
@@ -325,7 +328,7 @@ export default function ReviewSchedule() {
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center justify-between mb-1 gap-2">
                     <span className="text-xs text-gray-400 truncate">
-                      {new Date(post.scheduled_time).toLocaleString()}
+                      {formatInTimezone(post.scheduled_time, userTimezone)}
                     </span>
                     <div className="flex items-center gap-1.5 shrink-0">
                       <span className="text-xs text-gray-400 uppercase">{post.post_type}</span>

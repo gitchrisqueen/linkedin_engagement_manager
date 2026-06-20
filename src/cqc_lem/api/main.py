@@ -29,6 +29,7 @@ from cqc_lem.utilities.db import (
     deduct_avatar_credit, insert_avatar_training,
     update_avatar_training_status, set_active_avatar,
     get_avatar_trainings, get_active_avatar,
+    get_user_timezone, update_user_timezone,
 )
 from cqc_lem.utilities.email import generate_pin, hash_pin, send_pin_email
 from cqc_lem.utilities.linkedin.token_refresh import (
@@ -189,6 +190,11 @@ class LinkedInPasswordRequest(BaseModel):
     linkedin_password: str
 
 
+class TimezoneRequest(BaseModel):
+    session_token: str
+    timezone: str
+
+
 class FutureForwardValues(IntEnum):
     Zero = 0
     ONE = 1
@@ -216,7 +222,7 @@ def get_dashboard_stats(email: str) -> ResponseModel:
         raise HTTPException(status_code=403, detail="User not found")
 
     posts, _ = get_posts(user_id)
-    now = datetime.now()
+    now = datetime.now(timezone.utc)
     week_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
     week_start = week_start.replace(day=week_start.day - week_start.weekday())
 
@@ -815,6 +821,28 @@ def update_linkedin_password(request: LinkedInPasswordRequest) -> ResponseModel:
     if not saved:
         raise HTTPException(status_code=500, detail="Could not save LinkedIn password")
     return ResponseModel(status_code=200, detail="LinkedIn password saved")
+
+
+@router.get("/user/timezone")
+def get_user_timezone_endpoint(session_token: str) -> ResponseModel:
+    user_id = get_session_user_id(session_token)
+    if not user_id:
+        raise HTTPException(status_code=401, detail="Invalid or expired session")
+    return ResponseModel(status_code=200, detail={"timezone": get_user_timezone(user_id)})
+
+
+@router.put("/user/timezone")
+def update_user_timezone_endpoint(request: TimezoneRequest) -> ResponseModel:
+    from zoneinfo import available_timezones, ZoneInfoNotFoundError
+    user_id = get_session_user_id(request.session_token)
+    if not user_id:
+        raise HTTPException(status_code=401, detail="Invalid or expired session")
+    if request.timezone not in available_timezones():
+        raise HTTPException(status_code=422, detail=f"Unknown timezone: {request.timezone!r}")
+    saved = update_user_timezone(user_id, request.timezone)
+    if not saved:
+        raise HTTPException(status_code=500, detail="Could not update timezone")
+    return ResponseModel(status_code=200, detail="Timezone updated")
 
 
 @router.post("/billing/create-checkout-session")

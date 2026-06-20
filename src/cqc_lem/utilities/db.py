@@ -49,7 +49,8 @@ def get_db_connection():
         user=MYSQL_USER,
         password=MYSQL_PASSWORD,
         database=MYSQL_DATABASE,
-        port=MYSQL_PORT
+        port=MYSQL_PORT,
+        time_zone='+00:00',
     )
 
 
@@ -231,7 +232,11 @@ def get_user_access_token(user_id: int):
 
     try:
         cursor.execute(
-            "SELECT access_token FROM users WHERE id = %s AND (token_expiry IS NULL OR token_expiry > NOW())",
+            "SELECT access_token FROM users WHERE id = %s AND ("
+            "access_token_created_at IS NULL "
+            "OR access_token_expires_in IS NULL "
+            "OR DATE_ADD(access_token_created_at, INTERVAL access_token_expires_in SECOND) > NOW()"
+            ")",
             (user_id,),
         )
 
@@ -692,6 +697,39 @@ def get_ready_to_post_posts(pre_post_time: datetime = None, post_time_delta_minu
     except mysql.connector.Error as err:
         myprint(f"Could not get ready to post posts| Error: {err}")
         posts = None
+    finally:
+        cursor.close()
+        connection.close()
+
+    return posts
+
+
+def get_orphaned_scheduled_posts(lookback_hours: int = 2) -> list:
+    """Return posts stuck in 'scheduled' status that never reached 'posted'.
+
+    These arise when Celery tasks are purged on container restart while a post
+    has already been transitioned from 'approved' → 'scheduled'. Without this
+    recovery query, those posts stay stuck forever.
+    """
+    now = datetime.now(timezone.utc)
+    cutoff = now - timedelta(hours=lookback_hours)
+
+    connection = get_db_connection()
+    cursor = connection.cursor()
+    try:
+        cursor.execute(
+            """SELECT p.id, p.scheduled_time, p.user_id
+               FROM posts AS p
+               WHERE status = 'scheduled'
+                 AND scheduled_time <= %s
+               ORDER BY scheduled_time ASC""",
+            (cutoff,),
+        )
+        posts = cursor.fetchall()
+        myprint(f"Orphaned scheduled posts to re-queue: {[p[0] for p in posts]}")
+    except mysql.connector.Error as err:
+        myprint(f"Could not get orphaned scheduled posts | Error: {err}")
+        posts = []
     finally:
         cursor.close()
         connection.close()
@@ -1783,6 +1821,38 @@ def update_user_preferences(
         return cursor.rowcount >= 0
     except mysql.connector.Error as err:
         myprint(f"Could not update preferences for user_id {user_id} | Error: {err}")
+        return False
+    finally:
+        cursor.close()
+        connection.close()
+
+
+def get_user_timezone(user_id: int) -> str:
+    """Return the IANA timezone string for the user, defaulting to UTC."""
+    connection = get_db_connection()
+    cursor = connection.cursor()
+    try:
+        cursor.execute("SELECT timezone FROM users WHERE id = %s", (user_id,))
+        row = cursor.fetchone()
+        return row[0] if row and row[0] else 'UTC'
+    except mysql.connector.Error as err:
+        myprint(f"Could not get timezone for user_id {user_id} | Error: {err}")
+        return 'UTC'
+    finally:
+        cursor.close()
+        connection.close()
+
+
+def update_user_timezone(user_id: int, tz: str) -> bool:
+    """Persist the user's preferred IANA timezone string."""
+    connection = get_db_connection()
+    cursor = connection.cursor()
+    try:
+        cursor.execute("UPDATE users SET timezone = %s WHERE id = %s", (tz, user_id))
+        connection.commit()
+        return cursor.rowcount >= 0
+    except mysql.connector.Error as err:
+        myprint(f"Could not update timezone for user_id {user_id} | Error: {err}")
         return False
     finally:
         cursor.close()

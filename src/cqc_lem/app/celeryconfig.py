@@ -32,7 +32,8 @@ result_backend_max_retries = 3
 # The Redis backend health checks every 5 minutes (300 seconds)
 redis_backend_health_check_interval = 300
 
-timezone = os.getenv('TZ')
+timezone = os.getenv('CELERY_TIMEZONE') or os.getenv('TZ') or 'UTC'
+enable_utc = True
 
 # Prevent task messages from being lost
 task_acks_late = True,
