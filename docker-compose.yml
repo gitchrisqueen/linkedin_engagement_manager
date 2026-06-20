@@ -87,6 +87,8 @@ services:
       - web_app
     env_file:
       - .env
+    environment:
+      - CELERY_TIMEZONE=${TZ:-UTC}
     depends_on:
       redis:
         condition: service_healthy
@@ -109,6 +111,8 @@ services:
       - web_app
     env_file:
       - .env
+    environment:
+      - CELERY_TIMEZONE=${TZ:-UTC}
     depends_on:
       redis:
         condition: service_healthy
@@ -137,6 +141,7 @@ services:
     environment:
       - FLOWER_UNAUTHENTICATED_API=True
       - FLOWER_PERSISTENT=False
+      - CELERY_TIMEZONE=${TZ:-UTC}
     ports:
       - "${CELERY_FLOWER_PORT}:${CELERY_FLOWER_PORT}"
     depends_on:

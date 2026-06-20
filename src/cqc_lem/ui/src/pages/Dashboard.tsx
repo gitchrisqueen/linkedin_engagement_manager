@@ -2,6 +2,8 @@ import { useQuery } from '@tanstack/react-query'
 import { Link } from 'react-router-dom'
 import api from '../api/client'
 import { useAuth } from '../contexts/AuthContext'
+import { useUserTimezone } from '../hooks/useUserTimezone'
+import { formatInTimezone } from '../utils/datetime'
 
 interface DashboardStats {
   scheduled_this_week: number
@@ -55,6 +57,7 @@ function StatCard({ label, value, color }: { label: string; value: number; color
 export default function Dashboard() {
   const { user } = useAuth()
   const email = user?.email ?? ''
+  const userTimezone = useUserTimezone()
 
   const { data: statsData } = useQuery<{ detail: DashboardStats }>({
     queryKey: ['dashboard-stats', email],
@@ -149,12 +152,7 @@ export default function Dashboard() {
                   </div>
                   <div className="flex-1 min-w-0">
                     <p className="text-xs text-gray-500 mb-0.5">
-                      {new Date(post.scheduled_time).toLocaleString(undefined, {
-                        month: 'short',
-                        day: 'numeric',
-                        hour: '2-digit',
-                        minute: '2-digit',
-                      })}
+                      {formatInTimezone(post.scheduled_time, userTimezone)}
                     </p>
                     <p className="text-sm text-gray-700 line-clamp-2">{post.content}</p>
                   </div>
@@ -218,14 +216,7 @@ export default function Dashboard() {
                     )}
                   </div>
                   <span className="text-xs text-gray-400 flex-shrink-0 whitespace-nowrap">
-                    {entry.created_at
-                      ? new Date(entry.created_at).toLocaleString(undefined, {
-                          month: 'short',
-                          day: 'numeric',
-                          hour: '2-digit',
-                          minute: '2-digit',
-                        })
-                      : ''}
+                    {formatInTimezone(entry.created_at, userTimezone)}
                   </span>
                 </li>
               ))}

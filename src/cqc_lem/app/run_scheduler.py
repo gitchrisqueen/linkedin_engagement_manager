@@ -9,7 +9,6 @@ from cqc_lem.app.my_celery import app as shared_task
 from cqc_lem.app.run_automation import automate_commenting, automate_profile_viewer_engagement, \
     automate_appreciation_dms_for_user, clean_stale_invites, update_stale_profile, post_to_linkedin, \
     automate_invites_to_company_page_for_user
-from cqc_lem.utilities.date import convert_datetime_to_local_tz
 from cqc_lem.utilities.db import (
     get_ready_to_post_posts, update_db_post_status, get_active_user_ids, PostStatus,
     get_users_with_stripe_subscriptions, update_subscription_from_stripe,
@@ -29,7 +28,8 @@ def auto_check_scheduled_posts(self):
     for post in posts:
         post_id, scheduled_time, user_id = post
 
-        scheduled_time = convert_datetime_to_local_tz(scheduled_time)  # Must add timezone info to this
+        if scheduled_time.tzinfo is None:
+            scheduled_time = scheduled_time.replace(tzinfo=timezone.utc)
 
         log_info(f"Post ready to schedule", post_id=post_id, user_id=user_id, task_name="auto_check_scheduled_posts")
 

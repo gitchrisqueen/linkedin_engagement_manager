@@ -49,7 +49,8 @@ def get_db_connection():
         user=MYSQL_USER,
         password=MYSQL_PASSWORD,
         database=MYSQL_DATABASE,
-        port=MYSQL_PORT
+        port=MYSQL_PORT,
+        time_zone='+00:00',
     )
 
 
@@ -1783,6 +1784,38 @@ def update_user_preferences(
         return cursor.rowcount >= 0
     except mysql.connector.Error as err:
         myprint(f"Could not update preferences for user_id {user_id} | Error: {err}")
+        return False
+    finally:
+        cursor.close()
+        connection.close()
+
+
+def get_user_timezone(user_id: int) -> str:
+    """Return the IANA timezone string for the user, defaulting to UTC."""
+    connection = get_db_connection()
+    cursor = connection.cursor()
+    try:
+        cursor.execute("SELECT timezone FROM users WHERE id = %s", (user_id,))
+        row = cursor.fetchone()
+        return row[0] if row and row[0] else 'UTC'
+    except mysql.connector.Error as err:
+        myprint(f"Could not get timezone for user_id {user_id} | Error: {err}")
+        return 'UTC'
+    finally:
+        cursor.close()
+        connection.close()
+
+
+def update_user_timezone(user_id: int, tz: str) -> bool:
+    """Persist the user's preferred IANA timezone string."""
+    connection = get_db_connection()
+    cursor = connection.cursor()
+    try:
+        cursor.execute("UPDATE users SET timezone = %s WHERE id = %s", (tz, user_id))
+        connection.commit()
+        return cursor.rowcount >= 0
+    except mysql.connector.Error as err:
+        myprint(f"Could not update timezone for user_id {user_id} | Error: {err}")
         return False
     finally:
         cursor.close()

@@ -28,7 +28,6 @@ _PATCH_CLEAN_INVITES = f"{_MOD}.clean_stale_invites"
 _PATCH_UPDATE_STALE = f"{_MOD}.update_stale_profile"
 _PATCH_AUTOMATE_COMMENTING = f"{_MOD}.automate_commenting"
 _PATCH_AUTOMATE_PROFILE_VIEWER = f"{_MOD}.automate_profile_viewer_engagement"
-_PATCH_CONVERT_DT = f"{_MOD}.convert_datetime_to_local_tz"
 
 
 # ---------------------------------------------------------------------------
@@ -233,7 +232,6 @@ class TestAutoCheckScheduledPosts:
 
         with patch(_PATCH_GET_POSTS, return_value=posts), \
              patch(_PATCH_UPDATE_POST_STATUS) as mock_upd, \
-             patch(_PATCH_CONVERT_DT, return_value=scheduled_dt), \
              patch(_PATCH_POST_TO_LINKEDIN, mock_post_task), \
              patch(_PATCH_AUTOMATE_COMMENTING, mock_commenting_task), \
              patch(_PATCH_AUTOMATE_PROFILE_VIEWER, mock_profile_task):
@@ -272,7 +270,6 @@ class TestAutoCheckScheduledPosts:
 
         with patch(_PATCH_GET_POSTS, return_value=posts), \
              patch(_PATCH_UPDATE_POST_STATUS), \
-             patch(_PATCH_CONVERT_DT, return_value=scheduled_dt), \
              patch(_PATCH_POST_TO_LINKEDIN, mock_post_task), \
              patch(_PATCH_AUTOMATE_COMMENTING, mock_commenting_task), \
              patch(_PATCH_AUTOMATE_PROFILE_VIEWER, mock_profile_task):
@@ -281,6 +278,28 @@ class TestAutoCheckScheduledPosts:
 
         assert "3 post" in result
         assert mock_post_task.apply_async.call_count == 3
+
+    def test_naive_scheduled_time_gets_utc_tzinfo(self):
+        """A naive datetime returned from MySQL is treated as UTC before becoming the eta."""
+        naive_dt = datetime(2025, 6, 20, 14, 0, 0)  # no tzinfo — simulates MySQL read
+        expected_eta = datetime(2025, 6, 20, 14, 0, 0, tzinfo=timezone.utc)
+        posts = [(55, naive_dt, 10)]
+
+        mock_post_task = _async_task_mock()
+        mock_commenting_task = _async_task_mock()
+        mock_profile_task = _async_task_mock()
+
+        with patch(_PATCH_GET_POSTS, return_value=posts), \
+             patch(_PATCH_UPDATE_POST_STATUS), \
+             patch(_PATCH_POST_TO_LINKEDIN, mock_post_task), \
+             patch(_PATCH_AUTOMATE_COMMENTING, mock_commenting_task), \
+             patch(_PATCH_AUTOMATE_PROFILE_VIEWER, mock_profile_task):
+            from cqc_lem.app.run_scheduler import auto_check_scheduled_posts
+            auto_check_scheduled_posts.run()
+
+        eta = mock_post_task.apply_async.call_args[1]["eta"]
+        assert eta.tzinfo is not None, "eta must be timezone-aware"
+        assert eta == expected_eta
 
     def test_update_db_post_status_called_before_apply_async(self):
         """Status must be set to SCHEDULED before dispatching the Celery task."""
@@ -302,7 +321,6 @@ class TestAutoCheckScheduledPosts:
 
         with patch(_PATCH_GET_POSTS, return_value=posts), \
              patch(_PATCH_UPDATE_POST_STATUS, side_effect=record_update), \
-             patch(_PATCH_CONVERT_DT, return_value=scheduled_dt), \
              patch(_PATCH_POST_TO_LINKEDIN, mock_post_task), \
              patch(_PATCH_AUTOMATE_COMMENTING, mock_commenting_task), \
              patch(_PATCH_AUTOMATE_PROFILE_VIEWER, mock_profile_task):

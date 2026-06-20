@@ -4,6 +4,7 @@ import { useQuery } from '@tanstack/react-query'
 import api from '../api/client'
 import LinkedInPostPreview from '../components/LinkedInPostPreview'
 import { useAuth } from '../contexts/AuthContext'
+import { useUserTimezone } from '../hooks/useUserTimezone'
 
 const POST_TYPES = ['TEXT', 'VIDEO', 'CAROUSEL'] as const
 type PostType = typeof POST_TYPES[number]
@@ -39,6 +40,8 @@ export default function ScheduleContent() {
   const [result, setResult] = useState<{ ok: boolean; msg: string } | null>(null)
   const [useAvatar, setUseAvatar] = useState(false)
 
+  const userTimezone = useUserTimezone()
+
   const { data: avatarData } = useQuery({
     queryKey: ['avatar-credits', sessionToken],
     queryFn: async () => {
@@ -50,7 +53,6 @@ export default function ScheduleContent() {
   const activeAvatar = avatarData?.active_avatar
   const hasActiveAvatar = activeAvatar?.status === 'succeeded'
   const MAX_CHARS = 3000
-  const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone
 
   const bestTimeSuggestion = scheduledAt ? getBestPostingTime(new Date(scheduledAt)) : null
 
@@ -133,7 +135,7 @@ export default function ScheduleContent() {
         )}
 
         <div className="bg-blue-50 border border-blue-200 rounded-lg px-4 py-2 text-xs text-blue-700">
-          Your timezone: <span className="font-semibold">{timezone}</span>
+          Times are in your profile timezone: <span className="font-semibold">{userTimezone}</span>
         </div>
 
         <form onSubmit={handleSubmit} className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 space-y-4">
