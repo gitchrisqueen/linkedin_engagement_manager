@@ -6,7 +6,7 @@ from cqc_lem.utilities.db import get_cookies, store_cookies, get_linked_in_profi
     get_linked_in_profile_by_url, get_linked_in_profile_by_user_id
 from cqc_lem.utilities.linkedin.profile import LinkedInProfile
 from cqc_lem.utilities.linkedin.scrapper import returnProfileInfo
-from cqc_lem.utilities.logger import myprint
+from cqc_lem.utilities.logger import myprint, log_warning, log_error
 from cqc_lem.utilities.selenium_util import load_cookies, click_element_wait_retry, get_element_wait_retry, getText
 from selenium.webdriver.common.by import By
 from selenium.webdriver.remote.webdriver import WebDriver
@@ -34,6 +34,19 @@ def login_to_linkedin(driver: WebDriver, wait: WebDriverWait, user_email: str, u
     # Wait for the login page to load
     time.sleep(2)
 
+    _LINKEDIN_CHALLENGE_PATHS = ('/checkpoint/', '/authwall/', '/uas/login', '/challenge/')
+
+    def _is_challenge_url(url: str) -> bool:
+        return any(p in url for p in _LINKEDIN_CHALLENGE_PATHS)
+
+    if _is_challenge_url(driver.current_url):
+        log_error(
+            "LinkedIn security challenge detected after loading cookies — login blocked",
+            action_type="login",
+            error_message=f"Redirected to: {driver.current_url}",
+        )
+        raise RuntimeError(f"LinkedIn security challenge at {driver.current_url}")
+
     if "feed" in driver.current_url:
         myprint("Already Logged in!")
 
@@ -50,6 +63,14 @@ def login_to_linkedin(driver: WebDriver, wait: WebDriverWait, user_email: str, u
 
         # Wait for the login page to load
         # time.sleep(2)
+
+        if _is_challenge_url(driver.current_url):
+            log_error(
+                "LinkedIn security challenge detected after Sign In redirect — login blocked",
+                action_type="login",
+                error_message=f"Redirected to: {driver.current_url}",
+            )
+            raise RuntimeError(f"LinkedIn security challenge at {driver.current_url}")
 
         # Find the username and password input fields and log in
         username_field = get_element_wait_retry(driver, wait, 'username', "Finding Username Field", By.ID)
