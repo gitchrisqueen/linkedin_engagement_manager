@@ -14,7 +14,6 @@ import pytest
 from unittest.mock import MagicMock, patch
 
 
-_MODULE = "cqc_lem.utilities.linkedin.helper"
 _CAPSOLVER_BALANCE_URL = "https://api.capsolver.com/getBalance"
 
 
@@ -162,4 +161,4 @@ class TestSolveArkoseChallengeE2E:
             try:
                 driver.quit()
             except Exception:
-                pass
+                pass  # Best-effort cleanup; driver may already be closed

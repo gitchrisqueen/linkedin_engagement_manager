@@ -30,10 +30,20 @@ def solve_arkose_challenge(driver: WebDriver, wait: WebDriverWait) -> bool:
         )
         return False
 
-    # Detect Arkose Labs FunCaptcha iframe on the page
+    # Detect Arkose Labs FunCaptcha iframe on the page.
+    # Parse the hostname rather than substring-match to avoid matching attacker-controlled
+    # URLs that embed "arkoselabs.com" in a path or query string.
+    def _is_arkose_src(src: str) -> bool:
+        try:
+            from urllib.parse import urlparse as _urlparse
+            host = _urlparse(src).netloc
+            return host == "arkoselabs.com" or host.endswith(".arkoselabs.com")
+        except Exception:
+            return False
+
     iframes = driver.find_elements(By.TAG_NAME, "iframe")
     arkose_frame = next(
-        (f for f in iframes if "arkoselabs.com" in (f.get_attribute("src") or "")),
+        (f for f in iframes if _is_arkose_src(f.get_attribute("src") or "")),
         None,
     )
     if arkose_frame is None:
@@ -100,7 +110,7 @@ def solve_arkose_challenge(driver: WebDriver, wait: WebDriverWait) -> bool:
             submit.click()
             time.sleep(2)
         except Exception:
-            pass
+            pass  # No submit button on this challenge page — token injection alone is sufficient
 
         myprint("Arkose FunCaptcha solved via CapSolver")
         return True
