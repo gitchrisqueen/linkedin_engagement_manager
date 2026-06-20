@@ -16,28 +16,36 @@ from selenium.webdriver.support.wait import WebDriverWait
 
 def login_to_linkedin(driver: WebDriver, wait: WebDriverWait, user_email: str, user_password: str):
     linked_url = "https://www.linkedin.com"
+    feed_url = "https://www.linkedin.com/feed/"
+    login_url = "https://www.linkedin.com/login"
 
-    # Check the Database if we have any stored cookies for the LinkedIn url.
-    cookies = get_cookies(linked_url, user_email)
+    _CHALLENGE_PATHS = ('/checkpoint/', '/authwall', '/uas/login', '/challenge/')
+    # LinkedIn can land on /home, /feed, /mynetwork, etc. when logged in
+    _LOGGED_IN_PATHS = ('/feed', '/home', '/mynetwork', '/jobs', '/messaging',
+                        '/notifications', '/in/', '/search')
 
+    def _is_challenge_url(url: str) -> bool:
+        return any(p in url for p in _CHALLENGE_PATHS)
+
+    def _is_logged_in(url: str) -> bool:
+        return any(p in url for p in _LOGGED_IN_PATHS)
+
+    # Load base domain first so cookies can be set against the right origin
     driver.get(linked_url)
 
-    # If we have cookies, try to load them into the driver
+    cookies = get_cookies(linked_url, user_email)
+
     if cookies:
         myprint("Found previous cookies. Loading them now!")
         load_cookies(driver, cookies)
-        # Reload the page
-        driver.get(linked_url)
+        # Navigate directly to the feed — if cookies are valid LinkedIn serves it;
+        # if invalid/expired it redirects to a login or challenge page
+        driver.get(feed_url)
     else:
         myprint("No previous cookies found.")
 
-    # Wait for the login page to load
+    # Wait for the redirect / page load to settle
     time.sleep(2)
-
-    _LINKEDIN_CHALLENGE_PATHS = ('/checkpoint/', '/authwall/', '/uas/login', '/challenge/')
-
-    def _is_challenge_url(url: str) -> bool:
-        return any(p in url for p in _LINKEDIN_CHALLENGE_PATHS)
 
     if _is_challenge_url(driver.current_url):
         log_error(
@@ -47,56 +55,42 @@ def login_to_linkedin(driver: WebDriver, wait: WebDriverWait, user_email: str, u
         )
         raise RuntimeError(f"LinkedIn security challenge at {driver.current_url}")
 
-    if "feed" in driver.current_url:
-        myprint("Already Logged in!")
-
-        # update the cookies for this url in the database
+    if _is_logged_in(driver.current_url):
+        myprint(f"Already logged in! (current URL: {driver.current_url})")
         store_cookies(user_email, driver.get_cookies())
         myprint("Cookies stored to DB!")
+        return
 
+    # Cookies missing or expired — do a full credential login
+    myprint(f"Logging in to LinkedIn as: {user_email}")
+
+    # Go directly to the login page instead of clicking a "Sign in" link
+    driver.get(login_url)
+    time.sleep(1)
+
+    if _is_challenge_url(driver.current_url):
+        log_error(
+            "LinkedIn security challenge detected on login page — login blocked",
+            action_type="login",
+            error_message=f"Redirected to: {driver.current_url}",
+        )
+        raise RuntimeError(f"LinkedIn security challenge at {driver.current_url}")
+
+    username_field = get_element_wait_retry(driver, wait, 'username', "Finding Username Field", By.ID)
+    password_field = get_element_wait_retry(driver, wait, 'password', "Finding Password Field", By.ID)
+
+    username_field.send_keys(user_email)
+    password_field.send_keys(user_password)
+    click_element_wait_retry(driver, wait, '//*[@type="submit"]', "Finding Login Button", use_action_chain=True)
+
+    wait.until(EC.title_contains("Feed"), "Waiting for Feed to load after login")
+
+    if _is_logged_in(driver.current_url):
+        myprint("Login successful!")
+        store_cookies(user_email, driver.get_cookies())
+        myprint("Cookies stored to DB!")
     else:
-
-        myprint(f"Logging in to LinkedIn as: {user_email} ")
-
-        # click the Sign in button
-        click_element_wait_retry(driver, wait, '//a[contains(text(),"Sign in")][1]', 'Clicking Sign In Button')
-
-        # Wait for the login page to load
-        # time.sleep(2)
-
-        if _is_challenge_url(driver.current_url):
-            log_error(
-                "LinkedIn security challenge detected after Sign In redirect — login blocked",
-                action_type="login",
-                error_message=f"Redirected to: {driver.current_url}",
-            )
-            raise RuntimeError(f"LinkedIn security challenge at {driver.current_url}")
-
-        # Find the username and password input fields and log in
-        username_field = get_element_wait_retry(driver, wait, 'username', "Finding Username Field", By.ID)
-        password_field = get_element_wait_retry(driver, wait, 'password', "Finding Password Field", By.ID)
-
-        # Fill in the form and submit
-        username_field.send_keys(user_email)
-        password_field.send_keys(user_password)
-        click_element_wait_retry(driver, wait, '//*[@type="submit"]', "Finding Login Button", use_action_chain=True)
-
-        # Wait for the home page to load
-        # time.sleep(5)
-
-        # Wait for title to change
-        wait.until(EC.title_contains("Feed"), "Waiting for Title to change")
-
-        # Check for successful login by looking for the search box
-        if "feed" in driver.current_url:
-            myprint("Login successful!")
-
-            # update the cookies for this url in the database
-            store_cookies(user_email, driver.get_cookies())
-            myprint("Cookies stored to DB!")
-        else:
-            myprint("Login failed. Check your credentials.")
-            # are_you_satisfied()
+        myprint("Login failed. Check your credentials.")
 
 
 def get_my_profile(driver, wait, user_email: str, user_password: str, user_id: Optional[int] = None) -> LinkedInProfile:
