@@ -74,7 +74,7 @@ class TestAvatarCreditCheckoutEndpoint:
             })
 
         assert r.status_code == 200
-        assert "checkout.stripe.com" in r.json()["detail"]["checkout_url"]
+        assert r.json()["detail"]["checkout_url"].startswith("https://checkout.stripe.com")
 
     def test_returns_400_for_unknown_package(self):
         subscription = {"stripe_customer_id": "cus_test123"}

@@ -469,6 +469,36 @@ def update_post(post_id: int, post: PostRequest) -> ResponseModel:
         raise HTTPException(status_code=405, detail="Post could not be updated")
 
 
+def _find_asset_file(root: str, rel_path: str) -> str | None:
+    """Resolve rel_path within root using OS directory entries.
+
+    Each returned path comes from os.scandir() (server-controlled), so it is
+    never derived from user-supplied input.  Traversal components (.. / .) and
+    separator characters are rejected before any filesystem access.
+    """
+    parts = [p for p in rel_path.replace("\\", "/").split("/") if p]
+    if not parts:
+        return None
+    for part in parts:
+        if part in (".", "..") or os.sep in part:
+            return None
+    current = root
+    for i, part in enumerate(parts):
+        try:
+            matched = next((e for e in os.scandir(current) if e.name == part), None)
+        except OSError:
+            return None
+        if matched is None:
+            return None
+        is_last = i == len(parts) - 1
+        if is_last:
+            return matched.path if matched.is_file() else None
+        if not matched.is_dir():
+            return None
+        current = matched.path   # descend into subdirectory
+    return None
+
+
 @router.get("/assets", response_model=None, responses={
     200: {"description": "Asset returned successfully"},
     206: {"description": "Asset returned successfully via stream"},
@@ -479,17 +509,15 @@ def get_assets(file_name: str, content_type: Optional[str] = None,
     if not file_name:
         raise HTTPException(status_code=400, detail="A File Name is required")
 
-    # Strip all directory components to prevent path traversal (CWE-22)
-    safe_name = os.path.basename(file_name)
-    if not safe_name:
-        raise HTTPException(status_code=400, detail="Invalid file name")
+    # Resolve the file via a filesystem scan of the trusted assets_dir (CWE-22).
+    # _find_asset_file returns OS-provided paths, never paths constructed from
+    # user input, so the taint chain from file_name is broken entirely.
+    file_path = _find_asset_file(assets_dir, file_name)
+    if file_path is None:
+        raise HTTPException(status_code=404, detail="File not found")
 
-    file_path = os.path.join(assets_dir, safe_name)
     myprint(f"File Path: {file_path}")
     myprint(f"Content Type: {content_type}")
-
-    if not os.path.isfile(file_path):
-        raise HTTPException(status_code=404, detail="File not found")
 
     file_extension = get_file_extension_from_filepath(file_path)
     mim_type = get_file_mime_type(file_extension)

@@ -36,6 +36,7 @@ def test_avatar_page_shows_pricing_and_credit_balance(page):
         session_token = body["session_token"]
     else:
         pytest.skip("Email provider is configured — bypass auth not available in this environment")
+        session_token = ""  # unreachable — pytest.skip() always raises; satisfies static analysis
 
     # Set the session token in localStorage via a JS snippet
     page.goto(BASE_URL)
