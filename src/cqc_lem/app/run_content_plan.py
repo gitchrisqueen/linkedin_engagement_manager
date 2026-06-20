@@ -3,7 +3,7 @@ import json
 import os
 import random
 from datetime import datetime, timedelta
-from typing import Tuple
+from typing import Optional, Tuple
 from urllib.parse import urlparse
 from xml.etree import ElementTree
 
@@ -213,7 +213,8 @@ def create_content(user_id: int, post_type: str, stage: str, post_id: int = None
     return content, video_url
 
 
-def create_carousel_content(user_id: int, stage: str, post_id: int = None) -> str:
+def create_carousel_content(user_id: int, stage: str, post_id: int = None,
+                            template: Optional[str] = None) -> str:
     """Generate AI carousel content, render slide images, update DB, and return the post text."""
     from cqc_lem.utilities.ai.ai_helper import generate_carousel_content
     from cqc_lem.utilities.carousel_creator import (
@@ -236,6 +237,19 @@ def create_carousel_content(user_id: int, stage: str, post_id: int = None) -> st
     else:
         model_cls = IndustryInsightsCarousel
 
+    # Pick a template that fits the buyer stage
+    _template_by_stage = {
+        "awareness": "bold_listicle",
+        "consideration": "step_framework",
+        "decision": "stat_reveal",
+        "personal": "story_arc",
+        "story": "story_arc",
+    }
+    carousel_template = next(
+        (v for k, v in _template_by_stage.items() if k in stage_lower),
+        "bold_listicle",
+    )
+
     carousel_obj = None
     try:
         carousel_obj = model_cls(**carousel_dict)
@@ -245,8 +259,10 @@ def create_carousel_content(user_id: int, stage: str, post_id: int = None) -> st
     slide_urls = []
     if carousel_obj is not None and post_id is not None:
         try:
-            # Render slide images using Pillow
-            image_paths = create_carousel_slide_images(carousel_obj, post_id)
+            # Render slide images using Pillow; explicit override wins over auto-pick
+            image_paths = create_carousel_slide_images(
+                carousel_obj, post_id, template=template or carousel_template
+            )
             slide_urls = [
                 f"{API_URL_FINAL}/api/assets?file_name=images/carousel/{post_id}/{os.path.basename(p)}"
                 for p in image_paths

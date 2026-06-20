@@ -206,6 +206,13 @@ class AdminFixVideoUrlsRequest(BaseModel):
 class AdminRegenerateCarouselRequest(BaseModel):
     post_id: int
     user_id: int
+    template: Optional[str] = None  # e.g. "bold_listicle", "minimal_dark"; None = auto-pick by stage
+
+
+class GenerateCarouselPreviewRequest(BaseModel):
+    session_token: str
+    stage: str = "awareness"  # awareness | consideration | decision | personal
+    template: Optional[str] = None  # None = auto-pick by stage
 
 
 class FutureForwardValues(IntEnum):
@@ -1308,7 +1315,10 @@ def admin_regenerate_carousel(
     stage = get_post_buyer_stage(request.post_id) or "awareness"
     from cqc_lem.app.run_content_plan import create_carousel_content
     try:
-        new_content = create_carousel_content(request.user_id, stage=stage, post_id=request.post_id)
+        new_content = create_carousel_content(
+            request.user_id, stage=stage, post_id=request.post_id,
+            template=request.template,
+        )
         from cqc_lem.utilities.db import update_db_post_content
         update_db_post_content(request.post_id, new_content)
     except Exception as exc:
@@ -1317,6 +1327,98 @@ def admin_regenerate_carousel(
 
     myprint(f"admin/regenerate-carousel: regenerated post_id={request.post_id}")
     return ResponseModel(status_code=200, detail={"post_id": request.post_id, "content_preview": new_content[:120]})
+
+
+@router.get("/carousel-templates", responses={200: {"description": "Available carousel templates"}})
+def list_carousel_templates() -> ResponseModel:
+    """Return all available carousel visual templates for the UI picker."""
+    from cqc_lem.utilities.carousel_creator import CAROUSEL_TEMPLATES
+    templates = [
+        {"key": k, "label": v["label"], "description": v["description"]}
+        for k, v in CAROUSEL_TEMPLATES.items()
+    ]
+    return ResponseModel(status_code=200, detail={"templates": templates})
+
+
+@router.post("/generate-carousel", responses={
+    200: {"description": "Carousel slides generated"},
+    403: {"description": "Forbidden"},
+    500: {"description": "Generation failed"},
+})
+def generate_carousel_preview(request: GenerateCarouselPreviewRequest) -> ResponseModel:
+    """Generate carousel slide images from AI content + chosen template.
+    Returns slide_urls (publicly accessible) and a suggested caption.
+    The caller can pass these as carousel_slides when scheduling the post.
+    """
+    import time as _time
+    from cqc_lem.utilities.db import get_session_user_id
+    from cqc_lem.utilities.env_constants import API_URL_FINAL
+    from cqc_lem.utilities.carousel_creator import (
+        create_carousel_slide_images, CAROUSEL_TEMPLATES, DEFAULT_TEMPLATE,
+        EducationalContentCarousel, CaseStudyCarousel, PersonalStoryCarousel,
+        IndustryInsightsCarousel, ProductDemoCarousel,
+    )
+    from cqc_lem.utilities.ai.ai_helper import generate_carousel_content
+
+    user_id = get_session_user_id(request.session_token)
+    if not user_id:
+        raise HTTPException(status_code=403, detail="Invalid session token")
+    stage = request.stage or "awareness"
+    stage_lower = stage.lower()
+
+    _template_by_stage = {
+        "awareness": "bold_listicle",
+        "consideration": "step_framework",
+        "decision": "stat_reveal",
+        "personal": "story_arc",
+        "story": "story_arc",
+    }
+    carousel_template = request.template or next(
+        (v for k, v in _template_by_stage.items() if k in stage_lower),
+        DEFAULT_TEMPLATE,
+    )
+
+    if carousel_template not in CAROUSEL_TEMPLATES:
+        carousel_template = DEFAULT_TEMPLATE
+
+    # Generate a unique preview directory so slides don't collide across users
+    preview_id = f"preview_{user_id}_{int(_time.time())}"
+    current_dir = os.path.dirname(os.path.abspath(__file__))
+    assets_root = os.path.join(current_dir, "..", "assets", "images", "carousel", preview_id)
+    output_dir = os.path.realpath(assets_root)
+
+    try:
+        post_text, carousel_dict = generate_carousel_content(user_id, stage)
+
+        _model_map = {
+            "awareness": EducationalContentCarousel,
+            "consideration": CaseStudyCarousel,
+            "decision": ProductDemoCarousel,
+            "personal": PersonalStoryCarousel,
+            "story": PersonalStoryCarousel,
+        }
+        model_cls = next(
+            (v for k, v in _model_map.items() if k in stage_lower),
+            IndustryInsightsCarousel,
+        )
+
+        carousel_obj = model_cls(**carousel_dict)
+        image_paths = create_carousel_slide_images(
+            carousel_obj, post_id=0, output_dir=output_dir, template=carousel_template
+        )
+        slide_urls = [
+            f"{API_URL_FINAL}/api/assets?file_name=images/carousel/{preview_id}/{os.path.basename(p)}"
+            for p in image_paths
+        ]
+    except Exception as exc:
+        myprint(f"generate-carousel: failed for user_id={user_id} — {exc}")
+        raise HTTPException(status_code=500, detail=str(exc))
+
+    return ResponseModel(status_code=200, detail={
+        "slide_urls": slide_urls,
+        "caption": post_text,
+        "template": carousel_template,
+    })
 
 
 # Register the /api router
