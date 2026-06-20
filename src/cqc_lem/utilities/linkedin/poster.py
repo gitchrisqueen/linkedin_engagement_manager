@@ -206,11 +206,19 @@ def share_on_linkedin(user_id: int, content: str,
     return urn
 
 
+def _is_local_image_path(value: str) -> bool:
+    """Return True if value looks like a local file path rather than a Pexels search query."""
+    return bool(value) and (value.startswith("/") or os.path.isfile(value))
+
+
 def share_carousel_on_linkedin(user_id: int, content: str, slide_texts: list[str]) -> Optional[str]:
     """Post a multi-image carousel to LinkedIn.
 
-    Each slide text is used to fetch a contextual image from Pexels. All images
-    are uploaded individually and included as a multi-image ugcPost.
+    slide_texts entries can be:
+    - An absolute file path to a pre-generated PNG slide image (created by create_carousel_slide_images)
+    - A plain text search query (legacy) — a Pexels image is fetched for it
+
+    All images are uploaded individually and included as a multi-image ugcPost.
     """
     import os
     from cqc_lem.utilities.carousel_creator import get_pexels_image_path
@@ -229,8 +237,11 @@ def share_carousel_on_linkedin(user_id: int, content: str, slide_texts: list[str
     default_image_path = os.path.join(file_dir, "..", "carousel_creator", "images", "image.png")
 
     media_urns = []
-    for slide_text in slide_texts:
-        image_path = get_pexels_image_path(slide_text, default_image_path)
+    for slide in slide_texts:
+        if _is_local_image_path(slide):
+            image_path = slide
+        else:
+            image_path = get_pexels_image_path(slide, default_image_path)
         myprint(f"Carousel slide image: {image_path}")
         urn = upload_media(access_token, linked_sub_id, image_path, "IMAGE")
         if urn:

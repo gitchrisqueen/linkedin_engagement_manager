@@ -9,6 +9,13 @@ import { useUserTimezone } from '../hooks/useUserTimezone'
 const POST_TYPES = ['TEXT', 'VIDEO', 'CAROUSEL'] as const
 type PostType = typeof POST_TYPES[number]
 
+const CAROUSEL_STAGES = [
+  { value: 'awareness', label: 'Awareness', hint: 'Educational tips, insights, how-tos' },
+  { value: 'consideration', label: 'Consideration', hint: 'Step-by-step frameworks, processes' },
+  { value: 'decision', label: 'Decision', hint: 'Stats, data reveals, proof points' },
+  { value: 'personal', label: 'Personal Story', hint: 'Case studies, transformations, journeys' },
+]
+
 const DAY_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
 
 function getBestPostingTime(date: Date): { time: string; display: string; dayName: string } {
@@ -27,6 +34,12 @@ function getBestPostingTime(date: Date): { time: string; display: string; dayNam
   return { time: `${hh}:00`, dayName: DAY_NAMES[day], display: display12 }
 }
 
+interface CarouselTemplate {
+  key: string
+  label: string
+  description: string
+}
+
 export default function ScheduleContent() {
   const { user, sessionToken } = useAuth()
   const email = user?.email ?? ''
@@ -40,6 +53,14 @@ export default function ScheduleContent() {
   const [result, setResult] = useState<{ ok: boolean; msg: string } | null>(null)
   const [useAvatar, setUseAvatar] = useState(false)
 
+  // Carousel AI generation state
+  const [carouselMode, setCarouselMode] = useState<'manual' | 'ai'>('ai')
+  const [selectedStage, setSelectedStage] = useState('awareness')
+  const [selectedTemplate, setSelectedTemplate] = useState('')
+  const [generatingSlides, setGeneratingSlides] = useState(false)
+  const [generatedSlideUrls, setGeneratedSlideUrls] = useState<string[]>([])
+  const [generateError, setGenerateError] = useState<string | null>(null)
+
   const userTimezone = useUserTimezone()
 
   const { data: avatarData } = useQuery({
@@ -50,6 +71,16 @@ export default function ScheduleContent() {
     },
     enabled: !!sessionToken,
   })
+
+  const { data: templatesData } = useQuery({
+    queryKey: ['carousel-templates'],
+    queryFn: async () => {
+      const r = await api.get('/carousel-templates')
+      return r.data.detail.templates as CarouselTemplate[]
+    },
+  })
+
+  const templates = templatesData ?? []
   const activeAvatar = avatarData?.active_avatar
   const hasActiveAvatar = activeAvatar?.status === 'succeeded'
   const MAX_CHARS = 3000
@@ -74,14 +105,42 @@ export default function ScheduleContent() {
     setSlides((prev) => prev.map((s, i) => (i === idx ? value : s)))
   }
 
+  async function handleGenerateSlides() {
+    if (!sessionToken) { setGenerateError('Not logged in.'); return }
+    setGeneratingSlides(true)
+    setGenerateError(null)
+    setGeneratedSlideUrls([])
+    try {
+      const r = await api.post('/generate-carousel', {
+        session_token: sessionToken,
+        stage: selectedStage,
+        template: selectedTemplate || null,
+      })
+      const { slide_urls, caption } = r.data.detail
+      setGeneratedSlideUrls(slide_urls)
+      if (caption && !content.trim()) {
+        setContent(caption)
+      }
+      setSlides(slide_urls)
+    } catch (err: unknown) {
+      const msg = (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail
+      setGenerateError(msg || 'Slide generation failed. Please try again.')
+    } finally {
+      setGeneratingSlides(false)
+    }
+  }
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     if (!email) { setResult({ ok: false, msg: 'Set your email in Account settings first.' }); return }
     if (!content.trim()) { setResult({ ok: false, msg: 'Post content is required.' }); return }
     if (!scheduledAt) { setResult({ ok: false, msg: 'Scheduled date/time is required.' }); return }
-    if (postType === 'CAROUSEL' && slides.every((s) => !s.trim())) {
-      setResult({ ok: false, msg: 'At least one slide with text is required.' })
-      return
+    if (postType === 'CAROUSEL') {
+      const activeSlides = carouselMode === 'ai' ? generatedSlideUrls : slides.filter((s) => s.trim())
+      if (activeSlides.length === 0) {
+        setResult({ ok: false, msg: carouselMode === 'ai' ? 'Generate slides first before scheduling.' : 'At least one slide is required.' })
+        return
+      }
     }
 
     setSubmitting(true)
@@ -99,7 +158,9 @@ export default function ScheduleContent() {
         payload.video_url = videoUrl || null
       }
       if (postType === 'CAROUSEL') {
-        payload.carousel_slides = slides.filter((s) => s.trim())
+        payload.carousel_slides = carouselMode === 'ai'
+          ? generatedSlideUrls
+          : slides.filter((s) => s.trim())
       }
       await api.post('/schedule_post/', payload)
       setResult({ ok: true, msg: 'Post scheduled successfully!' })
@@ -107,6 +168,7 @@ export default function ScheduleContent() {
       setVideoUrl('')
       setSlides([''])
       setScheduledAt('')
+      setGeneratedSlideUrls([])
     } catch {
       setResult({ ok: false, msg: 'Failed to schedule post. Please try again.' })
     } finally {
@@ -116,7 +178,7 @@ export default function ScheduleContent() {
 
   const previewContent =
     postType === 'CAROUSEL'
-      ? slides.filter((s) => s.trim()).join('\n---\n') || 'Your carousel slides will appear here…'
+      ? (content || 'Your carousel caption will appear here…')
       : content || 'Your post content will appear here…'
 
   return (
@@ -176,7 +238,7 @@ export default function ScheduleContent() {
               rows={postType === 'CAROUSEL' ? 3 : 8}
               maxLength={MAX_CHARS}
               className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
-              placeholder={postType === 'CAROUSEL' ? 'Optional intro text for the carousel post…' : 'What would you like to share?'}
+              placeholder={postType === 'CAROUSEL' ? 'Optional intro text for the carousel post… (auto-filled after generation)' : 'What would you like to share?'}
             />
           </div>
 
@@ -195,40 +257,163 @@ export default function ScheduleContent() {
             </div>
           )}
 
-          {/* CAROUSEL: slide builder */}
+          {/* CAROUSEL: AI generator + manual fallback */}
           {postType === 'CAROUSEL' && (
-            <div className="space-y-3">
-              <label className="block text-sm font-medium text-gray-700">
-                Slides <span className="text-gray-400 font-normal text-xs">(images auto-fetched from Pexels at post time)</span>
-              </label>
-              {slides.map((slide, idx) => (
-                <div key={idx} className="flex gap-2 items-start">
-                  <span className="mt-2 text-xs text-gray-400 font-medium w-5 shrink-0">{idx + 1}.</span>
-                  <textarea
-                    rows={2}
-                    value={slide}
-                    onChange={(e) => updateSlide(idx, e.target.value)}
-                    className="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
-                    placeholder={`Slide ${idx + 1} text…`}
-                  />
-                  {slides.length > 1 && (
-                    <button
-                      type="button"
-                      onClick={() => removeSlide(idx)}
-                      className="mt-1.5 text-red-400 hover:text-red-600 text-xs font-semibold px-2 py-1 rounded border border-red-200 hover:border-red-400 transition-colors"
-                    >
-                      Remove
-                    </button>
+            <div className="space-y-4">
+              {/* Mode tabs */}
+              <div className="flex gap-1 bg-gray-100 rounded-lg p-1 w-fit">
+                {(['ai', 'manual'] as const).map((m) => (
+                  <button
+                    key={m}
+                    type="button"
+                    onClick={() => setCarouselMode(m)}
+                    className={`px-3 py-1 rounded-md text-xs font-semibold transition-colors ${
+                      carouselMode === m
+                        ? 'bg-white text-blue-700 shadow-sm'
+                        : 'text-gray-500 hover:text-gray-700'
+                    }`}
+                  >
+                    {m === 'ai' ? 'AI Generate' : 'Manual Slides'}
+                  </button>
+                ))}
+              </div>
+
+              {carouselMode === 'ai' ? (
+                <div className="space-y-4 border border-blue-100 rounded-lg p-4 bg-blue-50">
+                  {/* Stage picker */}
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-600 mb-2">Content Stage</label>
+                    <div className="grid grid-cols-2 gap-2">
+                      {CAROUSEL_STAGES.map((s) => (
+                        <button
+                          key={s.value}
+                          type="button"
+                          onClick={() => setSelectedStage(s.value)}
+                          className={`text-left px-3 py-2 rounded-lg border text-xs transition-colors ${
+                            selectedStage === s.value
+                              ? 'bg-blue-600 text-white border-blue-600'
+                              : 'bg-white text-gray-700 border-gray-200 hover:border-blue-300'
+                          }`}
+                        >
+                          <div className="font-semibold">{s.label}</div>
+                          <div className={`mt-0.5 ${selectedStage === s.value ? 'text-blue-100' : 'text-gray-400'}`}>
+                            {s.hint}
+                          </div>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Template picker */}
+                  {templates.length > 0 && (
+                    <div>
+                      <label className="block text-xs font-semibold text-gray-600 mb-2">
+                        Visual Template <span className="font-normal text-gray-400">(optional — auto-picked if blank)</span>
+                      </label>
+                      <div className="space-y-1.5">
+                        {templates.map((t) => (
+                          <button
+                            key={t.key}
+                            type="button"
+                            onClick={() => setSelectedTemplate(selectedTemplate === t.key ? '' : t.key)}
+                            className={`w-full text-left px-3 py-2 rounded-lg border text-xs transition-colors ${
+                              selectedTemplate === t.key
+                                ? 'bg-indigo-600 text-white border-indigo-600'
+                                : 'bg-white text-gray-700 border-gray-200 hover:border-indigo-300'
+                            }`}
+                          >
+                            <span className="font-semibold">{t.label}</span>
+                            <span className={`ml-2 ${selectedTemplate === t.key ? 'text-indigo-200' : 'text-gray-400'}`}>
+                              {t.description}
+                            </span>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Generate button */}
+                  <button
+                    type="button"
+                    onClick={handleGenerateSlides}
+                    disabled={generatingSlides}
+                    className="w-full bg-indigo-600 text-white py-2 rounded-lg text-sm font-semibold hover:bg-indigo-700 disabled:opacity-50 transition-colors flex items-center justify-center gap-2"
+                  >
+                    {generatingSlides ? (
+                      <>
+                        <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24" fill="none">
+                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                        </svg>
+                        Generating slides… (30–60 sec)
+                      </>
+                    ) : (
+                      'Generate AI Carousel Slides'
+                    )}
+                  </button>
+
+                  {generateError && (
+                    <p className="text-xs text-red-600 font-medium">{generateError}</p>
+                  )}
+
+                  {generatedSlideUrls.length > 0 && (
+                    <div className="space-y-2">
+                      <p className="text-xs font-semibold text-green-700">
+                        {generatedSlideUrls.length} slides generated
+                      </p>
+                      <div className="flex flex-wrap gap-2">
+                        {generatedSlideUrls.map((url, i) => (
+                          <a
+                            key={i}
+                            href={url}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="text-xs text-blue-600 underline hover:text-blue-800"
+                          >
+                            Slide {i + 1}
+                          </a>
+                        ))}
+                      </div>
+                      <p className="text-xs text-gray-400">Click each link to preview the slide image. Not happy? Click Generate again to regenerate.</p>
+                    </div>
                   )}
                 </div>
-              ))}
-              <button
-                type="button"
-                onClick={addSlide}
-                className="text-sm text-blue-600 font-semibold hover:text-blue-800 transition-colors"
-              >
-                + Add Slide
-              </button>
+              ) : (
+                /* Manual slide builder */
+                <div className="space-y-3">
+                  <label className="block text-sm font-medium text-gray-700">
+                    Slides <span className="text-gray-400 font-normal text-xs">(images auto-fetched from Pexels at post time)</span>
+                  </label>
+                  {slides.map((slide, idx) => (
+                    <div key={idx} className="flex gap-2 items-start">
+                      <span className="mt-2 text-xs text-gray-400 font-medium w-5 shrink-0">{idx + 1}.</span>
+                      <textarea
+                        rows={2}
+                        value={slide}
+                        onChange={(e) => updateSlide(idx, e.target.value)}
+                        className="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
+                        placeholder={`Slide ${idx + 1} text…`}
+                      />
+                      {slides.length > 1 && (
+                        <button
+                          type="button"
+                          onClick={() => removeSlide(idx)}
+                          className="mt-1.5 text-red-400 hover:text-red-600 text-xs font-semibold px-2 py-1 rounded border border-red-200 hover:border-red-400 transition-colors"
+                        >
+                          Remove
+                        </button>
+                      )}
+                    </div>
+                  ))}
+                  <button
+                    type="button"
+                    onClick={addSlide}
+                    className="text-sm text-blue-600 font-semibold hover:text-blue-800 transition-colors"
+                  >
+                    + Add Slide
+                  </button>
+                </div>
+              )}
             </div>
           )}
 
@@ -311,6 +496,26 @@ export default function ScheduleContent() {
           author={email.split('@')[0] || 'You'}
           headline="LinkedIn Member"
         />
+        {postType === 'CAROUSEL' && generatedSlideUrls.length > 0 && (
+          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
+            <p className="text-sm font-semibold text-gray-700 mb-3">Slide Previews</p>
+            <div className="grid grid-cols-2 gap-3">
+              {generatedSlideUrls.slice(0, 4).map((url, i) => (
+                <a key={i} href={url} target="_blank" rel="noreferrer" className="block">
+                  <img
+                    src={url}
+                    alt={`Slide ${i + 1}`}
+                    className="w-full rounded-lg border border-gray-200 hover:opacity-90 transition-opacity"
+                    onError={(e) => { (e.target as HTMLImageElement).style.display = 'none' }}
+                  />
+                </a>
+              ))}
+            </div>
+            {generatedSlideUrls.length > 4 && (
+              <p className="text-xs text-gray-400 mt-2">+{generatedSlideUrls.length - 4} more slides</p>
+            )}
+          </div>
+        )}
       </div>
     </div>
   )

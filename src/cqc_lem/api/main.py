@@ -30,17 +30,19 @@ from cqc_lem.utilities.db import (
     update_avatar_training_status, set_active_avatar,
     get_avatar_trainings, get_active_avatar,
     get_user_timezone, update_user_timezone,
+    replace_video_url_base, get_post_type, get_post_buyer_stage,
+    update_db_post_carousel_slides,
 )
 from cqc_lem.utilities.email import generate_pin, hash_pin, send_pin_email
 from cqc_lem.utilities.linkedin.token_refresh import (
     get_token_expiry, is_token_expired, is_token_expiring_soon, attempt_token_refresh,
 )
-from cqc_lem.utilities.env_constants import LI_CLIENT_ID, LI_CLIENT_SECRET, LI_REDIRECT_URL, LI_STATE_SALT
+from cqc_lem.utilities.env_constants import LI_CLIENT_ID, LI_CLIENT_SECRET, LI_REDIRECT_URL, LI_STATE_SALT, ADMIN_SECRET
 from cqc_lem.utilities.logger import myprint
 from cqc_lem.utilities.mime_type_helper import get_file_mime_type
 from cqc_lem.utilities.observability import track_api_call
 from cqc_lem.utilities.utils import get_file_extension_from_filepath
-from fastapi import FastAPI, HTTPException, Request, status, APIRouter
+from fastapi import FastAPI, HTTPException, Request, status, APIRouter, Header
 from fastapi import File, Form, Query, UploadFile
 from fastapi.responses import FileResponse
 from fastapi.responses import HTMLResponse
@@ -193,6 +195,24 @@ class LinkedInPasswordRequest(BaseModel):
 class TimezoneRequest(BaseModel):
     session_token: str
     timezone: str
+
+
+class AdminFixVideoUrlsRequest(BaseModel):
+    old_base: str
+    new_base: str
+    user_id: Optional[int] = None
+
+
+class AdminRegenerateCarouselRequest(BaseModel):
+    post_id: int
+    user_id: int
+    template: Optional[str] = None  # e.g. "bold_listicle", "minimal_dark"; None = auto-pick by stage
+
+
+class GenerateCarouselPreviewRequest(BaseModel):
+    session_token: str
+    stage: str = "awareness"  # awareness | consideration | decision | personal
+    template: Optional[str] = None  # None = auto-pick by stage
 
 
 class FutureForwardValues(IntEnum):
@@ -1254,8 +1274,163 @@ def activate_avatar(avatar_db_id: int, request: AvatarActivateRequest) -> Respon
     raise HTTPException(status_code=500, detail="Could not activate avatar")
 
 
+# ---------------------------------------------------------------------------
+# Admin endpoints — require X-Admin-Secret header matching ADMIN_SECRET env var
+# ---------------------------------------------------------------------------
+
+def _require_admin(x_admin_secret: Optional[str] = Header(default=None)) -> None:
+    if not ADMIN_SECRET or x_admin_secret != ADMIN_SECRET:
+        raise HTTPException(status_code=403, detail="Forbidden")
+
+
+@router.post("/admin/fix-video-urls", responses={
+    200: {"description": "Video URLs updated"},
+    403: {"description": "Forbidden"},
+})
+def admin_fix_video_urls(
+    request: AdminFixVideoUrlsRequest,
+    x_admin_secret: Optional[str] = Header(default=None),
+) -> ResponseModel:
+    _require_admin(x_admin_secret)
+    updated = replace_video_url_base(request.old_base, request.new_base, request.user_id)
+    myprint(f"admin/fix-video-urls: replaced {updated} row(s) — {request.old_base!r} → {request.new_base!r}")
+    return ResponseModel(status_code=200, detail={"updated_rows": updated})
+
+
+@router.post("/admin/regenerate-carousel", responses={
+    200: {"description": "Carousel regenerated"},
+    403: {"description": "Forbidden"},
+    404: {"description": "Post not found or not a carousel"},
+})
+def admin_regenerate_carousel(
+    request: AdminRegenerateCarouselRequest,
+    x_admin_secret: Optional[str] = Header(default=None),
+) -> ResponseModel:
+    _require_admin(x_admin_secret)
+
+    post_type = get_post_type(request.post_id)
+    if post_type != PostType.CAROUSEL:
+        raise HTTPException(status_code=404, detail="Post not found or not a carousel post")
+
+    stage = get_post_buyer_stage(request.post_id) or "awareness"
+    from cqc_lem.app.run_content_plan import create_carousel_content
+    try:
+        new_content = create_carousel_content(
+            request.user_id, stage=stage, post_id=request.post_id,
+            template=request.template,
+        )
+        from cqc_lem.utilities.db import update_db_post_content
+        update_db_post_content(request.post_id, new_content)
+    except Exception as exc:
+        myprint(f"admin/regenerate-carousel: failed for post_id={request.post_id} — {exc}")
+        raise HTTPException(status_code=500, detail=str(exc))
+
+    myprint(f"admin/regenerate-carousel: regenerated post_id={request.post_id}")
+    return ResponseModel(status_code=200, detail={"post_id": request.post_id, "content_preview": new_content[:120]})
+
+
+@router.get("/carousel-templates", responses={200: {"description": "Available carousel templates"}})
+def list_carousel_templates() -> ResponseModel:
+    """Return all available carousel visual templates for the UI picker."""
+    from cqc_lem.utilities.carousel_creator import CAROUSEL_TEMPLATES
+    templates = [
+        {"key": k, "label": v["label"], "description": v["description"]}
+        for k, v in CAROUSEL_TEMPLATES.items()
+    ]
+    return ResponseModel(status_code=200, detail={"templates": templates})
+
+
+@router.post("/generate-carousel", responses={
+    200: {"description": "Carousel slides generated"},
+    403: {"description": "Forbidden"},
+    500: {"description": "Generation failed"},
+})
+def generate_carousel_preview(request: GenerateCarouselPreviewRequest) -> ResponseModel:
+    """Generate carousel slide images from AI content + chosen template.
+    Returns slide_urls (publicly accessible) and a suggested caption.
+    The caller can pass these as carousel_slides when scheduling the post.
+    """
+    import time as _time
+    from cqc_lem.utilities.db import get_session_user_id
+    from cqc_lem.utilities.env_constants import API_URL_FINAL
+    from cqc_lem.utilities.carousel_creator import (
+        create_carousel_slide_images, CAROUSEL_TEMPLATES, DEFAULT_TEMPLATE,
+        EducationalContentCarousel, CaseStudyCarousel, PersonalStoryCarousel,
+        IndustryInsightsCarousel, ProductDemoCarousel,
+    )
+    from cqc_lem.utilities.ai.ai_helper import generate_carousel_content
+
+    user_id = get_session_user_id(request.session_token)
+    if not user_id:
+        raise HTTPException(status_code=403, detail="Invalid session token")
+    stage = request.stage or "awareness"
+    stage_lower = stage.lower()
+
+    _template_by_stage = {
+        "awareness": "bold_listicle",
+        "consideration": "step_framework",
+        "decision": "stat_reveal",
+        "personal": "story_arc",
+        "story": "story_arc",
+    }
+    carousel_template = request.template or next(
+        (v for k, v in _template_by_stage.items() if k in stage_lower),
+        DEFAULT_TEMPLATE,
+    )
+
+    if carousel_template not in CAROUSEL_TEMPLATES:
+        carousel_template = DEFAULT_TEMPLATE
+
+    # Generate a unique preview directory so slides don't collide across users
+    preview_id = f"preview_{user_id}_{int(_time.time())}"
+    current_dir = os.path.dirname(os.path.abspath(__file__))
+    assets_root = os.path.join(current_dir, "..", "assets", "images", "carousel", preview_id)
+    output_dir = os.path.realpath(assets_root)
+
+    try:
+        post_text, carousel_dict = generate_carousel_content(user_id, stage)
+
+        _model_map = {
+            "awareness": EducationalContentCarousel,
+            "consideration": CaseStudyCarousel,
+            "decision": ProductDemoCarousel,
+            "personal": PersonalStoryCarousel,
+            "story": PersonalStoryCarousel,
+        }
+        model_cls = next(
+            (v for k, v in _model_map.items() if k in stage_lower),
+            IndustryInsightsCarousel,
+        )
+
+        carousel_obj = model_cls(**carousel_dict)
+        image_paths = create_carousel_slide_images(
+            carousel_obj, post_id=0, output_dir=output_dir, template=carousel_template
+        )
+        slide_urls = [
+            f"{API_URL_FINAL}/api/assets?file_name=images/carousel/{preview_id}/{os.path.basename(p)}"
+            for p in image_paths
+        ]
+    except Exception as exc:
+        myprint(f"generate-carousel: failed for user_id={user_id} — {exc}")
+        raise HTTPException(status_code=500, detail=str(exc))
+
+    return ResponseModel(status_code=200, detail={
+        "slide_urls": slide_urls,
+        "caption": post_text,
+        "template": carousel_template,
+    })
+
+
 # Register the /api router
 app.include_router(router)
+
+# Backward-compat redirect: /assets?file_name=... → /api/assets?file_name=...
+# Must be registered before the SPA StaticFiles mount so it takes priority.
+@app.get("/assets", include_in_schema=False)
+async def assets_compat_redirect(request: Request, file_name: Optional[str] = None):
+    if file_name:
+        return RedirectResponse(url=f"/api/assets?{request.url.query}", status_code=301)
+    raise HTTPException(status_code=404)
 
 # Serve the React SPA for all non-API routes (must come after include_router)
 if os.path.isdir(_ui_dist):

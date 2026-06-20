@@ -563,6 +563,21 @@ def get_post_video_url(post_id: int):
     return post['video_url'] if post else None
 
 
+def get_post_buyer_stage(post_id: int) -> Optional[str]:
+    connection = get_db_connection()
+    cursor = connection.cursor(dictionary=True)
+    try:
+        cursor.execute("SELECT buyer_stage FROM posts WHERE id = %s", (post_id,))
+        row = cursor.fetchone()
+    except mysql.connector.Error as err:
+        myprint(f"Could not get buyer_stage for post id: {post_id} | Error: {err}")
+        row = None
+    finally:
+        cursor.close()
+        connection.close()
+    return row['buyer_stage'] if row else None
+
+
 def get_post_type(post_id: int) -> Optional[PostType]:
     connection = get_db_connection()
     cursor = connection.cursor(dictionary=True)
@@ -665,6 +680,55 @@ def bulk_update_posts(post_ids: list[int], status: Optional[PostStatus] = None,
 
 def soft_delete_posts(post_ids: list[int]) -> bool:
     return bulk_update_posts(post_ids, status=PostStatus.REJECTED)
+
+
+def update_db_post_carousel_slides(post_id: int, slides: list[str]) -> bool:
+    connection = get_db_connection()
+    cursor = connection.cursor()
+    try:
+        cursor.execute(
+            "UPDATE posts SET carousel_slides = %s WHERE id = %s",
+            (json.dumps(slides), post_id)
+        )
+        connection.commit()
+        success = cursor.rowcount == 1
+    except mysql.connector.Error as e:
+        success = False
+        myprint(f"Could not update carousel_slides for post {post_id}. Error: {e}")
+    finally:
+        cursor.close()
+        connection.close()
+    return success
+
+
+def replace_video_url_base(old_base: str, new_base: str, user_id: Optional[int] = None) -> int:
+    """Replace old_base URL prefix with new_base in video_url for all matching posts.
+
+    Scoped to user_id when provided. Returns count of updated rows.
+    """
+    connection = get_db_connection()
+    cursor = connection.cursor()
+    try:
+        if user_id is not None:
+            cursor.execute(
+                "UPDATE posts SET video_url = REPLACE(video_url, %s, %s) "
+                "WHERE video_url LIKE %s AND user_id = %s",
+                (old_base, new_base, f"{old_base}%", user_id)
+            )
+        else:
+            cursor.execute(
+                "UPDATE posts SET video_url = REPLACE(video_url, %s, %s) WHERE video_url LIKE %s",
+                (old_base, new_base, f"{old_base}%")
+            )
+        connection.commit()
+        updated = cursor.rowcount
+    except mysql.connector.Error as e:
+        updated = 0
+        myprint(f"Could not replace video URL base. Error: {e}")
+    finally:
+        cursor.close()
+        connection.close()
+    return updated
 
 
 def get_ready_to_post_posts(pre_post_time: datetime = None, post_time_delta_minutes=20) -> list:

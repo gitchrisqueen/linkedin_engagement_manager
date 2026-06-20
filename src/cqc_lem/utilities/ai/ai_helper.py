@@ -351,17 +351,25 @@ def get_ai_linked_post_refinement(original_message: str, character_limit: int = 
            - Ensure the opening is engaging to hook the audience and the closing provides a strong takeaway.  
            - Maintain an authentic voice suited for LinkedIn.  
         
-        4. **Ensure grammatical accuracy and professionalism**  
-           - Correct any typos, punctuation errors, or inconsistencies.  
-           - Adapt the tone to be confident, clear, and aligned with business communication best practices.  
-        
-        All responses should be **finalized drafts** ready for publishing. Do not ask for additional input—refine the given draft based on available information.  
-        
-        Provide only the **edited version of the LinkedIn post** without explanations or notes.  
-        
-        ---  
-        
-        Take a deep breath and work on this problem step-by-step.  
+        4. **Ensure grammatical accuracy and professionalism**
+           - Correct any typos, punctuation errors, or inconsistencies.
+           - Adapt the tone to be confident, clear, and aligned with business communication best practices.
+
+        5. **LinkedIn-native formatting only — no markdown**
+           - Do NOT use markdown syntax of any kind: no **bold**, no *italic*, no _underline_, no # headers, no [links](url), no `code`.
+           - LinkedIn does not render markdown; these characters appear as raw symbols to readers.
+           - Use emojis (✅, 👉, 🔑, 💡) for visual emphasis and as bullet replacements.
+           - Use ALL CAPS sparingly for emphasis of a single key word.
+           - Use line breaks and blank lines for structure and readability.
+           - Place all hashtags together on the final line of the post.
+
+        All responses should be **finalized drafts** ready for publishing. Do not ask for additional input—refine the given draft based on available information.
+
+        Provide only the edited version of the LinkedIn post without explanations or notes.
+
+        ---
+
+        Take a deep breath and work on this problem step-by-step.
         """
     }
 
@@ -1930,3 +1938,103 @@ def ai_check_message_history(message_history_json: str, main_focus: str, message
         return True
     else:
         return False
+
+
+def generate_carousel_content(user_id: int, stage: str) -> tuple[str, dict]:
+    """Generate structured carousel content using AI and return (post_text, carousel_dict).
+
+    The carousel_dict matches the schema of one of the carousel models in carousel_creator.py.
+    The carousel type is chosen by buyer journey stage:
+      awareness       → EducationalContentCarousel
+      consideration   → CaseStudyCarousel
+      decision        → ProductDemoCarousel
+      (anything else) → IndustryInsightsCarousel
+    """
+    from cqc_lem.utilities.db import get_user_password_pair_by_id
+    from cqc_lem.utilities.linkedin.helper import get_my_profile
+    from cqc_lem.utilities.selenium_util import get_driver_wait_pair, quit_gracefully
+    from cqc_lem.utilities.linkedin.profile import LinkedInProfile as _Profile
+
+    stage_lower = (stage or "").lower()
+    if "awareness" in stage_lower:
+        schema_hint = (
+            "EducationalContentCarousel with fields: "
+            "cover (title, content), "
+            "contents (list of 2-4 slides each with title and content), "
+            "call_to_action (title, content)"
+        )
+    elif "consideration" in stage_lower:
+        schema_hint = (
+            "CaseStudyCarousel with fields: "
+            "cover (title, content), challenge (title, content), "
+            "solution (title, content), results (title, content), "
+            "testimonial (title, content) [optional], "
+            "call_to_action (title, content)"
+        )
+    elif "decision" in stage_lower:
+        schema_hint = (
+            "ProductDemoCarousel with fields: "
+            "cover (title, content), main_feature (title, content), "
+            "additional_features (list of 1-2 slides each with title and content), "
+            "call_to_action (title, content)"
+        )
+    else:
+        schema_hint = (
+            "IndustryInsightsCarousel with fields: "
+            "cover (title, content), "
+            "insights (list of 2-4 slides each with title and content), "
+            "call_to_action (title, content)"
+        )
+
+    # Attempt to load user profile for personalisation; fall back gracefully
+    try:
+        user_email, user_password = get_user_password_pair_by_id(user_id)
+        driver, wait = get_driver_wait_pair(session_name="Carousel AI")
+        try:
+            profile = get_my_profile(driver, wait, user_email, user_password, user_id=user_id)
+        finally:
+            quit_gracefully(driver)
+    except Exception as exc:
+        log_warning("Could not load user profile for carousel generation; using defaults", exc=exc)
+        profile = _Profile(full_name="Professional", job_title="Expert", company_name="Your Company")
+
+    industry = getattr(profile, "industry", "Business") or "Business"
+    job_title = getattr(profile, "job_title", "Professional") or "Professional"
+
+    prompt = f"""You are a LinkedIn content strategist creating a visual carousel post for a {job_title} in the {industry} industry at the {stage} stage of the buyer journey.
+
+Create two things and return them as a single JSON object with these top-level keys:
+1. "post_text": A compelling 1300-2000 character LinkedIn post that introduces the carousel. Use line breaks for readability. End with 5-10 relevant hashtags on the final line. Do NOT use markdown syntax — no **bold**, no *italic*, no # headers.
+2. "carousel": A JSON object matching the {schema_hint}. Each slide's "title" should be 3-8 words. Each slide's "content" should be 1-3 engaging sentences (max 200 chars).
+
+Return ONLY valid JSON. No explanation, no markdown fences."""
+
+    system_prompt = {
+        "role": "system",
+        "content": (
+            "You are an expert LinkedIn content creator who produces high-engagement carousel posts. "
+            "You always return well-structured JSON with no markdown formatting. "
+            "All text in the JSON is concise, professional, and written for a LinkedIn audience."
+        ),
+    }
+    user_message = {"role": "user", "content": [{"type": "text", "text": prompt}]}
+
+    response = _call_llm(
+        model="lem-complex",
+        messages=[system_prompt, user_message],
+        response_format={"type": "json_object"},
+        temperature=round(random.uniform(0.6, 0.8), 2),
+        top_p=round(random.uniform(0.85, 0.95), 2),
+    )
+
+    import json as _json
+    raw = response.choices[0].message.content.strip()
+    try:
+        parsed = _json.loads(raw)
+    except _json.JSONDecodeError as exc:
+        log_error("generate_carousel_content: LLM returned invalid JSON", exc=exc)
+        parsed = {}
+
+    post_text = parsed.get("post_text", f"Explore our latest insights on {industry}.")
+    carousel_dict = parsed.get("carousel", {})
+    return post_text, carousel_dict
