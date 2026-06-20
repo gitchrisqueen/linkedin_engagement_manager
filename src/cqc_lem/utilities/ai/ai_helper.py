@@ -1957,7 +1957,6 @@ def generate_carousel_content(user_id: int, stage: str) -> tuple[str, dict]:
 
     stage_lower = (stage or "").lower()
     if "awareness" in stage_lower:
-        carousel_type = "educational"
         schema_hint = (
             "EducationalContentCarousel with fields: "
             "cover (title, content), "
@@ -1965,7 +1964,6 @@ def generate_carousel_content(user_id: int, stage: str) -> tuple[str, dict]:
             "call_to_action (title, content)"
         )
     elif "consideration" in stage_lower:
-        carousel_type = "case_study"
         schema_hint = (
             "CaseStudyCarousel with fields: "
             "cover (title, content), challenge (title, content), "
@@ -1974,7 +1972,6 @@ def generate_carousel_content(user_id: int, stage: str) -> tuple[str, dict]:
             "call_to_action (title, content)"
         )
     elif "decision" in stage_lower:
-        carousel_type = "product_demo"
         schema_hint = (
             "ProductDemoCarousel with fields: "
             "cover (title, content), main_feature (title, content), "
@@ -1982,7 +1979,6 @@ def generate_carousel_content(user_id: int, stage: str) -> tuple[str, dict]:
             "call_to_action (title, content)"
         )
     else:
-        carousel_type = "industry_insights"
         schema_hint = (
             "IndustryInsightsCarousel with fields: "
             "cover (title, content), "

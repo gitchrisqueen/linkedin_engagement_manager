@@ -5,7 +5,6 @@ generate_carousel_content → create_carousel_slide_images → update_db_post_ca
 """
 
 import json
-import os
 import pytest
 from unittest.mock import MagicMock, patch
 

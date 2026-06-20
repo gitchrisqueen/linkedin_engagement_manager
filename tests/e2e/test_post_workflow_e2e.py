@@ -23,6 +23,7 @@ Cleanup is handled automatically by the module-scoped fixture.
 """
 
 import os
+import socket
 import pytest
 from datetime import datetime, timezone, timedelta
 from unittest.mock import patch, MagicMock
@@ -35,6 +36,21 @@ pytestmark = pytest.mark.e2e
 # ---------------------------------------------------------------------------
 _E2E_MYSQL_HOST = os.environ.get("MYSQL_HOST_E2E") or os.environ.get("MYSQL_HOST", "127.0.0.1")
 _E2E_MYSQL_PORT = int(os.environ.get("MYSQL_PORT", "3306"))
+
+
+def _mysql_reachable() -> bool:
+    try:
+        with socket.create_connection((_E2E_MYSQL_HOST, _E2E_MYSQL_PORT), timeout=2):
+            return True
+    except OSError:
+        return False
+
+
+_MYSQL_REACHABLE = _mysql_reachable()
+_requires_mysql = pytest.mark.skipif(
+    not _MYSQL_REACHABLE,
+    reason=f"MySQL not reachable at {_E2E_MYSQL_HOST}:{_E2E_MYSQL_PORT}",
+)
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -96,6 +112,8 @@ def _get_latest_log(cursor, user_id: int, post_id: int):
 @pytest.fixture(scope="module")
 def workflow_state():
     """Creates a test user + post, yields state dict, then deletes all test data."""
+    if not _MYSQL_REACHABLE:
+        pytest.skip(f"MySQL not reachable at {_E2E_MYSQL_HOST}:{_E2E_MYSQL_PORT}")
     conn = _get_db()
     cursor = conn.cursor()
 
@@ -263,6 +281,7 @@ class TestOrphanedPostRecovery:
         assert dispatched["post_id"] == 9999
         assert dispatched["user_id"] == 1
 
+    @_requires_mysql
     def test_get_orphaned_scheduled_posts_uses_correct_status_filter(self):
         """get_orphaned_scheduled_posts must only return posts with status='scheduled'."""
         from cqc_lem.utilities.db import get_orphaned_scheduled_posts
@@ -296,6 +315,7 @@ class TestOrphanedPostRecovery:
 # ---------------------------------------------------------------------------
 
 class TestAccessTokenSqlCorrectness:
+    @_requires_mysql
     def test_access_token_retrieved_for_connected_user(self):
         """Regression: get_user_access_token must NOT reference the non-existent
         'token_expiry' column (which caused a MySQL error blocking all posts)."""

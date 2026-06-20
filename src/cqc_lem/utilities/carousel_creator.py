@@ -1718,7 +1718,6 @@ def create_carousel_slide_images(
     def _step_content(idx, total, title, body, badge_color) -> str:
         f_t = _load_font(62, bold=True)
         f_b = _load_font(36, bold=False)
-        f_l = _load_font(24, bold=False)
         f_n = _load_font(30, bold=True)
         title, body = _norm(title), _norm(body)
         content_steps = total - 2  # exclude cover + CTA
@@ -1785,7 +1784,6 @@ def create_carousel_slide_images(
     def _step_cta(idx, total, title, body) -> str:
         f_t = _load_font(74, bold=True)
         f_s = _load_font(36, bold=False)
-        f_l = _load_font(24, bold=False)
         title, body = _norm(title), _norm(body)
         img = Image.new("RGB", (W, H), color=cover_bg)
         draw = ImageDraw.Draw(img, "RGBA")
@@ -1798,7 +1796,6 @@ def create_carousel_slide_images(
         draw.text(((W - cw) // 2, 120), check_text, font=f_check, fill=(*cover_accent, 220))
         PAD = 70
         t_lines = _wrap(title, f_t, W - PAD * 2, draw)
-        t_h = _block_h(t_lines[:3], f_t, 18, draw)
         y = _draw_block(draw, t_lines, f_t, PAD, 380, cover_text, spacing=18, centered=True, max_lines=3)
         draw.rectangle([(PAD, y + 20), (W - PAD, y + 23)], fill=(*cover_accent, 180))
         y += 48

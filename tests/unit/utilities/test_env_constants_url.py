@@ -51,7 +51,7 @@ class TestAPIUrlFinalConstruction:
             "API_BASE_URL": "https://api.example.com",
             "API_PORT": "443",
         })
-        assert "api.example.com" in ec.API_URL_FINAL
+        assert ec.API_URL_FINAL == "https://api.example.com:443"
 
     def test_custom_domain_sets_api_base_url(self, monkeypatch):
         """API_BASE_URL should match API_URL_FINAL when custom domain is used."""

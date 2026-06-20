@@ -6,7 +6,7 @@ when LinkedIn credentials or a real DB are not available.
 """
 
 import pytest
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
 
 @pytest.mark.e2e
@@ -19,14 +19,14 @@ class TestCarouselPostE2E:
         mock_slides = ["/tmp/slide_01.png", "/tmp/slide_02.png", "/tmp/slide_03.png"]
         expected_urn = "urn:li:ugcPost:carousel123"
 
-        with patch("cqc_lem.utilities.db.get_carousel_slides", return_value=mock_slides), \
-             patch("cqc_lem.utilities.db.get_post_content", return_value="Test carousel post #linkedin"), \
-             patch("cqc_lem.utilities.db.get_post_type") as mock_get_type, \
-             patch("cqc_lem.utilities.db.update_db_post_status", return_value=True), \
-             patch("cqc_lem.utilities.db.insert_new_log", return_value=None), \
-             patch("cqc_lem.utilities.linkedin.poster.share_carousel_on_linkedin",
+        with patch("cqc_lem.app.run_automation.get_carousel_slides", return_value=mock_slides), \
+             patch("cqc_lem.app.run_automation.get_post_content", return_value="Test carousel post #linkedin"), \
+             patch("cqc_lem.app.run_automation.get_post_type") as mock_get_type, \
+             patch("cqc_lem.app.run_automation.update_db_post_status", return_value=True), \
+             patch("cqc_lem.app.run_automation.insert_new_log", return_value=None), \
+             patch("cqc_lem.app.run_automation.share_carousel_on_linkedin",
                    return_value=expected_urn) as mock_share, \
-             patch("cqc_lem.app.run_automation.automate_reply_commenting_task"):
+             patch("cqc_lem.app.run_automation.automate_reply_commenting"):
             from cqc_lem.utilities.db import PostType
             mock_get_type.return_value = PostType.CAROUSEL
 
@@ -92,14 +92,14 @@ class TestVideoPostE2E:
         video_url = "https://relegable-preroyally-marti.ngrok-free.dev/assets?file_name=videos/runwayml/test.mp4"
         expected_urn = "urn:li:ugcPost:video456"
 
-        with patch("cqc_lem.utilities.db.get_post_video_url", return_value=video_url), \
-             patch("cqc_lem.utilities.db.get_post_content", return_value="My video post #linkedin"), \
-             patch("cqc_lem.utilities.db.get_post_type") as mock_get_type, \
-             patch("cqc_lem.utilities.db.update_db_post_status", return_value=True), \
-             patch("cqc_lem.utilities.db.insert_new_log", return_value=None), \
-             patch("cqc_lem.utilities.linkedin.poster.share_on_linkedin",
+        with patch("cqc_lem.app.run_automation.get_post_video_url", return_value=video_url), \
+             patch("cqc_lem.app.run_automation.get_post_content", return_value="My video post #linkedin"), \
+             patch("cqc_lem.app.run_automation.get_post_type") as mock_get_type, \
+             patch("cqc_lem.app.run_automation.update_db_post_status", return_value=True), \
+             patch("cqc_lem.app.run_automation.insert_new_log", return_value=None), \
+             patch("cqc_lem.app.run_automation.share_on_linkedin",
                    return_value=expected_urn) as mock_share, \
-             patch("cqc_lem.app.run_automation.automate_reply_commenting_task"):
+             patch("cqc_lem.app.run_automation.automate_reply_commenting"):
             from cqc_lem.utilities.db import PostType
             mock_get_type.return_value = PostType.VIDEO
 
