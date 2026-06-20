@@ -10,7 +10,8 @@ from cqc_lem.app.run_automation import automate_commenting, automate_profile_vie
     automate_appreciation_dms_for_user, clean_stale_invites, update_stale_profile, post_to_linkedin, \
     automate_invites_to_company_page_for_user
 from cqc_lem.utilities.db import (
-    get_ready_to_post_posts, update_db_post_status, get_active_user_ids, PostStatus,
+    get_ready_to_post_posts, get_orphaned_scheduled_posts, update_db_post_status,
+    get_active_user_ids, PostStatus,
     get_users_with_stripe_subscriptions, update_subscription_from_stripe,
 )
 from cqc_lem.utilities.env_constants import SELENIUM_KEEP_VIDEOS_X_DAYS, CQC_LEM_POST_TIME_DELTA_MINUTES
@@ -52,10 +53,23 @@ def auto_check_scheduled_posts(self):
         base_kwargs['loop_for_duration'] = 60 * 10
         automate_profile_viewer_engagement.apply_async(kwargs=base_kwargs, eta=scheduled_time - timedelta(minutes=10))
 
-    if len(posts) == 0:
+    # Re-queue any posts that got stuck in 'scheduled' (task was lost, e.g. on container restart)
+    # but never transitioned to 'posted'. The 2-hour gap ensures we don't race with a task
+    # that is still in-flight.
+    orphaned = get_orphaned_scheduled_posts(lookback_hours=2)
+    for post_id, scheduled_time, user_id in orphaned:
+        if scheduled_time.tzinfo is None:
+            scheduled_time = scheduled_time.replace(tzinfo=timezone.utc)
+        log_warning(
+            f"Re-queueing orphaned scheduled post",
+            post_id=post_id, user_id=user_id, task_name="auto_check_scheduled_posts",
+        )
+        post_to_linkedin.apply_async(kwargs={'user_id': user_id, 'post_id': post_id})
+
+    if len(posts) == 0 and len(orphaned) == 0:
         return f"No Post to Schedule"
     else:
-        return f"Started Process for {len(posts)} post(s)"
+        return f"Started Process for {len(posts)} post(s); re-queued {len(orphaned)} orphaned post(s)"
 
 
 @shared_task.task

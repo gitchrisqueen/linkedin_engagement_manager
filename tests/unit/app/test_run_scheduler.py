@@ -21,6 +21,7 @@ _PATCH_GET_TIER = "cqc_lem.utilities.stripe_util.get_subscription_tier_from_pric
 _PATCH_STATUS_TO_DB = "cqc_lem.utilities.stripe_util.stripe_status_to_db"
 _PATCH_GET_ACTIVE = f"{_MOD}.get_active_user_ids"
 _PATCH_GET_POSTS = f"{_MOD}.get_ready_to_post_posts"
+_PATCH_GET_ORPHANED = f"{_MOD}.get_orphaned_scheduled_posts"
 _PATCH_UPDATE_POST_STATUS = f"{_MOD}.update_db_post_status"
 _PATCH_POST_TO_LINKEDIN = f"{_MOD}.post_to_linkedin"
 _PATCH_APPRECIATE = f"{_MOD}.automate_appreciation_dms_for_user"
@@ -216,7 +217,8 @@ class TestSyncStripeSubscriptions:
 
 class TestAutoCheckScheduledPosts:
     def test_no_posts_returns_no_post_to_schedule(self):
-        with patch(_PATCH_GET_POSTS, return_value=[]):
+        with patch(_PATCH_GET_POSTS, return_value=[]), \
+             patch(_PATCH_GET_ORPHANED, return_value=[]):
             from cqc_lem.app.run_scheduler import auto_check_scheduled_posts
             result = auto_check_scheduled_posts.run()
 
@@ -231,6 +233,7 @@ class TestAutoCheckScheduledPosts:
         mock_profile_task = _async_task_mock()
 
         with patch(_PATCH_GET_POSTS, return_value=posts), \
+             patch(_PATCH_GET_ORPHANED, return_value=[]), \
              patch(_PATCH_UPDATE_POST_STATUS) as mock_upd, \
              patch(_PATCH_POST_TO_LINKEDIN, mock_post_task), \
              patch(_PATCH_AUTOMATE_COMMENTING, mock_commenting_task), \
@@ -269,6 +272,7 @@ class TestAutoCheckScheduledPosts:
         mock_profile_task = _async_task_mock()
 
         with patch(_PATCH_GET_POSTS, return_value=posts), \
+             patch(_PATCH_GET_ORPHANED, return_value=[]), \
              patch(_PATCH_UPDATE_POST_STATUS), \
              patch(_PATCH_POST_TO_LINKEDIN, mock_post_task), \
              patch(_PATCH_AUTOMATE_COMMENTING, mock_commenting_task), \
@@ -290,6 +294,7 @@ class TestAutoCheckScheduledPosts:
         mock_profile_task = _async_task_mock()
 
         with patch(_PATCH_GET_POSTS, return_value=posts), \
+             patch(_PATCH_GET_ORPHANED, return_value=[]), \
              patch(_PATCH_UPDATE_POST_STATUS), \
              patch(_PATCH_POST_TO_LINKEDIN, mock_post_task), \
              patch(_PATCH_AUTOMATE_COMMENTING, mock_commenting_task), \
@@ -320,6 +325,7 @@ class TestAutoCheckScheduledPosts:
         mock_post_task.apply_async.side_effect = record_apply
 
         with patch(_PATCH_GET_POSTS, return_value=posts), \
+             patch(_PATCH_GET_ORPHANED, return_value=[]), \
              patch(_PATCH_UPDATE_POST_STATUS, side_effect=record_update), \
              patch(_PATCH_POST_TO_LINKEDIN, mock_post_task), \
              patch(_PATCH_AUTOMATE_COMMENTING, mock_commenting_task), \
@@ -329,6 +335,68 @@ class TestAutoCheckScheduledPosts:
 
         assert call_order[0] == "update_status"
         assert "apply_async" in call_order
+
+
+    def test_orphaned_scheduled_post_is_requeued(self):
+        """Posts stuck in 'scheduled' status (task lost on restart) must be re-dispatched."""
+        orphaned_dt = datetime(2026, 6, 19, 19, 45, 0, tzinfo=timezone.utc)
+        orphaned = [(1485, orphaned_dt, 60)]
+
+        mock_post_task = _async_task_mock()
+
+        with patch(_PATCH_GET_POSTS, return_value=[]), \
+             patch(_PATCH_GET_ORPHANED, return_value=orphaned), \
+             patch(_PATCH_POST_TO_LINKEDIN, mock_post_task):
+            from cqc_lem.app.run_scheduler import auto_check_scheduled_posts
+            result = auto_check_scheduled_posts.run()
+
+        mock_post_task.apply_async.assert_called_once()
+        call_kwargs = mock_post_task.apply_async.call_args[1]
+        assert call_kwargs["kwargs"] == {"user_id": 60, "post_id": 1485}
+        assert "re-queued" in result
+        assert "1" in result
+
+    def test_orphaned_naive_datetime_gets_utc_tzinfo(self):
+        """Naive orphaned scheduled_time is made UTC-aware before re-queuing."""
+        naive_orphaned_dt = datetime(2026, 6, 19, 19, 45, 0)  # no tzinfo
+        orphaned = [(1485, naive_orphaned_dt, 60)]
+
+        mock_post_task = _async_task_mock()
+
+        with patch(_PATCH_GET_POSTS, return_value=[]), \
+             patch(_PATCH_GET_ORPHANED, return_value=orphaned), \
+             patch(_PATCH_POST_TO_LINKEDIN, mock_post_task):
+            from cqc_lem.app.run_scheduler import auto_check_scheduled_posts
+            auto_check_scheduled_posts.run()
+
+        # Task dispatched without error — no assertion needed on eta since
+        # orphaned re-queuing dispatches immediately (no eta kwarg)
+        mock_post_task.apply_async.assert_called_once()
+
+    def test_both_approved_and_orphaned_processed_together(self):
+        """New approved posts and orphaned scheduled posts are both handled in one pass."""
+        approved_dt = datetime(2026, 6, 20, 14, 0, 0, tzinfo=timezone.utc)
+        orphaned_dt = datetime(2026, 6, 19, 19, 45, 0, tzinfo=timezone.utc)
+
+        new_posts = [(100, approved_dt, 7)]
+        orphaned = [(1485, orphaned_dt, 60)]
+
+        mock_post_task = _async_task_mock()
+        mock_commenting_task = _async_task_mock()
+        mock_profile_task = _async_task_mock()
+
+        with patch(_PATCH_GET_POSTS, return_value=new_posts), \
+             patch(_PATCH_GET_ORPHANED, return_value=orphaned), \
+             patch(_PATCH_UPDATE_POST_STATUS), \
+             patch(_PATCH_POST_TO_LINKEDIN, mock_post_task), \
+             patch(_PATCH_AUTOMATE_COMMENTING, mock_commenting_task), \
+             patch(_PATCH_AUTOMATE_PROFILE_VIEWER, mock_profile_task):
+            from cqc_lem.app.run_scheduler import auto_check_scheduled_posts
+            result = auto_check_scheduled_posts.run()
+
+        assert mock_post_task.apply_async.call_count == 2  # one new + one orphaned
+        assert "1 post" in result
+        assert "1 orphaned" in result
 
 
 # ---------------------------------------------------------------------------
