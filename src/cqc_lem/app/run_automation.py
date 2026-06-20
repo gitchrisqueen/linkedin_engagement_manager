@@ -898,7 +898,14 @@ def automate_profile_viewer_engagement(self, user_id: int, loop_for_duration: in
 
     myprint(f"Starting Profile Viewer DMs")
 
-    driver, wait, user_email, my_profile = get_current_profile(user_id=user_id, session_name="Profile Viewer DMs")
+    try:
+        driver, wait, user_email, my_profile = get_current_profile(user_id=user_id, session_name="Profile Viewer DMs")
+    except Exception as e:
+        log_error(
+            "Failed to get profile for profile viewer engagement",
+            exc=e, user_id=user_id, task_name="automate_profile_viewer_engagement",
+        )
+        raise
 
     result = "Profile Viewer DMs Started"
 

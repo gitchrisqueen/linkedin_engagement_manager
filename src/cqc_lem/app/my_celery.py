@@ -167,6 +167,14 @@ def get_queue_metric(name_space: str = 'cqc-lem/celery_queue/celery', metric_nam
 _task_start_times: dict = {}
 
 
+@worker_process_init.connect(weak=False)
+def configure_posthog_for_worker(**kwargs) -> None:
+    # Celery forks worker processes; the PostHog background Consumer thread does not
+    # survive fork. Sync mode sends each capture immediately instead of queuing.
+    import posthog as _posthog
+    _posthog.sync_mode = True
+
+
 @task_prerun.connect(weak=False)
 def on_task_prerun(task_id: str = None, task=None, **kwargs) -> None:
     _task_start_times[task_id] = _time.time()
