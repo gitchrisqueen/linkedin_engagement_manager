@@ -1,0 +1,293 @@
+"""Unit tests for post-related API endpoints:
+  GET  /api/posts/
+  POST /api/posts/bulk_update/
+  DELETE /api/posts/
+  POST /api/update_post/
+"""
+
+import pytest
+from unittest.mock import patch
+
+pytestmark = pytest.mark.unit
+
+_DB = "cqc_lem.api.main"
+
+_SAMPLE_POST = {
+    "id": 1,
+    "content": "Test LinkedIn post content",
+    "video_url": None,
+    "scheduled_time": "2024-06-01T10:00:00",
+    "post_type": "text",
+    "status": "pending",
+    "carousel_slides": None,
+}
+
+_POST_BODY = {
+    "content": "Test content",
+    "video_url": None,
+    "scheduled_datetime": "2024-06-01T10:00:00",
+    "post_type": "text",
+    "status": "pending",
+}
+
+
+@pytest.fixture(scope="module")
+def client():
+    patches = [
+        patch("cqc_lem.utilities.observability.track_api_call"),
+        patch("cqc_lem.app.run_automation.automate_invites_to_company_page_for_user"),
+        patch("cqc_lem.app.run_automation.automate_reply_commenting"),
+        patch("cqc_lem.app.run_content_plan.auto_create_weekly_content"),
+        patch("cqc_lem.app.aws_test_celery_task.test_get_my_profile"),
+    ]
+    for p in patches:
+        p.start()
+    try:
+        from fastapi.testclient import TestClient
+        from cqc_lem.api.main import app
+        with TestClient(app, raise_server_exceptions=False) as tc:
+            yield tc
+    finally:
+        for p in patches:
+            p.stop()
+
+
+# ---------------------------------------------------------------------------
+# GET /api/posts/
+# ---------------------------------------------------------------------------
+
+class TestGetPostsForEmail:
+
+    def test_returns_200_with_posts(self, client):
+        with patch(f"{_DB}.get_post_by_email", return_value=([_SAMPLE_POST], 1)):
+            resp = client.get("/api/posts/", params={"email": "test@example.com"})
+        assert resp.status_code == 200
+        body = resp.json()
+        assert body["detail"]["total"] == 1
+        assert body["detail"]["page"] == 1
+        assert body["detail"]["page_size"] == 10
+        assert len(body["detail"]["posts"]) == 1
+        assert body["detail"]["posts"][0]["post_id"] == 1
+
+    def test_missing_email_returns_400(self, client):
+        resp = client.get("/api/posts/", params={"email": ""})
+        assert resp.status_code == 400
+
+    def test_no_email_param_returns_422(self, client):
+        """FastAPI rejects the request when required query param is missing."""
+        resp = client.get("/api/posts/")
+        assert resp.status_code == 422
+
+    def test_pagination_params_forwarded(self, client):
+        with patch(f"{_DB}.get_post_by_email", return_value=([], 0)) as mock_get:
+            resp = client.get(
+                "/api/posts/",
+                params={"email": "test@example.com", "page": 2, "page_size": 5},
+            )
+        assert resp.status_code == 200
+        body = resp.json()
+        assert body["detail"]["page"] == 2
+        assert body["detail"]["page_size"] == 5
+        # offset for page 2 with page_size 5 is 5
+        mock_get.assert_called_once_with(
+            "test@example.com",
+            limit=5,
+            offset=5,
+            sort_order="asc",
+            status_filter=None,
+        )
+
+    def test_sort_order_desc(self, client):
+        with patch(f"{_DB}.get_post_by_email", return_value=([], 0)) as mock_get:
+            resp = client.get(
+                "/api/posts/",
+                params={"email": "test@example.com", "sort_order": "desc"},
+            )
+        assert resp.status_code == 200
+        mock_get.assert_called_once_with(
+            "test@example.com",
+            limit=10,
+            offset=0,
+            sort_order="desc",
+            status_filter=None,
+        )
+
+    def test_status_filter_forwarded(self, client):
+        with patch(f"{_DB}.get_post_by_email", return_value=([_SAMPLE_POST], 1)) as mock_get:
+            resp = client.get(
+                "/api/posts/",
+                params={"email": "test@example.com", "status_filter": "pending"},
+            )
+        assert resp.status_code == 200
+        mock_get.assert_called_once_with(
+            "test@example.com",
+            limit=10,
+            offset=0,
+            sort_order="asc",
+            status_filter="pending",
+        )
+
+    def test_carousel_slides_json_string_parsed(self, client):
+        """carousel_slides stored as a JSON string should be decoded to a list."""
+        post_with_slides = dict(_SAMPLE_POST, carousel_slides='["slide1.png", "slide2.png"]')
+        with patch(f"{_DB}.get_post_by_email", return_value=([post_with_slides], 1)):
+            resp = client.get("/api/posts/", params={"email": "test@example.com"})
+        assert resp.status_code == 200
+        slides = resp.json()["detail"]["posts"][0]["carousel_slides"]
+        assert slides == ["slide1.png", "slide2.png"]
+
+    def test_empty_posts_list_returns_200(self, client):
+        with patch(f"{_DB}.get_post_by_email", return_value=([], 0)):
+            resp = client.get("/api/posts/", params={"email": "test@example.com"})
+        assert resp.status_code == 200
+        assert resp.json()["detail"]["total"] == 0
+        assert resp.json()["detail"]["posts"] == []
+
+
+# ---------------------------------------------------------------------------
+# POST /api/posts/bulk_update/
+# ---------------------------------------------------------------------------
+
+class TestBulkUpdatePostsEndpoint:
+
+    def test_returns_200_on_success(self, client):
+        with patch(f"{_DB}.bulk_update_posts", return_value=True):
+            resp = client.post(
+                "/api/posts/bulk_update/",
+                json={"post_ids": [1, 2], "status": "approved"},
+            )
+        assert resp.status_code == 200
+        assert "updated" in resp.json()["detail"].lower()
+
+    def test_empty_post_ids_returns_400(self, client):
+        resp = client.post(
+            "/api/posts/bulk_update/",
+            json={"post_ids": []},
+        )
+        assert resp.status_code == 400
+
+    def test_bulk_update_failure_returns_405(self, client):
+        with patch(f"{_DB}.bulk_update_posts", return_value=False):
+            resp = client.post(
+                "/api/posts/bulk_update/",
+                json={"post_ids": [1, 2], "status": "approved"},
+            )
+        assert resp.status_code == 405
+
+    def test_status_only_update(self, client):
+        with patch(f"{_DB}.bulk_update_posts", return_value=True) as mock_update:
+            resp = client.post(
+                "/api/posts/bulk_update/",
+                json={"post_ids": [3], "status": "pending"},
+            )
+        assert resp.status_code == 200
+        mock_update.assert_called_once()
+
+    def test_scheduled_datetime_update(self, client):
+        with patch(f"{_DB}.bulk_update_posts", return_value=True) as mock_update:
+            resp = client.post(
+                "/api/posts/bulk_update/",
+                json={"post_ids": [4, 5], "scheduled_datetime": "2024-07-01T09:00:00"},
+            )
+        assert resp.status_code == 200
+        mock_update.assert_called_once()
+
+
+# ---------------------------------------------------------------------------
+# DELETE /api/posts/
+# ---------------------------------------------------------------------------
+
+class TestDeletePostsEndpoint:
+
+    def test_returns_200_on_success(self, client):
+        with patch(f"{_DB}.soft_delete_posts", return_value=True):
+            resp = client.request(
+                "DELETE",
+                "/api/posts/",
+                json={"post_ids": [1, 2]},
+            )
+        assert resp.status_code == 200
+        assert "deleted" in resp.json()["detail"].lower()
+
+    def test_empty_post_ids_returns_400(self, client):
+        resp = client.request(
+            "DELETE",
+            "/api/posts/",
+            json={"post_ids": []},
+        )
+        assert resp.status_code == 400
+
+    def test_soft_delete_failure_returns_405(self, client):
+        with patch(f"{_DB}.soft_delete_posts", return_value=False):
+            resp = client.request(
+                "DELETE",
+                "/api/posts/",
+                json={"post_ids": [1, 2]},
+            )
+        assert resp.status_code == 405
+
+    def test_calls_soft_delete_with_correct_ids(self, client):
+        with patch(f"{_DB}.soft_delete_posts", return_value=True) as mock_delete:
+            client.request(
+                "DELETE",
+                "/api/posts/",
+                json={"post_ids": [7, 8, 9]},
+            )
+        mock_delete.assert_called_once_with([7, 8, 9])
+
+
+# ---------------------------------------------------------------------------
+# POST /api/update_post/
+# ---------------------------------------------------------------------------
+
+class TestUpdatePost:
+
+    def test_returns_200_on_success(self, client):
+        with patch(f"{_DB}.update_db_post", return_value=True):
+            resp = client.post(
+                "/api/update_post/",
+                params={"post_id": 42},
+                json=_POST_BODY,
+            )
+        assert resp.status_code == 200
+        assert "updated" in resp.json()["detail"].lower()
+
+    def test_update_failure_returns_405(self, client):
+        with patch(f"{_DB}.update_db_post", return_value=False):
+            resp = client.post(
+                "/api/update_post/",
+                params={"post_id": 42},
+                json=_POST_BODY,
+            )
+        assert resp.status_code == 405
+
+    def test_missing_post_id_returns_422(self, client):
+        """FastAPI rejects the request when post_id query param is missing."""
+        with patch(f"{_DB}.update_db_post", return_value=True):
+            resp = client.post("/api/update_post/", json=_POST_BODY)
+        assert resp.status_code == 422
+
+    def test_calls_update_db_post_with_correct_args(self, client):
+        with patch(f"{_DB}.update_db_post", return_value=True) as mock_update:
+            client.post(
+                "/api/update_post/",
+                params={"post_id": 99},
+                json=_POST_BODY,
+            )
+        mock_update.assert_called_once()
+        call_args = mock_update.call_args
+        # update_db_post(content, video_url, scheduled_datetime, post_type, post_id, status)
+        assert call_args.args[0] == "Test content"   # content
+        assert call_args.args[4] == 99               # post_id
+
+    def test_with_video_url(self, client):
+        body = dict(_POST_BODY, video_url="https://example.com/video.mp4")
+        with patch(f"{_DB}.update_db_post", return_value=True) as mock_update:
+            resp = client.post(
+                "/api/update_post/",
+                params={"post_id": 10},
+                json=body,
+            )
+        assert resp.status_code == 200
+        call_args = mock_update.call_args
+        assert call_args.args[1] == "https://example.com/video.mp4"
