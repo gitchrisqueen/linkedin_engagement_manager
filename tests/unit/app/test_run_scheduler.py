@@ -550,3 +550,153 @@ class TestAutoCleanStaleProfiles:
         assert call_kwargs.get("retry") is True
         assert "retry_policy" in call_kwargs
         assert call_kwargs["retry_policy"]["max_retries"] == 3
+
+
+# ---------------------------------------------------------------------------
+# auto_invite_to_company_pages
+# ---------------------------------------------------------------------------
+
+_PATCH_AUTOMATE_INVITES = f"{_MOD}.automate_invites_to_company_page_for_user"
+
+
+class TestAutoInviteToCompanyPages:
+    def test_no_active_users_returns_no_active_users(self):
+        with patch(_PATCH_GET_ACTIVE, return_value=[]):
+            from cqc_lem.app.run_scheduler import auto_invite_to_company_pages
+            result = auto_invite_to_company_pages.run()
+        assert result == "No Active Users"
+
+    def test_single_user_calls_apply_async_with_user_id(self):
+        mock_task = _async_task_mock()
+        with patch(_PATCH_GET_ACTIVE, return_value=[7]), \
+             patch(_PATCH_AUTOMATE_INVITES, mock_task):
+            from cqc_lem.app.run_scheduler import auto_invite_to_company_pages
+            result = auto_invite_to_company_pages.run()
+
+        mock_task.apply_async.assert_called_once()
+        call_kwargs = mock_task.apply_async.call_args[1]
+        assert call_kwargs["kwargs"]["user_id"] == 7
+        assert "1 user" in result
+
+    def test_multiple_users_calls_apply_async_for_each(self):
+        mock_task = _async_task_mock()
+        with patch(_PATCH_GET_ACTIVE, return_value=[1, 2, 3]), \
+             patch(_PATCH_AUTOMATE_INVITES, mock_task):
+            from cqc_lem.app.run_scheduler import auto_invite_to_company_pages
+            result = auto_invite_to_company_pages.run()
+
+        assert mock_task.apply_async.call_count == 3
+        assert "3 user" in result
+
+    def test_apply_async_includes_retry_policy_with_max_retries_3(self):
+        mock_task = _async_task_mock()
+        with patch(_PATCH_GET_ACTIVE, return_value=[99]), \
+             patch(_PATCH_AUTOMATE_INVITES, mock_task):
+            from cqc_lem.app.run_scheduler import auto_invite_to_company_pages
+            auto_invite_to_company_pages.run()
+
+        call_kwargs = mock_task.apply_async.call_args[1]
+        assert call_kwargs.get("retry") is True
+        assert call_kwargs["retry_policy"]["max_retries"] == 3
+
+
+# ---------------------------------------------------------------------------
+# auto_clean_old_videos
+# ---------------------------------------------------------------------------
+
+_PATCH_ORGANIZE = f"{_MOD}.organize_videos_by_name_and_timestamp"
+_PATCH_OS_LISTDIR = f"{_MOD}.os.listdir"
+_PATCH_OS_ISDIR = f"{_MOD}.os.path.isdir"
+_PATCH_OS_GETMTIME = f"{_MOD}.os.path.getmtime"
+_PATCH_RMTREE = f"{_MOD}.shutil.rmtree"
+
+
+class TestAutoCleanOldVideos:
+    def test_no_expired_folders_deletes_zero(self):
+        # folder with mtime in the future (not expired)
+        from datetime import datetime, timedelta
+        future_ts = (datetime.now() + timedelta(days=10)).timestamp()
+
+        with patch(_PATCH_OS_LISTDIR, return_value=["fresh_folder"]), \
+             patch(_PATCH_OS_ISDIR, return_value=True), \
+             patch(_PATCH_OS_GETMTIME, return_value=future_ts), \
+             patch(_PATCH_RMTREE) as mock_rm, \
+             patch(_PATCH_ORGANIZE, return_value=0):
+            from cqc_lem.app.run_scheduler import auto_clean_old_videos
+            result = auto_clean_old_videos.run()
+
+        mock_rm.assert_not_called()
+        assert "Deleted 0 folders" in result
+        assert "Moved 0 videos" in result
+
+    def test_expired_folder_is_deleted(self):
+        from datetime import datetime, timedelta
+        old_ts = (datetime.now() - timedelta(days=200)).timestamp()
+
+        with patch(_PATCH_OS_LISTDIR, return_value=["old_folder"]), \
+             patch(_PATCH_OS_ISDIR, return_value=True), \
+             patch(_PATCH_OS_GETMTIME, return_value=old_ts), \
+             patch(_PATCH_RMTREE) as mock_rm, \
+             patch(_PATCH_ORGANIZE, return_value=0):
+            from cqc_lem.app.run_scheduler import auto_clean_old_videos
+            result = auto_clean_old_videos.run()
+
+        mock_rm.assert_called_once()
+        assert "Deleted 1 folders" in result
+
+    def test_organize_videos_result_reflected_in_return(self):
+        from datetime import datetime, timedelta
+        future_ts = (datetime.now() + timedelta(days=10)).timestamp()
+
+        with patch(_PATCH_OS_LISTDIR, return_value=[]), \
+             patch(_PATCH_OS_ISDIR, return_value=True), \
+             patch(_PATCH_OS_GETMTIME, return_value=future_ts), \
+             patch(_PATCH_RMTREE), \
+             patch(_PATCH_ORGANIZE, return_value=3):
+            from cqc_lem.app.run_scheduler import auto_clean_old_videos
+            result = auto_clean_old_videos.run()
+
+        assert "Moved 3 videos" in result
+
+
+# ---------------------------------------------------------------------------
+# organize_videos_by_name_and_timestamp
+# ---------------------------------------------------------------------------
+
+class TestOrganizeVideosByNameAndTimestamp:
+    def test_empty_selenium_folder_returns_zero(self):
+        with patch(_PATCH_OS_LISTDIR, return_value=[]):
+            from cqc_lem.app.run_scheduler import organize_videos_by_name_and_timestamp
+            result = organize_videos_by_name_and_timestamp()
+        assert result == 0
+
+    def test_cqc_lem_prefixed_folder_is_skipped(self):
+        # Folders starting with "CQC_LEM" should be skipped entirely
+        with patch(_PATCH_OS_LISTDIR, return_value=["CQC_LEM_session_abc"]), \
+             patch(_PATCH_OS_ISDIR, return_value=True):
+            from cqc_lem.app.run_scheduler import organize_videos_by_name_and_timestamp
+            result = organize_videos_by_name_and_timestamp()
+        assert result == 0
+
+    def test_mp4_file_in_non_cqc_folder_is_moved(self):
+        from datetime import datetime
+        from unittest.mock import call as mock_call
+
+        fake_mtime = datetime(2024, 1, 15, 10, 30, 0).timestamp()
+
+        # os.listdir called twice: once for the selenium folder listing, once for folder contents
+        listdir_returns = [["session_xyz"], ["recording.mp4"]]
+        listdir_iter = iter(listdir_returns)
+
+        with patch(_PATCH_OS_LISTDIR, side_effect=lambda _: next(listdir_iter)), \
+             patch(_PATCH_OS_ISDIR, return_value=True), \
+             patch(_PATCH_OS_GETMTIME, return_value=fake_mtime), \
+             patch(f"{_MOD}.os.makedirs") as mock_makedirs, \
+             patch(f"{_MOD}.shutil.move") as mock_move, \
+             patch(_PATCH_RMTREE):
+            from cqc_lem.app.run_scheduler import organize_videos_by_name_and_timestamp
+            result = organize_videos_by_name_and_timestamp()
+
+        assert result == 1
+        mock_makedirs.assert_called_once()
+        mock_move.assert_called_once()

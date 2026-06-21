@@ -41,6 +41,7 @@ googlenews = "^1.6.15"
 runwayml = ">=2.1,<5.0"
 replicate = "^1.0.4"
 pexels-api = "^1.0.1"
+capsolver = "^1.0"
 
 # --- Content processing ---
 markdownify = ">=0.13.1,<1.3.0"
@@ -132,6 +133,19 @@ pytest-playwright = ">=0.4.0,<1.0.0"
 omit = [
     "tests/*",
     "src/cqc_lem/aws/*",
+    "src/cqc_lem/ui/*",
+    # Legacy Streamlit UI — not maintained, no reasonable test strategy
+    "src/cqc_lem/streamlit/*",
+    # Deprecated Jaeger tracer — replaced by PostHog
+    "src/cqc_lem/utilities/jaeger_tracer_helper.py",
+    # Selenium browser driver utilities — E2E only, require Chrome container
+    "src/cqc_lem/utilities/selenium_util.py",
+    "src/cqc_lem/utilities/linkedin/scrapper.py",
+    "src/cqc_lem/utilities/linkedin/company_page_inviter.py",
+    # Celery automation tasks — ~90% Selenium, covered by E2E suite
+    "src/cqc_lem/app/run_automation.py",
+    # PIL image rendering — visual output, no unit-test strategy
+    "src/cqc_lem/utilities/carousel_creator.py",
 ]
 source = ["src/cqc_lem"]
 
@@ -186,5 +200,6 @@ markers = [
     "requires_database: mark test as requiring real database connection",
     "requires_selenium: mark test as requiring real browser automation",
     "requires_replicate: mark test as requiring a real REPLICATE_API_TOKEN",
+    "requires_capsolver: mark test as requiring a real CAPSOLVER_API_KEY",
 ]
 asyncio_mode = "auto"

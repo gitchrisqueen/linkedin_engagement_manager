@@ -26,6 +26,7 @@ interface Post {
   post_type: string
   status: string
   carousel_slides: string[] | null
+  post_url?: string | null
 }
 
 interface PostsResponse {
@@ -123,6 +124,13 @@ export default function ReviewSchedule() {
       api.get(`/user_id/?email=${encodeURIComponent(email)}`).then((r) =>
         api.post(`/create_weekly_content/?user_id=${r.data.detail}`)
       ),
+  })
+
+  const { data: postUrlData, isLoading: postUrlLoading } = useQuery<{ detail: { post_url: string | null } }>({
+    queryKey: ['post_url', editingPost?.post_id, email],
+    queryFn: () =>
+      api.get(`/post_url/?post_id=${editingPost!.post_id}&email=${encodeURIComponent(email)}`).then((r) => r.data),
+    enabled: !!editingPost && editingPost.status === 'posted' && !!email,
   })
 
   // Selection helpers
@@ -370,109 +378,155 @@ export default function ReviewSchedule() {
 
         {editingPost && (
           <div className="sticky top-4 self-start space-y-4 max-h-[calc(100vh-2rem)] overflow-y-auto">
-            <div className="bg-white rounded-lg border border-gray-200 shadow-sm p-5 space-y-4">
-              <h3 className="font-semibold text-gray-700">Edit Post #{editingPost.post_id}</h3>
+            {editingPost.status === 'posted' ? (
+              /* Read-only view for published posts */
+              <div className="bg-white rounded-lg border border-gray-200 shadow-sm p-5 space-y-4">
+                <div className="flex items-center justify-between">
+                  <h3 className="font-semibold text-gray-700">
+                    Post #{editingPost.post_id}
+                    <span className="ml-2 px-2 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-700">Published</span>
+                  </h3>
+                </div>
 
-              <textarea
-                rows={6}
-                value={editingPost.content}
-                onChange={(e) => setEditingPost({ ...editingPost, content: e.target.value })}
-                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
-              />
+                <p className="text-sm text-gray-700 whitespace-pre-wrap">{editingPost.content}</p>
 
-              <div>
-                <label className="block text-xs font-medium text-gray-600 mb-1">Post Type</label>
-                <select
-                  value={editingPost.post_type}
-                  onChange={(e) => {
-                    const newType = e.target.value
-                    setEditingPost({
-                      ...editingPost,
-                      post_type: newType,
-                      video_url: newType === 'video' ? editingPost.video_url : null,
-                      carousel_slides: newType === 'carousel' ? editingPost.carousel_slides : null,
-                    })
-                  }}
-                  disabled={editingPost.status === 'posted'}
-                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-50 disabled:text-gray-400"
+                <div className="grid grid-cols-2 gap-3 text-xs text-gray-500">
+                  <div>
+                    <span className="font-medium text-gray-600 block mb-0.5">Type</span>
+                    {editingPost.post_type.toUpperCase()}
+                  </div>
+                  <div>
+                    <span className="font-medium text-gray-600 block mb-0.5">Posted</span>
+                    {formatInTimezone(editingPost.scheduled_time, userTimezone)}
+                  </div>
+                </div>
+
+                <div>
+                  {postUrlLoading ? (
+                    <span className="text-xs text-gray-400">Loading link…</span>
+                  ) : postUrlData?.detail?.post_url ? (
+                    <a
+                      href={postUrlData.detail.post_url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1.5 bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-blue-700 transition-colors"
+                    >
+                      View on LinkedIn ↗
+                    </a>
+                  ) : (
+                    <span className="text-xs text-gray-400">LinkedIn link not available</span>
+                  )}
+                </div>
+
+                <button
+                  onClick={() => setEditingPost(null)}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg text-sm text-gray-600 hover:bg-gray-50"
                 >
-                  {['text', 'video', 'carousel'].map((t) => (
-                    <option key={t} value={t}>{t.toUpperCase()}</option>
-                  ))}
-                </select>
-                {editingPost.status === 'posted' && (
-                  <p className="text-xs text-gray-400 mt-1">Post type cannot be changed after posting.</p>
-                )}
+                  Close
+                </button>
               </div>
+            ) : (
+              /* Editable form for non-posted statuses */
+              <div className="bg-white rounded-lg border border-gray-200 shadow-sm p-5 space-y-4">
+                <h3 className="font-semibold text-gray-700">Edit Post #{editingPost.post_id}</h3>
 
-              {editingPost.post_type === 'video' && (
-                <div>
-                  <label className="block text-xs font-medium text-gray-600 mb-1">Video URL</label>
-                  <input
-                    type="url"
-                    value={editingPost.video_url ?? ''}
-                    onChange={(e) => setEditingPost({ ...editingPost, video_url: e.target.value || null })}
-                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    placeholder="https://example.com/video.mp4"
-                  />
-                </div>
-              )}
+                <textarea
+                  rows={6}
+                  value={editingPost.content}
+                  onChange={(e) => setEditingPost({ ...editingPost, content: e.target.value })}
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
+                />
 
-              {editingPost.post_type === 'carousel' && editingPost.carousel_slides && (
                 <div>
-                  <label className="block text-xs font-medium text-gray-600 mb-1">
-                    Slides ({editingPost.carousel_slides.length})
-                  </label>
-                  <ul className="space-y-1">
-                    {editingPost.carousel_slides.map((slide, i) => (
-                      <li key={i} className="text-xs text-gray-600 bg-gray-50 rounded px-2 py-1">
-                        <span className="text-gray-400 mr-1">{i + 1}.</span>{slide}
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              )}
-
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-xs font-medium text-gray-600 mb-1">Status</label>
+                  <label className="block text-xs font-medium text-gray-600 mb-1">Post Type</label>
                   <select
-                    value={editingPost.status}
-                    onChange={(e) => setEditingPost({ ...editingPost, status: e.target.value })}
+                    value={editingPost.post_type}
+                    onChange={(e) => {
+                      const newType = e.target.value
+                      setEditingPost({
+                        ...editingPost,
+                        post_type: newType,
+                        video_url: newType === 'video' ? editingPost.video_url : null,
+                        carousel_slides: newType === 'carousel' ? editingPost.carousel_slides : null,
+                      })
+                    }}
                     className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                   >
-                    {['pending', 'approved', 'scheduled', 'posted', 'rejected'].map((s) => (
-                      <option key={s} value={s}>{s.toUpperCase()}</option>
+                    {['text', 'video', 'carousel'].map((t) => (
+                      <option key={t} value={t}>{t.toUpperCase()}</option>
                     ))}
                   </select>
                 </div>
-                <div>
-                  <label className="block text-xs font-medium text-gray-600 mb-1">Scheduled Time</label>
-                  <input
-                    type="datetime-local"
-                    value={editingPost.scheduled_time?.slice(0, 16) ?? ''}
-                    onChange={(e) => setEditingPost({ ...editingPost, scheduled_time: e.target.value })}
-                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  />
+
+                {editingPost.post_type === 'video' && (
+                  <div>
+                    <label className="block text-xs font-medium text-gray-600 mb-1">Video URL</label>
+                    <input
+                      type="url"
+                      value={editingPost.video_url ?? ''}
+                      onChange={(e) => setEditingPost({ ...editingPost, video_url: e.target.value || null })}
+                      className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      placeholder="https://example.com/video.mp4"
+                    />
+                  </div>
+                )}
+
+                {editingPost.post_type === 'carousel' && editingPost.carousel_slides && (
+                  <div>
+                    <label className="block text-xs font-medium text-gray-600 mb-1">
+                      Slides ({editingPost.carousel_slides.length})
+                    </label>
+                    <ul className="space-y-1">
+                      {editingPost.carousel_slides.map((slide, i) => (
+                        <li key={i} className="text-xs text-gray-600 bg-gray-50 rounded px-2 py-1">
+                          <span className="text-gray-400 mr-1">{i + 1}.</span>{slide}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-xs font-medium text-gray-600 mb-1">Status</label>
+                    <select
+                      value={editingPost.status}
+                      onChange={(e) => setEditingPost({ ...editingPost, status: e.target.value })}
+                      className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    >
+                      {['pending', 'approved', 'scheduled', 'posted', 'rejected'].map((s) => (
+                        <option key={s} value={s}>{s.toUpperCase()}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-gray-600 mb-1">Scheduled Time</label>
+                    <input
+                      type="datetime-local"
+                      value={editingPost.scheduled_time?.slice(0, 16) ?? ''}
+                      onChange={(e) => setEditingPost({ ...editingPost, scheduled_time: e.target.value })}
+                      className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                  </div>
+                </div>
+
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => updateMutation.mutate(editingPost)}
+                    disabled={updateMutation.isPending}
+                    className="flex-1 bg-blue-600 text-white py-2 rounded-lg text-sm font-semibold hover:bg-blue-700 disabled:opacity-50"
+                  >
+                    {updateMutation.isPending ? 'Saving…' : 'Save Changes'}
+                  </button>
+                  <button
+                    onClick={() => setEditingPost(null)}
+                    className="px-4 py-2 border border-gray-300 rounded-lg text-sm text-gray-600 hover:bg-gray-50"
+                  >
+                    Cancel
+                  </button>
                 </div>
               </div>
-
-              <div className="flex gap-2">
-                <button
-                  onClick={() => updateMutation.mutate(editingPost)}
-                  disabled={updateMutation.isPending}
-                  className="flex-1 bg-blue-600 text-white py-2 rounded-lg text-sm font-semibold hover:bg-blue-700 disabled:opacity-50"
-                >
-                  {updateMutation.isPending ? 'Saving…' : 'Save Changes'}
-                </button>
-                <button
-                  onClick={() => setEditingPost(null)}
-                  className="px-4 py-2 border border-gray-300 rounded-lg text-sm text-gray-600 hover:bg-gray-50"
-                >
-                  Cancel
-                </button>
-              </div>
-            </div>
+            )}
 
             <LinkedInPostPreview
               content={editingPost.content}
