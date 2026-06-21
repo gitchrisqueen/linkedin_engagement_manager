@@ -1,8 +1,8 @@
 """Unit tests for general FastAPI endpoints in cqc_lem.api.main."""
 
 import pytest
-from unittest.mock import patch, MagicMock
-from datetime import datetime, timezone
+from unittest.mock import patch
+from datetime import datetime
 
 pytestmark = pytest.mark.unit
 

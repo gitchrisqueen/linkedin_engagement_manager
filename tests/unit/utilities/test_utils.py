@@ -2,7 +2,7 @@
 
 import datetime
 import pytest
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch
 
 pytestmark = pytest.mark.unit
 

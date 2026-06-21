@@ -2,7 +2,7 @@
 
 import json
 import pytest
-from unittest.mock import MagicMock, patch, call
+from unittest.mock import patch
 from datetime import datetime, timezone
 
 import mysql.connector
@@ -552,9 +552,10 @@ class TestReplaceVideoUrlBase:
             assert result == 3
             call_args = mock_database_connection["cursor"].execute.call_args[0]
             assert "user_id" in call_args[0]
-            assert 42 in call_args[1]
-            assert "http://old.cdn" in call_args[1]
-            assert "https://new.cdn" in call_args[1]
+            params = call_args[1]
+            assert params[0] == "http://old.cdn"
+            assert params[1] == "https://new.cdn"
+            assert 42 in params
 
     def test_without_user_id_uses_global_query(self, mock_database_connection):
         from cqc_lem.utilities.db import replace_video_url_base

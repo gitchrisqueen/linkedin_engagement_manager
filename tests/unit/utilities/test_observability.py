@@ -1,7 +1,7 @@
 """Unit tests for cqc_lem.utilities.observability."""
 
 import pytest
-from unittest.mock import MagicMock, patch, call
+from unittest.mock import patch
 
 pytestmark = pytest.mark.unit
 
