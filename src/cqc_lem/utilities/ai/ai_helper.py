@@ -1933,12 +1933,6 @@ def ai_check_message_history(message_history_json: str, main_focus: str, message
     content = response.choices[0].message.content.strip()
     return content
 
-    # Check if the message history contains the main focus and the message
-    if main_focus in message_history and message in message_history:
-        return True
-    else:
-        return False
-
 
 def generate_carousel_content(user_id: int, stage: str) -> tuple[str, dict]:
     """Generate structured carousel content using AI and return (post_text, carousel_dict).

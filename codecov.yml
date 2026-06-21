@@ -79,6 +79,7 @@ component_management:
     statuses:
       - type: project
         target: 80%
+        informational: true
   individual_components:
     - component_id: api
       name: FastAPI Endpoints

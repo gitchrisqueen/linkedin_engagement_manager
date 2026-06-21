@@ -76,7 +76,7 @@ def test_linked_login_over_multiple_sessions():
 def test_get_user_password_pair():
     user_email, user_password = get_user_password_pair_by_id(1)
     # print the results to the console
-    print(f"Email: {user_email} | Password: {user_password}")
+    print(f"Email: {user_email}")
 
 
 def test_get_ready_to_post_posts():
