@@ -83,7 +83,7 @@ streamlit-elements = "^0.1"
 extra-streamlit-components = "^0.1"
 streamlit-aggrid = "^1.0"
 # pandas is only imported in src/cqc_lem/streamlit/ — keep here, not in main
-pandas = "^2.2.3"
+pandas = ">=2.2.3,<4.0.0"
 
 [tool.poetry.group.dev]
 optional = true
