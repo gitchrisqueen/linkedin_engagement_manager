@@ -1,0 +1,22 @@
+#!/bin/bash
+
+set -o errexit
+set -o nounset
+
+CELERY_USER=celeryworker
+
+# Explicitly pass VIRTUAL_ENV and PATH: 'su' on Debian Bookworm resets PATH to
+# the system default, stripping /app/.venv/bin even when Docker ENV is set.
+VENV_ACTIVATE="VIRTUAL_ENV=/app/.venv PATH=/app/.venv/bin:/usr/local/bin:/usr/bin:/bin"
+
+printf "Starting Celery Selenium Worker as: %s\n" "$CELERY_USER"
+# concurrency=1  — only one Chrome session open at a time (SE_NODE_MAX_SESSIONS=1)
+# prefetch-multiplier=1 — never pre-fetch a second Selenium task while one is running
+# queues=selenium — consume only the selenium queue; main worker keeps the default queue
+su $CELERY_USER -c "$VENV_ACTIVATE celery --app cqc_lem.app.my_celery worker \
+  --loglevel=INFO \
+  --concurrency=1 \
+  --prefetch-multiplier=1 \
+  --queues=selenium \
+  --hostname=selenium-worker@%h \
+  -E"

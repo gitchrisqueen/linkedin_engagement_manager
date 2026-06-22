@@ -490,3 +490,24 @@ class TestFetchSubscription:
             result = fetch_subscription("sub_missing")
 
         assert result is None
+
+    def test_stripe_object_non_dict_is_converted_to_dict(self):
+        """Stripe SDK v5+ returns StripeObject, not dict; fetch_subscription must convert it."""
+        import json
+
+        class _FakeStripeObject:
+            """Minimal stand-in for stripe.StripeObject (not a dict subclass)."""
+            def __str__(self):
+                return json.dumps({"id": "sub_xyz", "status": "active", "items": {}})
+
+        mock_stripe = _make_stripe_mock()
+        mock_stripe.Subscription.retrieve.return_value = _FakeStripeObject()
+
+        with patch("cqc_lem.utilities.stripe_util.STRIPE_API_KEY", "sk_test_key"), \
+             patch("cqc_lem.utilities.stripe_util._get_stripe", return_value=mock_stripe):
+            from cqc_lem.utilities.stripe_util import fetch_subscription
+            result = fetch_subscription("sub_xyz")
+
+        assert isinstance(result, dict)
+        assert result["id"] == "sub_xyz"
+        assert result["status"] == "active"

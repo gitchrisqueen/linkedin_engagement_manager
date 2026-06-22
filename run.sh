@@ -63,9 +63,11 @@ printf "\n"
 # ─── Step 2c: Celery — restart if task files changed since worker started ────
 # Python API changes auto-reload via uvicorn --reload (no action needed).
 # Celery workers do NOT auto-reload; this detects stale task code and prompts.
-CELERY_RUNNING=$(docker ps -q -f "name=^celery_worker$" 2>/dev/null)
-if [ -n "$CELERY_RUNNING" ]; then
-    NEEDS_CELERY_RESTART=$(docker inspect --format='{{.State.StartedAt}}' celery_worker 2>/dev/null | \
+# Both workers (main + selenium) share the same codebase so we restart both.
+_celery_needs_restart() {
+    local container="$1"
+    docker ps -q -f "name=^${container}$" 2>/dev/null | grep -q . || return 1
+    docker inspect --format='{{.State.StartedAt}}' "$container" 2>/dev/null | \
         python3 -c "
 import sys, os
 from datetime import datetime, timezone
@@ -78,13 +80,14 @@ try:
                 print('yes'); sys.exit(0)
 except Exception:
     pass
-" 2>/dev/null)
-    if [ "$NEEDS_CELERY_RESTART" = "yes" ]; then
-        printf "Celery task files in src/cqc_lem/app/ changed since the worker last started.\n"
-        read -p "Restart celery_worker now? (y/n): " restart_celery
-        if [ "$restart_celery" = "y" ]; then
-            docker compose restart celery_worker
-        fi
+" 2>/dev/null | grep -q "yes"
+}
+
+if _celery_needs_restart celery_worker || _celery_needs_restart celery_worker_selenium; then
+    printf "Celery task files in src/cqc_lem/app/ changed since a worker last started.\n"
+    read -p "Restart celery_worker + celery_worker_selenium now? (y/n): " restart_celery
+    if [ "$restart_celery" = "y" ]; then
+        docker compose restart celery_worker celery_worker_selenium
     fi
 fi
 
@@ -235,7 +238,7 @@ print_urls "titles[@]" "urls[@]"
 printf "Dev workflow (no Docker rebuild needed):\n"
 printf "  Python changes  → auto-reloaded by uvicorn  (no action needed)\n"
 printf "  React UI change → cd src/cqc_lem/ui && npm run build\n"
-printf "  Celery changes  → docker compose restart celery_worker\n"
+printf "  Celery changes  → docker compose restart celery_worker celery_worker_selenium\n"
 printf "  View logs       → docker compose logs -f <service>\n"
 printf "  Stop all        → docker compose down\n\n"
 
