@@ -233,6 +233,7 @@ class TestAutoCheckScheduledPosts:
         mock_profile_task = _async_task_mock()
 
         with patch(_PATCH_GET_POSTS, return_value=posts), \
+             patch(_PATCH_GET_ACTIVE, return_value=[7]), \
              patch(_PATCH_GET_ORPHANED, return_value=[]), \
              patch(_PATCH_UPDATE_POST_STATUS) as mock_upd, \
              patch(_PATCH_POST_TO_LINKEDIN, mock_post_task), \
@@ -253,7 +254,7 @@ class TestAutoCheckScheduledPosts:
         assert post_call_kwargs["kwargs"] == {"user_id": 7, "post_id": 42}
         assert post_call_kwargs["eta"] == scheduled_dt
 
-        # Commenting and profile viewer tasks also scheduled
+        # Commenting and profile viewer tasks also scheduled (user 7 is active)
         mock_commenting_task.apply_async.assert_called_once()
         mock_profile_task.apply_async.assert_called_once()
 
@@ -272,6 +273,7 @@ class TestAutoCheckScheduledPosts:
         mock_profile_task = _async_task_mock()
 
         with patch(_PATCH_GET_POSTS, return_value=posts), \
+             patch(_PATCH_GET_ACTIVE, return_value=[7, 8, 9]), \
              patch(_PATCH_GET_ORPHANED, return_value=[]), \
              patch(_PATCH_UPDATE_POST_STATUS), \
              patch(_PATCH_POST_TO_LINKEDIN, mock_post_task), \
@@ -294,6 +296,7 @@ class TestAutoCheckScheduledPosts:
         mock_profile_task = _async_task_mock()
 
         with patch(_PATCH_GET_POSTS, return_value=posts), \
+             patch(_PATCH_GET_ACTIVE, return_value=[10]), \
              patch(_PATCH_GET_ORPHANED, return_value=[]), \
              patch(_PATCH_UPDATE_POST_STATUS), \
              patch(_PATCH_POST_TO_LINKEDIN, mock_post_task), \
@@ -325,6 +328,7 @@ class TestAutoCheckScheduledPosts:
         mock_post_task.apply_async.side_effect = record_apply
 
         with patch(_PATCH_GET_POSTS, return_value=posts), \
+             patch(_PATCH_GET_ACTIVE, return_value=[5]), \
              patch(_PATCH_GET_ORPHANED, return_value=[]), \
              patch(_PATCH_UPDATE_POST_STATUS, side_effect=record_update), \
              patch(_PATCH_POST_TO_LINKEDIN, mock_post_task), \
@@ -335,6 +339,80 @@ class TestAutoCheckScheduledPosts:
 
         assert call_order[0] == "update_status"
         assert "apply_async" in call_order
+
+    def test_inactive_user_pre_post_tasks_skipped(self):
+        """Pre-post Selenium tasks are NOT dispatched for inactive/disconnected users."""
+        scheduled_dt = datetime(2025, 6, 20, 14, 0, 0, tzinfo=timezone.utc)
+        posts = [(88, scheduled_dt, 70)]  # user 70 is inactive
+
+        mock_post_task = _async_task_mock()
+        mock_commenting_task = _async_task_mock()
+        mock_profile_task = _async_task_mock()
+
+        with patch(_PATCH_GET_POSTS, return_value=posts), \
+             patch(_PATCH_GET_ACTIVE, return_value=[60]), \
+             patch(_PATCH_GET_ORPHANED, return_value=[]), \
+             patch(_PATCH_UPDATE_POST_STATUS), \
+             patch(_PATCH_POST_TO_LINKEDIN, mock_post_task), \
+             patch(_PATCH_AUTOMATE_COMMENTING, mock_commenting_task), \
+             patch(_PATCH_AUTOMATE_PROFILE_VIEWER, mock_profile_task):
+            from cqc_lem.app.run_scheduler import auto_check_scheduled_posts
+            auto_check_scheduled_posts.run()
+
+        mock_post_task.apply_async.assert_called_once()  # post_to_linkedin still runs
+        mock_commenting_task.apply_async.assert_not_called()
+        mock_profile_task.apply_async.assert_not_called()
+
+    def test_post_to_linkedin_dispatched_regardless_of_user_activity(self):
+        """post_to_linkedin uses the REST API — it runs even for inactive users."""
+        scheduled_dt = datetime(2025, 6, 20, 14, 0, 0, tzinfo=timezone.utc)
+        posts = [(77, scheduled_dt, 99)]  # user 99 not in active list
+
+        mock_post_task = _async_task_mock()
+
+        with patch(_PATCH_GET_POSTS, return_value=posts), \
+             patch(_PATCH_GET_ACTIVE, return_value=[]), \
+             patch(_PATCH_GET_ORPHANED, return_value=[]), \
+             patch(_PATCH_UPDATE_POST_STATUS), \
+             patch(_PATCH_POST_TO_LINKEDIN, mock_post_task), \
+             patch(_PATCH_AUTOMATE_COMMENTING, _async_task_mock()), \
+             patch(_PATCH_AUTOMATE_PROFILE_VIEWER, _async_task_mock()):
+            from cqc_lem.app.run_scheduler import auto_check_scheduled_posts
+            auto_check_scheduled_posts.run()
+
+        mock_post_task.apply_async.assert_called_once()
+        call_kwargs = mock_post_task.apply_async.call_args[1]
+        assert call_kwargs["kwargs"]["user_id"] == 99
+
+    def test_mixed_active_and_inactive_users_filtered_correctly(self):
+        """Active users get Selenium tasks; inactive users get only post_to_linkedin."""
+        scheduled_dt = datetime(2025, 6, 20, 14, 0, 0, tzinfo=timezone.utc)
+        posts = [
+            (10, scheduled_dt, 60),   # active user
+            (11, scheduled_dt, 70),   # inactive user
+        ]
+
+        mock_post_task = _async_task_mock()
+        mock_commenting_task = _async_task_mock()
+        mock_profile_task = _async_task_mock()
+
+        with patch(_PATCH_GET_POSTS, return_value=posts), \
+             patch(_PATCH_GET_ACTIVE, return_value=[60]), \
+             patch(_PATCH_GET_ORPHANED, return_value=[]), \
+             patch(_PATCH_UPDATE_POST_STATUS), \
+             patch(_PATCH_POST_TO_LINKEDIN, mock_post_task), \
+             patch(_PATCH_AUTOMATE_COMMENTING, mock_commenting_task), \
+             patch(_PATCH_AUTOMATE_PROFILE_VIEWER, mock_profile_task):
+            from cqc_lem.app.run_scheduler import auto_check_scheduled_posts
+            auto_check_scheduled_posts.run()
+
+        # post_to_linkedin called for both users
+        assert mock_post_task.apply_async.call_count == 2
+        # Selenium pre-post tasks only for the active user
+        mock_commenting_task.apply_async.assert_called_once()
+        mock_profile_task.apply_async.assert_called_once()
+        # Verify the Selenium tasks were for the active user (user_id=60)
+        assert mock_commenting_task.apply_async.call_args[1]["kwargs"]["user_id"] == 60
 
 
     def test_orphaned_scheduled_post_is_requeued(self):
@@ -386,6 +464,7 @@ class TestAutoCheckScheduledPosts:
         mock_profile_task = _async_task_mock()
 
         with patch(_PATCH_GET_POSTS, return_value=new_posts), \
+             patch(_PATCH_GET_ACTIVE, return_value=[7]), \
              patch(_PATCH_GET_ORPHANED, return_value=orphaned), \
              patch(_PATCH_UPDATE_POST_STATUS), \
              patch(_PATCH_POST_TO_LINKEDIN, mock_post_task), \

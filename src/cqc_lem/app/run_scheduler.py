@@ -25,6 +25,8 @@ def auto_check_scheduled_posts(self):
 
     # Get post that should have run between yesterday and in the next 20 minutes
     posts = get_ready_to_post_posts(post_time_delta_minutes=CQC_LEM_POST_TIME_DELTA_MINUTES)
+    # Fetch active users only when there are posts (avoids a DB round-trip when idle).
+    active_user_ids = set(get_active_user_ids()) if posts else set()
 
     for post in posts:
         post_id, scheduled_time, user_id = post
@@ -38,20 +40,27 @@ def auto_check_scheduled_posts(self):
         update_db_post_status(post_id, PostStatus.SCHEDULED)
         log_info(f"Post {post_id} queued for {scheduled_time}", post_id=post_id, user_id=user_id)
 
-        # Schedule the post to be posted
+        # Schedule the post to be posted (REST API — no Selenium required)
         post_kwargs = {'user_id': user_id, 'post_id': post_id}
-        post_to_linkedin.apply_async(kwargs=post_kwargs,
-                                     eta=scheduled_time,
-                                     )
+        post_to_linkedin.apply_async(kwargs=post_kwargs, eta=scheduled_time)
 
-        base_kwargs = {'user_id': user_id, 'loop_for_duration': 60 * 15}
+        # Only dispatch Selenium pre-post tasks for users with an active LinkedIn
+        # connection and subscription. Inactive/disconnected users' sessions fail
+        # immediately and waste a Chrome slot that active users need.
+        if user_id in active_user_ids:
+            base_kwargs = {'user_id': user_id, 'loop_for_duration': 60 * 15}
 
-        # Start the pre-post commenting task 15 minutes before scheduled post (loop for 15 minutes)
-        automate_commenting.apply_async(kwargs=base_kwargs, eta=scheduled_time - timedelta(minutes=15))
+            # Start the pre-post commenting task 15 minutes before scheduled post (loop for 15 minutes)
+            automate_commenting.apply_async(kwargs=base_kwargs, eta=scheduled_time - timedelta(minutes=15))
 
-        # Schedule the pre-post profile viewer dm task 10 minutes before scheduled post (loop for 10 minutes)
-        base_kwargs['loop_for_duration'] = 60 * 10
-        automate_profile_viewer_engagement.apply_async(kwargs=base_kwargs, eta=scheduled_time - timedelta(minutes=10))
+            # Schedule the pre-post profile viewer dm task 10 minutes before scheduled post (loop for 10 minutes)
+            base_kwargs['loop_for_duration'] = 60 * 10
+            automate_profile_viewer_engagement.apply_async(kwargs=base_kwargs, eta=scheduled_time - timedelta(minutes=10))
+        else:
+            log_warning(
+                "Skipping pre-post Selenium tasks — user not active/connected",
+                user_id=user_id, post_id=post_id, task_name="auto_check_scheduled_posts",
+            )
 
     # Re-queue any posts that got stuck in 'scheduled' (task was lost, e.g. on container restart)
     # but never transitioned to 'posted'. The 2-hour gap ensures we don't race with a task
