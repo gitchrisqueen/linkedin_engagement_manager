@@ -211,6 +211,11 @@ def _is_local_image_path(value: str) -> bool:
     return bool(value) and (value.startswith("/") or os.path.isfile(value))
 
 
+def _is_image_url(value: str) -> bool:
+    """Return True if value is an HTTP/HTTPS URL (download handled by upload_media)."""
+    return bool(value) and value.startswith("http")
+
+
 def share_carousel_on_linkedin(user_id: int, content: str, slide_texts: list[str]) -> Optional[str]:
     """Post a multi-image carousel to LinkedIn.
 
@@ -238,7 +243,8 @@ def share_carousel_on_linkedin(user_id: int, content: str, slide_texts: list[str
 
     media_urns = []
     for slide in slide_texts:
-        if _is_local_image_path(slide):
+        if _is_local_image_path(slide) or _is_image_url(slide):
+            # Local file path or URL — upload_media handles both (URLs are downloaded first)
             image_path = slide
         else:
             image_path = get_pexels_image_path(slide, default_image_path)
