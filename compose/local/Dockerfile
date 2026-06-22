@@ -89,12 +89,13 @@ COPY ./compose/local/fastapi/start /start-fastapi
 COPY ./compose/local/fastapi/start-cloud /start-fastapi-cloud
 COPY ./compose/local/celery/worker/start /start-celeryworker
 COPY ./compose/local/celery/worker/start-solo-pool /start-celeryworker-solo
+COPY ./compose/local/celery/worker/start-selenium /start-celeryworker-selenium
 COPY ./compose/local/celery/beat/start /start-celerybeat
 COPY ./compose/local/celery/flower/start /start-flower
 COPY ./compose/local/celery/flower/start-no-wait /start-flower-no-wait
 
 RUN chmod +x /entrypoint /wait-for-it /start-fastapi \
     /start-fastapi-cloud /start-celeryworker /start-celeryworker-solo \
-    /start-celerybeat /start-flower /start-flower-no-wait
+    /start-celeryworker-selenium /start-celerybeat /start-flower /start-flower-no-wait
 
 ENTRYPOINT ["/entrypoint"]

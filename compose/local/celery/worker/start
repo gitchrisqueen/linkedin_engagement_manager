@@ -28,4 +28,11 @@ CELERY_USER=celeryworker
 VENV_ACTIVATE="VIRTUAL_ENV=/app/.venv PATH=/app/.venv/bin:/usr/local/bin:/usr/bin:/bin"
 
 printf "Starting Celery Worker as: %s\n" "$CELERY_USER"
-su $CELERY_USER -c "$VENV_ACTIVATE celery --app cqc_lem.app.my_celery worker --loglevel=INFO --autoscale=4,2 -E"
+# concurrency=2: handles only non-Selenium tasks (scheduler, content plan, Stripe, etc.)
+# Selenium tasks are routed to the selenium queue and consumed by celery_worker_selenium.
+su $CELERY_USER -c "$VENV_ACTIVATE celery --app cqc_lem.app.my_celery worker \
+  --loglevel=INFO \
+  --concurrency=2 \
+  --queues=celery \
+  --hostname=main-worker@%h \
+  -E"

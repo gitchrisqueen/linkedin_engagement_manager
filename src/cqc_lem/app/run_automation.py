@@ -395,13 +395,18 @@ def check_commented(driver, wait, user_id: int = None, post_url: str = None):
     return already_commented
 
 
-@shared_task.task(bind=True, base=QueueOnce, once={'graceful': True, 'unlock_before_run': True, 'keys': ['user_id']})
+@shared_task.task(bind=True, base=QueueOnce, once={'graceful': True, 'unlock_before_run': True, 'keys': ['user_id']},
+                  queue='selenium')
 def automate_commenting(self, user_id: int, loop_for_duration: int = None, future_forward: int = 60):
     global stop_all_thread
 
     myprint("Starting Automate Commenting Thread...")
 
-    driver, wait, user_email, my_profile = get_current_profile(user_id=user_id, session_name="Auto Commenting")
+    try:
+        driver, wait, user_email, my_profile = get_current_profile(user_id=user_id, session_name="Auto Commenting")
+    except Exception as e:
+        log_error("Error while getting profile for auto commenting", exc=e, user_id=user_id, task_name="automate_commenting")
+        return f"Failed to start auto commenting: {e}"
 
     result = "Automate Commenting Task Started"
 
@@ -484,11 +489,16 @@ def automate_commenting(self, user_id: int, loop_for_duration: int = None, futur
 
 
 @shared_task.task(bind=True, base=QueueOnce,
-                  once={'graceful': True, 'unlock_before_run': True, 'keys': ['user_id', 'post_id']})
+                  once={'graceful': True, 'unlock_before_run': True, 'keys': ['user_id', 'post_id']},
+                  queue='selenium')
 def automate_reply_commenting(self, user_id: int, post_id: int, loop_for_duration: int = 60, future_forward=0):
     """Reply to recent comments left on the post recently posted"""
 
-    driver, wait, user_email, my_profile = get_current_profile(user_id=user_id, session_name="Reply to Comments")
+    try:
+        driver, wait, user_email, my_profile = get_current_profile(user_id=user_id, session_name="Reply to Comments")
+    except Exception as e:
+        log_error("Error while getting profile for reply commenting", exc=e, user_id=user_id, task_name="automate_reply_commenting")
+        return f"Failed to start reply commenting: {e}"
 
     result = "Automate Reply Commenting Task Started"
 
@@ -743,8 +753,7 @@ def get_recent_collaborators(driver, wait) -> dict[str, str]:
 
 
 @shared_task.task(bind=True, base=QueueOnce, once={'graceful': True, 'unlock_before_run': True, 'keys': ['user_id']},
-                  reject_on_worker_lost=True,
-                  rate_limit='2/m')
+                  reject_on_worker_lost=True, rate_limit='2/m', queue='selenium')
 def automate_appreciation_dms_for_user(self, user_id: int, loop_for_duration: int = None, future_forward: int = 60):
     user_email, user_password = get_user_password_pair_by_id(user_id)
 
@@ -892,7 +901,8 @@ def generate_and_post_comment(driver, wait, post_link, my_profile: LinkedInProfi
     return True
 
 
-@shared_task.task(bind=True, base=QueueOnce, once={'graceful': True, 'unlock_before_run': True, 'keys': ['user_id']})
+@shared_task.task(bind=True, base=QueueOnce, once={'graceful': True, 'unlock_before_run': True, 'keys': ['user_id']},
+                  queue='selenium')
 def automate_profile_viewer_engagement(self, user_id: int, loop_for_duration: int = None, future_forward: int = 60):
     global stop_all_thread
 
@@ -905,7 +915,7 @@ def automate_profile_viewer_engagement(self, user_id: int, loop_for_duration: in
             "Failed to get profile for profile viewer engagement",
             exc=e, user_id=user_id, task_name="automate_profile_viewer_engagement",
         )
-        raise
+        return f"Failed to start profile viewer engagement: {e}"
 
     result = "Profile Viewer DMs Started"
 
@@ -1049,7 +1059,7 @@ def automate_profile_viewer_engagement(self, user_id: int, loop_for_duration: in
 
 
 @shared_task.task(bind=True, base=QueueOnce, once={'graceful': True, 'keys': ['user_id', 'viewer_url']},
-                  reject_on_worker_lost=True, rate_limit='2/m')
+                  reject_on_worker_lost=True, rate_limit='2/m', queue='selenium')
 def engage_with_profile_viewer(self, user_id: int, viewer_url, viewer_name):
     myprint(f"Starting Profile Viewer Engagement")
 
@@ -1062,8 +1072,12 @@ def engage_with_profile_viewer(self, user_id: int, viewer_url, viewer_name):
         result = f"Already engaged with {viewer_name} today. Skipping..."
     else:
 
-        driver, wait, user_email, my_profile = get_current_profile(user_id=user_id,
-                                                                   session_name="Profile Viewer Engagement")
+        try:
+            driver, wait, user_email, my_profile = get_current_profile(user_id=user_id,
+                                                                       session_name="Profile Viewer Engagement")
+        except Exception as e:
+            log_error("Error while getting profile for profile viewer engagement", exc=e, user_id=user_id, task_name="engage_with_profile_viewer")
+            return f"Failed to start profile viewer engagement: {e}"
 
         try:
 
@@ -1199,7 +1213,7 @@ def clean_stale_invites(self, user_id: int):
 
 
 @shared_task.task(bind=True, base=QueueOnce, once={'graceful': True}, reject_on_worker_lost=True,
-                  rate_limit='2/m')
+                  rate_limit='2/m', queue='selenium')
 def send_private_dm(self, user_id: int, profile_url: str, message: str):
     """ Send dm message to a profile. Must be a 1st connection"""
 
@@ -1268,7 +1282,7 @@ def send_private_dm(self, user_id: int, profile_url: str, message: str):
 
 
 @shared_task.task(bind=True, base=QueueOnce, once={'graceful': True, 'keys': ['user_id', 'profile_url']},
-                  reject_on_worker_lost=True, rate_limit='1/m')
+                  reject_on_worker_lost=True, rate_limit='1/m', queue='selenium')
 def invite_to_connect(self, user_id: int, profile_url: str, message: str = None):
     user_email, user_password = get_user_password_pair_by_id(user_id)
 
@@ -1399,10 +1413,14 @@ def final_method(drivers: List[WebDriver]):
 
 
 @shared_task.task(bind=True, base=QueueOnce, once={'graceful': True}, reject_on_worker_lost=True,
-                  rate_limit='1/m')
+                  rate_limit='1/m', queue='selenium')
 def update_stale_profile(self, user_id: int):
     myprint(f"Updating Stale Profile. User ID: {user_id}")
-    driver, wait, user_email, my_profile = get_current_profile(user_id=user_id, session_name="Update Stale Profile")
+    try:
+        driver, wait, user_email, my_profile = get_current_profile(user_id=user_id, session_name="Update Stale Profile")
+    except Exception as e:
+        log_error("Error while updating stale profile", exc=e, user_id=user_id, task_name="update_stale_profile")
+        return f"Failed to update profile: {e}"
     quit_gracefully(driver)
     return "Profile Updated Successfully"
 
@@ -1522,7 +1540,7 @@ def post_to_linkedin(self, user_id: int, post_id: int):
 
 
 @shared_task.task(bind=True, base=QueueOnce, once={'graceful': False}, reject_on_worker_lost=True,
-                  rate_limit='4/m')
+                  rate_limit='4/m', queue='selenium')
 def automate_invites_to_company_page_for_user(self, user_id: int):
     """Send invites to the company page for the given user."""
 

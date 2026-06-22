@@ -141,6 +141,9 @@ def init_celery_tracing(*args, **kwargs):
 def get_queue_metric(name_space: str = 'cqc-lem/celery_queue/celery', metric_name: str = 'QueueLength',
                      period: int = 60, time_delta_minutes: int = 1, statistics: str = "Maximum") -> int:
 
+    if not AWS_REGION:
+        return 0
+
     try:
         cloudwatch = get_cloudwatch_client(AWS_REGION)
 
@@ -216,31 +219,32 @@ def update_queue_length_metric(sender=None, headers=None, **kwargs) -> int:
     #print(f"Total tasks found: {total_tasks}")
 
 
-    try:
-        cloudwatch = get_cloudwatch_client(AWS_REGION)
+    if AWS_REGION:
+        try:
+            cloudwatch = get_cloudwatch_client(AWS_REGION)
 
-        # Push metric to CloudWatch
-        cloudwatch.put_metric_data(
-            Namespace=name_space,
-            MetricData=[
-                {
-                    'MetricName': 'QueueLength',
-                    'Value': total_tasks,
-                    'Unit': 'Count',
-                    'Timestamp': datetime.utcnow(),
-                    'Dimensions': [
-                        {
-                            'Name': 'QueueName',
-                            'Value': 'celery'
-                        }
-                    ]
-                }
-            ]
-        )
-        logger.info(
-            f"Successfully published metric to CloudWatch: Queue length [{queue_name}]: {total_tasks}")
+            # Push metric to CloudWatch
+            cloudwatch.put_metric_data(
+                Namespace=name_space,
+                MetricData=[
+                    {
+                        'MetricName': 'QueueLength',
+                        'Value': total_tasks,
+                        'Unit': 'Count',
+                        'Timestamp': datetime.utcnow(),
+                        'Dimensions': [
+                            {
+                                'Name': 'QueueName',
+                                'Value': 'celery'
+                            }
+                        ]
+                    }
+                ]
+            )
+            logger.info(
+                f"Successfully published metric to CloudWatch: Queue length [{queue_name}]: {total_tasks}")
 
-    except Exception as e:
-        logger.error(f"Failed to publish metric: {str(e)}")
+        except Exception as e:
+            logger.error(f"Failed to publish metric: {str(e)}")
 
     return total_tasks

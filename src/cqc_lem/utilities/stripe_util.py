@@ -210,7 +210,11 @@ def fetch_subscription(stripe_subscription_id: str) -> Optional[dict]:
     stripe = _get_stripe()
     try:
         sub = stripe.Subscription.retrieve(stripe_subscription_id)
-        return sub
+        if isinstance(sub, dict):
+            return sub
+        # Stripe SDK v5+ returns StripeObject (not a dict); str() serializes it
+        # to JSON, allowing callers to use plain .get() field access.
+        return json.loads(str(sub))
     except Exception as e:
         myprint(f"Could not fetch Stripe subscription {stripe_subscription_id}: {e}")
         return None

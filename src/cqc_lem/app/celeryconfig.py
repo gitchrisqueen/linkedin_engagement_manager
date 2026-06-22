@@ -1,6 +1,7 @@
 import os
 
 import boto3
+from kombu import Queue
 from kombu.utils.url import safequote
 
 # Redis port
@@ -72,6 +73,36 @@ def get_aws_sqs(queue_name: str,
 
 
 task_create_missing_queues = True
+
+# ---------------------------------------------------------------------------
+# Queue definitions
+# ---------------------------------------------------------------------------
+# 'celery'   — default queue consumed by the main worker (scheduler tasks, API
+#               calls, content plan, Stripe sync, etc.).
+# 'selenium' — consumed exclusively by the selenium worker (concurrency=1).
+#               All tasks that open a Chrome session must route here so only
+#               one browser is used at a time.
+task_queues = (
+    Queue('celery'),
+    Queue('selenium'),
+)
+task_default_queue = 'celery'
+
+# Explicit routing for every Selenium-backed task.  The queue='selenium'
+# parameter on each task decorator already handles routing at dispatch time;
+# this mapping is a belt-and-suspenders safety net for any send() call that
+# doesn't pass queue= explicitly.
+task_routes = {
+    'cqc_lem.app.run_automation.automate_commenting': {'queue': 'selenium'},
+    'cqc_lem.app.run_automation.automate_reply_commenting': {'queue': 'selenium'},
+    'cqc_lem.app.run_automation.automate_appreciation_dms_for_user': {'queue': 'selenium'},
+    'cqc_lem.app.run_automation.automate_profile_viewer_engagement': {'queue': 'selenium'},
+    'cqc_lem.app.run_automation.engage_with_profile_viewer': {'queue': 'selenium'},
+    'cqc_lem.app.run_automation.send_private_dm': {'queue': 'selenium'},
+    'cqc_lem.app.run_automation.invite_to_connect': {'queue': 'selenium'},
+    'cqc_lem.app.run_automation.update_stale_profile': {'queue': 'selenium'},
+    'cqc_lem.app.run_automation.automate_invites_to_company_page_for_user': {'queue': 'selenium'},
+}
 
 
 # Addition setting for AWS SQS Usage
