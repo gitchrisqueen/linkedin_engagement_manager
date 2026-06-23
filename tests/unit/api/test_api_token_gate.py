@@ -4,10 +4,27 @@ from unittest.mock import patch
 
 import pytest
 
-from cqc_lem.api import main
-from cqc_lem.api.main import _api_token_required, _bearer_token
-
 pytestmark = pytest.mark.unit
+
+
+# Import cqc_lem.api.main lazily (inside fixtures), not at module scope: importing
+# it builds the OpenAI client, which needs OPENAI_API_KEY — set by the session
+# autouse fixture in tests/conftest.py, which runs *after* collection.
+@pytest.fixture(scope="module")
+def main_mod():
+    from cqc_lem.api import main
+    return main
+
+
+@pytest.fixture(scope="module")
+def client():
+    with patch("cqc_lem.utilities.observability.track_api_call"):
+        from fastapi.testclient import TestClient
+
+        from cqc_lem.api.main import app
+        with TestClient(app, raise_server_exceptions=False) as tc:
+            yield tc
+
 
 # ---------------------------------------------------------------------------
 # _bearer_token — Authorization header parsing
@@ -23,8 +40,8 @@ class TestBearerTokenParsing:
         ("Basic abc123", None),        # wrong scheme
         ("abc123", None),              # no scheme
     ])
-    def test_parses_header(self, header, expected):
-        assert _bearer_token(header) == expected
+    def test_parses_header(self, main_mod, header, expected):
+        assert main_mod._bearer_token(header) == expected
 
 
 # ---------------------------------------------------------------------------
@@ -32,18 +49,18 @@ class TestBearerTokenParsing:
 # ---------------------------------------------------------------------------
 
 class TestApiTokenRequired:
-    def test_disabled_when_no_tokens_configured(self):
-        with patch.object(main, "_API_ACCESS_TOKEN_SET", set()):
-            assert _api_token_required("/api/posts") is False
+    def test_disabled_when_no_tokens_configured(self, main_mod):
+        with patch.object(main_mod, "_API_ACCESS_TOKEN_SET", set()):
+            assert main_mod._api_token_required("/api/posts") is False
 
     @pytest.mark.parametrize("path", [
         "/api/posts",
         "/api/assets",
         "/api/avatar/training",
     ])
-    def test_business_routes_gated(self, path):
-        with patch.object(main, "_API_ACCESS_TOKEN_SET", {"tok"}):
-            assert _api_token_required(path) is True
+    def test_business_routes_gated(self, main_mod, path):
+        with patch.object(main_mod, "_API_ACCESS_TOKEN_SET", {"tok"}):
+            assert main_mod._api_token_required(path) is True
 
     @pytest.mark.parametrize("path", [
         "/api/auth/email/init",   # login flow
@@ -54,35 +71,25 @@ class TestApiTokenRequired:
         "/auth/linkedin/callback",
         "/assets/index.js",       # SPA static
     ])
-    def test_public_routes_not_gated(self, path):
-        with patch.object(main, "_API_ACCESS_TOKEN_SET", {"tok"}):
-            assert _api_token_required(path) is False
+    def test_public_routes_not_gated(self, main_mod, path):
+        with patch.object(main_mod, "_API_ACCESS_TOKEN_SET", {"tok"}):
+            assert main_mod._api_token_required(path) is False
 
 
 # ---------------------------------------------------------------------------
 # Middleware behavior via TestClient
 # ---------------------------------------------------------------------------
 
-@pytest.fixture(scope="module")
-def client():
-    with patch("cqc_lem.utilities.observability.track_api_call"):
-        from fastapi.testclient import TestClient
-
-        from cqc_lem.api.main import app
-        with TestClient(app, raise_server_exceptions=False) as tc:
-            yield tc
-
-
 class TestGateMiddleware:
     TOKEN = "secret-token-xyz"
 
-    def test_guarded_route_without_token_is_401(self, client):
-        with patch.object(main, "_API_ACCESS_TOKEN_SET", {self.TOKEN}):
+    def test_guarded_route_without_token_is_401(self, main_mod, client):
+        with patch.object(main_mod, "_API_ACCESS_TOKEN_SET", {self.TOKEN}):
             resp = client.get("/api/assets", params={"file_name": "x.png"})
         assert resp.status_code == 401
 
-    def test_guarded_route_wrong_token_is_401(self, client):
-        with patch.object(main, "_API_ACCESS_TOKEN_SET", {self.TOKEN}):
+    def test_guarded_route_wrong_token_is_401(self, main_mod, client):
+        with patch.object(main_mod, "_API_ACCESS_TOKEN_SET", {self.TOKEN}):
             resp = client.get(
                 "/api/assets",
                 params={"file_name": "x.png"},
@@ -90,9 +97,9 @@ class TestGateMiddleware:
             )
         assert resp.status_code == 401
 
-    def test_guarded_route_valid_token_passes_gate(self, client):
+    def test_guarded_route_valid_token_passes_gate(self, main_mod, client):
         # Valid token clears the gate; the handler then 404s on the missing file.
-        with patch.object(main, "_API_ACCESS_TOKEN_SET", {self.TOKEN}):
+        with patch.object(main_mod, "_API_ACCESS_TOKEN_SET", {self.TOKEN}):
             resp = client.get(
                 "/api/assets",
                 params={"file_name": "x.png"},
@@ -100,7 +107,7 @@ class TestGateMiddleware:
             )
         assert resp.status_code != 401
 
-    def test_gate_disabled_allows_unauthenticated(self, client):
-        with patch.object(main, "_API_ACCESS_TOKEN_SET", set()):
+    def test_gate_disabled_allows_unauthenticated(self, main_mod, client):
+        with patch.object(main_mod, "_API_ACCESS_TOKEN_SET", set()):
             resp = client.get("/api/assets", params={"file_name": "x.png"})
         assert resp.status_code != 401
