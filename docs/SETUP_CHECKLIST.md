@@ -27,15 +27,18 @@ Legend: 🖱️ click-ops in a web console · ⌨️ run a command · ⏱️ rou
       scp scripts/vps_bootstrap.sh root@<vps-ip>:/root/
       ssh root@<vps-ip> 'REPO_URL=https://github.com/christopherqueenconsulting/linkedin_engagement_manager.git bash /root/vps_bootstrap.sh'
       ```
-- [ ] ⌨️ Generate a **CI deploy keypair** (do this on your laptop):
+- [ ] ⌨️ Generate a **CI deploy keypair** (do this on your laptop) **before**
+      running bootstrap so you can pre-seed the public key:
       ```
       ssh-keygen -t ed25519 -C "lem-ci-deploy" -f ~/.ssh/lem_ci_deploy -N ""
       ```
-- [ ] ⌨️ Install the **public** key for the deploy user:
+      Then the bootstrap command above can install it automatically by passing
+      `CI_DEPLOY_PUBKEY="$(cat ~/.ssh/lem_ci_deploy.pub)"` in front of `bash ...`.
+      (If you already ran bootstrap, add it manually:)
       ```
-      ssh root@<vps-ip> "mkdir -p /home/deploy/.ssh && \
+      ssh root@<vps-ip> "install -d -m700 -o deploy -g deploy /home/deploy/.ssh && \
         echo '$(cat ~/.ssh/lem_ci_deploy.pub)' >> /home/deploy/.ssh/authorized_keys && \
-        chown -R deploy:deploy /home/deploy/.ssh && chmod 600 /home/deploy/.ssh/authorized_keys"
+        chown deploy:deploy /home/deploy/.ssh/authorized_keys && chmod 600 /home/deploy/.ssh/authorized_keys"
       ```
 - [ ] ⌨️ Verify: `ssh -i ~/.ssh/lem_ci_deploy deploy@<vps-ip> 'docker ps'`
 
