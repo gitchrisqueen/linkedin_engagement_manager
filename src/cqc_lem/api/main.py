@@ -38,7 +38,7 @@ from cqc_lem.utilities.email import generate_pin, hash_pin, send_pin_email
 from cqc_lem.utilities.linkedin.token_refresh import (
     get_token_expiry, is_token_expired, is_token_expiring_soon, attempt_token_refresh,
 )
-from cqc_lem.utilities.env_constants import LI_CLIENT_ID, LI_CLIENT_SECRET, LI_REDIRECT_URL, LI_STATE_SALT, ADMIN_SECRET
+from cqc_lem.utilities.env_constants import LI_CLIENT_ID, LI_CLIENT_SECRET, LI_REDIRECT_URL, LI_STATE_SALT, ADMIN_SECRET, API_ACCESS_TOKENS
 from cqc_lem.utilities.logger import myprint
 from cqc_lem.utilities.mime_type_helper import get_file_mime_type
 from cqc_lem.utilities.observability import track_api_call
@@ -46,6 +46,7 @@ from cqc_lem.utilities.utils import get_file_extension_from_filepath
 from fastapi import FastAPI, HTTPException, Request, status, APIRouter, Header
 from fastapi import File, Form, Query, UploadFile
 from fastapi.responses import FileResponse
+from fastapi.responses import JSONResponse
 from fastapi.responses import HTMLResponse
 from fastapi.responses import RedirectResponse
 from fastapi.responses import StreamingResponse
@@ -76,6 +77,38 @@ async def observability_middleware(request: Request, call_next):
             status_code=status_code,
             latency_ms=int((time.time() - start) * 1000),
         )
+
+
+# Bearer-token gate for /api routes. Active only when API_ACCESS_TOKENS is set,
+# so local/dev (and existing tests) run open. Login and the Stripe webhook stay
+# public; everything else under /api requires a valid bearer token. Routes served
+# outside /api (SPA, /health, /docs, /auth/linkedin/*) are never gated here.
+_API_ACCESS_TOKEN_SET = {t.strip() for t in API_ACCESS_TOKENS.split(",") if t.strip()}
+_PUBLIC_API_PREFIXES = ("/api/auth/", "/api/billing/webhook")
+
+
+def _api_token_required(path: str) -> bool:
+    if not _API_ACCESS_TOKEN_SET or not path.startswith("/api/"):
+        return False
+    return not any(path.startswith(p) for p in _PUBLIC_API_PREFIXES)
+
+
+def _bearer_token(authorization: Optional[str]) -> Optional[str]:
+    if not authorization:
+        return None
+    scheme, _, token = authorization.partition(" ")
+    if scheme.lower() != "bearer" or not token.strip():
+        return None
+    return token.strip()
+
+
+@app.middleware("http")
+async def api_token_middleware(request: Request, call_next):
+    if _api_token_required(request.url.path):
+        token = _bearer_token(request.headers.get("Authorization"))
+        if token not in _API_ACCESS_TOKEN_SET:
+            return JSONResponse(status_code=401, content={"status_code": 401, "detail": "Unauthorized"})
+    return await call_next(request)
 
 
 _ui_dist = os.path.join(os.path.dirname(__file__), "..", "ui", "dist")

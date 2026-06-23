@@ -5,7 +5,14 @@ const api = axios.create({
   headers: { 'Content-Type': 'application/json' },
 })
 
+// Build-time API access token. Empty in local/dev (gate disabled server-side);
+// set via VITE_API_TOKEN for deployments that enforce bearer auth on /api.
+const apiToken = import.meta.env.VITE_API_TOKEN
+
 api.interceptors.request.use((config) => {
+  if (apiToken) {
+    config.headers['Authorization'] = `Bearer ${apiToken}`
+  }
   const token = localStorage.getItem('lem_session')
   if (token) {
     config.headers['X-Session-Token'] = token

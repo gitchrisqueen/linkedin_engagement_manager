@@ -27,6 +27,10 @@ WORKDIR /app
 FROM node:22-slim AS ui-builder
 
 WORKDIR /ui
+# Build-time API bearer token baked into the SPA bundle (Vite reads VITE_*).
+# Empty by default so dev images stay tokenless; CI passes the prod token.
+ARG VITE_API_TOKEN=""
+ENV VITE_API_TOKEN=${VITE_API_TOKEN}
 COPY ./src/cqc_lem/ui/package.json ./src/cqc_lem/ui/package-lock.json ./
 RUN npm ci
 COPY ./src/cqc_lem/ui ./
