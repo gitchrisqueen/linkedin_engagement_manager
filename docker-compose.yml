@@ -129,11 +129,11 @@ services:
       selenium-chrome:
         condition: service_healthy
     healthcheck:
-      test: ["CMD-SHELL", "celery --app cqc_lem.app.my_celery inspect ping -d selenium-worker@$CELERY_WORKER_HOST -t 5 || exit 1"]
+      test: ["CMD-SHELL", "celery --app cqc_lem.app.my_celery inspect ping -d selenium-worker@$(hostname) -t 10 || exit 1"]
       interval: 30s
-      timeout: 15s
+      timeout: 30s
       retries: 3
-      start_period: 30s
+      start_period: 60s
 
   celery_beat:
     image: ${DOCKER_IMAGE_NAME}
