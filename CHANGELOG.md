@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.3](https://github.com/christopherqueenconsulting/linkedin_engagement_manager/compare/v0.1.2...v0.1.3) (2026-06-25)
+
+
+### Bug Fixes
+
+* **prod:** drop dev src bind-mount that masked the built SPA ([#136](https://github.com/christopherqueenconsulting/linkedin_engagement_manager/issues/136)) ([a90eff1](https://github.com/christopherqueenconsulting/linkedin_engagement_manager/commit/a90eff174dc28d2f9581a4732fc33d543a3ff152))
+
 ## [0.1.2](https://github.com/christopherqueenconsulting/linkedin_engagement_manager/compare/v0.1.1...v0.1.2) (2026-06-25)
 
 
