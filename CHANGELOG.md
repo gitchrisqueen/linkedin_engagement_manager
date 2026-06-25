@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.2](https://github.com/christopherqueenconsulting/linkedin_engagement_manager/compare/v0.1.1...v0.1.2) (2026-06-25)
+
+
+### Bug Fixes
+
+* **build:** ensure SPA dist is in the image; expose MySQL on loopback ([#134](https://github.com/christopherqueenconsulting/linkedin_engagement_manager/issues/134)) ([46166bc](https://github.com/christopherqueenconsulting/linkedin_engagement_manager/commit/46166bce66c38b76de5c42e225b05a78923c067b))
+
 ## [0.1.1](https://github.com/christopherqueenconsulting/linkedin_engagement_manager/compare/v0.1.0...v0.1.1) (2026-06-25)
 
 
