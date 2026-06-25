@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.6.0](https://github.com/christopherqueenconsulting/linkedin_engagement_manager/compare/v0.5.0...v0.6.0) (2026-06-25)
+
+
+### Features
+
+* **media:** Gen-4 Turbo migration, profile-aligned prompts, variant review tool ([f36e685](https://github.com/christopherqueenconsulting/linkedin_engagement_manager/commit/f36e685b0390a8b3ead1734457046aefe0f08de8))
+* **media:** migrate to Gen-4 Turbo, profile-aligned prompts, variant tool ([23006cf](https://github.com/christopherqueenconsulting/linkedin_engagement_manager/commit/23006cfc4e15988f9d198de17942cb5854330532))
+
+
+### Bug Fixes
+
+* **script:** surface API errors + detect not-deployed (404/405) in variant script ([b4118c1](https://github.com/christopherqueenconsulting/linkedin_engagement_manager/commit/b4118c1942edf4c34cf96ff444ad75909b39696b))
+
 ## [0.5.0](https://github.com/christopherqueenconsulting/linkedin_engagement_manager/compare/v0.4.0...v0.5.0) (2026-06-25)
 
 
