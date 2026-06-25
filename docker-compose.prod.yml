@@ -52,6 +52,9 @@ services:
   celery_worker:
     image: "${DOCKER_IMAGE_NAME}:${IMAGE_TAG:-latest}"
     restart: unless-stopped
+    volumes: !override
+      - ./logs:/app/logs
+      - ~/.aws:/home/celeryworker/.aws:ro
     deploy:
       resources:
         limits:
@@ -63,6 +66,9 @@ services:
   celery_worker_selenium:
     image: "${DOCKER_IMAGE_NAME}:${IMAGE_TAG:-latest}"
     restart: unless-stopped
+    volumes: !override
+      - ./logs:/app/logs
+      - ~/.aws:/home/celeryworker/.aws:ro
     deploy:
       resources:
         limits:
@@ -74,6 +80,8 @@ services:
   celery_beat:
     image: "${DOCKER_IMAGE_NAME}:${IMAGE_TAG:-latest}"
     restart: unless-stopped
+    volumes: !override
+      - ./logs:/app/logs
     deploy:
       resources:
         limits:
@@ -83,6 +91,9 @@ services:
     image: "${DOCKER_IMAGE_NAME}:${IMAGE_TAG:-latest}"
     restart: unless-stopped
     ports: !reset []
+    volumes: !override
+      - ./logs:/app/logs
+      - flower_db:/data
     environment:
       # Replace the dev unauthenticated mode with basic auth + persistence.
       # Kept behind Cloudflare Access as well (see cloudflared/config.yml).
