@@ -19,7 +19,10 @@ services:
     command: /start-fastapi-cloud
     restart: unless-stopped
     # Ship code in the image — drop the dev source/test bind-mounts.
-    volumes:
+    # !override REPLACES the base volume list (a plain key would MERGE, leaving
+    # the dev ./src:/app/src mount which masks the image's built SPA at
+    # /app/src/cqc_lem/ui/dist and makes FastAPI 404 "/").
+    volumes: !override
       - ./logs:/app/logs
     ports: !reset []
     deploy:
