@@ -177,3 +177,53 @@ def get_aws_device_farm_url(deviceFarmProjectArn: str, testGridProjectArn: str, 
 
         expiresInSeconds=expiresInSeconds)
     return response["url"]
+
+
+def purge_post_assets(post_id, video_url=None):
+    """Delete a post's generated media from the assets volume after it is published.
+
+    LinkedIn re-hosts media at publish time, so the local copy becomes dead
+    weight. Removes the post's video file (resolved from its asset URL) and its
+    carousel slide directory (images/carousel/<post_id>/). Path-safe (only deletes
+    inside assets_dir) and tolerant of already-missing files. Returns removed paths.
+    """
+    import shutil
+    from urllib.parse import urlparse, parse_qs
+    from cqc_lem import assets_dir
+    from cqc_lem.utilities.logger import myprint
+
+    removed = []
+    assets_real = os.path.realpath(assets_dir)
+
+    def _within_assets(path):
+        try:
+            return os.path.commonpath([assets_real, os.path.realpath(path)]) == assets_real
+        except ValueError:
+            return False
+
+    if video_url:
+        try:
+            file_name = (parse_qs(urlparse(video_url).query).get("file_name") or [None])[0]
+        except Exception:
+            file_name = None
+        if file_name:
+            parts = [p for p in file_name.replace("\\", "/").split("/") if p and p not in (".", "..")]
+            candidate = os.path.join(assets_dir, *parts) if parts else None
+            if candidate and _within_assets(candidate) and os.path.isfile(candidate):
+                try:
+                    os.remove(candidate)
+                    removed.append(candidate)
+                except OSError as e:
+                    myprint(f"purge_post_assets: could not remove {candidate}: {e}")
+
+    carousel_dir = os.path.join(assets_dir, "images", "carousel", str(post_id))
+    if os.path.isdir(carousel_dir) and _within_assets(carousel_dir):
+        try:
+            shutil.rmtree(carousel_dir)
+            removed.append(carousel_dir)
+        except OSError as e:
+            myprint(f"purge_post_assets: could not remove {carousel_dir}: {e}")
+
+    if removed:
+        myprint(f"purge_post_assets: post_id={post_id} removed {len(removed)} asset path(s)")
+    return removed
