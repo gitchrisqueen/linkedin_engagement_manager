@@ -8,6 +8,14 @@ pytestmark = pytest.mark.unit
 _MODULE = "cqc_lem.utilities.linkedin.helper"
 
 
+@pytest.fixture(autouse=True)
+def _no_real_sleep():
+    """Login flow uses real time.sleep() between mocked Selenium steps — those
+    seconds are dead wait in unit tests (drivers are mocked, not timing-dependent)."""
+    with patch(f"{_MODULE}.time.sleep"):
+        yield
+
+
 def _make_driver(url: str) -> MagicMock:
     driver = MagicMock()
     driver.current_url = url
