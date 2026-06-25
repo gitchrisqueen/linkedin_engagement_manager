@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.3.1](https://github.com/christopherqueenconsulting/linkedin_engagement_manager/compare/v0.3.0...v0.3.1) (2026-06-25)
+
+
+### Bug Fixes
+
+* **api:** make /api/assets public so LinkedIn can fetch post media ([#142](https://github.com/christopherqueenconsulting/linkedin_engagement_manager/issues/142)) ([c67b495](https://github.com/christopherqueenconsulting/linkedin_engagement_manager/commit/c67b495720062e7ceb9f0b6b8d8bcec8e16c632e))
+
 ## [0.3.0](https://github.com/christopherqueenconsulting/linkedin_engagement_manager/compare/v0.2.0...v0.3.0) (2026-06-25)
 
 
