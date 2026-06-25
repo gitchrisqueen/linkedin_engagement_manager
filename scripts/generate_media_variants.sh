@@ -35,8 +35,11 @@ ADMIN=$(grep '^ADMIN_SECRET=' "$ENV" | cut -d= -f2-)
 PROBE=$(curl -sS -o /dev/null -w '%{http_code}' -X POST "$BASE/api/admin/generate-media-variants" \
   -H "Authorization: Bearer $TOKEN" -H "x-admin-secret: $ADMIN" \
   -H 'Content-Type: application/json' -d '{}' 2>/dev/null || echo 000)
-if [ "$PROBE" = "404" ]; then
-  echo "✗ /api/admin/generate-media-variants returns 404 — deploy this feature first." >&2
+# 404 = no route; 405 = the SPA catch-all GET swallowed the path (endpoint not built).
+# A deployed endpoint returns 422 (bad body) / 401 / 403 for this probe.
+if [ "$PROBE" = "404" ] || [ "$PROBE" = "405" ]; then
+  echo "✗ /api/admin/generate-media-variants not available (HTTP $PROBE) — this feature" >&2
+  echo "  isn't deployed yet. Merge + deploy the media-variants PR, then re-run." >&2
   exit 1
 fi
 
@@ -53,11 +56,20 @@ PY
 )
 
 echo "→ Generating variants (this runs image + Gen-4 Turbo video, ~1-2 min each)…"
-RESP=$(curl -sS -X POST "$BASE/api/admin/generate-media-variants" \
+RESP=$(curl -sS -w $'\n%{http_code}' -X POST "$BASE/api/admin/generate-media-variants" \
   -H "Authorization: Bearer $TOKEN" -H "x-admin-secret: $ADMIN" \
   -H 'Content-Type: application/json' -d "$BODY")
+CODE=$(printf '%s' "$RESP" | tail -n1)
+RESP=$(printf '%s' "$RESP" | sed '$d')
 
-# --- Pretty-print URLs + cost ----------------------------------------------
+# --- Error responses: print the raw body so failures are never hidden -------
+if [ "$CODE" != "200" ]; then
+  echo "✗ HTTP $CODE — request failed:" >&2
+  echo "$RESP" | python3 -m json.tool 2>/dev/null || echo "$RESP"
+  exit 1
+fi
+
+# --- Pretty-print URLs + cost (success: detail is the payload object) -------
 if command -v jq >/dev/null 2>&1; then
   echo "$RESP" | jq -r '
     .detail as $d
