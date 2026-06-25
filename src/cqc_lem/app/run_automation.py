@@ -1514,6 +1514,14 @@ def post_to_linkedin(self, user_id: int, post_id: int):
         # Update DB with status=posted
         update_db_post_status(post_id, PostStatus.POSTED)
 
+        # Purge local media now that LinkedIn has re-hosted it — keeps the assets
+        # volume bounded. Best-effort: never let cleanup failure break posting.
+        try:
+            from cqc_lem.utilities.utils import purge_post_assets
+            purge_post_assets(post_id, video_url=get_post_video_url(post_id) if post_type == PostType.VIDEO else None)
+        except Exception as e:
+            myprint(f"purge_post_assets failed for post_id={post_id}: {e}")
+
         # Update DB with status=success in the logs table and the post url
         insert_new_log(user_id=user_id, action_type=LogActionType.POST, result=LogResultType.SUCCESS, post_id=post_id,
                        post_url=post_url,
