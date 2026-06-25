@@ -86,6 +86,13 @@ RUN useradd -m -s /bin/bash celeryworker && \
 COPY --chown=celeryworker:celeryworker --from=builder /app/.venv /app/.venv
 COPY --chown=celeryworker:celeryworker --from=builder /app/src /app/src
 
+# Copy the built SPA straight from the ui-builder stage so it is guaranteed to
+# land in the final image (the builder->final /app/src copy was dropping it,
+# leaving FastAPI to 404 "/"). Assert it is present so this can't silently break.
+COPY --chown=celeryworker:celeryworker --from=ui-builder /ui/dist /app/src/cqc_lem/ui/dist
+RUN test -f /app/src/cqc_lem/ui/dist/index.html \
+    || (echo "FATAL: SPA dist missing from image (ui build did not land)" && exit 1)
+
 # Start scripts live at / so they are not inside the chowned /app tree
 COPY ./compose/local/entrypoint /entrypoint
 COPY ./compose/local/wait-for-it /wait-for-it
