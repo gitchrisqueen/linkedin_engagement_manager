@@ -71,14 +71,27 @@ NGROK_CUSTOM_DOMAIN=get_constant_from_env('NGROK_CUSTOM_DOMAIN')
 NGROK_FREE_DOMAIN=get_constant_from_env('NGROK_FREE_DOMAIN')
 NGROK_API_PREFIX=get_constant_from_env('NGROK_API_PREFIX')
 
-# Dynamic LinkedIn redirect URL: NGROK_CUSTOM_DOMAIN takes precedence over static LI_REDIRECT_URL
-# when running in a dev/ngrok environment (the ngrok domain is registered in the LinkedIn developer app)
-if NGROK_CUSTOM_DOMAIN:
+# Production public base URL — full scheme+host, no port, no trailing slash
+# (e.g. https://lem.example.com). Canonical prod setting; takes precedence over
+# all ngrok-derived URLs (use this when NGROK_PLAN=off).
+PUBLIC_BASE_URL=get_constant_from_env('PUBLIC_BASE_URL')
+if PUBLIC_BASE_URL:
+    PUBLIC_BASE_URL = PUBLIC_BASE_URL.rstrip('/')
+
+# Dynamic LinkedIn redirect URL precedence:
+#   PUBLIC_BASE_URL (prod) > NGROK_CUSTOM_DOMAIN (dev/ngrok) > static LI_REDIRECT_URL env.
+if PUBLIC_BASE_URL:
+    LI_REDIRECT_URL = f"{PUBLIC_BASE_URL}/auth/linkedin/callback"
+elif NGROK_CUSTOM_DOMAIN:
     LI_REDIRECT_URL = f"https://{NGROK_CUSTOM_DOMAIN}/auth/linkedin/callback"
 
-# NGROK_CUSTOM_DOMAIN (full domain) takes precedence; fallback to PREFIX.FREE_DOMAIN form;
-# final fallback to API_BASE_URL env var with port.
-if NGROK_CUSTOM_DOMAIN:
+# API base URL precedence:
+#   PUBLIC_BASE_URL (prod, port-less) > NGROK_CUSTOM_DOMAIN > PREFIX.FREE_DOMAIN
+#   > API_BASE_URL env with :PORT (local dev fallback).
+if PUBLIC_BASE_URL:
+    API_BASE_URL = PUBLIC_BASE_URL
+    API_URL_FINAL = PUBLIC_BASE_URL
+elif NGROK_CUSTOM_DOMAIN:
     API_BASE_URL = f"https://{NGROK_CUSTOM_DOMAIN}"
     API_URL_FINAL = API_BASE_URL
 elif NGROK_FREE_DOMAIN and NGROK_API_PREFIX:
