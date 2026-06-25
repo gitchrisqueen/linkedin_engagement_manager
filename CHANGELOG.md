@@ -1,5 +1,15 @@
 # Changelog
 
+## [0.1.1](https://github.com/christopherqueenconsulting/linkedin_engagement_manager/compare/v0.1.0...v0.1.1) (2026-06-25)
+
+
+### Bug Fixes
+
+* **build:** commit UI package-lock.json (Docker npm ci requires it) ([#132](https://github.com/christopherqueenconsulting/linkedin_engagement_manager/issues/132)) ([7d53fa2](https://github.com/christopherqueenconsulting/linkedin_engagement_manager/commit/7d53fa22fa1449be0241ad9932c5949454ecf5e2))
+* **ci:** correct trivy-action tag (v0.28.0) in release workflow ([#129](https://github.com/christopherqueenconsulting/linkedin_engagement_manager/issues/129)) ([38c8aea](https://github.com/christopherqueenconsulting/linkedin_engagement_manager/commit/38c8aeaaad4ff2025399eea678c046c86cde15ce))
+* **ci:** remove advisory Trivy scan blocking the release build ([#131](https://github.com/christopherqueenconsulting/linkedin_engagement_manager/issues/131)) ([cbc6e8a](https://github.com/christopherqueenconsulting/linkedin_engagement_manager/commit/cbc6e8a60d5fbbb69bf8109bedc6ad41229e055b))
+* **ops:** logs dir ACL for mixed-uid containers + dynamic backup volume ([#133](https://github.com/christopherqueenconsulting/linkedin_engagement_manager/issues/133)) ([077ea27](https://github.com/christopherqueenconsulting/linkedin_engagement_manager/commit/077ea277586e79d5f2101c2cf5d4773b89888242))
+
 ## 0.1.0 (2026-06-25)
 
 
