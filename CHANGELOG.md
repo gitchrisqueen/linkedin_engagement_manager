@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.5.0](https://github.com/christopherqueenconsulting/linkedin_engagement_manager/compare/v0.4.0...v0.5.0) (2026-06-25)
+
+
+### Features
+
+* **assets:** purge post media after publish to bound the assets volume ([#148](https://github.com/christopherqueenconsulting/linkedin_engagement_manager/issues/148)) ([98dacbb](https://github.com/christopherqueenconsulting/linkedin_engagement_manager/commit/98dacbb6b1dcf4c4e9d4707b80a4a967da068f11))
+
 ## [0.4.0](https://github.com/christopherqueenconsulting/linkedin_engagement_manager/compare/v0.3.2...v0.4.0) (2026-06-25)
 
 
