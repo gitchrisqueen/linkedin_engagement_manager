@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.2.0](https://github.com/christopherqueenconsulting/linkedin_engagement_manager/compare/v0.1.3...v0.2.0) (2026-06-25)
+
+
+### Features
+
+* **ui+prod:** app title; run celery/flower from image (drop src bind-mount) ([#138](https://github.com/christopherqueenconsulting/linkedin_engagement_manager/issues/138)) ([5a66105](https://github.com/christopherqueenconsulting/linkedin_engagement_manager/commit/5a66105992b765ce848e78bd1894f2fc818cc277))
+
 ## [0.1.3](https://github.com/christopherqueenconsulting/linkedin_engagement_manager/compare/v0.1.2...v0.1.3) (2026-06-25)
 
 
