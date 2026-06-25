@@ -57,14 +57,6 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
-      - name: Scan image (advisory)
-        continue-on-error: true
-        uses: aquasecurity/trivy-action@v0.28.0
-        with:
-          image-ref: ${{ env.IMAGE }}:${{ steps.ver.outputs.tag }}
-          format: table
-          severity: HIGH,CRITICAL
-
   deploy:
     name: Deploy to Hostinger VPS
     needs: build-and-push
