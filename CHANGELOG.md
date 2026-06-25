@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.3.2](https://github.com/christopherqueenconsulting/linkedin_engagement_manager/compare/v0.3.1...v0.3.2) (2026-06-25)
+
+
+### Bug Fixes
+
+* **prod:** shared persistent volume for generated assets ([#144](https://github.com/christopherqueenconsulting/linkedin_engagement_manager/issues/144)) ([fdf8fe4](https://github.com/christopherqueenconsulting/linkedin_engagement_manager/commit/fdf8fe4517a2d5d2afbaebacfc34f05905fa6376))
+
 ## [0.3.1](https://github.com/christopherqueenconsulting/linkedin_engagement_manager/compare/v0.3.0...v0.3.1) (2026-06-25)
 
 
