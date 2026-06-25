@@ -1,4 +1,3 @@
-import base64
 import os
 import random
 import time
@@ -11,8 +10,11 @@ from cqc_lem.utilities.ai.tools import search_recent_news, search_with_perplexit
 from cqc_lem.utilities.linkedin.profile import LinkedInProfile
 from cqc_lem.utilities.logger import myprint, log_debug, log_error, log_warning
 from cqc_lem.utilities.utils import create_folder_if_not_exists, save_video_url_to_dir
+from cqc_lem.utilities.env_constants import DEFAULT_VIDEO_MODEL, DEFAULT_IMAGE_MODEL, DEFAULT_IMAGE_RATIO
+# create_runway_video lives in video_models (model abstraction); re-exported here
+# so existing `from ai_helper import create_runway_video` imports keep working.
+from cqc_lem.utilities.ai.video_models import create_runway_video  # noqa: F401
 from dotenv import load_dotenv
-from runwayml import RunwayML
 
 # Load .env file
 load_dotenv()
@@ -1536,19 +1538,44 @@ def generate_dall_e_image_from_prompt(prompt: str, size: str = "1024x1024"):
         return response.data[0].url
 
 
-def get_flux_image_prompt_from_ai(post_content: str):
+def _profile_visual_context(profile: "LinkedInProfile | None") -> str:
+    """Short brand/context line for image prompts, built from a user's profile."""
+    if profile is None:
+        return ""
+    bits = []
+    if profile.job_title:
+        bits.append(f"a {profile.job_title}")
+    if profile.industry:
+        bits.append(f"in the {profile.industry} industry")
+    if profile.company_name:
+        bits.append(f"at {profile.company_name}")
+    if not bits:
+        return ""
+    return (
+        "The author is " + " ".join(bits) + ". "
+        "Make the visual feel on-brand, credible, and relevant to this professional "
+        "context.\n\n"
+    )
+
+
+def get_flux_image_prompt_from_ai(post_content: str, *, profile: "LinkedInProfile | None" = None,
+                                  ratio: str = "1:1") -> str:
+    """Generate a Flux.1 image prompt from the post content and optional profile.
+
+    The prompt is engineered for a single attention-drawing focal subject and brand
+    alignment — the image must stop a prospect mid-scroll, not be abstract art.
     """
-       Generate a Flux.1 image prompt from the provided post content
-       """
 
-    prompt = f"""Here’s a LinkedIn post: <post_content>{post_content}</post_content>.
+    profile_context = _profile_visual_context(profile)
 
-    Analyze the post and, based on its themes, select a focal point or core message to emphasize. 
-    Decide on a tone or style that creatively aligns with the post but think outside the box—incorporate unexpected interpretations, moods, or styles that give the visual concept a fresh and imaginative twist.
-    
-    Your response should include a single, detailed paragraph describing the image scene, style, and mood in a way that feels unique and specific to this post. 
-    Each response to similar posts should offer a different perspective, approach, or creative take.
+    prompt = f"""{profile_context}Here is a LinkedIn post: <post_content>{post_content}</post_content>.
 
+    Pick ONE clear focal point that best represents this post and describe a single,
+    photorealistic, professional image built around it. Compose it for a {ratio}
+    aspect ratio. Keep it specific and grounded — not abstract or surreal.
+
+    Respond with a single detailed paragraph describing the scene, subject, setting,
+    lighting, and color — no preamble.
     """
 
     content = [{"type": "text", "text": prompt}]
@@ -1556,39 +1583,31 @@ def get_flux_image_prompt_from_ai(post_content: str):
     # System prompt to be included in every request
     system_prompt = {
         "role": "system",
-        "content": f"""Act as a **world-class visual content creator and prompt engineer specializing in unique AI-generated imagery**. 
-        Your task is to craft highly imaginative and detailed image descriptions that translate the essence of a LinkedIn post into extraordinary visuals. 
-        The goal is to create visually distinct, outside-the-box concepts, ensuring variety and originality in every image prompt.  
+        "content": """Act as a world-class commercial visual director creating
+        scroll-stopping LinkedIn imagery. Your image descriptions must read like a
+        brief for a professional photoshoot, optimized to draw the attention of
+        business prospects.
 
-        ### Step-by-Step Instructions:  
-        
-        1. **Analyze the Post:**
-           - Identify the **core message** or theme of the post, capturing both explicit content and implied meanings.
-           - Recognize the **tone**, **emotion**, and **key metaphors** conveyed in the post.  
-           - Extract **unconventional angles or perspectives** to spark originality.  
-        
-        2. **Innovate the Scene:**
-           - **Core Concept:** Pinpoint the central idea or subject that visually represents the post.
-           - **Unexpected Creativity:** Go beyond obvious interpretations; add surreal, abstract, or symbolic elements to make the image unique.
-           - **Style:** Choose a visual style, referencing artistic techniques, movements, or imaginative aesthetics (e.g., steampunk fusion, futuristic minimalism, or ethereal dreamscapes).  
-           - **Composition:** Detail a balanced or intentionally dynamic arrangement, suggesting unique perspectives or camera angles.  
-           - **Lighting:** Specify unique or experimental lighting (e.g., "luminous glow with starlight accents" or "moody fog with ethereal blue undertones").  
-           - **Color Palette:** Recommend a striking or harmonious color scheme that amplifies the post’s mood and theme.
-           - **Mood/Atmosphere:** Reflect the emotional resonance or underlying energy, infusing elements that evoke the intended response.
-           - **Technical Elements:** Suggest additional visual or technical features that make the image exceptional (e.g., "wide lens for expansive depth" or "macro perspective on intricate details").  
-        
-        3. **Incorporate Symbolism and Details:**
-           - Add unexpected metaphors, symbols, or creative background elements to enhance the narrative (e.g., "a phoenix rising in a city of glass" or "a vast tree with digital leaves representing ideas").  
-        
-        4. **Generate the Prompt:**
-           - Combine all elements into a single, fluid, detailed paragraph with vibrant, evocative language.
-           - **Avoid repetition, generic phrasing, or predictable descriptions.**
-           - Ensure every prompt is designed to inspire unique, high-quality visuals.  
-        
-        ### Output Format:  
-        - One paragraph, richly descriptive, without prefixes or additional instructions.  
-        - No system text, introductions, or explanations—just the prompt.
-   
+        ### Required qualities
+        - **One clear focal subject** in the foreground — ideally a real person or a
+          tangible object central to the post's message. When a person is present,
+          they make confident eye contact with the camera.
+        - **Attention-drawing composition:** strong foreground/background separation,
+          shallow depth of field, and a bold, high-contrast color accent that makes
+          the subject pop in a busy feed.
+        - **Professional & on-brand:** modern, clean, and credible for the author's
+          stated industry. Photorealistic by default; tasteful editorial illustration
+          only when it clearly fits.
+        - **Good lighting:** natural or studio lighting that flatters the subject.
+
+        ### Hard constraints
+        - **NO text, letters, words, numbers, logos, watermarks, captions, charts, or
+          UI** anywhere in the image — generators render these as garbled artifacts.
+        - No collages, no split screens, no busy montages — one cohesive scene.
+        - Avoid surreal, steampunk, glitch, or abstract treatments.
+
+        ### Output
+        One richly descriptive paragraph, no prefixes, no explanation — just the prompt.
         """
     }
 
@@ -1621,25 +1640,37 @@ def get_flux_image_prompt_from_ai(post_content: str):
     return content
 
 
-def get_flux_image_via_replicate(prompt: str, ref: str = "black-forest-labs/flux-dev"):
-    output = replicate.run(
-        ref,
-        input={
+def get_flux_image_via_replicate(prompt: str, ref: str = DEFAULT_IMAGE_MODEL, *,
+                                 aspect_ratio: str = "1:1"):
+    if "1.1-pro" in ref:
+        # flux-1.1-pro uses a different (smaller) input schema than flux-dev.
+        input_params = {
+            "prompt": prompt,
+            "aspect_ratio": aspect_ratio,
+            "output_format": "png",
+            "output_quality": 100,
+            "prompt_upsampling": True,
+            "safety_tolerance": 2,
+        }
+    else:
+        input_params = {
             "prompt": prompt,
             "go_fast": True,
             "guidance": 3.5,
             "megapixels": "1",
             "num_outputs": 1,
-            "aspect_ratio": "1:1",
+            "aspect_ratio": aspect_ratio,
             "output_format": "webp",
             "output_quality": 100,
             "prompt_strength": 0.8,
-            "num_inference_steps": 28
+            "num_inference_steps": 28,
         }
-    )
+
+    output = replicate.run(ref, input=input_params)
 
     print("Flux Image via Replicate:")
-    url = str(output[0])
+    # flux-dev returns a list; flux-1.1-pro returns a single output object.
+    url = str(output[0]) if isinstance(output, (list, tuple)) else str(output)
     print(url)
 
     # Get the folder name of the parent of the url image
@@ -1658,7 +1689,8 @@ def get_flux_image_via_replicate(prompt: str, ref: str = "black-forest-labs/flux
     return video_file_path
 
 
-def generate_flux1_image_from_prompt(prompt: str):
+def generate_flux1_image_from_prompt(prompt: str, *, ratio: str = DEFAULT_IMAGE_RATIO,
+                                     image_model: str = DEFAULT_IMAGE_MODEL):
     """
     video_file_path = get_flux_image_via_huggingface(prompt)
 
@@ -1684,10 +1716,11 @@ def generate_flux1_image_from_prompt(prompt: str):
     return video_file_dest
     """
 
-    return get_flux_image_via_replicate(prompt)
+    return get_flux_image_via_replicate(prompt, ref=image_model, aspect_ratio=ratio)
 
 
-def generate_post_image(prompt: str, user_id: int) -> str:
+def generate_post_image(prompt: str, user_id: int, *, ratio: str = DEFAULT_IMAGE_RATIO,
+                        image_model: str = DEFAULT_IMAGE_MODEL) -> str:
     """Generate a LinkedIn post image, using the user's active avatar LoRA when available.
 
     Falls back to the base Flux.1 model when the user has no active succeeded avatar.
@@ -1699,20 +1732,29 @@ def generate_post_image(prompt: str, user_id: int) -> str:
     if avatar and avatar.get("status") == "succeeded" and avatar.get("model_ref"):
         full_prompt = f"{avatar['trigger_word']}, {prompt}"
         return generate_image_with_avatar(full_prompt, avatar["model_ref"])
-    return generate_flux1_image_from_prompt(prompt)
+    return generate_flux1_image_from_prompt(prompt, ratio=ratio, image_model=image_model)
 
 
-def get_runway_ml_video_prompt_from_ai(post_content: str, image_prompt: str):
+def get_runway_ml_video_prompt_from_ai(post_content: str, image_prompt: str, *,
+                                       model: str = DEFAULT_VIDEO_MODEL) -> str:
+    """Generate a motion-first Runway Gen-4 video prompt.
+
+    Gen-4 image-to-video uses the IMAGE to define the scene; the text prompt should
+    describe ONLY camera and subject motion, in plain concrete terms. Keyword-stuffed
+    cinematic prompts (the old Gen-3 style) degrade Gen-4 output.
     """
-       Generate a RunwayMl video prompt from the provided post content and image prompt
-       """
 
-    prompt = f"""Please generate an video prompt based on the following:
+    # veo3.1 supports native audio; other models ignore audio cues.
+    audio_note = ("\n        - You MAY add ONE short ambient audio cue (e.g. \"soft "
+                  "office ambience\") since this model supports native audio."
+                  if model == "veo3.1" else "")
 
-    Post: <content>{post_content}</content>
-    
-    Image Prompt: <image_prompt>{image_prompt}</image_prompt>
-    
+    prompt = f"""Describe the motion for a short video built from this still image.
+
+    Post (for context only): <content>{post_content}</content>
+
+    Image already generated (the scene — do NOT re-describe it):
+    <image_prompt>{image_prompt}</image_prompt>
     """
 
     content = [{"type": "text", "text": prompt}]
@@ -1720,71 +1762,26 @@ def get_runway_ml_video_prompt_from_ai(post_content: str, image_prompt: str):
     # System prompt to be included in every request
     system_prompt = {
         "role": "system",
-        "content": f"""Act like an expert cinematic prompt creator and a master of visual storytelling for Runway Gen-3 Alpha. You specialize in crafting detailed and precise video prompts that transform concepts into immersive 10-second videos. Your task is to create a video prompt based on a provided LinkedIn post and an accompanying image prompt. Leverage both inputs to ensure the final video aligns with the user’s vision and leaves a powerful impact. 
+        "content": f"""You write motion prompts for Runway Gen-4 image-to-video. The
+        input image already defines the subject, composition, colors, and style — your
+        job is to describe ONLY what moves.
 
-        You must strictly adhere to the following guidelines:
-        
-        ---
-        
-        #### **Step-by-Step Instructions:**
-        
-        1. **Analyze Inputs:**
-           - **Post:** Extract key themes, tone, emotions, and significant keywords from the provided content.
-           - **Image Prompt:** Identify the key visual elements, color schemes, subjects, and mood conveyed by the image.
-           - Combine insights from both inputs to develop a unified concept for the video prompt.
-        
-        2. **Define the Video Objective:**
-           - Ensure the video reflects the essence of the LinkedIn post while visually harmonizing with the style and elements of the image prompt.
-           - Aim for a visually compelling 10-second scene with high emotional or thematic resonance.
-        
-        3. **Compose the Video Prompt:**
-           - Use the following structured format to ensure clarity and detail:
-             ```
-             [camera movement]: [establishing scene]. [additional details]. [lighting and style].
-             ```
-           - Ensure every section of the prompt enhances the video's impact:
-             - **Camera Movement:** Specify movements such as dynamic motion, FPV, slow motion, or close-up.
-             - **Scene Description:** Vividly describe the environment, subject(s), and actions, ensuring they align with the LinkedIn post’s core message and the image’s visual tone.
-             - **Lighting and Style:** Choose lighting styles (e.g., backlit, lens flare, diffused) and aesthetics (e.g., cinematic, moody, glitchcore) to complement the scene and reinforce the intended mood.
-        
-        4. **Leverage Keyword Options:**
-           - Select and integrate relevant keywords from the following categories to enrich the prompt:
-             - **Camera Styles:** Low angle, high angle, overhead, FPV, handheld, wide angle, close-up, macro cinematography, over-the-shoulder, tracking, establishing wide, 50mm lens, SnorriCam, realistic documentary, camcorder.
-             - **Lighting Styles:** Diffused lighting, silhouette, lens flare, backlit, side-lit, [color] gel lighting, Venetian lighting.
-             - **Movement Speeds:** Dynamic motion, slow motion, fast motion, timelapse.
-             - **Movement Types:** Grows, emerges, explodes, ascends, undulates, warps, transforms, ripples, shatters, unfolds, vortex.
-             - **Style and Aesthetic:** Moody, cinematic, iridescent, home video VHS, glitchcore.
-             - **Text Styles:** Bold, graffiti, neon, varsity, embroidery.
-        
-        5. **Iterative Refinement:**
-           - Ensure repeated or emphasized concepts reinforce key themes from both inputs.
-           - Adjust camera movements, lighting, or aesthetic choices to refine adherence to the envisioned output.
-        
-        6. **Final Verification:**
-           - Review the prompt for clarity, cohesiveness, and creativity.
-           - Confirm all critical elements and keywords are present to achieve the intended cinematic effect.
-        
-        ---
-        
-        #### **Example Output:**
-        
-        **Inputs:**  
-        - Post: <content>"Breaking barriers in the tech industry, we celebrate resilience and innovation."</content>  
-        - Image Prompt: <image_prompt>A silhouette of a person standing on a glowing circuit board with a starry background.</image_prompt>  
-        
-        **Generated Video Prompt:**  
-        "Dynamic FPV shot: The camera glides low over a glowing circuit board, revealing a silhouetted figure standing tall amidst a backdrop of sparkling stars. The figure's outline pulses with an iridescent glow, symbolizing energy and resilience. Lighting: Backlit with lens flare accents, cinematic tones. Style: Iridescent and futuristic."
-        
-        ---
-        
-        ### Your Final Steps: 
-        - Take a deep breath and work on this problem step-by-step.
-        - Do not surround your response in quotes or added any additional system text. 
-        - Do not share your thoughts nor show your work. 
-        - Do not need to say "Create" Just start describing it.
-        - Your response must be less than 512 characters toal including white spaces and punctuation.
-        - Only respond with one final response without the prefix "Generated Video Prompt:".
+        ### Rules
+        - Describe camera movement and subject motion in simple, concrete, physical
+          terms (e.g. "slow push-in toward the subject; she turns her head and smiles;
+          gentle hair movement; subtle background blur shift").
+        - Lead with the camera move, then the subject's motion.
+        - Keep motion natural and subtle — this is a professional clip, not a music video.
+        - NO negatives ("no X"), NO style/lighting/aesthetic adjectives, NO film-stock
+          or text-effect keywords, NO scene re-description.
+        - 1–3 short sentences, well under 480 characters.{audio_note}
 
+        ### Example
+        Image: a founder at a standing desk in a bright office.
+        Motion prompt: "Slow push-in toward the founder. She looks up from her laptop
+        and smiles at the camera. Soft papers flutter in the background."
+
+        Output only the motion prompt — no quotes, no prefix, no explanation.
         """
     }
 
@@ -1798,7 +1795,7 @@ def get_runway_ml_video_prompt_from_ai(post_content: str, image_prompt: str):
     response = _call_llm(
         model="lem-simple",  # Specify the model you want to use
         messages=[system_prompt, user_message],  # System prompt + current user prompt
-        temperature=round(random.uniform(0.5, 0.7), 2),  # Encourage creative but logical outputs
+        temperature=round(random.uniform(0.4, 0.6), 2),  # Concrete, low-embellishment motion
         top_p=round(random.uniform(0.8, 0.9), 2),  # Prioritize high-probability tokens
         frequency_penalty=round(random.uniform(0.6, 0.8), 2),  # Discourage repetition
         presence_penalty=round(random.uniform(0.5, 0.7), 2),  # Encourage exploration of new ideas
@@ -1811,39 +1808,6 @@ def get_runway_ml_video_prompt_from_ai(post_content: str, image_prompt: str):
     content = response.choices[0].message.content.strip()
     return content
 
-
-def create_runway_video(image_path: str, prompt: str):
-    """Create a video using RunwayML"""
-
-    runway_client = RunwayML()
-
-    # encode image to base64
-    with open(image_path, "rb") as f:
-        base64_image = base64.b64encode(f.read()).decode("utf-8")
-
-    # Create a new image-to-video task using the "gen3a_turbo" model
-    task = runway_client.image_to_video.create(
-        model='gen3a_turbo',
-        # Point this at your own image file
-        prompt_image=f"data:image/png;base64,{base64_image}",
-        prompt_text=prompt,
-    )
-    task_id = task.id
-
-    # Poll the task until it's complete
-    time.sleep(10)  # Wait for a second before polling
-    task = runway_client.tasks.retrieve(task_id)
-    while task.status not in ['SUCCEEDED', 'FAILED']:
-        time.sleep(10)  # Wait for ten seconds before polling
-        task = runway_client.tasks.retrieve(task_id)
-
-    # Get the url from the TaskRetrieveResponse
-    if task.status == 'SUCCEEDED':
-        video_url = task.output[0]
-    else:
-        video_url = None
-
-    return video_url
 
 def ai_check_message_history(message_history_json: str, main_focus: str, message: str, user_name: str = "the recipient"):
     """Check if the message history contains sentiments of the message already. It will return it or try to generate a seamless new message that is tied to the main_focus"""

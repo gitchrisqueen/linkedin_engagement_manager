@@ -38,7 +38,8 @@ from cqc_lem.utilities.email import generate_pin, hash_pin, send_pin_email
 from cqc_lem.utilities.linkedin.token_refresh import (
     get_token_expiry, is_token_expired, is_token_expiring_soon, attempt_token_refresh,
 )
-from cqc_lem.utilities.env_constants import LI_CLIENT_ID, LI_CLIENT_SECRET, LI_REDIRECT_URL, LI_STATE_SALT, ADMIN_SECRET, API_ACCESS_TOKENS
+from cqc_lem.utilities.env_constants import LI_CLIENT_ID, LI_CLIENT_SECRET, LI_REDIRECT_URL, LI_STATE_SALT, ADMIN_SECRET, API_ACCESS_TOKENS, \
+    DEFAULT_IMAGE_MODEL, DEFAULT_VIDEO_MODEL, DEFAULT_VIDEO_RATIO
 from cqc_lem.utilities.logger import myprint
 from cqc_lem.utilities.mime_type_helper import get_file_mime_type
 from cqc_lem.utilities.observability import track_api_call
@@ -54,7 +55,7 @@ from fastapi.staticfiles import StaticFiles
 from linkedin_api.clients.auth.client import AuthClient
 from linkedin_api.clients.restli.client import RestliClient
 from linkedin_api.common.errors import ResponseFormattingError
-from pydantic import BaseModel, computed_field
+from pydantic import BaseModel, computed_field, model_validator
 
 app = FastAPI()
 
@@ -250,6 +251,29 @@ class AdminRegenerateCarouselRequest(BaseModel):
 class AdminRegenerateVideoRequest(BaseModel):
     post_id: int
     user_id: int
+
+
+class VariantCombo(BaseModel):
+    image_model: str = DEFAULT_IMAGE_MODEL
+    video_model: str = DEFAULT_VIDEO_MODEL
+    ratio: str = DEFAULT_VIDEO_RATIO
+    duration: int = 5
+    seed: Optional[int] = None
+    include_video: bool = True
+
+
+class GenerateMediaVariantsRequest(BaseModel):
+    post_id: Optional[int] = None
+    text: Optional[str] = None
+    topic: Optional[str] = None
+    user_id: Optional[int] = None
+    combos: Optional[List[VariantCombo]] = None  # None = default 3-variant matrix
+
+    @model_validator(mode="after")
+    def _require_source(self):
+        if self.post_id is None and not (self.text or self.topic):
+            raise ValueError("Provide post_id or text/topic")
+        return self
 
 
 class GenerateCarouselPreviewRequest(BaseModel):
@@ -1414,6 +1438,41 @@ def admin_regenerate_video(
 
     myprint(f"admin/regenerate-video: regenerated post_id={request.post_id} -> {new_url}")
     return ResponseModel(status_code=200, detail={"post_id": request.post_id, "video_url": new_url})
+
+
+@router.post("/admin/generate-media-variants", responses={
+    200: {"description": "Variants generated"},
+    403: {"description": "Forbidden"},
+    422: {"description": "Provide post_id or text/topic"},
+    500: {"description": "Generation failed"},
+})
+def admin_generate_media_variants(
+    request: GenerateMediaVariantsRequest,
+    x_admin_secret: Optional[str] = Header(default=None),
+) -> ResponseModel:
+    """Generate image/video variants for review WITHOUT mutating any post.
+
+    Returns public /api/assets URLs + a cost estimate. Defaults to a 3-variant
+    Gen-4 Turbo matrix; pass `combos` to compare other models/ratios/seeds.
+    """
+    _require_admin(x_admin_secret)
+
+    from cqc_lem.app.generate_variants import generate_media_variants
+    combos = [c.model_dump() for c in request.combos] if request.combos else None
+    try:
+        payload = generate_media_variants(
+            post_id=request.post_id, text=request.text, topic=request.topic,
+            user_id=request.user_id, combos=combos,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc))
+    except Exception as exc:
+        myprint(f"admin/generate-media-variants: failed — {exc}")
+        raise HTTPException(status_code=500, detail=str(exc))
+
+    myprint(f"admin/generate-media-variants: batch={payload['batch_id']} "
+            f"variants={len(payload['variants'])} est=${payload['total_estimated_cost_usd']}")
+    return ResponseModel(status_code=200, detail=payload)
 
 
 @router.get("/carousel-templates", responses={200: {"description": "Available carousel templates"}})

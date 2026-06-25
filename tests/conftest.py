@@ -138,6 +138,23 @@ def mock_replicate_training():
         yield {"create": mock_create, "get": mock_get, "training": training}
 
 
+@pytest.fixture
+def mock_runwayml():
+    """Mock the RunwayML SDK used by video_models (task completes immediately)."""
+    with patch("cqc_lem.utilities.ai.video_models.RunwayML") as mock_cls, \
+         patch("cqc_lem.utilities.ai.video_models.time.sleep"):
+        client = MagicMock()
+        mock_cls.return_value = client
+        task = MagicMock()
+        task.id = "task-mock-1"
+        task.status = "SUCCEEDED"
+        task.output = ["https://runway.example/video.mp4"]
+        client.image_to_video.create.return_value = task
+        client.text_to_video.create.return_value = task
+        client.tasks.retrieve.return_value = task
+        yield {"client": client, "class": mock_cls, "task": task}
+
+
 def pytest_collection_modifyitems(config, items):
     """Auto-skip tests whose external service keys are absent or placeholder."""
     # --- REPLICATE_API_TOKEN ---

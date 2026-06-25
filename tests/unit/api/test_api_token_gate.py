@@ -55,7 +55,6 @@ class TestApiTokenRequired:
 
     @pytest.mark.parametrize("path", [
         "/api/posts",
-        "/api/assets",
         "/api/avatar/training",
     ])
     def test_business_routes_gated(self, main_mod, path):
@@ -67,6 +66,7 @@ class TestApiTokenRequired:
         "/api/auth/email/verify",
         "/api/auth/session",
         "/api/billing/webhook",   # Stripe (signature-verified)
+        "/api/assets",            # public: LinkedIn fetches media over unauth URL
         "/health",                # non-/api
         "/auth/linkedin/callback",
         "/assets/index.js",       # SPA static
@@ -83,28 +83,24 @@ class TestApiTokenRequired:
 class TestGateMiddleware:
     TOKEN = "secret-token-xyz"
 
+    # A gated, non-existent /api route exercises the gate without invoking a real
+    # handler (/api/assets is public by design, so it can't test the gate).
+    GATED_PROBE = "/api/__gated_probe__"
+
     def test_guarded_route_without_token_is_401(self, main_mod, client):
         with patch.object(main_mod, "_API_ACCESS_TOKEN_SET", {self.TOKEN}):
-            resp = client.get("/api/assets", params={"file_name": "x.png"})
+            resp = client.get(self.GATED_PROBE)
         assert resp.status_code == 401
 
     def test_guarded_route_wrong_token_is_401(self, main_mod, client):
         with patch.object(main_mod, "_API_ACCESS_TOKEN_SET", {self.TOKEN}):
-            resp = client.get(
-                "/api/assets",
-                params={"file_name": "x.png"},
-                headers={"Authorization": "Bearer wrong"},
-            )
+            resp = client.get(self.GATED_PROBE, headers={"Authorization": "Bearer wrong"})
         assert resp.status_code == 401
 
     def test_guarded_route_valid_token_passes_gate(self, main_mod, client):
-        # Valid token clears the gate; the handler then 404s on the missing file.
+        # Valid token clears the gate; routing then 404s on the unknown path.
         with patch.object(main_mod, "_API_ACCESS_TOKEN_SET", {self.TOKEN}):
-            resp = client.get(
-                "/api/assets",
-                params={"file_name": "x.png"},
-                headers={"Authorization": f"Bearer {self.TOKEN}"},
-            )
+            resp = client.get(self.GATED_PROBE, headers={"Authorization": f"Bearer {self.TOKEN}"})
         assert resp.status_code != 401
 
     def test_gate_disabled_allows_unauthenticated(self, main_mod, client):

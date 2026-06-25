@@ -254,6 +254,27 @@ def get_my_profile(driver, wait, user_email: str, user_password: str, user_id: O
     return profile
 
 
+def load_profile_for_user(user_id: int) -> "LinkedInProfile | None":
+    """Best-effort load of a cached LinkedInProfile for a user.
+
+    Returns None when there's no cached profile or the stored JSON can't be parsed —
+    callers use it only to enrich prompts, so missing data must never raise.
+    """
+    try:
+        raw = get_linked_in_profile_by_user_id(user_id)
+    except Exception as e:
+        myprint(f"load_profile_for_user: lookup failed for user_id={user_id}: {e}")
+        return None
+    if not raw:
+        return None
+    profile_json_str = raw[0] if isinstance(raw, tuple) else raw
+    try:
+        return LinkedInProfile.model_validate_json(profile_json_str)
+    except Exception as e:
+        myprint(f"load_profile_for_user: could not parse profile for user_id={user_id}: {e}")
+        return None
+
+
 def get_linkedin_profile_from_url(driver, wait, profile_url, is_main_user=False, force_save=False):
     # Get the profile from the DB if it exists
     profile_json = get_linked_in_profile_by_url(profile_url)

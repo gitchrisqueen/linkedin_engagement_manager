@@ -172,7 +172,8 @@ class TestGeneratePostImage:
 
             result = generate_post_image("a business photo", 99)
 
-            mock_flux.assert_called_once_with("a business photo")
+            mock_flux.assert_called_once()
+            assert mock_flux.call_args[0][0] == "a business photo"
             assert result == "/flux/image.webp"
 
     def test_falls_back_when_avatar_not_succeeded(self):
@@ -192,5 +193,6 @@ class TestGeneratePostImage:
 
             result = generate_post_image("a business photo", 1)
 
-            mock_flux.assert_called_once_with("a business photo")
+            mock_flux.assert_called_once()
+            assert mock_flux.call_args[0][0] == "a business photo"
             assert result == "/flux/image.webp"

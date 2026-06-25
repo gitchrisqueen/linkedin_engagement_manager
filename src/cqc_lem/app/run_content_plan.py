@@ -21,8 +21,9 @@ from cqc_lem.utilities.db import get_post_type_counts, insert_planned_post, upda
     get_user_blog_url, get_user_sitemap_url, get_active_user_ids, get_planned_posts_for_next_week, PostStatus, \
     update_db_post_video_url, update_db_post_status, PostType, get_user_preferences, \
     update_db_post_carousel_slides, get_post_content
-from cqc_lem.utilities.env_constants import API_URL_FINAL
-from cqc_lem.utilities.linkedin.helper import get_my_profile
+from cqc_lem.utilities.env_constants import API_URL_FINAL, DEFAULT_VIDEO_MODEL, DEFAULT_VIDEO_RATIO, \
+    DEFAULT_IMAGE_RATIO, AI_DISCLOSURE_ENABLED, AI_DISCLOSURE_TEXT
+from cqc_lem.utilities.linkedin.helper import get_my_profile, load_profile_for_user
 from cqc_lem.utilities.linkedin_formatter import sanitize_for_linkedin
 from cqc_lem.utilities.linkedin.profile import LinkedInProfile
 from cqc_lem.utilities.logger import myprint
@@ -309,25 +310,41 @@ def _extract_slide_texts(carousel_obj) -> list[str]:
     return texts
 
 
+def _apply_ai_disclosure(content: str) -> str:
+    """Append the AI-visuals disclosure line to a caption (idempotent)."""
+    if not AI_DISCLOSURE_ENABLED or not content:
+        return content
+    marker = AI_DISCLOSURE_TEXT.strip()
+    if marker and marker in content:
+        return content
+    return content + AI_DISCLOSURE_TEXT
+
+
 def create_video_content(user_id: int, stage: str) -> tuple[str, str | None]:
     # Get Text Content
     text_content = create_text_post(user_id, stage)
 
+    # Load profile once so the image prompt is brand/role-aligned
+    user_profile = load_profile_for_user(user_id)
+
     try:
-        # Create an image prompt from the text content
-        image_prompt = get_flux_image_prompt_from_ai(text_content)
+        # Create an image prompt from the text content (profile-aligned, square)
+        image_prompt = get_flux_image_prompt_from_ai(
+            text_content, profile=user_profile, ratio=DEFAULT_IMAGE_RATIO)
         myprint(f"Generated AI Image Prompt: {image_prompt[:100]}...")
 
-        # Create the image from the image prompt using flux1
-        image_path = generate_flux1_image_from_prompt(image_prompt)
+        # Create the image from the image prompt using flux1 (matches video ratio)
+        image_path = generate_flux1_image_from_prompt(image_prompt, ratio=DEFAULT_IMAGE_RATIO)
         myprint(f"Generated Image From Prompt | Path: {image_path}")
 
-        # Create a video prompt from the text content and image
-        video_prompt = get_runway_ml_video_prompt_from_ai(text_content, image_prompt)
+        # Create a motion-first video prompt for the configured Gen-4 model
+        video_prompt = get_runway_ml_video_prompt_from_ai(
+            text_content, image_prompt, model=DEFAULT_VIDEO_MODEL)
         video_prompt = video_prompt[:512]
 
-        # Create a video from the image url and video prompt using Runway ML
-        video_url = create_runway_video(image_path, video_prompt)
+        # Create a video from the image and video prompt using Runway ML
+        video_url = create_runway_video(
+            image_path, video_prompt, model=DEFAULT_VIDEO_MODEL, ratio=DEFAULT_VIDEO_RATIO)
         myprint(f"Generated Video URL: {video_url}")
     except Exception as e:
         myprint(f"Video generation failed ({type(e).__name__}: {e}) — trying Pexels stock video")
@@ -360,12 +377,22 @@ def regenerate_video_for_post(post_id: int) -> Optional[str]:
         myprint(f"regenerate_video_for_post: no content for post_id={post_id}")
         return None
 
+    user_profile = None
+    try:
+        from cqc_lem.utilities.db import get_post_user_id
+        user_profile = load_profile_for_user(get_post_user_id(post_id))
+    except Exception as e:
+        myprint(f"regenerate_video_for_post: profile load skipped: {e}")
+
     video_src_url = None
     try:
-        image_prompt = get_flux_image_prompt_from_ai(text_content)
-        image_path = generate_flux1_image_from_prompt(image_prompt)
-        video_prompt = get_runway_ml_video_prompt_from_ai(text_content, image_prompt)[:512]
-        video_src_url = create_runway_video(image_path, video_prompt)
+        image_prompt = get_flux_image_prompt_from_ai(
+            text_content, profile=user_profile, ratio=DEFAULT_IMAGE_RATIO)
+        image_path = generate_flux1_image_from_prompt(image_prompt, ratio=DEFAULT_IMAGE_RATIO)
+        video_prompt = get_runway_ml_video_prompt_from_ai(
+            text_content, image_prompt, model=DEFAULT_VIDEO_MODEL)[:512]
+        video_src_url = create_runway_video(
+            image_path, video_prompt, model=DEFAULT_VIDEO_MODEL, ratio=DEFAULT_VIDEO_RATIO)
     except Exception as e:
         myprint(f"regenerate_video_for_post: RunwayML failed ({type(e).__name__}: {e}) — trying Pexels")
         try:
@@ -383,6 +410,13 @@ def regenerate_video_for_post(post_id: int) -> Optional[str]:
     videos_dir = os.path.join(assets_dir, 'videos', 'runwayml')
     create_folder_if_not_exists(videos_dir)
     video_file_path = save_video_url_to_dir(video_src_url, videos_dir)
+    # Only AI (Runway, http) output gets C2PA AI credentials — not Pexels stock.
+    if str(video_src_url).startswith("http"):
+        try:
+            from cqc_lem.utilities.c2pa_helper import add_ai_content_credentials
+            add_ai_content_credentials(video_file_path)
+        except Exception as e:
+            myprint(f"regenerate_video_for_post: C2PA signing skipped: {e}")
     video_file_name = os.path.basename(video_file_path)
     api_video_url = f"{API_URL_FINAL}/api/assets?file_name=videos/runwayml/{video_file_name}"
     update_db_post_video_url(post_id, api_video_url)
@@ -864,12 +898,22 @@ def auto_create_weekly_content(user_id: int = None):
             continue
 
         # Copy the video from url to our assets/video folder and store it to the database for later retrieval via api call
+        ai_video = False
         if video_url:
+            # AI (Runway) output is a remote http URL; Pexels fallback is a local path.
+            ai_video = str(video_url).startswith("http")
             # Define and create assets_dir / videos
             videos_dir = os.path.join(assets_dir, 'videos', 'runwayml')
             create_folder_if_not_exists(videos_dir)
             video_file_path = save_video_url_to_dir(video_url, videos_dir)
             myprint(f"Video from url: {video_url} | Saved to: {video_file_path}")
+            # Attach AI Content Credentials to AI-generated video only (not stock).
+            if ai_video:
+                try:
+                    from cqc_lem.utilities.c2pa_helper import add_ai_content_credentials
+                    add_ai_content_credentials(video_file_path)
+                except Exception as e:
+                    myprint(f"C2PA signing skipped for post_id={post_id}: {e}")
             # Get the file name from the video file path
             video_file_name = os.path.basename(video_file_path)
 
@@ -879,6 +923,10 @@ def auto_create_weekly_content(user_id: int = None):
 
             # Update the database with the video url
             update_db_post_video_url(post_id, api_video_url)
+
+        # Disclose AI-generated visuals in the caption (caption-line fallback for C2PA)
+        if ai_video:
+            content = _apply_ai_disclosure(content)
 
         # Update the database with the created content
         myprint(f"Updating content for post_id: {post_id}")

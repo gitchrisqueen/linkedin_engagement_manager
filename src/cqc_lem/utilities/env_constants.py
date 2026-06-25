@@ -40,6 +40,28 @@ HF_TOKEN = get_constant_from_env('HF_TOKEN')
 REPLICATE_API_TOKEN = get_constant_from_env('REPLICATE_API_TOKEN')
 REPLICATE_USERNAME = get_constant_from_env('REPLICATE_USERNAME', default_value='')
 RUNWAYML_API_SECRET = get_constant_from_env('RUNWAYML_API_SECRET')
+
+# --- Media generation defaults ---
+# Video model: gen4_turbo (default, cheap, drop-in for the sunsetting gen3a_turbo),
+# gen4.5 (quality) and veo3.1 (realism) are opt-in per-call. Ratio is the Runway
+# resolution string; 960:960 is square 1:1 to match the base image.
+DEFAULT_VIDEO_MODEL = get_constant_from_env('DEFAULT_VIDEO_MODEL', default_value='gen4_turbo')
+DEFAULT_VIDEO_RATIO = get_constant_from_env('DEFAULT_VIDEO_RATIO', default_value='960:960')
+DEFAULT_IMAGE_MODEL = get_constant_from_env('DEFAULT_IMAGE_MODEL', default_value='black-forest-labs/flux-dev')
+DEFAULT_IMAGE_RATIO = get_constant_from_env('DEFAULT_IMAGE_RATIO', default_value='1:1')
+
+# AI disclosure: append a short caption line to AI-visual posts. Guaranteed-visible
+# fallback for C2PA (which self-signed certs can't make LinkedIn trust yet).
+AI_DISCLOSURE_ENABLED = isTrue(get_constant_from_env('AI_DISCLOSURE_ENABLED', default_value='True'))
+AI_DISCLOSURE_TEXT = get_constant_from_env('AI_DISCLOSURE_TEXT', default_value='\n\n(Visuals created with AI)')
+
+# C2PA Content Credentials: best-effort signing of generated assets. No-ops unless
+# enabled AND a cert+key pair is present. Self-signed is valid C2PA but flagged
+# untrusted by validators — swap in a CA-issued cert (no code change) to gain trust.
+C2PA_ENABLED = isTrue(get_constant_from_env('C2PA_ENABLED', default_value='False'))
+C2PA_CERT_PATH = get_constant_from_env('C2PA_CERT_PATH', default_value='')
+C2PA_KEY_PATH = get_constant_from_env('C2PA_KEY_PATH', default_value='')
+
 TZ = get_constant_from_env('TZ', default_value='UTC')
 CQC_LEM_CHECK_SCHEDULE_DELTA_MINUTES = int(get_constant_from_env('CQC_LEM_CHECK_SCHEDULE_DELTA_MINUTES', default_value='5'))
 CQC_LEM_POST_TIME_DELTA_MINUTES = int(get_constant_from_env('CQC_LEM_POST_TIME_DELTA_MINUTES', default_value='20'))
