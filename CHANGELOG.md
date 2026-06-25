@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.3.0](https://github.com/christopherqueenconsulting/linkedin_engagement_manager/compare/v0.2.0...v0.3.0) (2026-06-25)
+
+
+### Features
+
+* **config:** add PUBLIC_BASE_URL taking precedence over ngrok URLs ([#140](https://github.com/christopherqueenconsulting/linkedin_engagement_manager/issues/140)) ([46222f4](https://github.com/christopherqueenconsulting/linkedin_engagement_manager/commit/46222f431abbef636c9ce19bdbb1a6dbf6f39359))
+
 ## [0.2.0](https://github.com/christopherqueenconsulting/linkedin_engagement_manager/compare/v0.1.3...v0.2.0) (2026-06-25)
 
 
