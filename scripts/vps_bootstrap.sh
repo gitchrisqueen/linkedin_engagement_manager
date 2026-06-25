@@ -60,7 +60,7 @@ if ! grep -qiE 'ubuntu' /etc/os-release; then warn "Not Ubuntu — apt/docker st
 step "Installing base packages"
 export DEBIAN_FRONTEND=noninteractive
 apt-get update -y -qq
-apt-get install -y -qq ca-certificates curl git ufw gnupg
+apt-get install -y -qq ca-certificates curl git ufw gnupg acl
 info "ok"
 
 # --- 2. Docker Engine + Compose v2 --------------------------------------------
@@ -134,6 +134,14 @@ else
 fi
 mkdir -p "${APP_DIR}/logs"
 chown -R "$DEPLOY_USER:$DEPLOY_USER" "$APP_DIR"
+# Some containers run as root, others as celeryworker (uid 1000), but they
+# share the bind-mounted logs dir and a single daily logfile. A default ACL
+# lets uid 1000 write even when a root service creates the file first
+# (otherwise the celery workers crash-loop on PermissionError).
+if command -v setfacl >/dev/null 2>&1; then
+  setfacl -R  -m u:1000:rwX "${APP_DIR}/logs" || true
+  setfacl -dR -m u:1000:rwX "${APP_DIR}/logs" || true
+fi
 
 # --- 6. Firewall + SSH hardening ---------------------------------------------
 step "Firewall (SSH-only inbound; Cloudflare Tunnel dials out)"

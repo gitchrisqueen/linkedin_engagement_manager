@@ -22,11 +22,18 @@ docker exec "${MYSQL_HOST:-mysql_db}" \
   | gzip > "${BACKUP_DIR}/db-${STAMP}.sql.gz"
 
 echo "[backup ${STAMP}] archiving chrome-profile volume"
-docker run --rm \
-  -v linkedin_engagement_manager_chrome-profile:/data:ro \
-  -v "${BACKUP_DIR}:/backup" \
-  alpine tar czf "/backup/chrome-profile-${STAMP}.tar.gz" -C /data . 2>/dev/null || \
-  echo "[backup] chrome-profile volume not found (named differently?) — skipping"
+# The volume is Compose-project-prefixed (e.g. lem_chrome-profile), so detect it
+# rather than hardcoding a name — a wrong name makes docker create an empty
+# volume and silently back up nothing.
+CHROME_VOL="$(docker volume ls --format '{{.Name}}' | grep -E '_chrome-profile$' | head -1)"
+if [[ -n "$CHROME_VOL" ]]; then
+  docker run --rm \
+    -v "${CHROME_VOL}:/data:ro" \
+    -v "${BACKUP_DIR}:/backup" \
+    alpine tar czf "/backup/chrome-profile-${STAMP}.tar.gz" -C /data . 2>/dev/null
+else
+  echo "[backup] no *_chrome-profile volume found — skipping"
+fi
 
 echo "[backup ${STAMP}] pruning backups older than ${RETAIN_DAYS} days"
 find "$BACKUP_DIR" -name '*.gz' -mtime "+${RETAIN_DAYS}" -delete
