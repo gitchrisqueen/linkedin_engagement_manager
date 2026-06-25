@@ -1,0 +1,34 @@
+# Cloudflare Tunnel ingress (file-managed alternative).
+#
+# By default the prod stack runs cloudflared in TOKEN mode (TUNNEL_TOKEN in the
+# VPS .env), and ingress hostnames are managed in the Cloudflare Zero Trust
+# dashboard — this file is NOT read in that mode.
+#
+# To manage ingress from the repo instead, create a named tunnel locally:
+#   cloudflared tunnel login
+#   cloudflared tunnel create lem
+#   cloudflared tunnel route dns lem app.example.com   (repeat per hostname)
+# then mount this file + the tunnel credentials into the container and switch
+# the compose command to:  tunnel --config /etc/cloudflared/config.yml run lem
+# (drop TUNNEL_TOKEN). Replace example.com with your zone.
+#
+# Service targets use compose service hostnames on the shared network.
+
+tunnel: lem
+credentials-file: /etc/cloudflared/credentials.json
+
+ingress:
+  # Public: React SPA + FastAPI (API routes require a bearer token, see Part 3).
+  - hostname: app.example.com
+    service: http://web_app:8000
+
+  # Ops tools — keep behind Cloudflare Access policies in the dashboard.
+  - hostname: flower.example.com
+    service: http://flower:8555
+  - hostname: litellm.example.com
+    service: http://litellm:4000
+  - hostname: vnc.example.com
+    service: http://selenium-chrome:7900
+
+  # Required catch-all.
+  - service: http_status:404

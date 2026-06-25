@@ -1,9 +1,10 @@
 name: Deploy CDK Stack to AWS
 
+# Manual-only. The primary deploy path is the Hostinger VPS (build-and-push.yml
+# → deploy). This AWS/CDK workflow is retained for the optional cloud path and
+# no longer runs automatically on pushes to main.
 on:
-  push:
-    branches:
-      - main
+  workflow_dispatch:
 env:
   CDK_VERSION: ${{ vars.CDK_VERSION }}
   AWS_ACCOUNT_ID: ${{ secrets.AWS_ACCOUNT_ID }}

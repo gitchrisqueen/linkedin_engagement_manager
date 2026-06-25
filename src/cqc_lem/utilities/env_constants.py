@@ -112,5 +112,9 @@ else:
 
 ADMIN_SECRET = get_constant_from_env('ADMIN_SECRET')
 
+# Comma-separated bearer tokens accepted on /api routes. Empty disables the gate
+# (local/dev) so only deployments that set it enforce token auth.
+API_ACCESS_TOKENS = get_constant_from_env('API_ACCESS_TOKENS', default_value='')
+
 # Set other constants here
 USE_DOCKER_BROWSER = isTrue(get_constant_from_env('USE_DOCKER_BROWSER', default_value='True'))

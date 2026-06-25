@@ -214,6 +214,20 @@ poetry run ruff check --fix src/ tests/
 
 ## Pull Request Process
 
+### Commit Messages (Conventional Commits — required)
+
+Releases are automated by [release-please](https://github.com/googleapis/release-please),
+which derives the next version and the `CHANGELOG.md` from commit messages on
+`main`. Use [Conventional Commits](https://www.conventionalcommits.org/):
+
+- `feat: ...` → minor version bump (new feature)
+- `fix: ...` → patch version bump (bug fix)
+- `feat!: ...` or a `BREAKING CHANGE:` footer → major version bump
+- `chore: / docs: / refactor: / test: / ci:` → no release on their own
+
+Scopes are encouraged (e.g. `fix(carousel): ...`). When a PR squash-merges, the
+PR title becomes the commit — make it a valid Conventional Commit.
+
 ### Before Submitting
 
 1. **Update your branch** with the latest changes from main:

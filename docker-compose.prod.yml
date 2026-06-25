@@ -1,0 +1,116 @@
+# Production overlay for the Hostinger VPS.
+#   docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+#
+# Differences from the dev base (docker-compose.yml):
+#   - Runs prebuilt GHCR images by tag (no local build, no ./src bind-mount).
+#   - FastAPI runs multi-worker with no --reload (/start-fastapi-cloud).
+#   - No internal ports published to the host — Cloudflare Tunnel reaches
+#     services over the compose network instead.
+#   - Flower requires basic auth; cloudflared is added to expose the stack.
+#   - restart: unless-stopped + resource caps on everything long-running.
+#
+# DOCKER_IMAGE_NAME=ghcr.io/gitchrisqueen/cqc-lem and IMAGE_TAG are set in the
+# VPS .env (IMAGE_TAG is overridden per-deploy by scripts/deploy.sh).
+
+services:
+  web_app:
+    build: !reset null
+    image: "${DOCKER_IMAGE_NAME}:${IMAGE_TAG:-latest}"
+    command: /start-fastapi-cloud
+    restart: unless-stopped
+    # Ship code in the image — drop the dev source/test bind-mounts.
+    volumes:
+      - ./logs:/app/logs
+    ports: !reset []
+    deploy:
+      resources:
+        limits:
+          cpus: '2'
+          memory: 2g
+
+  redis:
+    restart: unless-stopped
+    ports: !reset []
+    deploy:
+      resources:
+        limits:
+          memory: 1g
+
+  mysql:
+    restart: unless-stopped
+    ports: !reset []
+    deploy:
+      resources:
+        limits:
+          memory: 2g
+
+  celery_worker:
+    image: "${DOCKER_IMAGE_NAME}:${IMAGE_TAG:-latest}"
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: '3'
+          memory: 4g
+        reservations:
+          cpus: '1'
+
+  celery_worker_selenium:
+    image: "${DOCKER_IMAGE_NAME}:${IMAGE_TAG:-latest}"
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: '1'
+          memory: 2g
+        reservations:
+          cpus: '0.5'
+
+  celery_beat:
+    image: "${DOCKER_IMAGE_NAME}:${IMAGE_TAG:-latest}"
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 1g
+
+  flower:
+    image: "${DOCKER_IMAGE_NAME}:${IMAGE_TAG:-latest}"
+    restart: unless-stopped
+    ports: !reset []
+    environment:
+      # Replace the dev unauthenticated mode with basic auth + persistence.
+      # Kept behind Cloudflare Access as well (see cloudflared/config.yml).
+      - FLOWER_BASIC_AUTH=${CELERY_FLOWER_USER}:${CELERY_FLOWER_PASSWORD}
+      - FLOWER_PERSISTENT=True
+      - CELERY_TIMEZONE=${TZ:-UTC}
+    deploy:
+      resources:
+        limits:
+          memory: 512m
+
+  selenium-chrome:
+    # already restart: unless-stopped + 2cpu/4g in the base file
+    ports: !reset []
+
+  litellm:
+    # already restart: unless-stopped in the base file
+    ports: !reset []
+    deploy:
+      resources:
+        limits:
+          memory: 1g
+
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+    container_name: cloudflared
+    restart: unless-stopped
+    command: tunnel --no-autoupdate run
+    environment:
+      - TUNNEL_TOKEN=${TUNNEL_TOKEN}
+    depends_on:
+      - web_app
+    deploy:
+      resources:
+        limits:
+          memory: 256m
