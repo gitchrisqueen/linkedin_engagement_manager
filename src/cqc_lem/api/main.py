@@ -247,6 +247,11 @@ class AdminRegenerateCarouselRequest(BaseModel):
     template: Optional[str] = None  # e.g. "bold_listicle", "minimal_dark"; None = auto-pick by stage
 
 
+class AdminRegenerateVideoRequest(BaseModel):
+    post_id: int
+    user_id: int
+
+
 class GenerateCarouselPreviewRequest(BaseModel):
     session_token: str
     stage: str = "awareness"  # awareness | consideration | decision | personal
@@ -1379,6 +1384,36 @@ def admin_regenerate_carousel(
 
     myprint(f"admin/regenerate-carousel: regenerated post_id={request.post_id}")
     return ResponseModel(status_code=200, detail={"post_id": request.post_id, "content_preview": new_content[:120]})
+
+
+@router.post("/admin/regenerate-video", responses={
+    200: {"description": "Video regenerated"},
+    403: {"description": "Forbidden"},
+    404: {"description": "Post not found or not a video"},
+    500: {"description": "Regeneration failed"},
+})
+def admin_regenerate_video(
+    request: AdminRegenerateVideoRequest,
+    x_admin_secret: Optional[str] = Header(default=None),
+) -> ResponseModel:
+    """Regenerate ONLY the video asset for an existing video post (keeps content)."""
+    _require_admin(x_admin_secret)
+
+    post_type = get_post_type(request.post_id)
+    if post_type != PostType.VIDEO:
+        raise HTTPException(status_code=404, detail="Post not found or not a video post")
+
+    from cqc_lem.app.run_content_plan import regenerate_video_for_post
+    try:
+        new_url = regenerate_video_for_post(request.post_id)
+    except Exception as exc:
+        myprint(f"admin/regenerate-video: failed for post_id={request.post_id} — {exc}")
+        raise HTTPException(status_code=500, detail=str(exc))
+    if not new_url:
+        raise HTTPException(status_code=500, detail="Video regeneration failed (no asset produced)")
+
+    myprint(f"admin/regenerate-video: regenerated post_id={request.post_id} -> {new_url}")
+    return ResponseModel(status_code=200, detail={"post_id": request.post_id, "video_url": new_url})
 
 
 @router.get("/carousel-templates", responses={200: {"description": "Available carousel templates"}})
