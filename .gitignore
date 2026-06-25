@@ -185,6 +185,9 @@ compose/local/prometheus/prometheus.yml
 
 *.swp
 package-lock.json
+# The UI lockfile MUST be committed — the Docker image build runs `npm ci`,
+# which requires it. Keep it tracked despite the broad ignore above.
+!src/cqc_lem/ui/package-lock.json
 
 # CDK asset staging directory
 .cdk.staging
