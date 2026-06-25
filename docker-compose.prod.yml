@@ -38,7 +38,9 @@ services:
 
   mysql:
     restart: unless-stopped
-    ports: !reset []
+    # Loopback-only publish so DB GUIs (e.g. Sequel Ace) can reach it via an SSH
+    # tunnel to the VPS; never exposed to the WAN (127.0.0.1 bind + ufw).
+    ports: !override ["127.0.0.1:3306:3306"]
     deploy:
       resources:
         limits:
