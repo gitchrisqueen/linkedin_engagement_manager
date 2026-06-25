@@ -486,6 +486,32 @@ files = [
 beautifulsoup4 = "*"
 
 [[package]]
+name = "c2pa-python"
+version = "0.36.0"
+description = "Python bindings for the C2PA Content Authenticity Initiative (CAI) library"
+optional = false
+python-versions = ">=3.10"
+groups = ["main"]
+files = [
+    {file = "c2pa_python-0.36.0-py3-none-macosx_10_9_universal2.whl", hash = "sha256:e14c87144064220a69c9c463110c164cb0344e4fdd3bfa6eeb9d1ed12cc5becb"},
+    {file = "c2pa_python-0.36.0-py3-none-macosx_10_9_x86_64.whl", hash = "sha256:e542466982ac737d96cc43d25204885a078eace1be63c358668791463d81c208"},
+    {file = "c2pa_python-0.36.0-py3-none-macosx_11_0_arm64.whl", hash = "sha256:e45aa43b6bb477e45122572372232185a71012d4bde32250ddf64a1068e8c26f"},
+    {file = "c2pa_python-0.36.0-py3-none-manylinux_2_28_aarch64.whl", hash = "sha256:d9b9b6680490f4cddf08d6f22d91d6e08c178f2a9d07222da6af0fbbba162e99"},
+    {file = "c2pa_python-0.36.0-py3-none-manylinux_2_28_x86_64.whl", hash = "sha256:f059696aab2c7bca1a200ec533458cf0f34ba76b19ddf88656fbeee627ac2b12"},
+    {file = "c2pa_python-0.36.0-py3-none-win_amd64.whl", hash = "sha256:8939fd8e94b444ecb7ba09108dabc4e5dc248db3aa945f8d5f0a2c3b4f6b5775"},
+    {file = "c2pa_python-0.36.0-py3-none-win_arm64.whl", hash = "sha256:eb7a2d2060ca35d0cb9c161ef50353fe4a0dc91d6e9f7ab4a7d45b19ff24f40c"},
+    {file = "c2pa_python-0.36.0.tar.gz", hash = "sha256:39fc2202fa5bdfef3eeee30d5ee4b9b0f2060974b01d7814eef79b21fd761284"},
+]
+
+[package.dependencies]
+cryptography = ">=41.0.0"
+pytest = ">=7.4.0"
+requests = ">=2.0.0"
+setuptools = ">=68.0.0"
+toml = ">=0.10.2"
+wheel = ">=0.41.2"
+
+[[package]]
 name = "cachetools"
 version = "7.1.4"
 description = "Extensible memoizing collections and decorators"
@@ -977,7 +1003,7 @@ files = [
     {file = "colorama-0.4.6-py2.py3-none-any.whl", hash = "sha256:4f1d9991f5acc0ca119f9d443620b77f9d6b33703e51011c16baf57afb285fc6"},
     {file = "colorama-0.4.6.tar.gz", hash = "sha256:08695f5cb7ed6e0531a20572697297273c47b8cae5a63ffc6d6ed5c201be6e44"},
 ]
-markers = {main = "platform_system == \"Windows\"", dev = "sys_platform == \"win32\"", streamlit = "platform_system == \"Windows\"", test = "sys_platform == \"win32\""}
+markers = {main = "platform_system == \"Windows\" or sys_platform == \"win32\"", dev = "sys_platform == \"win32\"", streamlit = "platform_system == \"Windows\"", test = "sys_platform == \"win32\""}
 
 [[package]]
 name = "comm"
@@ -1899,7 +1925,7 @@ version = "2.3.0"
 description = "brain-dead simple config-ini parsing"
 optional = false
 python-versions = ">=3.10"
-groups = ["test"]
+groups = ["main", "test"]
 files = [
     {file = "iniconfig-2.3.0-py3-none-any.whl", hash = "sha256:f631c04d2c48c52b84d0d0549c99ff3859c98df65b3101406327ecc7d53fbf12"},
     {file = "iniconfig-2.3.0.tar.gz", hash = "sha256:c76315c77db068650d49c5b56314774a7804df16fee4402c1f19d6d15d8c4730"},
@@ -3892,7 +3918,7 @@ version = "1.6.0"
 description = "plugin and hook calling mechanisms for python"
 optional = false
 python-versions = ">=3.9"
-groups = ["test"]
+groups = ["main", "test"]
 files = [
     {file = "pluggy-1.6.0-py3-none-any.whl", hash = "sha256:e920276dd6813095e9377c0bc5566d94c932c33b27a3e3945d8389c374dd4746"},
     {file = "pluggy-1.6.0.tar.gz", hash = "sha256:7dcc130b76258d33b90f61b658791dede3486c3e6bfb003ee5c9bfb396dd22f3"},
@@ -4405,7 +4431,7 @@ version = "2.20.0"
 description = "Pygments is a syntax highlighting package written in Python."
 optional = false
 python-versions = ">=3.9"
-groups = ["dev", "test"]
+groups = ["main", "dev", "test"]
 files = [
     {file = "pygments-2.20.0-py3-none-any.whl", hash = "sha256:81a9e26dd42fd28a23a2d169d86d7ac03b46e2f8b59ed4698fb4785f946d0176"},
     {file = "pygments-2.20.0.tar.gz", hash = "sha256:6757cd03768053ff99f3039c1a36d6c0aa0b263438fcab17520b30a303a82b5f"},
@@ -4448,7 +4474,7 @@ version = "8.4.2"
 description = "pytest: simple powerful testing with Python"
 optional = false
 python-versions = ">=3.9"
-groups = ["test"]
+groups = ["main", "test"]
 files = [
     {file = "pytest-8.4.2-py3-none-any.whl", hash = "sha256:872f880de3fc3a5bdc88a11b39c9710c3497a547cfa9320bc3c5e62fbf272e79"},
     {file = "pytest-8.4.2.tar.gz", hash = "sha256:86c0d0b93306b961d58d62a4db4879f27fe25513d4b969df351abdddb3c30e01"},
@@ -5460,7 +5486,7 @@ version = "82.0.1"
 description = "Most extensible Python build backend with support for C/C++ extension modules"
 optional = false
 python-versions = ">=3.9"
-groups = ["dev"]
+groups = ["main", "dev"]
 files = [
     {file = "setuptools-82.0.1-py3-none-any.whl", hash = "sha256:a59e362652f08dcd477c78bb6e7bd9d80a7995bc73ce773050228a348ce2e5bb"},
     {file = "setuptools-82.0.1.tar.gz", hash = "sha256:7d872682c5d01cfde07da7bccc7b65469d3dca203318515ada1de5eda35efbf9"},
@@ -5804,7 +5830,7 @@ version = "0.10.2"
 description = "Python Library for Tom's Obvious, Minimal Language"
 optional = false
 python-versions = ">=2.6, !=3.0.*, !=3.1.*, !=3.2.*"
-groups = ["streamlit"]
+groups = ["main", "streamlit"]
 files = [
     {file = "toml-0.10.2-py2.py3-none-any.whl", hash = "sha256:806143ae5bfb6a3c6e736a764057db0e6a0e05e338b5630894a5f779cabb4f9b"},
     {file = "toml-0.10.2.tar.gz", hash = "sha256:b3bda1d108d5dd99f4a20d24d9c348e91c4db7ab1b749200bded2f839ccbe68f"},
@@ -6233,6 +6259,21 @@ markupsafe = ">=2.1.1"
 watchdog = ["watchdog (>=2.3)"]
 
 [[package]]
+name = "wheel"
+version = "0.47.0"
+description = "Command line tool for manipulating wheel files"
+optional = false
+python-versions = ">=3.9"
+groups = ["main"]
+files = [
+    {file = "wheel-0.47.0-py3-none-any.whl", hash = "sha256:212281cab4dff978f6cedd499cd893e1f620791ca6ff7107cf270781e587eced"},
+    {file = "wheel-0.47.0.tar.gz", hash = "sha256:cc72bd1009ba0cf63922e28f94d9d83b920aa2bb28f798a31d0691b02fa3c9b3"},
+]
+
+[package.dependencies]
+packaging = ">=24.0"
+
+[[package]]
 name = "widgetsnbextension"
 version = "4.0.15"
 description = "Jupyter interactive widgets for Jupyter Notebook"
@@ -6385,4 +6426,4 @@ type = ["pytest-mypy (>=1.0.1) ; platform_python_implementation != \"PyPy\""]
 [metadata]
 lock-version = "2.1"
 python-versions = ">=3.12,<4.0"
-content-hash = "e32514c09bf12454ac4e672b294afe4f19ec14d18a0107d9ade5c28b9d2af297"
+content-hash = "068b937b1413592a5d50c83c399464453e0eeff186a7f9fdea1ddbf57897d22a"
