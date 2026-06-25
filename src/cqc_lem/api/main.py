@@ -84,7 +84,11 @@ async def observability_middleware(request: Request, call_next):
 # public; everything else under /api requires a valid bearer token. Routes served
 # outside /api (SPA, /health, /docs, /auth/linkedin/*) are never gated here.
 _API_ACCESS_TOKEN_SET = {t.strip() for t in API_ACCESS_TOKENS.split(",") if t.strip()}
-_PUBLIC_API_PREFIXES = ("/api/auth/", "/api/billing/webhook")
+# /api/assets is public: it serves generated post media (images/videos) that
+# LinkedIn fetches over an unauthenticated public URL when publishing. The
+# handler (get_assets) is GET-only and path-traversal safe (_find_asset_file
+# rejects .. / separators and only returns real files under assets_dir).
+_PUBLIC_API_PREFIXES = ("/api/auth/", "/api/billing/webhook", "/api/assets")
 
 
 def _api_token_required(path: str) -> bool:
