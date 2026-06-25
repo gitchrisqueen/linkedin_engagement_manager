@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.4.0](https://github.com/christopherqueenconsulting/linkedin_engagement_manager/compare/v0.3.2...v0.4.0) (2026-06-25)
+
+
+### Features
+
+* **api:** add /api/admin/regenerate-video (asset-only) ([#146](https://github.com/christopherqueenconsulting/linkedin_engagement_manager/issues/146)) ([06458a0](https://github.com/christopherqueenconsulting/linkedin_engagement_manager/commit/06458a0b9049a1b53b26da7f1367b5a45a709d9e))
+
 ## [0.3.2](https://github.com/christopherqueenconsulting/linkedin_engagement_manager/compare/v0.3.1...v0.3.2) (2026-06-25)
 
 
