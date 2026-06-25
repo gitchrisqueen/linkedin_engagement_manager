@@ -20,7 +20,7 @@ from cqc_lem.utilities.db import get_post_type_counts, insert_planned_post, upda
     get_planned_posts_for_current_week, get_last_planned_post_date_for_user, get_user_password_pair_by_id, \
     get_user_blog_url, get_user_sitemap_url, get_active_user_ids, get_planned_posts_for_next_week, PostStatus, \
     update_db_post_video_url, update_db_post_status, PostType, get_user_preferences, \
-    update_db_post_carousel_slides
+    update_db_post_carousel_slides, get_post_content
 from cqc_lem.utilities.env_constants import API_URL_FINAL
 from cqc_lem.utilities.linkedin.helper import get_my_profile
 from cqc_lem.utilities.linkedin_formatter import sanitize_for_linkedin
@@ -345,6 +345,49 @@ def create_video_content(user_id: int, stage: str) -> tuple[str, str | None]:
             video_url = None
 
     return text_content, video_url
+
+
+def regenerate_video_for_post(post_id: int) -> Optional[str]:
+    """Regenerate ONLY the video asset for an existing post, keeping its content.
+
+    Uses the post's existing text content to drive the image->video pipeline
+    (RunwayML, with Pexels fallback), saves the result into the shared assets
+    volume, updates posts.video_url, and returns the new public asset URL
+    (or None if generation failed).
+    """
+    text_content = get_post_content(post_id)
+    if not text_content:
+        myprint(f"regenerate_video_for_post: no content for post_id={post_id}")
+        return None
+
+    video_src_url = None
+    try:
+        image_prompt = get_flux_image_prompt_from_ai(text_content)
+        image_path = generate_flux1_image_from_prompt(image_prompt)
+        video_prompt = get_runway_ml_video_prompt_from_ai(text_content, image_prompt)[:512]
+        video_src_url = create_runway_video(image_path, video_prompt)
+    except Exception as e:
+        myprint(f"regenerate_video_for_post: RunwayML failed ({type(e).__name__}: {e}) — trying Pexels")
+        try:
+            from cqc_lem.utilities.pexels_helper import download_pexels_video
+            pexels_dir = os.path.join(assets_dir, 'videos', 'pexels')
+            create_folder_if_not_exists(pexels_dir)
+            video_src_url = download_pexels_video(text_content[:50], pexels_dir)
+        except Exception as pe:
+            myprint(f"regenerate_video_for_post: Pexels fallback failed ({type(pe).__name__}: {pe})")
+            video_src_url = None
+
+    if not video_src_url:
+        return None
+
+    videos_dir = os.path.join(assets_dir, 'videos', 'runwayml')
+    create_folder_if_not_exists(videos_dir)
+    video_file_path = save_video_url_to_dir(video_src_url, videos_dir)
+    video_file_name = os.path.basename(video_file_path)
+    api_video_url = f"{API_URL_FINAL}/api/assets?file_name=videos/runwayml/{video_file_name}"
+    update_db_post_video_url(post_id, api_video_url)
+    myprint(f"regenerate_video_for_post: post_id={post_id} -> {api_video_url}")
+    return api_video_url
 
 
 def create_text_post(user_id: int, stage: str, post_type: str = None, user_profile: LinkedInProfile=None,
