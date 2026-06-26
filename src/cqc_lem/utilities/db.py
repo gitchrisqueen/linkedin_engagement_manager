@@ -270,7 +270,8 @@ def get_user_id(email: str):
 
 
 def insert_post(email: str, content: str, scheduled_time: datetime, post_type: PostType,
-                video_url: Optional[str] = None, carousel_slides: Optional[list[str]] = None) -> bool:
+                video_url: Optional[str] = None, carousel_slides: Optional[list[str]] = None,
+                video_quality: str = "standard") -> bool:
     user_id = get_user_id(email)
 
     success = False
@@ -291,9 +292,10 @@ def insert_post(email: str, content: str, scheduled_time: datetime, post_type: P
         slides_json = json.dumps(carousel_slides) if carousel_slides else None
 
         cursor.execute("""
-            INSERT INTO posts (content, scheduled_time, post_type, user_id, video_url, carousel_slides)
-            VALUES (%s, %s, %s, %s, %s, %s)
-        """, (content, scheduled_time, post_type.value, user_id, video_url, slides_json))
+            INSERT INTO posts (content, scheduled_time, post_type, user_id, video_url, carousel_slides, video_quality)
+            VALUES (%s, %s, %s, %s, %s, %s, %s)
+        """, (content, scheduled_time, post_type.value, user_id, video_url, slides_json,
+              video_quality or "standard"))
 
         connection.commit()
         success = cursor.rowcount == 1
@@ -2037,6 +2039,136 @@ def refund_avatar_credit(user_id: int, training_id: str) -> bool:
         return True
     except mysql.connector.Error as err:
         myprint(f"Could not refund avatar credit for user_id {user_id} | Error: {err}")
+        return False
+    finally:
+        cursor.close()
+        connection.close()
+
+
+# ---------------------------------------------------------------------------
+# Premium video credits (mirrors avatar_credit_ledger; balance = SUM(delta))
+# ---------------------------------------------------------------------------
+
+def get_video_credit_balance(user_id: int) -> int:
+    connection = get_db_connection()
+    cursor = connection.cursor(dictionary=True)
+    try:
+        cursor.execute(
+            "SELECT COALESCE(SUM(delta), 0) AS balance FROM video_credit_ledger WHERE user_id = %s",
+            (user_id,),
+        )
+        row = cursor.fetchone()
+        return int(row["balance"]) if row else 0
+    except mysql.connector.Error as err:
+        myprint(f"Could not get video credit balance for user_id {user_id} | Error: {err}")
+        return 0
+    finally:
+        cursor.close()
+        connection.close()
+
+
+def get_video_credit_ledger_entry_by_session(stripe_session_id: str) -> Optional[dict]:
+    """Return an existing purchase ledger entry for a Stripe session (idempotency check)."""
+    connection = get_db_connection()
+    cursor = connection.cursor(dictionary=True)
+    try:
+        cursor.execute(
+            "SELECT id, user_id, delta FROM video_credit_ledger WHERE stripe_session_id = %s AND delta > 0 LIMIT 1",
+            (stripe_session_id,),
+        )
+        return cursor.fetchone()
+    except mysql.connector.Error as err:
+        myprint(f"Could not look up video credit ledger by session | Error: {err}")
+        return None
+    finally:
+        cursor.close()
+        connection.close()
+
+
+def add_video_credits(user_id: int, amount: int, reason: str,
+                      stripe_session_id: Optional[str] = None) -> bool:
+    connection = get_db_connection()
+    cursor = connection.cursor(dictionary=True)
+    try:
+        cursor.execute(
+            """INSERT INTO video_credit_ledger (user_id, delta, reason, stripe_session_id)
+               VALUES (%s, %s, %s, %s)""",
+            (user_id, amount, reason, stripe_session_id),
+        )
+        connection.commit()
+        return True
+    except mysql.connector.Error as err:
+        myprint(f"Could not add video credits for user_id {user_id} | Error: {err}")
+        return False
+    finally:
+        cursor.close()
+        connection.close()
+
+
+def deduct_video_credits(user_id: int, amount: int, post_id: Optional[int] = None,
+                         reason: str = "premium_video") -> bool:
+    connection = get_db_connection()
+    cursor = connection.cursor(dictionary=True)
+    try:
+        cursor.execute(
+            """INSERT INTO video_credit_ledger (user_id, delta, reason, post_id)
+               VALUES (%s, %s, %s, %s)""",
+            (user_id, -abs(amount), reason, post_id),
+        )
+        connection.commit()
+        return True
+    except mysql.connector.Error as err:
+        myprint(f"Could not deduct video credits for user_id {user_id} | Error: {err}")
+        return False
+    finally:
+        cursor.close()
+        connection.close()
+
+
+def refund_video_credits(user_id: int, amount: int, post_id: Optional[int] = None,
+                         reason: str = "premium_video_refund") -> bool:
+    connection = get_db_connection()
+    cursor = connection.cursor(dictionary=True)
+    try:
+        cursor.execute(
+            """INSERT INTO video_credit_ledger (user_id, delta, reason, post_id)
+               VALUES (%s, %s, %s, %s)""",
+            (user_id, abs(amount), reason, post_id),
+        )
+        connection.commit()
+        return True
+    except mysql.connector.Error as err:
+        myprint(f"Could not refund video credits for user_id {user_id} | Error: {err}")
+        return False
+    finally:
+        cursor.close()
+        connection.close()
+
+
+def get_post_video_quality(post_id: int) -> str:
+    connection = get_db_connection()
+    cursor = connection.cursor(dictionary=True)
+    try:
+        cursor.execute("SELECT video_quality FROM posts WHERE id = %s", (post_id,))
+        row = cursor.fetchone()
+        return (row["video_quality"] if row and row.get("video_quality") else "standard")
+    except mysql.connector.Error as err:
+        myprint(f"Could not get video_quality for post {post_id} | Error: {err}")
+        return "standard"
+    finally:
+        cursor.close()
+        connection.close()
+
+
+def update_post_video_quality(post_id: int, quality: str) -> bool:
+    connection = get_db_connection()
+    cursor = connection.cursor(dictionary=True)
+    try:
+        cursor.execute("UPDATE posts SET video_quality = %s WHERE id = %s", (quality, post_id))
+        connection.commit()
+        return cursor.rowcount > 0
+    except mysql.connector.Error as err:
+        myprint(f"Could not update video_quality for post {post_id} | Error: {err}")
         return False
     finally:
         cursor.close()

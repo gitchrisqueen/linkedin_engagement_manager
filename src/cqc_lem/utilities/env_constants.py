@@ -50,6 +50,16 @@ DEFAULT_VIDEO_RATIO = get_constant_from_env('DEFAULT_VIDEO_RATIO', default_value
 DEFAULT_IMAGE_MODEL = get_constant_from_env('DEFAULT_IMAGE_MODEL', default_value='black-forest-labs/flux-dev')
 DEFAULT_IMAGE_RATIO = get_constant_from_env('DEFAULT_IMAGE_RATIO', default_value='1:1')
 
+# Video quality tiers. STANDARD is free (included in every plan); PREMIUM tiers cost
+# video credits (deducted on a successful premium render, refunded on failure).
+# Premium uses Veo (realism + native audio); with an active avatar it runs Veo
+# image->video on the avatar image to keep the user's likeness, else text->video.
+STANDARD_VIDEO_MODEL = get_constant_from_env('STANDARD_VIDEO_MODEL', default_value='gen4_turbo')
+PREMIUM_VIDEO_MODEL = get_constant_from_env('PREMIUM_VIDEO_MODEL', default_value='veo3.1_fast')   # 1 credit
+PREMIUM_TOP_VIDEO_MODEL = get_constant_from_env('PREMIUM_TOP_VIDEO_MODEL', default_value='veo3.1')  # 3 credits
+PREMIUM_VIDEO_CREDITS = int(get_constant_from_env('PREMIUM_VIDEO_CREDITS', default_value='1'))
+PREMIUM_TOP_VIDEO_CREDITS = int(get_constant_from_env('PREMIUM_TOP_VIDEO_CREDITS', default_value='3'))
+
 # AI disclosure: append a short caption line to AI-visual posts. Guaranteed-visible
 # fallback for C2PA (which self-signed certs can't make LinkedIn trust yet).
 AI_DISCLOSURE_ENABLED = isTrue(get_constant_from_env('AI_DISCLOSURE_ENABLED', default_value='True'))
