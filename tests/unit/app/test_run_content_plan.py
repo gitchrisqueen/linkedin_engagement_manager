@@ -300,7 +300,7 @@ class TestCreateContent:
         content, video_url = create_content(user_id=1, post_type="video", stage="decision")
         assert content == "Video post content"
         assert video_url == "https://video.url"
-        mock_video.assert_called_once_with(1, "decision")
+        mock_video.assert_called_once_with(1, "decision", post_id=None)
 
     @patch("cqc_lem.app.run_content_plan.create_text_post", return_value="  Trimmed content  ")
     def test_text_content_is_stripped(self, mock_text):

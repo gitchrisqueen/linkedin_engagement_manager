@@ -286,6 +286,69 @@ def create_avatar_credits_checkout(
         return None
 
 
+# Premium video credits (~$2/credit). 1 credit = 1 veo3.1_fast video; veo3.1 = 3 credits.
+VIDEO_CREDIT_PACKAGES: dict[str, dict] = {
+    "small":  {"credits": 5,   "amount_cents": 1200,  "label": "5 premium videos"},
+    "medium": {"credits": 15,  "amount_cents": 3000,  "label": "15 premium videos — save 17%"},
+    "large":  {"credits": 40,  "amount_cents": 7000,  "label": "40 premium videos — save 27%"},
+    "max":    {"credits": 100, "amount_cents": 15000, "label": "100 premium videos — save 38%"},
+}
+
+
+def create_video_credits_checkout(
+    stripe_customer_id: str,
+    package: str,
+    success_url: str,
+    cancel_url: str,
+) -> Optional[str]:
+    """Create a one-time Stripe Checkout session for premium video credits.
+    Uses inline price_data so no Stripe products need to be pre-created.
+    Returns the checkout URL, or None on failure.
+    """
+    pkg = VIDEO_CREDIT_PACKAGES.get(package)
+    if not pkg:
+        myprint(f"Unknown video credit package '{package}'")
+        return None
+    if not STRIPE_API_KEY:
+        myprint("STRIPE_API_KEY not set — cannot create video credits checkout")
+        return None
+
+    stripe = _get_stripe()
+    try:
+        session = stripe.checkout.Session.create(
+            customer=stripe_customer_id,
+            payment_method_types=["card"],
+            line_items=[
+                {
+                    "price_data": {
+                        "currency": "usd",
+                        "unit_amount": pkg["amount_cents"],
+                        "product_data": {
+                            "name": f"Premium Video Credits — {pkg['label']}",
+                            "description": (
+                                "Use these credits to generate premium AI videos "
+                                "(Veo realism + native audio). 1 credit per premium video."
+                            ),
+                        },
+                    },
+                    "quantity": 1,
+                }
+            ],
+            mode="payment",
+            success_url=success_url,
+            cancel_url=cancel_url,
+            metadata={
+                "type": "video_credits",
+                "package": package,
+                "credits": str(pkg["credits"]),
+            },
+        )
+        return session.url
+    except Exception as e:
+        myprint(f"Video credits checkout failed for customer={stripe_customer_id}: {e}")
+        return None
+
+
 def get_checkout_session_by_payment_intent(payment_intent_id: str) -> Optional[dict]:
     """Return the first Checkout Session associated with a PaymentIntent, or None."""
     if not STRIPE_API_KEY:

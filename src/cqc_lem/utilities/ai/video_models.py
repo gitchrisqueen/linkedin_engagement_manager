@@ -1,9 +1,13 @@
 """RunwayML video-model abstraction.
 
-Isolates the RunwayML SDK shape so model migration lives in one place. gen3a_turbo
-(the previous default) is deliberately absent — Runway sunsets it on 2026-07-30.
-gen4_turbo is the drop-in successor; gen4.5 and veo3.1 are opt-in higher tiers
-reachable through the same SDK client.
+Isolates the RunwayML SDK shape so model selection lives in one place. gen3a_turbo
+(the previous default) is deliberately absent — Runway sunset it on 2026-07-30.
+
+Two quality tiers:
+- STANDARD (credits=0, free): gen4_turbo / gen4.5 image->video, no audio.
+- PREMIUM (credits>0): Veo (veo3.1_fast=1 credit, veo3.1=3 credits) with native
+  audio. Veo supports BOTH image->video (used to preserve an avatar's likeness)
+  and text->video (when there's no base image / an abstract concept fits better).
 """
 import base64
 import time
@@ -18,18 +22,22 @@ from cqc_lem.utilities.logger import log_debug, log_warning
 
 @dataclass(frozen=True)
 class VideoModelSpec:
-    sdk_model: str           # value passed to the SDK 'model' kwarg
-    endpoint: str            # RunwayML client attribute, e.g. 'image_to_video'
-    cost_per_second: float   # USD, for cost estimates
-    supports_prompt_image: bool
-    default_ratio: str
+    sdk_model: str               # value passed to the SDK 'model' kwarg
+    cost_per_second: float       # USD (premium values assume audio on)
+    credits: int                 # video credits charged (0 = free/standard tier)
+    supports_audio: bool
+    valid_durations: tuple       # durations the API accepts for this model
+    default_duration: int
 
 
-# Runway API models reachable through the same RunwayML() client.
+# Runway API models reachable through the same RunwayML() client. Veo only accepts
+# 4/6/8s durations; gen4/seedance accept 5/10.
 VIDEO_MODELS: dict[str, VideoModelSpec] = {
-    "gen4_turbo": VideoModelSpec("gen4_turbo", "image_to_video", 0.05, True, "960:960"),
-    "gen4.5":     VideoModelSpec("gen4.5",     "image_to_video", 0.12, True, "960:960"),
-    "veo3.1":     VideoModelSpec("veo3.1",     "image_to_video", 0.30, True, "1280:720"),
+    "gen4_turbo":     VideoModelSpec("gen4_turbo",     0.05, 0, False, (5, 10), 5),
+    "gen4.5":         VideoModelSpec("gen4.5",         0.12, 0, False, (5, 10), 5),
+    "veo3.1_fast":    VideoModelSpec("veo3.1_fast",    0.15, 1, True,  (4, 6, 8), 6),
+    "veo3.1":         VideoModelSpec("veo3.1",         0.40, 3, True,  (4, 6, 8), 6),
+    "seedance2_fast": VideoModelSpec("seedance2_fast", 0.29, 1, False, (5, 10), 5),
 }
 
 DEFAULT_VIDEO_DURATION = 5
@@ -52,6 +60,24 @@ def resolve_ratio(ratio: str) -> str:
     return RATIO_ALIASES.get(ratio, ratio)
 
 
+def model_credits(model: str) -> int:
+    spec = VIDEO_MODELS.get(model)
+    return spec.credits if spec else 0
+
+
+def is_premium(model: str) -> bool:
+    return model_credits(model) > 0
+
+
+def resolve_duration(model: str, duration: Optional[int]) -> int:
+    spec = VIDEO_MODELS.get(model)
+    if not spec:
+        return duration or DEFAULT_VIDEO_DURATION
+    if duration in spec.valid_durations:
+        return duration
+    return spec.default_duration
+
+
 def estimate_video_cost(model: str, duration: int = DEFAULT_VIDEO_DURATION) -> float:
     spec = VIDEO_MODELS.get(model)
     return round(spec.cost_per_second * duration, 3) if spec else 0.0
@@ -68,7 +94,7 @@ def _to_prompt_image(image_path_or_url: str) -> str:
 
 def _create_task(endpoint, create_kwargs: dict):
     """Call endpoint.create, retrying without optional kwargs if the pinned SDK
-    version rejects them (resilience across runwayml >=2.1,<5.0)."""
+    version rejects them (resilience across runwayml versions)."""
     try:
         return endpoint.create(**create_kwargs)
     except TypeError:
@@ -77,39 +103,50 @@ def _create_task(endpoint, create_kwargs: dict):
 
 
 def create_runway_video(
-    image_path_or_url: str,
-    prompt: str,
+    image_path_or_url: Optional[str] = None,
+    prompt: str = "",
     *,
     model: str = DEFAULT_VIDEO_MODEL,
     ratio: str = DEFAULT_VIDEO_RATIO,
-    duration: int = DEFAULT_VIDEO_DURATION,
+    duration: Optional[int] = None,
     seed: Optional[int] = None,
+    audio: bool = False,
 ) -> Optional[str]:
-    """Create a video from an image via the RunwayML API and return its URL.
+    """Create a video via the RunwayML API and return its URL.
 
+    If ``image_path_or_url`` is provided -> image->video; if it's None -> text->video
+    (the model must support it). ``audio`` is honored only for audio-capable models.
     Backwards compatible with the old positional ``(image_path, prompt)`` call.
-    Raises on creation failure so callers' Pexels fallback can trigger; returns
-    None only when the task itself reports FAILED / produces no output.
+    Raises on creation failure (so callers' fallback can trigger); returns None only
+    when the task itself reports FAILED / produces no output.
     """
     spec = VIDEO_MODELS.get(model)
     if spec is None:
         raise ValueError(f"Unknown video model {model!r}. Known: {sorted(VIDEO_MODELS)}")
 
     runway_client = RunwayML()
+    use_text = not image_path_or_url
+    endpoint_name = "text_to_video" if use_text else "image_to_video"
     resolved_ratio = resolve_ratio(ratio)
+    dur = resolve_duration(model, duration)
+
     create_kwargs = {
         "model": spec.sdk_model,
-        "prompt_image": _to_prompt_image(image_path_or_url),
         "prompt_text": prompt,
         "ratio": resolved_ratio,
-        "duration": duration,
+        "duration": dur,
     }
+    if not use_text:
+        create_kwargs["prompt_image"] = _to_prompt_image(image_path_or_url)
+    if audio and spec.supports_audio:
+        create_kwargs["audio"] = True
     if seed is not None:
         create_kwargs["seed"] = seed
 
-    endpoint = getattr(runway_client, spec.endpoint)
+    endpoint = getattr(runway_client, endpoint_name)
     log_debug(
-        f"Runway create model={spec.sdk_model} ratio={resolved_ratio} duration={duration}s",
+        f"Runway {endpoint_name} model={spec.sdk_model} ratio={resolved_ratio} "
+        f"duration={dur}s audio={audio and spec.supports_audio}",
         ai_model=spec.sdk_model,
     )
     try:

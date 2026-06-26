@@ -52,6 +52,7 @@ export default function ScheduleContent() {
   const [submitting, setSubmitting] = useState(false)
   const [result, setResult] = useState<{ ok: boolean; msg: string } | null>(null)
   const [useAvatar, setUseAvatar] = useState(false)
+  const [videoQuality, setVideoQuality] = useState<'standard' | 'premium' | 'premium_top'>('standard')
 
   // Carousel AI generation state
   const [carouselMode, setCarouselMode] = useState<'manual' | 'ai'>('ai')
@@ -71,6 +72,16 @@ export default function ScheduleContent() {
     },
     enabled: !!sessionToken,
   })
+
+  const { data: videoCreditData } = useQuery({
+    queryKey: ['video-credits', sessionToken],
+    queryFn: async () => {
+      const r = await api.get('/video/credits', { params: { session_token: sessionToken } })
+      return r.data.detail as { balance: number }
+    },
+    enabled: !!sessionToken,
+  })
+  const videoCredits = videoCreditData?.balance ?? 0
 
   const { data: templatesData } = useQuery({
     queryKey: ['carousel-templates'],
@@ -156,6 +167,7 @@ export default function ScheduleContent() {
       }
       if (postType === 'VIDEO') {
         payload.video_url = videoUrl || null
+        payload.video_quality = videoQuality
       }
       if (postType === 'CAROUSEL') {
         payload.carousel_slides = carouselMode === 'ai'
@@ -254,6 +266,55 @@ export default function ScheduleContent() {
                 placeholder="https://example.com/video.mp4"
               />
               <p className="mt-1 text-xs text-gray-400">Direct URL to the video file that will be uploaded to LinkedIn.</p>
+            </div>
+          )}
+
+          {/* VIDEO: quality tier (premium tiers spend video credits when LEM generates the video) */}
+          {postType === 'VIDEO' && (
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Video Quality</label>
+              <div className="space-y-2">
+                {[
+                  { key: 'standard' as const, label: 'Standard', desc: 'Included free with your plan', cost: 0 },
+                  { key: 'premium' as const, label: 'Premium — Veo + audio', desc: 'Realistic video with native sound', cost: 1 },
+                  { key: 'premium_top' as const, label: 'Premium Max — top realism', desc: 'Highest-realism Veo + audio', cost: 3 },
+                ].map((opt) => {
+                  const affordable = opt.cost === 0 || videoCredits >= opt.cost
+                  return (
+                    <label
+                      key={opt.key}
+                      className={`flex items-center gap-3 border rounded-lg px-3 py-2 cursor-pointer transition-colors ${
+                        videoQuality === opt.key ? 'border-blue-500 bg-blue-50' : 'border-gray-200'
+                      } ${!affordable ? 'opacity-50' : ''}`}
+                    >
+                      <input
+                        type="radio"
+                        name="videoQuality"
+                        value={opt.key}
+                        checked={videoQuality === opt.key}
+                        disabled={!affordable}
+                        onChange={() => setVideoQuality(opt.key)}
+                      />
+                      <div className="flex-1">
+                        <p className="text-sm font-medium text-gray-800">
+                          {opt.label}
+                          {opt.cost > 0 && (
+                            <span className="ml-2 text-xs text-blue-700">
+                              {opt.cost} credit{opt.cost > 1 ? 's' : ''}
+                            </span>
+                          )}
+                        </p>
+                        <p className="text-xs text-gray-500">{opt.desc}</p>
+                      </div>
+                    </label>
+                  )
+                })}
+              </div>
+              <p className="mt-1 text-xs text-gray-400">
+                You have <span className="font-semibold">{videoCredits}</span> premium video credit
+                {videoCredits === 1 ? '' : 's'}.{' '}
+                <a href="/account" className="text-blue-600 hover:underline">Buy more</a>
+              </p>
             </div>
           )}
 

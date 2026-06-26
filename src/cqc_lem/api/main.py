@@ -26,6 +26,8 @@ from cqc_lem.utilities.db import (
     get_user_blog_url, get_user_sitemap_url,
     get_user_by_stripe_customer_id, get_avatar_credit_ledger_entry_by_session,
     get_avatar_credit_balance, add_avatar_credits,
+    get_video_credit_balance, add_video_credits,
+    get_video_credit_ledger_entry_by_session, update_post_video_quality,
     deduct_avatar_credit, insert_avatar_training,
     update_avatar_training_status, set_active_avatar,
     get_avatar_trainings, get_active_avatar,
@@ -154,6 +156,7 @@ class PostRequest(BaseModel):
     status: Optional[PostStatus] = PostStatus.PENDING
     carousel_slides: Optional[List[str]] = None
     use_avatar: Optional[bool] = False
+    video_quality: Optional[str] = "standard"  # standard | premium | premium_top
 
 
 class AvatarCreditCheckoutRequest(BaseModel):
@@ -161,6 +164,19 @@ class AvatarCreditCheckoutRequest(BaseModel):
     package: str
     success_url: str
     cancel_url: str
+
+
+class VideoCreditCheckoutRequest(BaseModel):
+    session_token: str
+    package: str        # "small" | "medium" | "large" | "max"
+    success_url: str
+    cancel_url: str
+
+
+class UpgradeVideoRequest(BaseModel):
+    session_token: str
+    post_id: int
+    tier: str = "premium"  # "premium" (1 credit) or "premium_top" (3 credits)
 
 
 class AvatarActivateRequest(BaseModel):
@@ -415,7 +431,8 @@ def schedule_post(post: PostRequest) -> ResponseModel:
         raise HTTPException(status_code=403, detail="User not found")
 
     if insert_post(post.email, post.content, post.scheduled_datetime, post.post_type,
-                   video_url=post.video_url, carousel_slides=post.carousel_slides):
+                   video_url=post.video_url, carousel_slides=post.carousel_slides,
+                   video_quality=post.video_quality or "standard"):
         return ResponseModel(status_code=200, detail="Post scheduled successfully")
     else:
         raise HTTPException(status_code=404, detail="Could not schedule post")
@@ -1147,6 +1164,27 @@ async def billing_webhook(request: Request) -> dict:
             else:
                 myprint(f"Avatar credits webhook: no user found for customer={stripe_customer_id}")
 
+        elif meta.get("type") == "video_credits":
+            if data.get("payment_status") != "paid":
+                myprint(f"video_credits checkout: payment_status={data.get('payment_status')} — skipping")
+                return {"received": True}
+            stripe_customer_id = data.get("customer")
+            stripe_session_id = data.get("id")
+            credits = int(meta.get("credits", 0))
+            package = meta.get("package", "unknown")
+            if not stripe_customer_id or credits <= 0:
+                myprint("Video credits webhook: missing customer or zero credits — skipping")
+                return {"received": True}
+            if get_video_credit_ledger_entry_by_session(stripe_session_id):
+                myprint(f"Video credits already granted for session={stripe_session_id} — skipping duplicate")
+                return {"received": True}
+            user_row = get_user_by_stripe_customer_id(stripe_customer_id)
+            if user_row:
+                add_video_credits(user_row["id"], credits, f"purchase_{package}", stripe_session_id)
+                myprint(f"Added {credits} video credit(s) for user_id={user_row['id']} via session={stripe_session_id}")
+            else:
+                myprint(f"Video credits webhook: no user found for customer={stripe_customer_id}")
+
     elif event_type == "charge.refunded":
         payment_intent_id = data.get("payment_intent")
         stripe_customer_id = data.get("customer")
@@ -1173,31 +1211,32 @@ async def billing_webhook(request: Request) -> dict:
             return {"received": True}
 
         session_meta = session.get("metadata", {})
-        if session_meta.get("type") != "avatar_credits":
-            myprint(f"charge.refunded: not an avatar credits charge — ignoring")
+        credit_type = session_meta.get("type")
+        if credit_type not in ("avatar_credits", "video_credits"):
+            myprint(f"charge.refunded: not a credits charge — ignoring")
             return {"received": True}
+
+        # Route to the right ledger based on what was purchased.
+        if credit_type == "avatar_credits":
+            entry_fn, add_fn, label = get_avatar_credit_ledger_entry_by_session, add_avatar_credits, "avatar"
+        else:
+            entry_fn, add_fn, label = get_video_credit_ledger_entry_by_session, add_video_credits, "video"
 
         stripe_session_id = session.get("id")
-        original_entry = get_avatar_credit_ledger_entry_by_session(stripe_session_id)
+        original_entry = entry_fn(stripe_session_id)
         if not original_entry:
-            myprint(f"charge.refunded: no credit ledger entry found for session={stripe_session_id} — nothing to deduct")
+            myprint(f"charge.refunded: no {label} credit ledger entry for session={stripe_session_id} — nothing to deduct")
             return {"received": True}
 
-        # Guard against double-refund: check if a refund entry already exists for this session.
         user_row = get_user_by_stripe_customer_id(stripe_customer_id)
         if not user_row:
             myprint(f"charge.refunded: no user found for customer={stripe_customer_id}")
             return {"received": True}
 
         credits_to_deduct = original_entry["delta"]
-        add_avatar_credits(
-            user_row["id"],
-            -credits_to_deduct,
-            f"refund_{stripe_session_id}",
-            stripe_session_id=None,
-        )
+        add_fn(user_row["id"], -credits_to_deduct, f"refund_{stripe_session_id}", stripe_session_id=None)
         myprint(
-            f"Deducted {credits_to_deduct} avatar credit(s) for user_id={user_row['id']} "
+            f"Deducted {credits_to_deduct} {label} credit(s) for user_id={user_row['id']} "
             f"due to full refund of session={stripe_session_id}"
         )
 
@@ -1248,6 +1287,74 @@ def avatar_credits_checkout(request: AvatarCreditCheckoutRequest) -> ResponseMod
     if not url:
         raise HTTPException(status_code=500, detail="Could not create Stripe checkout session")
     return ResponseModel(status_code=200, detail={"checkout_url": url})
+
+
+@router.get("/video/credits", responses={
+    200: {"description": "Video credit balance returned"},
+    **{k: v for k, v in error_responses.items() if k in [401]}
+})
+def get_video_credits_endpoint(session_token: str) -> ResponseModel:
+    user_id = get_session_user_id(session_token)
+    if not user_id:
+        raise HTTPException(status_code=401, detail="Invalid or expired session")
+    return ResponseModel(status_code=200, detail={"balance": get_video_credit_balance(user_id)})
+
+
+@router.post("/video/credits/checkout", responses={
+    200: {"description": "Stripe checkout URL returned"},
+    **{k: v for k, v in error_responses.items() if k in [400, 401]}
+})
+def video_credits_checkout(request: VideoCreditCheckoutRequest) -> ResponseModel:
+    user_id = get_session_user_id(request.session_token)
+    if not user_id:
+        raise HTTPException(status_code=401, detail="Invalid or expired session")
+    subscription = get_user_subscription_info(user_id)
+    stripe_customer_id = subscription.get("stripe_customer_id") if subscription else None
+    if not stripe_customer_id:
+        raise HTTPException(status_code=400, detail="No Stripe customer record — contact support")
+    from cqc_lem.utilities.stripe_util import create_video_credits_checkout, VIDEO_CREDIT_PACKAGES
+    if request.package not in VIDEO_CREDIT_PACKAGES:
+        raise HTTPException(status_code=400, detail=f"Unknown package '{request.package}'")
+    url = create_video_credits_checkout(
+        stripe_customer_id, request.package, request.success_url, request.cancel_url)
+    if not url:
+        raise HTTPException(status_code=500, detail="Could not create Stripe checkout session")
+    return ResponseModel(status_code=200, detail={"checkout_url": url})
+
+
+@router.post("/video/upgrade", responses={
+    200: {"description": "Premium video regeneration queued"},
+    **{k: v for k, v in error_responses.items() if k in [400, 401, 403, 404]},
+    402: {"description": "Insufficient video credits"},
+})
+def upgrade_video(request: UpgradeVideoRequest) -> ResponseModel:
+    """Upgrade a video post to a premium tier — regenerates the video at premium
+    quality (Veo + audio), charging credits at render time (refunded on failure)."""
+    user_id = get_session_user_id(request.session_token)
+    if not user_id:
+        raise HTTPException(status_code=401, detail="Invalid or expired session")
+    if get_post_user_id(request.post_id) != user_id:
+        raise HTTPException(status_code=403, detail="Not your post")
+    if get_post_type(request.post_id) != PostType.VIDEO:
+        raise HTTPException(status_code=404, detail="Post not found or not a video post")
+
+    from cqc_lem.utilities.env_constants import PREMIUM_VIDEO_CREDITS, PREMIUM_TOP_VIDEO_CREDITS
+    tier_credits = {"premium": PREMIUM_VIDEO_CREDITS, "premium_top": PREMIUM_TOP_VIDEO_CREDITS}
+    if request.tier not in tier_credits:
+        raise HTTPException(status_code=400, detail=f"Unknown tier '{request.tier}'")
+    needed = tier_credits[request.tier]
+    if get_video_credit_balance(user_id) < needed:
+        raise HTTPException(status_code=402,
+                            detail=f"Insufficient video credits (need {needed}). Buy credits to use premium video.")
+
+    update_post_video_quality(request.post_id, request.tier)
+    from cqc_lem.app.run_content_plan import regenerate_post_video_task
+    regenerate_post_video_task.apply_async(kwargs={"post_id": request.post_id})
+    myprint(f"video/upgrade: queued post_id={request.post_id} tier={request.tier} for user_id={user_id}")
+    return ResponseModel(status_code=200, detail={
+        "post_id": request.post_id, "tier": request.tier,
+        "credits_required": needed, "status": "queued",
+    })
 
 
 @router.post("/avatar/training", responses={

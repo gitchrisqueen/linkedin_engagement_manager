@@ -22,7 +22,9 @@ from cqc_lem.utilities.db import get_post_type_counts, insert_planned_post, upda
     update_db_post_video_url, update_db_post_status, PostType, get_user_preferences, \
     update_db_post_carousel_slides, get_post_content
 from cqc_lem.utilities.env_constants import API_URL_FINAL, DEFAULT_VIDEO_MODEL, DEFAULT_VIDEO_RATIO, \
-    DEFAULT_IMAGE_RATIO, AI_DISCLOSURE_ENABLED, AI_DISCLOSURE_TEXT
+    DEFAULT_IMAGE_RATIO, AI_DISCLOSURE_ENABLED, AI_DISCLOSURE_TEXT, \
+    STANDARD_VIDEO_MODEL, PREMIUM_VIDEO_MODEL, PREMIUM_TOP_VIDEO_MODEL, \
+    PREMIUM_VIDEO_CREDITS, PREMIUM_TOP_VIDEO_CREDITS
 from cqc_lem.utilities.linkedin.helper import get_my_profile, load_profile_for_user
 from cqc_lem.utilities.linkedin_formatter import sanitize_for_linkedin
 from cqc_lem.utilities.linkedin.profile import LinkedInProfile
@@ -203,7 +205,7 @@ def create_content(user_id: int, post_type: str, stage: str, post_id: int = None
     content = None
 
     if post_type == "video":
-        content, video_url = create_video_content(user_id, stage)
+        content, video_url = create_video_content(user_id, stage, post_id=post_id)
     elif post_type == "carousel":
         content = create_carousel_content(user_id, stage, post_id)
     else:
@@ -320,47 +322,79 @@ def _apply_ai_disclosure(content: str) -> str:
     return content + AI_DISCLOSURE_TEXT
 
 
-def create_video_content(user_id: int, stage: str) -> tuple[str, str | None]:
-    # Get Text Content
-    text_content = create_text_post(user_id, stage)
+def _premium_tier_for_quality(quality: str):
+    """Map a post's video_quality to (model, credits, audio); None for standard/free."""
+    if quality == "premium":
+        return (PREMIUM_VIDEO_MODEL, PREMIUM_VIDEO_CREDITS, True)
+    if quality == "premium_top":
+        return (PREMIUM_TOP_VIDEO_MODEL, PREMIUM_TOP_VIDEO_CREDITS, True)
+    return None
 
-    # Load profile once so the image prompt is brand/role-aligned
-    user_profile = load_profile_for_user(user_id)
+
+def _generate_video_src(user_id: int, text_content: str, profile, post_id: int = None):
+    """Generate a video source URL honoring the post's quality tier + video credits.
+
+    Standard (free) = gen4_turbo image->video. Premium = Veo (+audio): with an active
+    avatar it runs Veo image->video on the avatar image to preserve the likeness, else
+    Veo text->video. Premium credits are reserved up-front and refunded on failure;
+    falls back to standard when the user has no credits, and to Pexels stock on error.
+    Returns the remote Runway URL (http) or a local Pexels path, or None.
+    """
+    from cqc_lem.utilities.ai.video_models import is_premium
+    from cqc_lem.utilities.db import (get_post_video_quality, get_video_credit_balance,
+                                      deduct_video_credits, refund_video_credits, get_active_avatar)
+
+    quality = get_post_video_quality(post_id) if post_id else "standard"
+    tier = _premium_tier_for_quality(quality)
+
+    model, audio, deducted = STANDARD_VIDEO_MODEL, False, 0
+    if tier and user_id:
+        pmodel, pcredits, paudio = tier
+        if get_video_credit_balance(user_id) >= pcredits and \
+                deduct_video_credits(user_id, pcredits, post_id, reason=f"premium_video_{pmodel}"):
+            model, audio, deducted = pmodel, paudio, pcredits
+        else:
+            myprint(f"Premium video requested but no credits for user {user_id} — using standard")
 
     try:
-        # Create an image prompt from the text content (profile-aligned, square)
-        image_prompt = get_flux_image_prompt_from_ai(
-            text_content, profile=user_profile, ratio=DEFAULT_IMAGE_RATIO)
-        myprint(f"Generated AI Image Prompt: {image_prompt[:100]}...")
-
-        # Create the image from the image prompt using flux1 (matches video ratio)
-        image_path = generate_flux1_image_from_prompt(image_prompt, ratio=DEFAULT_IMAGE_RATIO)
-        myprint(f"Generated Image From Prompt | Path: {image_path}")
-
-        # Create a motion-first video prompt for the configured Gen-4 model
-        video_prompt = get_runway_ml_video_prompt_from_ai(
-            text_content, image_prompt, model=DEFAULT_VIDEO_MODEL)
-        video_prompt = video_prompt[:512]
-
-        # Create a video from the image and video prompt using Runway ML
-        video_url = create_runway_video(
-            image_path, video_prompt, model=DEFAULT_VIDEO_MODEL, ratio=DEFAULT_VIDEO_RATIO)
-        myprint(f"Generated Video URL: {video_url}")
+        image_prompt = get_flux_image_prompt_from_ai(text_content, profile=profile, ratio=DEFAULT_IMAGE_RATIO)
+        motion = get_runway_ml_video_prompt_from_ai(text_content, image_prompt, model=model)[:512]
+        if is_premium(model):
+            avatar = get_active_avatar(user_id) if user_id else None
+            if avatar and avatar.get("status") == "succeeded" and avatar.get("model_ref"):
+                from cqc_lem.utilities.ai.ai_helper import generate_post_image
+                image_path = generate_post_image(image_prompt, user_id, ratio="9:16")
+                src = create_runway_video(image_path, motion, model=model, ratio="9:16", audio=audio)
+            else:
+                combined = (image_prompt[:700] + " Motion: " + motion)[:980]
+                src = create_runway_video(None, combined, model=model, ratio="9:16", audio=audio)
+        else:
+            image_path = generate_flux1_image_from_prompt(image_prompt, ratio=DEFAULT_IMAGE_RATIO)
+            src = create_runway_video(image_path, motion, model=model, ratio=DEFAULT_VIDEO_RATIO)
+        if not src:
+            raise RuntimeError("no video output")
+        myprint(f"_generate_video_src: model={model} audio={audio} -> {str(src)[:60]}")
+        return src
     except Exception as e:
-        myprint(f"Video generation failed ({type(e).__name__}: {e}) — trying Pexels stock video")
+        myprint(f"_generate_video_src failed ({type(e).__name__}: {e}) — refunding any credits, trying Pexels")
+        if deducted and user_id:
+            refund_video_credits(user_id, deducted, post_id)
         try:
             from cqc_lem.utilities.pexels_helper import download_pexels_video
             videos_dir = os.path.join(assets_dir, 'videos', 'pexels')
             create_folder_if_not_exists(videos_dir)
-            video_url = download_pexels_video(text_content[:50], videos_dir)
-            if video_url:
-                myprint(f"Pexels fallback video saved: {video_url}")
-            else:
-                myprint("Pexels returned no results — publishing text content without video")
+            return download_pexels_video(text_content[:50], videos_dir)
         except Exception as pe:
-            myprint(f"Pexels fallback also failed ({type(pe).__name__}: {pe}) — publishing text content without video")
-            video_url = None
+            myprint(f"_generate_video_src: Pexels fallback failed ({type(pe).__name__}: {pe})")
+            return None
 
+
+def create_video_content(user_id: int, stage: str, post_id: int = None) -> tuple[str, str | None]:
+    # Get Text Content
+    text_content = create_text_post(user_id, stage)
+    # Load profile once so the image prompt is brand/role-aligned
+    user_profile = load_profile_for_user(user_id)
+    video_url = _generate_video_src(user_id, text_content, user_profile, post_id)
     return text_content, video_url
 
 
@@ -377,33 +411,17 @@ def regenerate_video_for_post(post_id: int) -> Optional[str]:
         myprint(f"regenerate_video_for_post: no content for post_id={post_id}")
         return None
 
+    user_id = None
     user_profile = None
     try:
         from cqc_lem.utilities.db import get_post_user_id
-        user_profile = load_profile_for_user(get_post_user_id(post_id))
+        user_id = get_post_user_id(post_id)
+        user_profile = load_profile_for_user(user_id)
     except Exception as e:
         myprint(f"regenerate_video_for_post: profile load skipped: {e}")
 
-    video_src_url = None
-    try:
-        image_prompt = get_flux_image_prompt_from_ai(
-            text_content, profile=user_profile, ratio=DEFAULT_IMAGE_RATIO)
-        image_path = generate_flux1_image_from_prompt(image_prompt, ratio=DEFAULT_IMAGE_RATIO)
-        video_prompt = get_runway_ml_video_prompt_from_ai(
-            text_content, image_prompt, model=DEFAULT_VIDEO_MODEL)[:512]
-        video_src_url = create_runway_video(
-            image_path, video_prompt, model=DEFAULT_VIDEO_MODEL, ratio=DEFAULT_VIDEO_RATIO)
-    except Exception as e:
-        myprint(f"regenerate_video_for_post: RunwayML failed ({type(e).__name__}: {e}) — trying Pexels")
-        try:
-            from cqc_lem.utilities.pexels_helper import download_pexels_video
-            pexels_dir = os.path.join(assets_dir, 'videos', 'pexels')
-            create_folder_if_not_exists(pexels_dir)
-            video_src_url = download_pexels_video(text_content[:50], pexels_dir)
-        except Exception as pe:
-            myprint(f"regenerate_video_for_post: Pexels fallback failed ({type(pe).__name__}: {pe})")
-            video_src_url = None
-
+    # Honors the post's video_quality tier + premium video credits (deduct/refund).
+    video_src_url = _generate_video_src(user_id, text_content, user_profile, post_id)
     if not video_src_url:
         return None
 
@@ -422,6 +440,12 @@ def regenerate_video_for_post(post_id: int) -> Optional[str]:
     update_db_post_video_url(post_id, api_video_url)
     myprint(f"regenerate_video_for_post: post_id={post_id} -> {api_video_url}")
     return api_video_url
+
+
+@shared_task.task
+def regenerate_post_video_task(post_id: int):
+    """Celery wrapper so premium-video upgrades run async (Veo can take minutes)."""
+    return regenerate_video_for_post(post_id)
 
 
 def create_text_post(user_id: int, stage: str, post_type: str = None, user_profile: LinkedInProfile=None,
