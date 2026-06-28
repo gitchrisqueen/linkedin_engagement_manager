@@ -74,6 +74,10 @@ app.conf.update(
             'task': 'cqc_lem.app.run_content_plan.auto_create_weekly_content',
             'schedule': crontab(hour='1', minute='30')  # Run every day at 1:30 AM
         },
+        'backfill-missing-assets': {
+            'task': 'cqc_lem.app.run_scheduler.auto_backfill_missing_assets',
+            'schedule': crontab(minute='15', hour='*/3')  # Every 3 hours — regen any missing video/carousel media
+        },
         'clean-up-stale-invites': {
             'task': 'cqc_lem.app.run_scheduler.auto_clean_stale_invites',
             'schedule': crontab(hour='2', minute='0', )  # Run every day at 2:00 AM

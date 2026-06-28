@@ -107,6 +107,31 @@ def auto_appreciate_dms():
 
 
 @shared_task.task
+def auto_backfill_missing_assets():
+    """Safety net: regenerate missing media for unposted video/carousel posts before they
+    publish, so a post never reaches its scheduled time without its asset (e.g. when the
+    original generation failed)."""
+    from cqc_lem.utilities.db import get_unposted_posts_missing_assets
+    from cqc_lem.app.run_content_plan import regenerate_post_video_task, regenerate_post_carousel_task
+
+    posts = get_unposted_posts_missing_assets()
+    queued = 0
+    for post_id, user_id, post_type, buyer_stage, scheduled_time in posts:
+        pt = str(post_type).lower()
+        if pt == 'video':
+            regenerate_post_video_task.apply_async(kwargs={'post_id': post_id})
+            queued += 1
+        elif pt == 'carousel':
+            regenerate_post_carousel_task.apply_async(kwargs={'post_id': post_id})
+            queued += 1
+        log_warning("Backfilling missing media asset for unposted post",
+                    post_id=post_id, user_id=user_id, task_name="auto_backfill_missing_assets")
+    log_info(f"Asset backfill: queued {queued} regeneration(s) across {len(posts)} post(s)",
+             task_name="auto_backfill_missing_assets")
+    return f"Queued {queued} asset regeneration(s)"
+
+
+@shared_task.task
 def auto_clean_stale_invites():
     """Cleans up stale invites for each active user"""
 
