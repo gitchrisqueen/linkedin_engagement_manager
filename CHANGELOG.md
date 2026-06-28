@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.7.1](https://github.com/christopherqueenconsulting/linkedin_engagement_manager/compare/v0.7.0...v0.7.1) (2026-06-28)
+
+
+### Bug Fixes
+
+* **assets:** make worker-written media reliable + backfill missing assets ([8364817](https://github.com/christopherqueenconsulting/linkedin_engagement_manager/commit/83648172f7f89d510dc3d30144c054c7477c5265))
+* **assets:** reliable worker media writes + missing-asset backfill ([52271f2](https://github.com/christopherqueenconsulting/linkedin_engagement_manager/commit/52271f2ccf9eff8b2e1f0d90620b87394751d19c))
+
 ## [0.7.0](https://github.com/christopherqueenconsulting/linkedin_engagement_manager/compare/v0.6.0...v0.7.0) (2026-06-26)
 
 
