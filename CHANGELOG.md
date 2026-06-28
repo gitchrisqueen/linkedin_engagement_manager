@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.7.0](https://github.com/christopherqueenconsulting/linkedin_engagement_manager/compare/v0.6.0...v0.7.0) (2026-06-26)
+
+
+### Features
+
+* **video:** premium video tiers with a credit system ([e346e72](https://github.com/christopherqueenconsulting/linkedin_engagement_manager/commit/e346e72eb2ca5b4271dd8f3caa21159f45cc4c6a))
+* **video:** premium video tiers with a credit system ([a87b3de](https://github.com/christopherqueenconsulting/linkedin_engagement_manager/commit/a87b3debe931dfa924e8ed828acc6d228eee29ec))
+
 ## [0.6.0](https://github.com/christopherqueenconsulting/linkedin_engagement_manager/compare/v0.5.0...v0.6.0) (2026-06-25)
 
 
