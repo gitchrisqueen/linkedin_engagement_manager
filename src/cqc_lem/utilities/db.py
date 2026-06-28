@@ -2175,6 +2175,49 @@ def update_post_video_quality(post_id: int, quality: str) -> bool:
         connection.close()
 
 
+def get_post_carousel_slides(post_id: int):
+    connection = get_db_connection()
+    cursor = connection.cursor(dictionary=True)
+    try:
+        cursor.execute("SELECT carousel_slides FROM posts WHERE id = %s", (post_id,))
+        row = cursor.fetchone()
+        return row["carousel_slides"] if row else None
+    except mysql.connector.Error as err:
+        myprint(f"Could not get carousel_slides for post {post_id} | Error: {err}")
+        return None
+    finally:
+        cursor.close()
+        connection.close()
+
+
+def get_unposted_posts_missing_assets(within_days: int = 14) -> list:
+    """Posts not yet posted, due within `within_days`, whose required media asset is
+    missing: video posts with no video_url, or carousel posts with no slides. Used by the
+    backfill safety net. Returns (id, user_id, post_type, buyer_stage, scheduled_time)."""
+    connection = get_db_connection()
+    cursor = connection.cursor()
+    try:
+        cursor.execute("""
+            SELECT id, user_id, post_type, buyer_stage, scheduled_time
+            FROM posts
+            WHERE status IN ('approved', 'pending', 'scheduled')
+              AND scheduled_time > NOW()
+              AND scheduled_time <= NOW() + INTERVAL %s DAY
+              AND (
+                    (post_type = 'video'    AND (video_url IS NULL OR video_url = ''))
+                 OR (post_type = 'carousel' AND (carousel_slides IS NULL OR carousel_slides = '' OR carousel_slides = '[]'))
+              )
+            ORDER BY scheduled_time
+        """, (within_days,))
+        return cursor.fetchall()
+    except mysql.connector.Error as err:
+        myprint(f"Could not get unposted posts missing assets | Error: {err}")
+        return []
+    finally:
+        cursor.close()
+        connection.close()
+
+
 # ---------------------------------------------------------------------------
 # Avatar training records
 # ---------------------------------------------------------------------------

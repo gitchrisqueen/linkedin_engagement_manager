@@ -312,6 +312,19 @@ def _extract_slide_texts(carousel_obj) -> list[str]:
     return texts
 
 
+def _post_missing_required_asset(post_id: int, post_type, video_url) -> bool:
+    """True when a video post has no video or a carousel post has no slides — used to
+    hold such posts PENDING instead of approving them to publish with no media."""
+    pt = str(post_type).lower()
+    if pt == PostType.VIDEO.value:
+        return not video_url
+    if pt == PostType.CAROUSEL.value:
+        from cqc_lem.utilities.db import get_post_carousel_slides
+        slides = get_post_carousel_slides(post_id)
+        return not slides or str(slides).strip() in ("", "[]")
+    return False
+
+
 def _apply_ai_disclosure(content: str) -> str:
     """Append the AI-visuals disclosure line to a caption (idempotent)."""
     if not AI_DISCLOSURE_ENABLED or not content:
@@ -446,6 +459,21 @@ def regenerate_video_for_post(post_id: int) -> Optional[str]:
 def regenerate_post_video_task(post_id: int):
     """Celery wrapper so premium-video upgrades run async (Veo can take minutes)."""
     return regenerate_video_for_post(post_id)
+
+
+@shared_task.task
+def regenerate_post_carousel_task(post_id: int):
+    """Regenerate a carousel post's slide images (used by the asset-backfill safety net)."""
+    from cqc_lem.utilities.db import get_post_user_id, get_post_buyer_stage, update_db_post_content
+    user_id = get_post_user_id(post_id)
+    if not user_id:
+        myprint(f"regenerate_post_carousel_task: no user for post_id={post_id}")
+        return None
+    stage = get_post_buyer_stage(post_id) or "awareness"
+    content = create_carousel_content(user_id, stage, post_id)
+    if content:
+        update_db_post_content(post_id, content)
+    return content
 
 
 def create_text_post(user_id: int, stage: str, post_type: str = None, user_profile: LinkedInProfile=None,
@@ -963,6 +991,14 @@ def auto_create_weekly_content(user_id: int = None):
         prefs = _prefs_cache[user_id]
         auto_schedule = bool(prefs.get("auto_schedule_posts", True))
         new_status = PostStatus.APPROVED if auto_schedule else PostStatus.PENDING
+
+        # Never auto-approve a video/carousel post whose media failed to generate — hold it
+        # PENDING so the backfill task (or manual review) can complete the asset before it
+        # can be scheduled/posted. Prevents assetless posts going out.
+        if _post_missing_required_asset(post_id, post_type, video_url):
+            new_status = PostStatus.PENDING
+            myprint(f"post_id {post_id}: required media asset missing — holding PENDING")
+
         myprint(f"Updating post_id: {post_id} Status={new_status}")
         update_db_post_status(post_id, new_status)
 

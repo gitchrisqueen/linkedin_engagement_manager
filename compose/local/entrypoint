@@ -7,4 +7,15 @@ set -o pipefail
 # exits if any of your variables is not set
 set -o nounset
 
+# The shared "assets" named volume mounts over /app/src/cqc_lem/assets at runtime, so the
+# image-time COPY --chown doesn't cover it. The celery workers run as the non-root user
+# "celeryworker" (uid 1000); without this they cannot write generated images/videos to the
+# volume (web_app runs as root and created the dirs root-owned), so asset generation
+# silently fails and video/carousel posts get approved with no media. Re-own the volume to
+# celeryworker on every container start. Runs as root (entrypoint); best-effort so a
+# transient error never blocks boot.
+if [ -d /app/src/cqc_lem/assets ]; then
+  chown -R celeryworker:celeryworker /app/src/cqc_lem/assets 2>/dev/null || true
+fi
+
 exec "$@"
