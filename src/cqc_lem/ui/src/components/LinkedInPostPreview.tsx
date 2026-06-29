@@ -14,6 +14,25 @@ function isUrl(value: string): boolean {
   return /^(https?:)?\/\//.test(value) || value.startsWith('/api/') || value.startsWith('/assets')
 }
 
+// Only allow safe schemes to reach a media `src` — blocks javascript:/vbscript:/etc.
+// so post-derived URLs can't become a DOM-based XSS sink. Validates via the URL
+// parser and returns the normalized href (parse + scheme allowlist sanitizes the value).
+const SAFE_MEDIA_PROTOCOLS = new Set(['http:', 'https:', 'blob:', 'data:'])
+
+function safeMediaUrl(value: string | null | undefined): string | undefined {
+  if (!value) return undefined
+  const origin = typeof window !== 'undefined' ? window.location.origin : 'http://localhost'
+  try {
+    const parsed = new URL(value, origin)
+    if (SAFE_MEDIA_PROTOCOLS.has(parsed.protocol)) {
+      return parsed.href
+    }
+  } catch {
+    // not a parseable URL — fall through to undefined
+  }
+  return undefined
+}
+
 function CarouselPreview({ slides }: { slides: string[] }) {
   const [index, setIndex] = useState(0)
   const total = slides.length
@@ -26,7 +45,7 @@ function CarouselPreview({ slides }: { slides: string[] }) {
       <div className="aspect-square w-full flex items-center justify-center overflow-hidden">
         {isUrl(current) ? (
           <img
-            src={current}
+            src={safeMediaUrl(current)}
             alt={`Slide ${index + 1} of ${total}`}
             className="w-full h-full object-contain"
           />
@@ -139,7 +158,7 @@ export default function LinkedInPostPreview({
         <div className="bg-black">
           <video
             key={videoUrl ?? undefined}
-            src={videoUrl ?? undefined}
+            src={safeMediaUrl(videoUrl)}
             controls
             playsInline
             preload="metadata"
@@ -150,7 +169,7 @@ export default function LinkedInPostPreview({
       {showCarousel && <CarouselPreview slides={slides!} />}
       {showImage && (
         <div className="bg-gray-100 aspect-video overflow-hidden">
-          <img src={mediaUrl} alt="Post media" className="w-full h-full object-cover" />
+          <img src={safeMediaUrl(mediaUrl)} alt="Post media" className="w-full h-full object-cover" />
         </div>
       )}
 

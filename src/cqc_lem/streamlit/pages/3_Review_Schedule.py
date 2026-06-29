@@ -57,7 +57,7 @@ with (tracer.start_as_current_span("review_schedule") if tracer else nullcontext
         st.session_state.email = email
 
         # Get the user id
-        response = requests.get(f"{GET_USER_ID_URL}?email={st.session_state.email}")
+        response = requests.get(GET_USER_ID_URL, params={"email": st.session_state.email})
         if response.status_code == 200:
             # st.success(f"User id fetched successfully: {str(response.json())}")
             st.session_state.user_id = response.json()['detail']
@@ -67,7 +67,7 @@ with (tracer.start_as_current_span("review_schedule") if tracer else nullcontext
             st.error(
                 f"Failed to get user id. Error ({response.status_code}): {response.json()['detail']}")
 
-        response = requests.get(f"{GET_POSTS_URL}?email={email}")
+        response = requests.get(GET_POSTS_URL, params={"email": email})
 
         if response.status_code == 200:
             st.success("Posts fetched successfully")

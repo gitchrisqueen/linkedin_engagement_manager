@@ -1,7 +1,6 @@
 """Unit tests for the RunwayML video-model abstraction."""
 
 import pytest
-from unittest.mock import patch
 
 pytestmark = pytest.mark.unit
 

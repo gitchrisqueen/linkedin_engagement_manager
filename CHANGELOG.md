@@ -1,5 +1,21 @@
 # Changelog
 
+## [0.12.5](https://github.com/christopherqueenconsulting/linkedin_engagement_manager/compare/v0.12.4...v0.12.5) (2026-06-29)
+
+
+### Bug Fixes
+
+* **security:** harden safeMediaUrl (URL-parser allowlist) ([ccb1ad1](https://github.com/christopherqueenconsulting/linkedin_engagement_manager/commit/ccb1ad1c24e848e0d06fea1c15a2c836419b9dec))
+* **security:** harden safeMediaUrl with URL-parser scheme allowlist ([8a2cafb](https://github.com/christopherqueenconsulting/linkedin_engagement_manager/commit/8a2cafb8e43b895e637d116a1eb760f114b0f595))
+
+## [0.12.4](https://github.com/christopherqueenconsulting/linkedin_engagement_manager/compare/v0.12.3...v0.12.4) (2026-06-29)
+
+
+### Bug Fixes
+
+* **security:** resolve open CodeQL alerts ([62d2bc7](https://github.com/christopherqueenconsulting/linkedin_engagement_manager/commit/62d2bc78adf53ddd6b9a8ed1bfa949b54bfa8004))
+* **security:** resolve open CodeQL alerts ([5432d68](https://github.com/christopherqueenconsulting/linkedin_engagement_manager/commit/5432d68ee523d5ecd2e015bf3a737f5ecfc1874d))
+
 ## [0.12.3](https://github.com/christopherqueenconsulting/linkedin_engagement_manager/compare/v0.12.2...v0.12.3) (2026-06-29)
 
 

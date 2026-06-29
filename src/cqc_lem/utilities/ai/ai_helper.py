@@ -13,7 +13,8 @@ from cqc_lem.utilities.utils import create_folder_if_not_exists, save_video_url_
 from cqc_lem.utilities.env_constants import DEFAULT_VIDEO_MODEL, DEFAULT_IMAGE_MODEL, DEFAULT_IMAGE_RATIO
 # create_runway_video lives in video_models (model abstraction); re-exported here
 # so existing `from ai_helper import create_runway_video` imports keep working.
-from cqc_lem.utilities.ai.video_models import create_runway_video  # noqa: F401
+# The redundant `as create_runway_video` alias marks it an intentional re-export.
+from cqc_lem.utilities.ai.video_models import create_runway_video as create_runway_video  # noqa: F401
 from dotenv import load_dotenv
 
 # Load .env file

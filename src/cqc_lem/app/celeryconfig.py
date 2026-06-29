@@ -120,8 +120,8 @@ def setup_aws_sqs_config():
             session = boto3.session.Session(region_name=aws_region)
             aws_access_key = safequote(session.get_credentials().access_key)
             aws_secret_key = safequote(session.get_credentials().secret_key)
-            print(f"Session Access Key: {session.get_credentials().access_key}")
-            print(f"Session Secret Key: {session.get_credentials().secret_key}")
+            # Never log AWS credentials in clear text — only confirm presence + region.
+            print(f"Session credentials loaded: {bool(aws_access_key and aws_secret_key)}")
             print(f"Session Region: {session.region_name}")
 
             if sqs_queue_name:
