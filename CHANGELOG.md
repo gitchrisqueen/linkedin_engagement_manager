@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.12.3](https://github.com/christopherqueenconsulting/linkedin_engagement_manager/compare/v0.12.2...v0.12.3) (2026-06-29)
+
+
+### Bug Fixes
+
+* **security:** source debug-harness email from get_user_email ([721440f](https://github.com/christopherqueenconsulting/linkedin_engagement_manager/commit/721440fa7840358a33bea4d92ed4da3ab55f0f7d))
+* **security:** source debug-harness email from get_user_email (untaint) ([e0767f5](https://github.com/christopherqueenconsulting/linkedin_engagement_manager/commit/e0767f5950fedad9857dfd00e3369ecef5024280))
+
 ## [0.12.2](https://github.com/christopherqueenconsulting/linkedin_engagement_manager/compare/v0.12.1...v0.12.2) (2026-06-29)
 
 
