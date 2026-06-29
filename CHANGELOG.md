@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.10.0](https://github.com/christopherqueenconsulting/linkedin_engagement_manager/compare/v0.9.2...v0.10.0) (2026-06-29)
+
+
+### Features
+
+* **api:** admin test-run endpoints for comment/reply/DM + Postman & VNC guide ([060acf4](https://github.com/christopherqueenconsulting/linkedin_engagement_manager/commit/060acf484acd96bed762acaef51f58905c065cf7))
+* **api:** admin test-run endpoints for comment/reply/DM + Postman & VNC guide ([ea8217a](https://github.com/christopherqueenconsulting/linkedin_engagement_manager/commit/ea8217a327248b89a402fb03a36fba23b3859024))
+
 ## [0.9.2](https://github.com/christopherqueenconsulting/linkedin_engagement_manager/compare/v0.9.1...v0.9.2) (2026-06-29)
 
 
