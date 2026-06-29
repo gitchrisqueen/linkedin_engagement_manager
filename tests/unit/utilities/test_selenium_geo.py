@@ -8,7 +8,7 @@ pytestmark = pytest.mark.unit
 _MOD = "cqc_lem.utilities.selenium_util"
 
 
-def _run(user_id=None, geo=None, headless=False):
+def _run(user_id=None, geo=None, headless=False, proxy=None):
     fake_driver = MagicMock()
     cdp_calls = {}
 
@@ -20,7 +20,8 @@ def _run(user_id=None, geo=None, headless=False):
          patch(f"{_MOD}.DEVICE_FARM_PROJECT_ARN", None), \
          patch(f"{_MOD}.TEST_GRID_PROJECT_ARN", None), \
          patch(f"{_MOD}.webdriver.Remote", return_value=fake_driver), \
-         patch("cqc_lem.utilities.db.get_user_geo", return_value=geo):
+         patch("cqc_lem.utilities.db.get_user_geo", return_value=geo), \
+         patch("cqc_lem.utilities.db.get_user_proxy", return_value=proxy):
         from cqc_lem.utilities.selenium_util import get_docker_driver
         get_docker_driver(headless=headless, user_id=user_id)
     return cdp_calls
