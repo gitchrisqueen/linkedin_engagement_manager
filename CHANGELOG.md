@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.9.0](https://github.com/christopherqueenconsulting/linkedin_engagement_manager/compare/v0.8.0...v0.9.0) (2026-06-29)
+
+
+### Features
+
+* **automation:** per-user geo/timezone/locale spoofing for LinkedIn login ([e24a5b7](https://github.com/christopherqueenconsulting/linkedin_engagement_manager/commit/e24a5b7e9ca35759cc6f94a373ab4a3c73c8a5f0))
+* **automation:** per-user geo/timezone/locale spoofing for LinkedIn login ([f6f8acc](https://github.com/christopherqueenconsulting/linkedin_engagement_manager/commit/f6f8acc5084fa6bc8fdc799d9d0b2af3d5fd4c2e))
+
 ## [0.8.0](https://github.com/christopherqueenconsulting/linkedin_engagement_manager/compare/v0.7.1...v0.8.0) (2026-06-29)
 
 
