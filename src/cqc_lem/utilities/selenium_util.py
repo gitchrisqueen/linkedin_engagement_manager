@@ -120,6 +120,20 @@ def get_docker_driver(headless: bool = True, session_name: str = "ChromeTests", 
     driver = webdriver.Remote(command_executor=remote_url, options=options)
     driver.set_window_size(1920, 1080)
 
+    # Stealth: scrub the most-checked automation tells before any page script runs.
+    # navigator.webdriver=undefined (the #1 signal), a realistic navigator.languages
+    # matching the user's locale, and a present window.chrome. Best-effort.
+    primary_lang = user_locale.split("-")[0] if user_locale else "en"
+    stealth_js = (
+        "Object.defineProperty(navigator,'webdriver',{get:()=>undefined});"
+        f"Object.defineProperty(navigator,'languages',{{get:()=>['{user_locale}','{primary_lang}']}});"
+        "window.chrome=window.chrome||{runtime:{}};"
+    )
+    try:
+        driver.execute_cdp_cmd("Page.addScriptToEvaluateOnNewDocument", {"source": stealth_js})
+    except Exception as e:
+        myprint(f"Could not apply stealth init script | Error: {e}")
+
     if coordinates is None:
         coordinates = {
             "latitude": lat if lat is not None else 30.3321,
@@ -149,15 +163,17 @@ def add_headless_options(options: Options) -> Options:
     options.add_argument('--disable-popup-blocking')  # Working
     options.add_argument('--incognito')  # Working
     options.add_argument('--no-sandbox')  # Working
-    options.add_argument('--enable-automation')  # Working
     options.add_argument('--disable-gpu')  # Working
     options.add_argument('--disable-extensions')  # Working
     options.add_argument('--disable-infobars')  # Working
+    # NOTE: deliberately NOT adding --enable-automation — it advertises automation
+    # (sets navigator.webdriver=true), which is exactly what we want to avoid.
     options.add_argument('--disable-browser-side-navigation')  # Working
     options.add_argument('--disable-dev-shm-usage')  # Working
     options.add_argument('--disable-features=VizDisplayCompositor')  # Working
     options.add_argument('--dns-prefetch-disable')  # Working
     options.add_argument("--force-device-scale-factor=1")  # Working
+    options.add_argument("--disable-blink-features=AutomationControlled")  # stealth
 
     options.set_capability('goog:loggingPrefs', {'performance': 'ALL'})
 
@@ -180,6 +196,15 @@ def getBaseOptions(base_download_directory: str = None):
     options.add_argument('--disable-dev-shm-usage')
 
     # Options to make us undetectable (Review https://amiunique.org/fingerprint from the browser to verify)
+    # Stealth flags: stop Chrome advertising automation. --disable-blink-features=
+    # AutomationControlled keeps navigator.webdriver from being forced to true, and the
+    # excludeSwitches/useAutomationExtension pair removes the "controlled by automated
+    # test software" banner and the cdc_ automation extension — both are signals LinkedIn
+    # uses to flag a session as a bot. (Note: the dominant "new device/location" signal is
+    # still the egress IP; these reduce the automation fingerprint, not the IP geo.)
+    options.add_argument("--disable-blink-features=AutomationControlled")
+    options.add_experimental_option("excludeSwitches", ["enable-automation"])
+    options.add_experimental_option("useAutomationExtension", False)
     options.add_argument("window-size=1920x1080")
     options.add_argument(
         # "user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/74.0.3729.169 Safari/537.36"
@@ -282,6 +307,45 @@ def get_element_wait_retry(driver: WebDriver, wait: WebDriverWait, find_by_value
                 element = None
 
     return element
+
+
+def get_visible_element_wait_retry(driver: WebDriver, wait: WebDriverWait,
+                                   locators: list[tuple[str, str]], wait_text: str,
+                                   max_try: int = MAX_WAIT_RETRY,
+                                   element_always_expected: bool = True) -> WebElement | None:
+    """Return the first *displayed* element matching any of `locators`.
+
+    `locators` is an ordered list of (By, value) pairs tried in turn. Some pages
+    (e.g. LinkedIn's redesigned login) render duplicate hidden+visible copies of
+    the same field, so matching on presence alone can return an invisible element —
+    we must pick the one the user actually sees.
+    """
+
+    def _find_visible(d):
+        for find_by, value in locators:
+            try:
+                for el in d.find_elements(find_by, value):
+                    try:
+                        if el.is_displayed():
+                            return el
+                    except StaleElementReferenceException:
+                        continue
+            except (StaleElementReferenceException, NoSuchElementException):
+                continue
+        return False
+
+    try:
+        return wait.until(_find_visible, wait_text)
+    except (StaleElementReferenceException, TimeoutException) as se:
+        if max_try > 1:
+            myprint(wait_text + " | Not visible | .....retrying")
+            time.sleep(5)
+            return get_visible_element_wait_retry(driver, wait, locators, wait_text,
+                                                  max_try - 1, element_always_expected)
+        if element_always_expected:
+            raise se
+        myprint(f"Failed to find visible element: {wait_text}")
+        return None
 
 
 def get_elements_as_list_wait_stale(wait: WebDriverWait, find_by_value: str, wait_text: str,

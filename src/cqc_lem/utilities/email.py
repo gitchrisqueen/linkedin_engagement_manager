@@ -75,6 +75,91 @@ def _send_via_smtp(to_email: str, html_content: str) -> bool:
         return False
 
 
+def _build_approval_html(vnc_url: str | None) -> str:
+    watch = (
+        f'<p>Want to watch it happen live? <a href="{vnc_url}">Open the session viewer</a>.</p>'
+        if vnc_url else ""
+    )
+    return f"""
+    <html><body>
+    <h2>Action needed: approve your LinkedIn sign-in</h2>
+    <p>LinkedIn Engagement Manager is signing in to LinkedIn on your behalf, and
+    LinkedIn asked to <strong>verify this sign-in from your device</strong>.</p>
+    <ol>
+      <li>Open the <strong>LinkedIn mobile app</strong>.</li>
+      <li>You'll see a "Did you just try to sign in?" prompt — tap <strong>Yes</strong>.</li>
+    </ol>
+    <p>This is expected and safe — it's our automation, not someone else. Approving once
+    lets LinkedIn remember the device so you won't be asked every time.</p>
+    {watch}
+    <p style="color:#888;font-size:12px;">If you were not expecting any automation activity,
+    do not approve, and change your LinkedIn password.</p>
+    </body></html>
+    """
+
+
+def send_login_approval_email(to_email: str, vnc_url: str | None = None) -> bool:
+    """Send a HIGH-PRIORITY email asking the user to approve a LinkedIn device sign-in.
+
+    LinkedIn's "Check your LinkedIn app → tap Yes" challenge can't be solved
+    programmatically, so the automation pauses briefly waiting for approval. This
+    notifies the user immediately (flagged high priority) so they can act instead of
+    the run silently stalling. Best-effort: returns True only if an email was dispatched.
+    """
+    has_sendgrid = bool(SENDGRID_API_KEY)
+    has_smtp = bool(SMTP_USER) and bool(SMTP_PASSWORD)
+    if not has_sendgrid and not has_smtp:
+        myprint("No email provider configured — cannot send login-approval notice")
+        return False
+
+    subject = "⚠️ Action needed: approve your LinkedIn sign-in"
+    html = _build_approval_html(vnc_url)
+
+    if has_sendgrid:
+        try:
+            from sendgrid import SendGridAPIClient
+            from sendgrid.helpers.mail import Header, Mail
+
+            message = Mail(
+                from_email=SENDGRID_FROM_EMAIL,
+                to_emails=to_email,
+                subject=subject,
+                html_content=html,
+            )
+            # High-priority headers (Outlook/Gmail honor these)
+            message.header = Header("X-Priority", "1")
+            message.header = Header("X-MSMail-Priority", "High")
+            message.header = Header("Importance", "High")
+            SendGridAPIClient(SENDGRID_API_KEY).send(message)
+            myprint(f"Login-approval email sent via SendGrid to {to_email}")
+            return True
+        except Exception as e:
+            myprint(f"SendGrid login-approval send failed for {to_email}: {e}")
+
+    if has_smtp:
+        msg = MIMEMultipart("alternative")
+        msg["Subject"] = subject
+        msg["From"] = SMTP_USER
+        msg["To"] = to_email
+        msg["X-Priority"] = "1"
+        msg["X-MSMail-Priority"] = "High"
+        msg["Importance"] = "High"
+        msg.attach(MIMEText(html, "html"))
+        try:
+            with smtplib.SMTP(SMTP_HOST, SMTP_PORT, timeout=15) as server:
+                server.ehlo()
+                server.starttls()
+                server.login(SMTP_USER, SMTP_PASSWORD)
+                server.sendmail(SMTP_USER, to_email, msg.as_string())
+            myprint(f"Login-approval email sent via SMTP to {to_email}")
+            return True
+        except Exception as e:
+            myprint(f"SMTP login-approval send failed for {to_email}: {e}")
+            return False
+
+    return False
+
+
 def send_pin_email(
     to_email: str,
     pin: str,
