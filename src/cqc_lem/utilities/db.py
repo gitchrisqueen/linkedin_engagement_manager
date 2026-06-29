@@ -1893,6 +1893,69 @@ def update_user_preferences(
         connection.close()
 
 
+def get_user_geo(user_id: int) -> Optional[dict]:
+    """Return the user's full geo profile for Selenium spoofing.
+
+    Keys: latitude, longitude (floats or None), timezone, locale, city, country.
+    Returns None only if the user row is missing.
+    """
+    connection = get_db_connection()
+    cursor = connection.cursor()
+    try:
+        cursor.execute(
+            "SELECT latitude, longitude, timezone, locale, city, country FROM users WHERE id = %s",
+            (user_id,),
+        )
+        row = cursor.fetchone()
+    except mysql.connector.Error as err:
+        myprint(f"Could not get user geo for user_id {user_id} | Error: {err}")
+        row = None
+    finally:
+        cursor.close()
+        connection.close()
+    if not row:
+        return None
+    return {
+        "latitude": float(row[0]) if row[0] is not None else None,
+        "longitude": float(row[1]) if row[1] is not None else None,
+        "timezone": row[2],
+        "locale": row[3],
+        "city": row[4],
+        "country": row[5],
+    }
+
+
+def update_user_location(user_id: int, latitude: float, longitude: float,
+                         city: Optional[str] = None, country: Optional[str] = None,
+                         locale: Optional[str] = None, timezone: Optional[str] = None,
+                         source: str = "manual") -> bool:
+    """Persist the user's location. timezone is updated only when provided so the
+    user's display-timezone preference is preserved unless autocapture supplies one."""
+    connection = get_db_connection()
+    cursor = connection.cursor()
+    try:
+        if timezone:
+            cursor.execute(
+                "UPDATE users SET latitude=%s, longitude=%s, city=%s, country=%s, "
+                "locale=%s, timezone=%s, location_source=%s WHERE id=%s",
+                (latitude, longitude, city, country, locale, timezone, source, user_id),
+            )
+        else:
+            cursor.execute(
+                "UPDATE users SET latitude=%s, longitude=%s, city=%s, country=%s, "
+                "locale=%s, location_source=%s WHERE id=%s",
+                (latitude, longitude, city, country, locale, source, user_id),
+            )
+        connection.commit()
+        return cursor.rowcount >= 0
+    except mysql.connector.Error as err:
+        myprint(f"Could not update location for user_id {user_id} | Error: {err}")
+        return False
+    finally:
+        cursor.close()
+        connection.close()
+
+
 def get_user_timezone(user_id: int) -> str:
     """Return the IANA timezone string for the user, defaulting to UTC."""
     connection = get_db_connection()

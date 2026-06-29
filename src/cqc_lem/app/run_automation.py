@@ -1433,7 +1433,7 @@ def get_current_profile(user_id: int, session_name: str = "Get Current Profile")
 
     user_email, user_password = get_user_password_pair_by_id(user_id)
 
-    driver, wait = get_driver_wait_pair(session_name=session_name)
+    driver, wait = get_driver_wait_pair(session_name=session_name, user_id=user_id)
 
     try:
 
