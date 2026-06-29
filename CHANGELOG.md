@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.12.0](https://github.com/christopherqueenconsulting/linkedin_engagement_manager/compare/v0.11.0...v0.12.0) (2026-06-29)
+
+
+### Features
+
+* **linkedin:** notify user on device-approval + browser anti-detection ([9a284e9](https://github.com/christopherqueenconsulting/linkedin_engagement_manager/commit/9a284e9e78f841de388981129e7026a3438c5287))
+
+
+### Bug Fixes
+
+* **linkedin:** repair login selectors for redesigned login page ([da9e9f9](https://github.com/christopherqueenconsulting/linkedin_engagement_manager/commit/da9e9f9885e2cfefc85c4594d11f785e09c4d273))
+* **linkedin:** repair login selectors for redesigned login page ([b21fd97](https://github.com/christopherqueenconsulting/linkedin_engagement_manager/commit/b21fd975621e6b3167dff450c3ebe9437e6c49c8))
+
 ## [0.11.0](https://github.com/christopherqueenconsulting/linkedin_engagement_manager/compare/v0.10.0...v0.11.0) (2026-06-29)
 
 
