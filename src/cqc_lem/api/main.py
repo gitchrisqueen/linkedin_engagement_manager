@@ -12,7 +12,7 @@ from cqc_lem.app.aws_test_celery_task import test_get_my_profile
 from cqc_lem.app.run_automation import (
     automate_invites_to_company_page_for_user, automate_reply_commenting,
     automate_commenting, automate_appreciation_dms_for_user,
-    automate_profile_viewer_engagement, send_private_dm,
+    send_private_dm,
 )
 from celery import chain as celery_chain
 from cqc_lem.app.run_content_plan import auto_create_weekly_content, plan_content_for_user
