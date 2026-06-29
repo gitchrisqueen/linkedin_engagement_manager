@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.12.4](https://github.com/christopherqueenconsulting/linkedin_engagement_manager/compare/v0.12.3...v0.12.4) (2026-06-29)
+
+
+### Bug Fixes
+
+* **security:** resolve open CodeQL alerts ([62d2bc7](https://github.com/christopherqueenconsulting/linkedin_engagement_manager/commit/62d2bc78adf53ddd6b9a8ed1bfa949b54bfa8004))
+* **security:** resolve open CodeQL alerts ([5432d68](https://github.com/christopherqueenconsulting/linkedin_engagement_manager/commit/5432d68ee523d5ecd2e015bf3a737f5ecfc1874d))
+
 ## [0.12.3](https://github.com/christopherqueenconsulting/linkedin_engagement_manager/compare/v0.12.2...v0.12.3) (2026-06-29)
 
 
