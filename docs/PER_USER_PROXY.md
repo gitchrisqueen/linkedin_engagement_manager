@@ -1,85 +1,95 @@
-# Per-user egress proxy (DRAFT)
+# Per-user egress proxy
 
-**Status:** groundwork / draft. The plumbing (DB field + Selenium wiring) is in place;
-no paid provider is wired by default. This doc records the design and the **free**
-strategies that rely only on services we already have.
+Routes each user's automation browser through an egress IP near where they normally
+sign in — the durable fix for LinkedIn's "new location" device-approval challenges.
+**Zero user-side setup:** routing is derived automatically from the user's stored
+location; the user installs/configures nothing.
 
 ## The problem
 
-LinkedIn flags a login when the request's **IP geolocates somewhere different** from
-where the user normally signs in, and challenges it with "Check your LinkedIn app →
-tap Yes". Our automation egresses from the **VPS's single datacenter IP**, which:
+LinkedIn challenges a login when its **IP geolocates far from the user's usual
+location**, and again when the IP keeps changing. Our automation egresses from the
+VPS's single datacenter IP — wrong location for most users, and unstable across the
+fleet. Browser-fingerprint stealth (shipped: `navigator.webdriver`, UA, timezone,
+locale, geolocation overrides) makes the session look non-automated but **cannot
+change the IP**, which is the dominant signal. So we need per-user egress from a
+**stable IP near that user's location**.
 
-1. is geographically fixed (one city) — wrong for every user not near it, and
-2. is a *datacenter* IP, which LinkedIn weights as higher-risk than a residential ISP.
+## How it resolves (automatic, no user action)
 
-Browser fingerprint stealth (already shipped: `navigator.webdriver`, UA, timezone,
-locale, geolocation overrides) makes the session look non-automated, **but it cannot
-change the IP**. The IP is the dominant "new location" signal. So the durable fix is
-**per-user egress from an IP near that user's normal location.**
+`get_docker_driver(user_id=…)` calls `resolve_proxy(explicit, country)` —
+`utilities/proxy.py` — which picks, first match wins:
 
-## Why not just buy residential proxies
+1. **`users.proxy_url`** — explicit per-user override (power users / paid proxies).
+2. **`REGION_PROXIES[country]`** — a regional proxy matched to the user's **stored
+   country** (we already capture location, incl. IP auto-capture). **This is the
+   zero-setup path:** the user just has a location (often auto-detected) and is routed
+   automatically.
+3. **`PROXY_URL`** — a global default.
+4. **none** — direct egress (today's behavior).
 
-Residential proxy providers (Bright Data, Oxylabs, Smartproxy…) bill ~$3–15 **per GB**.
-At SaaS scale — every user, every automation cycle, loading image-heavy LinkedIn pages
-— that cost grows with usage and erodes margin. So paid residential is **not** the
-default. We want a free path that scales.
+`REGION_PROXIES` is a JSON map of ISO country codes (+ optional `"DEFAULT"`) → proxy
+URL. Chrome gets `--proxy-server=scheme://host:port`.
 
-## The abstraction (shipped in this draft)
+## Options that need NO user setup
 
-Each user has an optional `users.proxy_url` (`scheme://[user:pass@]host:port`, migration
-`V32`). `get_docker_driver(user_id=…)` reads it (falling back to a global `PROXY_URL`
-env) and adds `--proxy-server=scheme://host:port` to Chrome, so that user's browser
-egresses through it. `NULL` → straight from the host (today's behavior). DB helpers:
-`get_user_proxy` / `update_user_proxy`.
+### 1. A few cheap regional egress nodes — recommended ✅
 
-Auth note: Chrome's `--proxy-server` can't carry inline `user:pass`. The free options
-below are all **auth-less from the browser** (they authenticate by *source IP*), so
-they work as-is. Credentialed commercial proxies would additionally need an
-auth-handler extension (a follow-up, deliberately out of this draft).
+Stand up one tiny proxy (Squid/3proxy on a `t4g.nano` / Lightsail / cheap VPS, ~$3–4/mo)
+in each region your users cluster in (e.g. `us-east`, `us-west`, `eu-west`,
+`ap-southeast`). Put their URLs in `REGION_PROXIES`. Each user is auto-routed to the
+node matching their country.
 
-## Free strategies (use only services we already have)
+- **Zero user setup** — derived from location we already have.
+- **Cost scales with *regions* (a handful), not users** — one node serves everyone in
+  its region, so it stays cheap at SaaS scale.
+- **Stable IP per region** — once a user's device is approved from that IP, cookies +
+  "recognize this device" keep subsequent logins clean.
+- Uses infra we already have (**AWS** account / the same VPS provider).
+- Trade-off: these are *datacenter* IPs. The **geography matches** (kills the "new
+  location" flag), but datacenter is a minor residual signal vs. residential. In
+  practice geography-match + stable IP + one-time approval is enough for most users.
+  Provision these as a small Terraform/CDK module or a per-region cloud-init script
+  (follow-up — the app side is done and config-driven).
 
-### 1. BYO home exit node — recommended, free, per-user, scales ✅
+### 2. Cloudflare WARP on the box — free baseline 🟡
 
-Each user runs a **free exit node on their own home connection**; LEM routes *that
-user's* session through *their* home IP. The egress is then a genuine residential IP in
-the user's real city — exactly what LinkedIn expects — at **zero marginal cost to the
-SaaS** (the user supplies the bandwidth). Two zero-cost ways, both services we use:
+Run WARP (`warp-cli`, free) on the VPS / a sidecar and set it as `REGION_PROXIES`'
+`DEFAULT` (or `PROXY_URL`). Free, zero setup, sheds the raw datacenter IP for a
+cleaner Cloudflare egress — but it's **one shared location**, so it doesn't match
+per-user geography. Good as the catch-all default beneath the regional nodes.
 
-- **Cloudflare Tunnel (`cloudflared`)** — we already run Cloudflare. The user installs
-  `cloudflared` at home and exposes a local SOCKS/HTTP forward; we store that as their
-  `proxy_url`. (Cloudflare WARP Connector / private networks can do the same on the
-  free plan.)
-- **Tailscale exit node (free Personal plan)** — the user enables "exit node" on a home
-  device; the LEM box joins their tailnet and routes the session out that node.
+### 3. Commercial residential proxy — opt-in, paid 🟡
 
-Onboarding cost: the user runs one installer once. This is the scalable answer — cost
-stays flat as users grow because each user brings their own egress.
+Point a user's `users.proxy_url` at a residential provider (Bright Data, Oxylabs,
+Smartproxy…). Best stealth (real residential IPs), but **per-GB billing** that grows
+with usage — so keep it opt-in for users who want turnkey and will pay, not the default.
 
-### 2. Cloudflare WARP on the box — free, but shared 🟡
+## Not recommended here
 
-Run WARP (`warp-cli`, free) on the VPS / a sidecar so automation egresses through
-Cloudflare rather than the bare datacenter IP. Cleaner reputation than the raw VPS IP,
-**but** it's one shared egress for everyone — it does **not** match each user's
-location. Useful as a baseline; not a per-user fix.
-
-### 3. BYO proxy — free/cheap, user's choice 🟡
-
-A power user can point `proxy_url` at any IP-allowlisted proxy they trust (a free-tier
-VPS in their region, a friend's connection, etc.). Same wiring, their responsibility.
+- **BYO home exit node (Tailscale / `cloudflared`)** — gives a genuine residential IP
+  at zero marginal cost, but **requires the user to install software at home**. Ruled
+  out: we want no user-side setup. (Left reachable only as a `users.proxy_url` override
+  for a technical user who opts in.)
+- **Tor** — free but LinkedIn blocks exit nodes and you can't pin exit geography.
 
 ## Recommendation
 
-Ship the abstraction (this draft) → make **#1 (BYO home exit node)** the documented
-onboarding path for users who get flagged, with **#2 (WARP)** as a free box-wide
-baseline. Keep paid residential proxies as an opt-in `proxy_url` for users who want
-turnkey and will pay. Combined with the existing one-time device approval + cookie
-persistence, most users should stop seeing challenges without any per-GB spend.
+Ship the resolver (this change) → run **a few regional egress nodes (#1)** keyed by
+country via `REGION_PROXIES`, with **WARP (#2)** as the free `DEFAULT`. Users do
+nothing. Combined with the existing one-time device approval + cookie persistence,
+this removes the "new location" challenge without per-GB spend or user onboarding.
 
-## Open follow-ups (not in this draft)
+## Auth note
 
-- Auth-handler extension so credentialed (`user:pass`) proxies work over the Remote grid.
-- `GET/PUT /user/proxy` API + a Settings UI field (mirrors the location endpoints).
-- Optional WARP sidecar in `docker-compose.prod.yml` + a setup script.
-- Health-check a user's proxy before a run; fall back to direct egress with a warning.
+Chrome's `--proxy-server` can't carry inline `user:pass`. The options above are all
+auth-less from the browser (they authenticate by *source IP* — lock the regional nodes
+to the VPS's IP). Credentialed commercial proxies additionally need an auth-handler
+extension (follow-up).
+
+## Status / follow-ups
+
+- App side (DB field, resolver, Selenium wiring, tests) — **done, config-driven**.
+- Provision the regional nodes (Terraform/CDK or cloud-init) + lock to the box IP.
+- `GET/PUT /user/proxy` + Settings UI (only needed for the opt-in override).
+- Auth-handler extension for credentialed proxies.

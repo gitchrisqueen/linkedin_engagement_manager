@@ -97,6 +97,7 @@ def get_docker_driver(headless: bool = True, session_name: str = "ChromeTests", 
     user_timezone = TZ
     user_locale = "en-US"
     user_proxy = None
+    user_country = None
     if user_id is not None:
         from cqc_lem.utilities.db import get_user_geo, get_user_proxy
         geo = get_user_geo(user_id)
@@ -107,17 +108,20 @@ def get_docker_driver(headless: bool = True, session_name: str = "ChromeTests", 
                 user_timezone = geo["timezone"]
             if geo.get("locale"):
                 user_locale = geo["locale"]
+            user_country = geo.get("country")
         user_proxy = get_user_proxy(user_id)
-    # A global default proxy (PROXY_URL) applies when a user has none configured.
-    if not user_proxy:
-        user_proxy = os.getenv("PROXY_URL") or None
+
+    # Resolve egress proxy with zero user setup: explicit override → regional proxy
+    # matched to the user's country → global default → none (direct egress).
+    from cqc_lem.utilities.proxy import resolve_proxy
+    effective_proxy = resolve_proxy(user_proxy, user_country)
 
     options = getBaseOptions()
     options.add_argument("--ignore-ssl-errors=yes")
     options.add_argument("--ignore-certificate-errors")
     options.add_argument(f"--lang={user_locale}")
-    if user_proxy:
-        apply_proxy(options, user_proxy)
+    if effective_proxy:
+        apply_proxy(options, effective_proxy)
     if headless:
         options = add_headless_options(options)
 
