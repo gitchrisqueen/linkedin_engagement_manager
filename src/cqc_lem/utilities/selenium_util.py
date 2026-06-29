@@ -2,6 +2,7 @@ import json
 import time
 from datetime import datetime, timedelta
 from functools import wraps
+from urllib.parse import urlparse
 
 import requests
 import selenium
@@ -95,8 +96,9 @@ def get_docker_driver(headless: bool = True, session_name: str = "ChromeTests", 
     # where the user normally logs in, to reduce LinkedIn "new location" challenges.
     user_timezone = TZ
     user_locale = "en-US"
+    user_proxy = None
     if user_id is not None:
-        from cqc_lem.utilities.db import get_user_geo
+        from cqc_lem.utilities.db import get_user_geo, get_user_proxy
         geo = get_user_geo(user_id)
         if geo:
             if lat is None and geo.get("latitude") is not None:
@@ -105,11 +107,17 @@ def get_docker_driver(headless: bool = True, session_name: str = "ChromeTests", 
                 user_timezone = geo["timezone"]
             if geo.get("locale"):
                 user_locale = geo["locale"]
+        user_proxy = get_user_proxy(user_id)
+    # A global default proxy (PROXY_URL) applies when a user has none configured.
+    if not user_proxy:
+        user_proxy = os.getenv("PROXY_URL") or None
 
     options = getBaseOptions()
     options.add_argument("--ignore-ssl-errors=yes")
     options.add_argument("--ignore-certificate-errors")
     options.add_argument(f"--lang={user_locale}")
+    if user_proxy:
+        apply_proxy(options, user_proxy)
     if headless:
         options = add_headless_options(options)
 
@@ -150,6 +158,34 @@ def get_docker_driver(headless: bool = True, session_name: str = "ChromeTests", 
         myprint(f"Could not apply timezone/locale override | Error: {e}")
 
     return driver
+
+
+def apply_proxy(options: Options, proxy_url: str) -> None:
+    """Route the browser's egress through `proxy_url` (scheme://[user:pass@]host:port).
+
+    Chrome's --proxy-server cannot carry inline credentials, so we pass only
+    scheme://host:port. Auth-less proxies — the free, recommended case (a home exit
+    node via Tailscale/cloudflared, Cloudflare WARP, or an IP-allowlisted proxy) —
+    work directly. Credentialed proxies additionally need an auth-handler extension;
+    see docs/PER_USER_PROXY.md. Best-effort: a malformed URL is logged and ignored
+    rather than failing driver creation.
+    """
+    try:
+        parsed = urlparse(proxy_url)
+        scheme = parsed.scheme or "http"
+        host = parsed.hostname or ""
+        if not host:
+            myprint(f"Invalid proxy_url (no host) — ignoring: {proxy_url}")
+            return
+        hostport = f"{host}:{parsed.port}" if parsed.port else host
+        options.add_argument(f"--proxy-server={scheme}://{hostport}")
+        myprint(f"Routing browser egress via proxy {scheme}://{hostport}")
+        if parsed.username:
+            myprint("Proxy URL has inline credentials; --proxy-server cannot carry "
+                    "them. Use an IP-allowlisted proxy or an auth extension "
+                    "(see docs/PER_USER_PROXY.md).")
+    except Exception as e:
+        myprint(f"Could not apply proxy '{proxy_url}': {e}")
 
 
 def add_headless_options(options: Options) -> Options:

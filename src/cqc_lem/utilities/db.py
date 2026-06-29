@@ -1956,6 +1956,48 @@ def update_user_location(user_id: int, latitude: float, longitude: float,
         connection.close()
 
 
+def get_user_proxy(user_id: int) -> Optional[str]:
+    """Return the user's egress proxy URL (scheme://[user:pass@]host:port) or None.
+
+    Used by Selenium to route a user's browser session through an IP near where they
+    normally log in, reducing LinkedIn "new location" challenges. None = egress from
+    the host directly.
+    """
+    connection = get_db_connection()
+    cursor = connection.cursor()
+    try:
+        cursor.execute("SELECT proxy_url FROM users WHERE id = %s", (user_id,))
+        row = cursor.fetchone()
+    except mysql.connector.Error as err:
+        myprint(f"Could not get proxy for user_id {user_id} | Error: {err}")
+        row = None
+    finally:
+        cursor.close()
+        connection.close()
+    if not row or not row[0]:
+        return None
+    return row[0]
+
+
+def update_user_proxy(user_id: int, proxy_url: Optional[str]) -> bool:
+    """Set (or clear, when proxy_url is None/empty) the user's egress proxy URL."""
+    connection = get_db_connection()
+    cursor = connection.cursor()
+    try:
+        cursor.execute(
+            "UPDATE users SET proxy_url = %s WHERE id = %s",
+            (proxy_url or None, user_id),
+        )
+        connection.commit()
+        return cursor.rowcount >= 0
+    except mysql.connector.Error as err:
+        myprint(f"Could not update proxy for user_id {user_id} | Error: {err}")
+        return False
+    finally:
+        cursor.close()
+        connection.close()
+
+
 def get_user_timezone(user_id: int) -> str:
     """Return the IANA timezone string for the user, defaulting to UTC."""
     connection = get_db_connection()
