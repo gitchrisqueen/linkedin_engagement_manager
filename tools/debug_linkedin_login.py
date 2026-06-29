@@ -23,15 +23,17 @@ import time
 
 from selenium.webdriver.common.by import By
 
-from cqc_lem.utilities.db import get_cookies, get_user_password_pair_by_id
+from cqc_lem.utilities.db import get_cookies, get_user_email, get_user_password_pair_by_id
 from cqc_lem.utilities.selenium_util import get_driver_wait_pair
 
 LOGIN_URL = "https://www.linkedin.com/login"
 
 
 def inspect(user_id: int, out: str) -> None:
-    # Discard the password — never let it (or anything derived from it) reach a log.
-    email, _ = get_user_password_pair_by_id(user_id)
+    # Source the email from get_user_email (not the password pair): CodeQL taints
+    # everything returned by get_user_password_pair_by_id as sensitive, so logging
+    # an email obtained from it trips clear-text-logging even though it's not secret.
+    email = get_user_email(user_id)
     print(f"[creds] user_id={user_id} email={email!r}")
     cookies = get_cookies("https://www.linkedin.com", email) if email else None
     print(f"[cookies] count={len(cookies) if cookies else 0}")
