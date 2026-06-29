@@ -567,20 +567,20 @@ ujson = ["ujson (>=5.10.0)"]
 
 [[package]]
 name = "cdk-ecr-deployment"
-version = "4.2.19"
+version = "4.2.21"
 description = "CDK construct to deploy docker image to Amazon ECR"
 optional = false
 python-versions = ">=3.10"
 groups = ["dev"]
 files = [
-    {file = "cdk_ecr_deployment-4.2.19-py3-none-any.whl", hash = "sha256:3e53ec5b7b1394fc69b31d5c5a45c03b4f6e7a047441a3e548f6ea487b624c8c"},
-    {file = "cdk_ecr_deployment-4.2.19.tar.gz", hash = "sha256:c188cadcd94dd5b44cff6b90d85a4e653bec9ef2b708f5685582a04c7c9bf873"},
+    {file = "cdk_ecr_deployment-4.2.21-py3-none-any.whl", hash = "sha256:52107414faf6d72d422db2039aa421eef236ae41111c387e4443d09338f7fff2"},
+    {file = "cdk_ecr_deployment-4.2.21.tar.gz", hash = "sha256:7bd698edec2bcb7e872591548d8b667fd41c8735d4dc7f801960e6f5f43584f0"},
 ]
 
 [package.dependencies]
 aws-cdk-lib = ">=2.80.0,<3.0.0"
 constructs = ">=10.5.1,<11.0.0"
-jsii = ">=1.135.0,<2.0.0"
+jsii = ">=1.136.0,<2.0.0"
 publication = ">=0.0.3"
 
 [[package]]
@@ -1003,7 +1003,7 @@ files = [
     {file = "colorama-0.4.6-py2.py3-none-any.whl", hash = "sha256:4f1d9991f5acc0ca119f9d443620b77f9d6b33703e51011c16baf57afb285fc6"},
     {file = "colorama-0.4.6.tar.gz", hash = "sha256:08695f5cb7ed6e0531a20572697297273c47b8cae5a63ffc6d6ed5c201be6e44"},
 ]
-markers = {main = "platform_system == \"Windows\" or sys_platform == \"win32\"", dev = "sys_platform == \"win32\"", streamlit = "platform_system == \"Windows\"", test = "sys_platform == \"win32\""}
+markers = {main = "sys_platform == \"win32\" or platform_system == \"Windows\"", dev = "sys_platform == \"win32\"", streamlit = "platform_system == \"Windows\"", test = "sys_platform == \"win32\""}
 
 [[package]]
 name = "comm"
