@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.12.2](https://github.com/christopherqueenconsulting/linkedin_engagement_manager/compare/v0.12.1...v0.12.2) (2026-06-29)
+
+
+### Bug Fixes
+
+* **security:** drop password entirely from debug harness log ([d25f556](https://github.com/christopherqueenconsulting/linkedin_engagement_manager/commit/d25f556226065d41c7774318c057fed30fa72023))
+* **security:** drop password entirely from debug harness log ([02b7b97](https://github.com/christopherqueenconsulting/linkedin_engagement_manager/commit/02b7b9704a20852f86c104aac30ee62f1706dde3))
+
 ## [0.12.1](https://github.com/christopherqueenconsulting/linkedin_engagement_manager/compare/v0.12.0...v0.12.1) (2026-06-29)
 
 
