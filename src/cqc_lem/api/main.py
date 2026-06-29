@@ -32,6 +32,7 @@ from cqc_lem.utilities.db import (
     update_avatar_training_status, set_active_avatar,
     get_avatar_trainings, get_active_avatar,
     get_user_timezone, update_user_timezone,
+    get_user_geo, update_user_location,
     replace_video_url_base, get_post_type, get_post_buyer_stage,
     update_db_post_carousel_slides,
     get_post_url_from_log_for_user,
@@ -42,7 +43,8 @@ from cqc_lem.utilities.linkedin.token_refresh import (
 )
 from cqc_lem.utilities.env_constants import LI_CLIENT_ID, LI_CLIENT_SECRET, LI_REDIRECT_URL, LI_STATE_SALT, ADMIN_SECRET, API_ACCESS_TOKENS, \
     DEFAULT_IMAGE_MODEL, DEFAULT_VIDEO_MODEL, DEFAULT_VIDEO_RATIO
-from cqc_lem.utilities.logger import myprint
+import requests
+from cqc_lem.utilities.logger import myprint, log_warning
 from cqc_lem.utilities.mime_type_helper import get_file_mime_type
 from cqc_lem.utilities.observability import track_api_call
 from cqc_lem.utilities.utils import get_file_extension_from_filepath
@@ -250,6 +252,20 @@ class LinkedInPasswordRequest(BaseModel):
 class TimezoneRequest(BaseModel):
     session_token: str
     timezone: str
+
+
+class LocationRequest(BaseModel):
+    session_token: str
+    latitude: float
+    longitude: float
+    city: Optional[str] = None
+    country: Optional[str] = None
+    locale: Optional[str] = None
+    timezone: Optional[str] = None
+
+
+class LocationAutocaptureRequest(BaseModel):
+    session_token: str
 
 
 class AdminFixVideoUrlsRequest(BaseModel):
@@ -961,6 +977,80 @@ def update_user_timezone_endpoint(request: TimezoneRequest) -> ResponseModel:
     if not saved:
         raise HTTPException(status_code=500, detail="Could not update timezone")
     return ResponseModel(status_code=200, detail="Timezone updated")
+
+
+@router.get("/user/location")
+def get_user_location_endpoint(session_token: str) -> ResponseModel:
+    user_id = get_session_user_id(session_token)
+    if not user_id:
+        raise HTTPException(status_code=401, detail="Invalid or expired session")
+    return ResponseModel(status_code=200, detail=get_user_geo(user_id) or {})
+
+
+@router.put("/user/location")
+def update_user_location_endpoint(request: LocationRequest) -> ResponseModel:
+    user_id = get_session_user_id(request.session_token)
+    if not user_id:
+        raise HTTPException(status_code=401, detail="Invalid or expired session")
+    if not (-90 <= request.latitude <= 90) or not (-180 <= request.longitude <= 180):
+        raise HTTPException(status_code=422, detail="Invalid latitude/longitude")
+    if request.country and len(request.country) != 2:
+        raise HTTPException(status_code=422, detail="country must be an ISO-3166 alpha-2 code")
+    saved = update_user_location(
+        user_id, request.latitude, request.longitude,
+        city=request.city, country=request.country, locale=request.locale,
+        timezone=request.timezone, source="manual",
+    )
+    if not saved:
+        raise HTTPException(status_code=500, detail="Could not update location")
+    return ResponseModel(status_code=200, detail="Location updated")
+
+
+@router.post("/user/location/autocapture")
+def autocapture_user_location_endpoint(request: LocationAutocaptureRequest, http_request: Request) -> ResponseModel:
+    """Geolocate the caller's real IP and persist it as their login location.
+    The app sits behind a Cloudflare tunnel, so the client IP arrives in
+    CF-Connecting-IP / X-Forwarded-For — never trust the immediate peer."""
+    user_id = get_session_user_id(request.session_token)
+    if not user_id:
+        raise HTTPException(status_code=401, detail="Invalid or expired session")
+
+    client_ip = (
+        http_request.headers.get("cf-connecting-ip")
+        or (http_request.headers.get("x-forwarded-for") or "").split(",")[0].strip()
+        or (http_request.client.host if http_request.client else None)
+    )
+    if not client_ip:
+        raise HTTPException(status_code=400, detail="Could not determine client IP")
+
+    try:
+        resp = requests.get(f"https://ipapi.co/{client_ip}/json/", timeout=8)
+        resp.raise_for_status()
+        data = resp.json()
+        if data.get("error"):
+            raise ValueError(data.get("reason", "ip geolocation failed"))
+        lat, lng = float(data["latitude"]), float(data["longitude"])
+    except Exception as e:
+        log_warning("IP geolocation failed", exc=e, user_id=user_id)
+        raise HTTPException(status_code=502, detail="IP geolocation service unavailable")
+
+    locale = None
+    languages = data.get("languages")  # e.g. "en-US,es"
+    if languages:
+        locale = languages.split(",")[0]
+
+    saved = update_user_location(
+        user_id, lat, lng,
+        city=data.get("city"), country=data.get("country_code") or data.get("country"),
+        locale=locale, timezone=data.get("timezone"), source="ip_autocapture",
+    )
+    if not saved:
+        raise HTTPException(status_code=500, detail="Could not save captured location")
+    return ResponseModel(status_code=200, detail={
+        "latitude": lat, "longitude": lng,
+        "city": data.get("city"), "country": data.get("country_code") or data.get("country"),
+        "timezone": data.get("timezone"), "locale": locale,
+    })
 
 
 @router.post("/billing/create-checkout-session")
