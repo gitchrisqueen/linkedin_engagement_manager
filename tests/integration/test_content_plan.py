@@ -32,8 +32,14 @@ class TestPlanContentForUser:
         def capture_insert(user_id, scheduled_time, post_type, buyer_stage):
             inserted_types.append(post_type)
             return True
-        with patch('cqc_lem.app.run_content_plan.get_last_planned_post_date_for_user', return_value=None), \
+        # Freeze to June 1 so target_posts is large enough to span multiple types;
+        # without this the test breaks near month-end when only ~1 post is planned.
+        fixed_now = datetime(2026, 6, 1, 0, 0, 0)
+        with patch('cqc_lem.app.run_content_plan.datetime') as mock_dt, \
+             patch('cqc_lem.app.run_content_plan.get_last_planned_post_date_for_user', return_value=None), \
              patch('cqc_lem.app.run_content_plan.insert_planned_post', side_effect=capture_insert):
+            mock_dt.now.return_value = fixed_now
+            mock_dt.combine = datetime.combine
             plan_content_for_user(user_id=1)
             unique_types = set(inserted_types)
             assert len(unique_types) > 1, f"Expected multiple post types, got only: {unique_types}"
