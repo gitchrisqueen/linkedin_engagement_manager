@@ -9,7 +9,11 @@ from urllib.parse import urlparse, urlunparse
 
 from cqc_lem import assets_dir
 from cqc_lem.app.aws_test_celery_task import test_get_my_profile
-from cqc_lem.app.run_automation import automate_invites_to_company_page_for_user, automate_reply_commenting
+from cqc_lem.app.run_automation import (
+    automate_invites_to_company_page_for_user, automate_reply_commenting,
+    automate_commenting, automate_appreciation_dms_for_user,
+    automate_profile_viewer_engagement, send_private_dm,
+)
 from celery import chain as celery_chain
 from cqc_lem.app.run_content_plan import auto_create_weekly_content, plan_content_for_user
 from cqc_lem.utilities.db import (
@@ -283,6 +287,28 @@ class AdminRegenerateCarouselRequest(BaseModel):
 class AdminRegenerateVideoRequest(BaseModel):
     post_id: int
     user_id: int
+
+
+class AdminTestCommentRequest(BaseModel):
+    user_id: int
+    loop_for_duration: int = 300  # seconds; short window so a test run ends on its own
+
+
+class AdminTestReplyRequest(BaseModel):
+    post_id: int
+    loop_for_duration: int = 300
+    future_forward: int = 0
+
+
+class AdminTestDMRequest(BaseModel):
+    user_id: int
+    loop_for_duration: int = 300
+
+
+class AdminTestDirectDMRequest(BaseModel):
+    user_id: int
+    profile_url: str
+    message: str
 
 
 class VariantCombo(BaseModel):
@@ -1670,6 +1696,119 @@ def admin_generate_media_variants(
     myprint(f"admin/generate-media-variants: batch={payload['batch_id']} "
             f"variants={len(payload['variants'])} est=${payload['total_estimated_cost_usd']}")
     return ResponseModel(status_code=200, detail=payload)
+
+
+# ---------------------------------------------------------------------------
+# Admin test-run endpoints — kick a single engagement task on the selenium
+# worker so you can watch it live in the Chrome VNC. All require X-Admin-Secret.
+# ---------------------------------------------------------------------------
+
+@router.post("/admin/test/comment", responses={
+    200: {"description": "Commenting test run queued"},
+    403: {"description": "Forbidden"},
+})
+def admin_test_comment(
+    request: AdminTestCommentRequest,
+    x_admin_secret: Optional[str] = Header(default=None),
+) -> ResponseModel:
+    """Run the feed-commenting automation for a user (comments on posts in their feed)."""
+    _require_admin(x_admin_secret)
+    result = automate_commenting.apply_async(kwargs={
+        "user_id": request.user_id,
+        "loop_for_duration": request.loop_for_duration,
+    }, queue="selenium")
+    myprint(f"admin/test/comment: queued task={result.id} user_id={request.user_id}")
+    return ResponseModel(status_code=200, detail={
+        "task_id": result.id, "task": "automate_commenting", "user_id": request.user_id,
+    })
+
+
+@router.post("/admin/test/reply", responses={
+    200: {"description": "Reply test run queued"},
+    403: {"description": "Forbidden"},
+})
+def admin_test_reply(
+    request: AdminTestReplyRequest,
+    x_admin_secret: Optional[str] = Header(default=None),
+) -> ResponseModel:
+    """Run the reply-to-comments automation for a specific (already-posted) post."""
+    _require_admin(x_admin_secret)
+    user_id = get_post_user_id(request.post_id)
+    if not user_id:
+        raise HTTPException(status_code=404, detail="User for post not found")
+    result = automate_reply_commenting.apply_async(kwargs={
+        "user_id": user_id,
+        "post_id": request.post_id,
+        "loop_for_duration": request.loop_for_duration,
+        "future_forward": request.future_forward,
+    }, queue="selenium")
+    myprint(f"admin/test/reply: queued task={result.id} post_id={request.post_id}")
+    return ResponseModel(status_code=200, detail={
+        "task_id": result.id, "task": "automate_reply_commenting",
+        "post_id": request.post_id, "user_id": user_id,
+    })
+
+
+@router.post("/admin/test/dm", responses={
+    200: {"description": "DM test run queued"},
+    403: {"description": "Forbidden"},
+})
+def admin_test_dm(
+    request: AdminTestDMRequest,
+    x_admin_secret: Optional[str] = Header(default=None),
+) -> ResponseModel:
+    """Run the appreciation-DM automation (DMs people who recently viewed the profile)."""
+    _require_admin(x_admin_secret)
+    result = automate_appreciation_dms_for_user.apply_async(kwargs={
+        "user_id": request.user_id,
+        "loop_for_duration": request.loop_for_duration,
+    }, queue="selenium")
+    myprint(f"admin/test/dm: queued task={result.id} user_id={request.user_id}")
+    return ResponseModel(status_code=200, detail={
+        "task_id": result.id, "task": "automate_appreciation_dms_for_user",
+        "user_id": request.user_id,
+    })
+
+
+@router.post("/admin/test/dm-direct", responses={
+    200: {"description": "Direct DM queued"},
+    403: {"description": "Forbidden"},
+})
+def admin_test_dm_direct(
+    request: AdminTestDirectDMRequest,
+    x_admin_secret: Optional[str] = Header(default=None),
+) -> ResponseModel:
+    """Send ONE direct DM to a specific profile URL — the most deterministic way to
+    watch the messaging flow end-to-end in the VNC."""
+    _require_admin(x_admin_secret)
+    result = send_private_dm.apply_async(kwargs={
+        "user_id": request.user_id,
+        "profile_url": request.profile_url,
+        "message": request.message,
+    }, queue="selenium")
+    myprint(f"admin/test/dm-direct: queued task={result.id} user_id={request.user_id} -> {request.profile_url}")
+    return ResponseModel(status_code=200, detail={
+        "task_id": result.id, "task": "send_private_dm",
+        "user_id": request.user_id, "profile_url": request.profile_url,
+    })
+
+
+@router.get("/admin/task-status/{task_id}", responses={
+    200: {"description": "Task status"},
+    403: {"description": "Forbidden"},
+})
+def admin_task_status(
+    task_id: str,
+    x_admin_secret: Optional[str] = Header(default=None),
+) -> ResponseModel:
+    """Poll a queued test task's state (PENDING/STARTED/SUCCESS/FAILURE)."""
+    _require_admin(x_admin_secret)
+    from cqc_lem.app.my_celery import app as celery_app
+    res = celery_app.AsyncResult(task_id)
+    detail = {"task_id": task_id, "state": res.state}
+    if res.ready():
+        detail["result"] = str(res.result)[:500]
+    return ResponseModel(status_code=200, detail=detail)
 
 
 @router.get("/carousel-templates", responses={200: {"description": "Available carousel templates"}})
