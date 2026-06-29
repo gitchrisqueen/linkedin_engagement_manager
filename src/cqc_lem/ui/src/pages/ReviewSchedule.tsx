@@ -532,6 +532,9 @@ export default function ReviewSchedule() {
               content={editingPost.content}
               author={email.split('@')[0]}
               headline="LinkedIn Member"
+              postType={editingPost.post_type}
+              videoUrl={editingPost.video_url}
+              slides={editingPost.carousel_slides}
             />
           </div>
         )}

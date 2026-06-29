@@ -115,6 +115,7 @@ export default function Account() {
   const [timezone, setTimezone] = useState('America/New_York')
   const [tzInitialised, setTzInitialised] = useState(false)
   const [tzSavedMsg, setTzSavedMsg] = useState<string | null>(null)
+  const [locationMsg, setLocationMsg] = useState<{ ok: boolean; text: string } | null>(null)
 
   // Handle LinkedIn OAuth callback: ?li_connected=1 or ?li_error=... in URL
   useEffect(() => {
@@ -309,6 +310,37 @@ export default function Account() {
     onError: () => {
       setTzSavedMsg('Save failed — please try again.')
       setTimeout(() => setTzSavedMsg(null), 5000)
+    },
+  })
+
+  // Login location — used so the automation browser appears to log in from where
+  // you normally do, reducing LinkedIn "new location" challenges.
+  const { data: locationData } = useQuery({
+    queryKey: ['user-location', sessionToken],
+    queryFn: () =>
+      api
+        .get(`/user/location?session_token=${encodeURIComponent(sessionToken!)}`)
+        .then((r) => r.data.detail as {
+          latitude?: number; longitude?: number; city?: string; country?: string; timezone?: string
+        }),
+    enabled: !!sessionToken,
+  })
+
+  const autocaptureLocationMutation = useMutation({
+    mutationFn: () =>
+      api
+        .post('/user/location/autocapture', { session_token: sessionToken })
+        .then((r) => r.data.detail),
+    onSuccess: (d: { city?: string; country?: string }) => {
+      queryClient.invalidateQueries({ queryKey: ['user-location'] })
+      queryClient.invalidateQueries({ queryKey: ['user-timezone'] })
+      const where = [d?.city, d?.country].filter(Boolean).join(', ')
+      setLocationMsg({ ok: true, text: where ? `Location set to ${where}.` : 'Location detected.' })
+      setTimeout(() => setLocationMsg(null), 4000)
+    },
+    onError: () => {
+      setLocationMsg({ ok: false, text: 'Could not detect your location — try again.' })
+      setTimeout(() => setLocationMsg(null), 5000)
     },
   })
 
@@ -810,6 +842,38 @@ export default function Account() {
           {tzMutation.isPending ? 'Saving…' : 'Save Timezone'}
         </button>
       </form>
+
+      {/* Login location card */}
+      <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 space-y-4">
+        <h2 className="text-base font-semibold text-gray-700">Login Location</h2>
+        <p className="text-xs text-gray-500">
+          The automation logs into LinkedIn from our servers. Setting your location makes the
+          browser appear to come from where you normally log in, which reduces LinkedIn
+          "new location" security challenges.
+        </p>
+
+        <div className="text-sm text-gray-700">
+          <span className="font-medium text-gray-600">Current: </span>
+          {locationData?.latitude != null
+            ? `${[locationData.city, locationData.country].filter(Boolean).join(', ') || 'Set'} (${locationData.latitude.toFixed(3)}, ${locationData.longitude?.toFixed(3)})`
+            : 'Not set'}
+        </div>
+
+        {locationMsg && (
+          <p className={`text-sm font-medium ${locationMsg.ok ? 'text-green-600' : 'text-red-600'}`}>
+            {locationMsg.text}
+          </p>
+        )}
+
+        <button
+          type="button"
+          onClick={() => autocaptureLocationMutation.mutate()}
+          disabled={autocaptureLocationMutation.isPending}
+          className="w-full bg-blue-600 text-white py-2 rounded-lg text-sm font-semibold hover:bg-blue-700 disabled:opacity-50 transition-colors"
+        >
+          {autocaptureLocationMutation.isPending ? 'Detecting…' : 'Use my current location'}
+        </button>
+      </div>
     </div>
   )
 }
