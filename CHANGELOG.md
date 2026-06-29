@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.13.0](https://github.com/christopherqueenconsulting/linkedin_engagement_manager/compare/v0.12.5...v0.13.0) (2026-06-29)
+
+
+### Features
+
+* **proxy:** zero-setup region-based egress proxy ([55d4adf](https://github.com/christopherqueenconsulting/linkedin_engagement_manager/commit/55d4adf1aa10ee3d4e427c4b670eafe4e4809afe))
+* **proxy:** zero-setup region-based egress proxy resolution ([8a13676](https://github.com/christopherqueenconsulting/linkedin_engagement_manager/commit/8a13676411e2bc1619760080c19fdf9aaaf96b6d))
+
 ## [0.12.5](https://github.com/christopherqueenconsulting/linkedin_engagement_manager/compare/v0.12.4...v0.12.5) (2026-06-29)
 
 
