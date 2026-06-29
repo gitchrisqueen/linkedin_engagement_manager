@@ -1,27 +1,42 @@
 {
   "info": {
     "name": "LEM Engagement Tests",
-    "description": "Trigger comment/reply/DM automation on demand and poll task status. Requires the LEM Prod environment (base_url, api_token, admin_secret, user_id). See docs/TESTING_ENGAGEMENT_API.md.",
+    "description": "Trigger comment/reply/DM automation on demand and poll task status. Inputs are query params; auth uses BOTH a bearer token ({{api_token}}) and the X-Admin-Secret header ({{admin_secret}}). Select an environment first: 'LEM — Prod' or 'LEM — Local/Dev'. See docs/TESTING_ENGAGEMENT_API.md.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "auth": {
     "type": "bearer",
     "bearer": [{ "key": "token", "value": "{{api_token}}", "type": "string" }]
   },
-  "variable": [],
+  "event": [
+    {
+      "listen": "test",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "// Save the returned task_id so the 'Task status' request can poll it.",
+          "try {",
+          "  const id = pm.response.json().detail.task_id;",
+          "  if (id) { pm.environment.set('task_id', id); console.log('task_id =', id); }",
+          "} catch (e) {}"
+        ]
+      }
+    }
+  ],
   "item": [
     {
       "name": "Comment on feed",
       "request": {
         "method": "POST",
-        "header": [
-          { "key": "Content-Type", "value": "application/json" },
-          { "key": "X-Admin-Secret", "value": "{{admin_secret}}" }
-        ],
-        "url": { "raw": "{{base_url}}/api/admin/test/comment", "host": ["{{base_url}}"], "path": ["api", "admin", "test", "comment"] },
-        "body": {
-          "mode": "raw",
-          "raw": "{\n  \"user_id\": {{user_id}},\n  \"loop_for_duration\": 300\n}"
+        "header": [{ "key": "X-Admin-Secret", "value": "{{admin_secret}}" }],
+        "url": {
+          "raw": "{{base_url}}/api/admin/test/comment?user_id={{user_id}}&loop_for_duration=300",
+          "host": ["{{base_url}}"],
+          "path": ["api", "admin", "test", "comment"],
+          "query": [
+            { "key": "user_id", "value": "{{user_id}}" },
+            { "key": "loop_for_duration", "value": "300", "description": "seconds; run self-terminates" }
+          ]
         }
       }
     },
@@ -29,14 +44,16 @@
       "name": "Reply to comments on a post",
       "request": {
         "method": "POST",
-        "header": [
-          { "key": "Content-Type", "value": "application/json" },
-          { "key": "X-Admin-Secret", "value": "{{admin_secret}}" }
-        ],
-        "url": { "raw": "{{base_url}}/api/admin/test/reply", "host": ["{{base_url}}"], "path": ["api", "admin", "test", "reply"] },
-        "body": {
-          "mode": "raw",
-          "raw": "{\n  \"post_id\": 42,\n  \"loop_for_duration\": 300,\n  \"future_forward\": 0\n}"
+        "header": [{ "key": "X-Admin-Secret", "value": "{{admin_secret}}" }],
+        "url": {
+          "raw": "{{base_url}}/api/admin/test/reply?post_id=42&loop_for_duration=300&future_forward=0",
+          "host": ["{{base_url}}"],
+          "path": ["api", "admin", "test", "reply"],
+          "query": [
+            { "key": "post_id", "value": "42", "description": "an already-posted post id" },
+            { "key": "loop_for_duration", "value": "300" },
+            { "key": "future_forward", "value": "0" }
+          ]
         }
       }
     },
@@ -44,14 +61,15 @@
       "name": "Appreciation DMs to profile viewers",
       "request": {
         "method": "POST",
-        "header": [
-          { "key": "Content-Type", "value": "application/json" },
-          { "key": "X-Admin-Secret", "value": "{{admin_secret}}" }
-        ],
-        "url": { "raw": "{{base_url}}/api/admin/test/dm", "host": ["{{base_url}}"], "path": ["api", "admin", "test", "dm"] },
-        "body": {
-          "mode": "raw",
-          "raw": "{\n  \"user_id\": {{user_id}},\n  \"loop_for_duration\": 300\n}"
+        "header": [{ "key": "X-Admin-Secret", "value": "{{admin_secret}}" }],
+        "url": {
+          "raw": "{{base_url}}/api/admin/test/dm?user_id={{user_id}}&loop_for_duration=300",
+          "host": ["{{base_url}}"],
+          "path": ["api", "admin", "test", "dm"],
+          "query": [
+            { "key": "user_id", "value": "{{user_id}}" },
+            { "key": "loop_for_duration", "value": "300" }
+          ]
         }
       }
     },
@@ -59,14 +77,16 @@
       "name": "DM (direct, single profile)",
       "request": {
         "method": "POST",
-        "header": [
-          { "key": "Content-Type", "value": "application/json" },
-          { "key": "X-Admin-Secret", "value": "{{admin_secret}}" }
-        ],
-        "url": { "raw": "{{base_url}}/api/admin/test/dm-direct", "host": ["{{base_url}}"], "path": ["api", "admin", "test", "dm-direct"] },
-        "body": {
-          "mode": "raw",
-          "raw": "{\n  \"user_id\": {{user_id}},\n  \"profile_url\": \"https://www.linkedin.com/in/some-person/\",\n  \"message\": \"Hi — testing my outreach automation, please ignore.\"\n}"
+        "header": [{ "key": "X-Admin-Secret", "value": "{{admin_secret}}" }],
+        "url": {
+          "raw": "{{base_url}}/api/admin/test/dm-direct?user_id={{user_id}}&profile_url=https://www.linkedin.com/in/some-person/&message=Hi — testing my outreach automation, please ignore.",
+          "host": ["{{base_url}}"],
+          "path": ["api", "admin", "test", "dm-direct"],
+          "query": [
+            { "key": "user_id", "value": "{{user_id}}" },
+            { "key": "profile_url", "value": "https://www.linkedin.com/in/some-person/" },
+            { "key": "message", "value": "Hi — testing my outreach automation, please ignore." }
+          ]
         }
       }
     },
@@ -74,9 +94,7 @@
       "name": "Task status",
       "request": {
         "method": "GET",
-        "header": [
-          { "key": "X-Admin-Secret", "value": "{{admin_secret}}" }
-        ],
+        "header": [{ "key": "X-Admin-Secret", "value": "{{admin_secret}}" }],
         "url": {
           "raw": "{{base_url}}/api/admin/task-status/{{task_id}}",
           "host": ["{{base_url}}"],

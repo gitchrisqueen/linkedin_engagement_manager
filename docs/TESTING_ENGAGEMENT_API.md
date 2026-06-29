@@ -1,8 +1,8 @@
 # Testing LinkedIn Engagement (Comment / Reply / DM) via the API
 
 This guide shows how to **trigger a single engagement task on demand** and
-**watch the Chrome browser do it live** over VNC. It's meant for manual
-verification — e.g. "does commenting actually work for my account now?"
+**watch the Chrome browser do it live** over VNC — e.g. "does commenting actually
+work for my account now?"
 
 ---
 
@@ -10,153 +10,123 @@ verification — e.g. "does commenting actually work for my account now?"
 
 | What | URL |
 |---|---|
-| App (SPA + API) | `https://lem.christopherqueenconsulting.com` |
-| API base prefix | `https://lem.christopherqueenconsulting.com/api` |
-| Interactive API docs (Swagger) | `https://lem.christopherqueenconsulting.com/docs` |
-| OpenAPI schema (import into Postman) | `https://lem.christopherqueenconsulting.com/openapi.json` |
-| Live browser (VNC, via SSH tunnel) | `http://localhost:7900/?autoconnect=1` (after tunnel — see §5) |
+| App (SPA + API) | <https://lem.christopherqueenconsulting.com> |
+| API base prefix | <https://lem.christopherqueenconsulting.com/api> |
+| **Interactive API docs (Swagger)** | <https://lem.christopherqueenconsulting.com/docs> |
+| OpenAPI schema (import into Postman) | <https://lem.christopherqueenconsulting.com/openapi.json> |
+| **Live browser (VNC)** | <https://lemvnc.christopherqueenconsulting.com/?autoconnect=1&password=secret> |
+
+> The VNC link auto-connects and passes the noVNC password (`secret`) in the
+> query string, so it opens straight into the live Chrome session. It's gated by
+> Cloudflare Access, so you'll sign in with your Cloudflare identity first.
 
 ---
 
-## 2. Authentication — two headers
+## 2. Authentication — BOTH headers are required
 
-Engagement test endpoints live under `/api/admin/*` and require **both**:
+The engagement test endpoints (`/api/admin/*`) require **two** credentials at the
+same time. Sending only one returns 401 or 403.
 
 | Header | Value | Where to find it (on the VPS) |
 |---|---|---|
 | `Authorization` | `Bearer <API_ACCESS_TOKEN>` | `API_ACCESS_TOKENS=` in `/opt/lem/.env` (comma-separated; use any one) |
 | `X-Admin-Secret` | `<ADMIN_SECRET>` | `ADMIN_SECRET=` in `/opt/lem/.env` |
 
-- The **bearer token** gates every `/api/*` route (except auth/webhook/assets).
-- The **admin secret** additionally gates the `/api/admin/*` endpoints.
+- **`Authorization` bearer** gates every `/api/*` route (set globally).
+- **`X-Admin-Secret`** additionally gates the `/api/admin/*` endpoints.
+- In the [Swagger page](https://lem.christopherqueenconsulting.com/docs), click
+  **Authorize** — it now presents **both** schemes (`HTTPBearer` and
+  `X-Admin-Secret`). Fill in both, then every endpoint's **Try it out** works.
 
-> Get the values: `sudo grep -E '^API_ACCESS_TOKENS=|^ADMIN_SECRET=' /opt/lem/.env`
+> Print the values:
+> ```bash
+> sudo grep -E '^API_ACCESS_TOKENS=|^ADMIN_SECRET=' /opt/lem/.env
+> ```
 
 ---
 
 ## 3. The test-run endpoints
 
-All are `POST` with a JSON body and return a Celery `task_id` you can poll.
-Your only LinkedIn account is **`user_id = 1`** (christopher.queen@gmail.com).
+All take **typed query parameters** (so Swagger renders individual input fields,
+not a raw JSON body) and return a Celery `task_id` you can poll. Your only
+LinkedIn account is **`user_id = 1`** (christopher.queen@gmail.com).
 
-### Comment on feed posts
-```
-POST /api/admin/test/comment
-{ "user_id": 1, "loop_for_duration": 300 }
-```
-Runs `automate_commenting` — the bot scrolls its feed and comments on posts.
+| Method & path | Params | Task |
+|---|---|---|
+| `POST /api/admin/test/comment` | `user_id`, `loop_for_duration=300` | comment on your feed |
+| `POST /api/admin/test/reply` | `post_id`, `loop_for_duration=300`, `future_forward=0` | reply to comments on a post |
+| `POST /api/admin/test/dm` | `user_id`, `loop_for_duration=300` | DM recent profile viewers |
+| `POST /api/admin/test/dm-direct` | `user_id`, `profile_url`, `message` | send ONE direct DM (most watchable) |
+| `GET /api/admin/task-status/{task_id}` | — | poll PENDING/STARTED/SUCCESS/FAILURE |
 
-### Reply to comments on one of your posts
-```
-POST /api/admin/test/reply
-{ "post_id": 42, "loop_for_duration": 300, "future_forward": 0 }
-```
-Runs `automate_reply_commenting` for that post (user is derived from the post).
+`loop_for_duration` is in **seconds** (default **300**) so a test run ends on its
+own instead of running for an hour.
 
-### Appreciation DMs to recent profile viewers
-```
-POST /api/admin/test/dm
-{ "user_id": 1, "loop_for_duration": 300 }
-```
-Runs `automate_appreciation_dms_for_user` — DMs people who viewed your profile.
+### Easiest: use Swagger
+1. Open <https://lem.christopherqueenconsulting.com/docs> → **Authorize** (fill both).
+2. Expand e.g. `POST /api/admin/test/dm-direct` → **Try it out** → fill the fields →
+   **Execute**. You'll get `{ "detail": { "task_id": "…" } }`.
 
-### Send ONE direct DM (most deterministic to watch)
+### Or curl (query params, both headers)
+```bash
+BASE=https://lem.christopherqueenconsulting.com
+curl -X POST "$BASE/api/admin/test/dm-direct?user_id=1&profile_url=https%3A%2F%2Fwww.linkedin.com%2Fin%2Fsome-person%2F&message=Hi%20there" \
+  -H "Authorization: Bearer $API_ACCESS_TOKEN" \
+  -H "X-Admin-Secret: $ADMIN_SECRET"
 ```
-POST /api/admin/test/dm-direct
-{ "user_id": 1,
-  "profile_url": "https://www.linkedin.com/in/some-person/",
-  "message": "Hi — testing my outreach automation, please ignore." }
-```
-Runs `send_private_dm`. Best for watching the messaging flow start-to-finish.
-
-### Poll a task's status
-```
-GET /api/admin/task-status/{task_id}
-```
-Returns `{ "state": "PENDING|STARTED|SUCCESS|FAILURE", "result": "..." }`.
-
-`loop_for_duration` is in **seconds** and defaults to **300** so a test run
-ends on its own instead of running for an hour.
 
 ---
 
 ## 4. Postman setup
 
-### a) Create an Environment
-Postman → **Environments → +**. Name it `LEM Prod` and add variables:
+Files live in [`docs/postman/`](postman/). See
+[`docs/postman/README.md`](postman/README.md) for the full walkthrough. In short:
 
-| Variable | Initial value |
-|---|---|
-| `base_url` | `https://lem.christopherqueenconsulting.com` |
-| `api_token` | *(your API_ACCESS_TOKENS value)* |
-| `admin_secret` | *(your ADMIN_SECRET value)* |
-| `user_id` | `1` |
-
-Mark `api_token` and `admin_secret` as **secret** type. Select this
-environment in the top-right dropdown.
-
-### b) Import the ready-made collection
-Import `docs/postman/LEM_Engagement_Tests.postman_collection.json` (in this
-repo) — it already contains all five requests with the two auth headers wired
-to `{{api_token}}` / `{{admin_secret}}` and bodies using `{{user_id}}`.
-
-**Or** import live from `…/openapi.json` (every endpoint, no bodies/headers
-pre-filled).
-
-### c) Per request, confirm these headers
-```
-Authorization: Bearer {{api_token}}
-X-Admin-Secret: {{admin_secret}}
-Content-Type: application/json
-```
-
-### d) Run it
-1. Open the **VNC** first (§5) so you can watch.
-2. Send e.g. **DM (direct)**. You'll get `{ "detail": { "task_id": "…" } }`.
-3. Switch to the VNC tab — within a few seconds Chrome opens LinkedIn, logs in
-   (or reuses cookies), navigates, and performs the action.
-4. Poll **Task status** with the returned `task_id` until `SUCCESS`/`FAILURE`.
+1. **Import the collection** —
+   [`LEM_Engagement_Tests.postman_collection.json`](postman/LEM_Engagement_Tests.postman_collection.json).
+2. **Import an environment** and pick it (top-right dropdown):
+   - **Prod** → [`LEM_Prod.postman_environment.json`](postman/LEM_Prod.postman_environment.json)
+     (`base_url = https://lem.christopherqueenconsulting.com`)
+   - **Local/Dev** → [`LEM_Local.postman_environment.json`](postman/LEM_Local.postman_environment.json)
+     (`base_url = http://localhost:8000`)
+3. Fill the env's `api_token` and `admin_secret` (both marked *secret*).
+4. Send a request — the collection passes both headers automatically and **saves
+   the returned `task_id`** into the environment, so **Task status** just works.
 
 ---
 
 ## 5. Watching it live in VNC
 
-The Selenium Chrome container runs a noVNC server on port **7900**. In prod it's
-bound to the VPS **loopback only** (not public), so reach it through an SSH
-tunnel from your laptop:
+The Selenium Chrome container runs a noVNC server. The simplest way to watch:
 
+**Open** <https://lemvnc.christopherqueenconsulting.com/?autoconnect=1&password=secret>
+(sign in via Cloudflare Access). You'll land directly in the live Chrome session —
+trigger a test request (§3/§4) and watch the automation drive the browser in real
+time.
+
+### Alternative: SSH tunnel (no public hostname needed)
+noVNC is also bound to the VPS loopback on port `7900`:
 ```bash
 ssh -L 7900:localhost:7900 <your-vps-user>@<your-vps-host>
 ```
-Leave that session open, then browse to:
-```
-http://localhost:7900/?autoconnect=1
-```
-noVNC password: **`secret`** (Selenium standalone default).
+then open <http://localhost:7900/?autoconnect=1&password=secret>.
 
-You'll see the live Chrome session. Trigger a test request (§4) and watch the
-automation drive the browser in real time.
-
-### Optional: browser access without SSH
-Add a public hostname in the **Cloudflare Zero Trust dashboard** →
-Tunnels → your tunnel → Public Hostname:
-`vnc.christopherqueenconsulting.com` → `http://selenium-chrome:7900`, and put a
-**Cloudflare Access** policy in front of it (email allow-list). Then just open
-that URL — no SSH needed. (Keep it gated; never expose VNC unauthenticated.)
+> Keep the public VNC hostname behind Cloudflare Access — never expose it
+> unauthenticated.
 
 ---
 
 ## 6. Troubleshooting
 
-- **403 Forbidden** → missing/wrong `X-Admin-Secret`.
-- **401 Unauthorized** → missing/wrong `Authorization: Bearer` token.
+- **401 Unauthorized** → missing/invalid `Authorization: Bearer` token.
+- **403 Forbidden** → missing/invalid `X-Admin-Secret`. (Both headers are required.)
+- **422 Unprocessable Entity** → a required query param is missing (e.g. `user_id`).
 - **Task goes to FAILURE / nothing happens in VNC** → almost always a LinkedIn
   login problem (no stored password/cookies, or a "new location" security
-  challenge). Set your **Login Location** in Account first
-  (Account → Login Location → "Use my current location") and ensure the LinkedIn
-  password is saved.
-- **VNC shows a blank/again-login screen** → the session may have ended
+  challenge). Set your **Login Location** first
+  (Account → Login Location → "Use my current location") and make sure your
+  LinkedIn password is saved.
+- **VNC shows a login/blank screen** → the session may have ended
   (`loop_for_duration` elapsed). Re-trigger and watch immediately.
-- **Nothing on `localhost:7900`** → the SSH tunnel isn't up, or this change
-  (loopback port bind) hasn't deployed yet — confirm the running release ≥ the
-  one that adds `127.0.0.1:7900:7900`.
+- **Nothing at `localhost:7900`** (SSH path) → the tunnel isn't up, or the running
+  release predates the `127.0.0.1:7900:7900` bind.

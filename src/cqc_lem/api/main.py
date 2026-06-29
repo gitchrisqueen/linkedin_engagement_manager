@@ -52,8 +52,9 @@ from cqc_lem.utilities.logger import myprint, log_warning
 from cqc_lem.utilities.mime_type_helper import get_file_mime_type
 from cqc_lem.utilities.observability import track_api_call
 from cqc_lem.utilities.utils import get_file_extension_from_filepath
-from fastapi import FastAPI, HTTPException, Request, status, APIRouter, Header
+from fastapi import FastAPI, HTTPException, Request, status, APIRouter, Header, Depends
 from fastapi import File, Form, Query, UploadFile
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials, APIKeyHeader
 from fastapi.responses import FileResponse
 from fastapi.responses import JSONResponse
 from fastapi.responses import HTMLResponse
@@ -287,28 +288,6 @@ class AdminRegenerateCarouselRequest(BaseModel):
 class AdminRegenerateVideoRequest(BaseModel):
     post_id: int
     user_id: int
-
-
-class AdminTestCommentRequest(BaseModel):
-    user_id: int
-    loop_for_duration: int = 300  # seconds; short window so a test run ends on its own
-
-
-class AdminTestReplyRequest(BaseModel):
-    post_id: int
-    loop_for_duration: int = 300
-    future_forward: int = 0
-
-
-class AdminTestDMRequest(BaseModel):
-    user_id: int
-    loop_for_duration: int = 300
-
-
-class AdminTestDirectDMRequest(BaseModel):
-    user_id: int
-    profile_url: str
-    message: str
 
 
 class VariantCombo(BaseModel):
@@ -1587,6 +1566,31 @@ def _require_admin(x_admin_secret: Optional[str] = Header(default=None)) -> None
         raise HTTPException(status_code=403, detail="Forbidden")
 
 
+# Declared security schemes so Swagger (/docs) shows BOTH required credentials in
+# the Authorize dialog: the bearer API token AND the admin secret. Both are needed.
+_bearer_scheme = HTTPBearer(
+    auto_error=False,
+    description="API access token — one of API_ACCESS_TOKENS. Sent as 'Authorization: Bearer <token>'.",
+)
+_admin_secret_scheme = APIKeyHeader(
+    name="X-Admin-Secret", auto_error=False,
+    description="Admin secret — the ADMIN_SECRET env var.",
+)
+
+
+def _require_api_and_admin(
+    credentials: Optional[HTTPAuthorizationCredentials] = Depends(_bearer_scheme),
+    x_admin_secret: Optional[str] = Depends(_admin_secret_scheme),
+) -> None:
+    """Require BOTH the bearer API token and the admin secret. Used by the
+    /admin/test/* endpoints so the docs page presents and enforces both."""
+    token = credentials.credentials if credentials else None
+    if _API_ACCESS_TOKEN_SET and token not in _API_ACCESS_TOKEN_SET:
+        raise HTTPException(status_code=401, detail="Unauthorized — missing or invalid bearer token")
+    if not ADMIN_SECRET or x_admin_secret != ADMIN_SECRET:
+        raise HTTPException(status_code=403, detail="Forbidden — missing or invalid X-Admin-Secret")
+
+
 @router.post("/admin/fix-video-urls", responses={
     200: {"description": "Video URLs updated"},
     403: {"description": "Forbidden"},
@@ -1700,109 +1704,116 @@ def admin_generate_media_variants(
 
 # ---------------------------------------------------------------------------
 # Admin test-run endpoints — kick a single engagement task on the selenium
-# worker so you can watch it live in the Chrome VNC. All require X-Admin-Secret.
+# worker so you can watch it live in the Chrome VNC. Inputs are typed query
+# params (so /docs renders individual fields, not a raw JSON body). BOTH the
+# bearer API token AND X-Admin-Secret are required (see _require_api_and_admin).
 # ---------------------------------------------------------------------------
 
 @router.post("/admin/test/comment", responses={
     200: {"description": "Commenting test run queued"},
-    403: {"description": "Forbidden"},
+    401: {"description": "Missing/invalid bearer token"},
+    403: {"description": "Missing/invalid admin secret"},
 })
 def admin_test_comment(
-    request: AdminTestCommentRequest,
-    x_admin_secret: Optional[str] = Header(default=None),
+    user_id: int = Query(..., description="LinkedIn account user id", examples=[1]),
+    loop_for_duration: int = Query(300, ge=10, le=3600,
+                                   description="Seconds before the run self-terminates"),
+    _: None = Depends(_require_api_and_admin),
 ) -> ResponseModel:
     """Run the feed-commenting automation for a user (comments on posts in their feed)."""
-    _require_admin(x_admin_secret)
     result = automate_commenting.apply_async(kwargs={
-        "user_id": request.user_id,
-        "loop_for_duration": request.loop_for_duration,
+        "user_id": user_id, "loop_for_duration": loop_for_duration,
     }, queue="selenium")
-    myprint(f"admin/test/comment: queued task={result.id} user_id={request.user_id}")
+    myprint(f"admin/test/comment: queued task={result.id} user_id={user_id}")
     return ResponseModel(status_code=200, detail={
-        "task_id": result.id, "task": "automate_commenting", "user_id": request.user_id,
+        "task_id": result.id, "task": "automate_commenting", "user_id": user_id,
     })
 
 
 @router.post("/admin/test/reply", responses={
     200: {"description": "Reply test run queued"},
-    403: {"description": "Forbidden"},
+    401: {"description": "Missing/invalid bearer token"},
+    403: {"description": "Missing/invalid admin secret"},
+    404: {"description": "User for post not found"},
 })
 def admin_test_reply(
-    request: AdminTestReplyRequest,
-    x_admin_secret: Optional[str] = Header(default=None),
+    post_id: int = Query(..., description="Id of an already-posted post to reply on", examples=[42]),
+    loop_for_duration: int = Query(300, ge=10, le=3600,
+                                   description="Seconds before the run self-terminates"),
+    future_forward: int = Query(0, ge=0, le=5, description="Forward index (0-5)"),
+    _: None = Depends(_require_api_and_admin),
 ) -> ResponseModel:
     """Run the reply-to-comments automation for a specific (already-posted) post."""
-    _require_admin(x_admin_secret)
-    user_id = get_post_user_id(request.post_id)
+    user_id = get_post_user_id(post_id)
     if not user_id:
         raise HTTPException(status_code=404, detail="User for post not found")
     result = automate_reply_commenting.apply_async(kwargs={
-        "user_id": user_id,
-        "post_id": request.post_id,
-        "loop_for_duration": request.loop_for_duration,
-        "future_forward": request.future_forward,
+        "user_id": user_id, "post_id": post_id,
+        "loop_for_duration": loop_for_duration, "future_forward": future_forward,
     }, queue="selenium")
-    myprint(f"admin/test/reply: queued task={result.id} post_id={request.post_id}")
+    myprint(f"admin/test/reply: queued task={result.id} post_id={post_id}")
     return ResponseModel(status_code=200, detail={
         "task_id": result.id, "task": "automate_reply_commenting",
-        "post_id": request.post_id, "user_id": user_id,
+        "post_id": post_id, "user_id": user_id,
     })
 
 
 @router.post("/admin/test/dm", responses={
     200: {"description": "DM test run queued"},
-    403: {"description": "Forbidden"},
+    401: {"description": "Missing/invalid bearer token"},
+    403: {"description": "Missing/invalid admin secret"},
 })
 def admin_test_dm(
-    request: AdminTestDMRequest,
-    x_admin_secret: Optional[str] = Header(default=None),
+    user_id: int = Query(..., description="LinkedIn account user id", examples=[1]),
+    loop_for_duration: int = Query(300, ge=10, le=3600,
+                                   description="Seconds before the run self-terminates"),
+    _: None = Depends(_require_api_and_admin),
 ) -> ResponseModel:
     """Run the appreciation-DM automation (DMs people who recently viewed the profile)."""
-    _require_admin(x_admin_secret)
     result = automate_appreciation_dms_for_user.apply_async(kwargs={
-        "user_id": request.user_id,
-        "loop_for_duration": request.loop_for_duration,
+        "user_id": user_id, "loop_for_duration": loop_for_duration,
     }, queue="selenium")
-    myprint(f"admin/test/dm: queued task={result.id} user_id={request.user_id}")
+    myprint(f"admin/test/dm: queued task={result.id} user_id={user_id}")
     return ResponseModel(status_code=200, detail={
         "task_id": result.id, "task": "automate_appreciation_dms_for_user",
-        "user_id": request.user_id,
+        "user_id": user_id,
     })
 
 
 @router.post("/admin/test/dm-direct", responses={
     200: {"description": "Direct DM queued"},
-    403: {"description": "Forbidden"},
+    401: {"description": "Missing/invalid bearer token"},
+    403: {"description": "Missing/invalid admin secret"},
 })
 def admin_test_dm_direct(
-    request: AdminTestDirectDMRequest,
-    x_admin_secret: Optional[str] = Header(default=None),
+    user_id: int = Query(..., description="LinkedIn account user id", examples=[1]),
+    profile_url: str = Query(..., description="LinkedIn profile URL to message",
+                             examples=["https://www.linkedin.com/in/some-person/"]),
+    message: str = Query(..., description="Message body to send", examples=["Hi — testing, please ignore."]),
+    _: None = Depends(_require_api_and_admin),
 ) -> ResponseModel:
     """Send ONE direct DM to a specific profile URL — the most deterministic way to
     watch the messaging flow end-to-end in the VNC."""
-    _require_admin(x_admin_secret)
     result = send_private_dm.apply_async(kwargs={
-        "user_id": request.user_id,
-        "profile_url": request.profile_url,
-        "message": request.message,
+        "user_id": user_id, "profile_url": profile_url, "message": message,
     }, queue="selenium")
-    myprint(f"admin/test/dm-direct: queued task={result.id} user_id={request.user_id} -> {request.profile_url}")
+    myprint(f"admin/test/dm-direct: queued task={result.id} user_id={user_id} -> {profile_url}")
     return ResponseModel(status_code=200, detail={
         "task_id": result.id, "task": "send_private_dm",
-        "user_id": request.user_id, "profile_url": request.profile_url,
+        "user_id": user_id, "profile_url": profile_url,
     })
 
 
 @router.get("/admin/task-status/{task_id}", responses={
     200: {"description": "Task status"},
-    403: {"description": "Forbidden"},
+    401: {"description": "Missing/invalid bearer token"},
+    403: {"description": "Missing/invalid admin secret"},
 })
 def admin_task_status(
     task_id: str,
-    x_admin_secret: Optional[str] = Header(default=None),
+    _: None = Depends(_require_api_and_admin),
 ) -> ResponseModel:
     """Poll a queued test task's state (PENDING/STARTED/SUCCESS/FAILURE)."""
-    _require_admin(x_admin_secret)
     from cqc_lem.app.my_celery import app as celery_app
     res = celery_app.AsyncResult(task_id)
     detail = {"task_id": task_id, "state": res.state}
