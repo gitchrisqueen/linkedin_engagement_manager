@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.11.0](https://github.com/christopherqueenconsulting/linkedin_engagement_manager/compare/v0.10.0...v0.11.0) (2026-06-29)
+
+
+### Features
+
+* **api:** structured inputs + dual-auth on engagement test endpoints; doc/Postman polish ([233c017](https://github.com/christopherqueenconsulting/linkedin_engagement_manager/commit/233c01728d2b65bae735837b163542073a3c7f76))
+* **api:** structured query-param inputs + dual-auth on engagement test endpoints; doc/Postman polish ([9218a6a](https://github.com/christopherqueenconsulting/linkedin_engagement_manager/commit/9218a6a5332487f326cfa5200f73057df761539e))
+
 ## [0.10.0](https://github.com/christopherqueenconsulting/linkedin_engagement_manager/compare/v0.9.2...v0.10.0) (2026-06-29)
 
 
