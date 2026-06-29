@@ -556,6 +556,13 @@ export default function ScheduleContent() {
           content={previewContent}
           author={email.split('@')[0] || 'You'}
           headline="LinkedIn Member"
+          postType={postType.toLowerCase()}
+          videoUrl={postType === 'VIDEO' ? videoUrl || null : null}
+          slides={
+            postType === 'CAROUSEL'
+              ? (carouselMode === 'ai' ? generatedSlideUrls : slides.filter((s) => s.trim()))
+              : null
+          }
         />
         {postType === 'CAROUSEL' && generatedSlideUrls.length > 0 && (
           <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
