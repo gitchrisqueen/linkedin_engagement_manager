@@ -284,6 +284,45 @@ def get_element_wait_retry(driver: WebDriver, wait: WebDriverWait, find_by_value
     return element
 
 
+def get_visible_element_wait_retry(driver: WebDriver, wait: WebDriverWait,
+                                   locators: list[tuple[str, str]], wait_text: str,
+                                   max_try: int = MAX_WAIT_RETRY,
+                                   element_always_expected: bool = True) -> WebElement | None:
+    """Return the first *displayed* element matching any of `locators`.
+
+    `locators` is an ordered list of (By, value) pairs tried in turn. Some pages
+    (e.g. LinkedIn's redesigned login) render duplicate hidden+visible copies of
+    the same field, so matching on presence alone can return an invisible element —
+    we must pick the one the user actually sees.
+    """
+
+    def _find_visible(d):
+        for find_by, value in locators:
+            try:
+                for el in d.find_elements(find_by, value):
+                    try:
+                        if el.is_displayed():
+                            return el
+                    except StaleElementReferenceException:
+                        continue
+            except (StaleElementReferenceException, NoSuchElementException):
+                continue
+        return False
+
+    try:
+        return wait.until(_find_visible, wait_text)
+    except (StaleElementReferenceException, TimeoutException) as se:
+        if max_try > 1:
+            myprint(wait_text + " | Not visible | .....retrying")
+            time.sleep(5)
+            return get_visible_element_wait_retry(driver, wait, locators, wait_text,
+                                                  max_try - 1, element_always_expected)
+        if element_always_expected:
+            raise se
+        myprint(f"Failed to find visible element: {wait_text}")
+        return None
+
+
 def get_elements_as_list_wait_stale(wait: WebDriverWait, find_by_value: str, wait_text: str,
                                     find_by: str = By.XPATH, max_retry=3) -> list[WebElement]:
     elements = []

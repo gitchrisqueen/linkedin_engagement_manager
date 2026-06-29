@@ -8,7 +8,9 @@ from cqc_lem.utilities.db import get_cookies, store_cookies, get_linked_in_profi
 from cqc_lem.utilities.linkedin.profile import LinkedInProfile
 from cqc_lem.utilities.linkedin.scrapper import returnProfileInfo
 from cqc_lem.utilities.logger import myprint, log_warning, log_error
-from cqc_lem.utilities.selenium_util import load_cookies, click_element_wait_retry, get_element_wait_retry, getText
+from cqc_lem.utilities.selenium_util import load_cookies, get_element_wait_retry, \
+    get_visible_element_wait_retry, getText
+from selenium.common.exceptions import WebDriverException
 from selenium.webdriver.common.by import By
 from selenium.webdriver.remote.webdriver import WebDriver
 from selenium.webdriver.support import expected_conditions as EC
@@ -143,13 +145,52 @@ def login_to_linkedin(driver: WebDriver, wait: WebDriverWait, user_email: str, u
     def _is_logged_in(url: str) -> bool:
         return any(p in url for p in _LOGGED_IN_PATHS)
 
+    def _wait_for_manual_approval() -> bool:
+        """Poll for a device-approval / 2FA checkpoint to clear.
+
+        LinkedIn's "Check your LinkedIn app — tap Yes" challenge cannot be solved
+        programmatically; it needs a one-time tap in the user's mobile app (the
+        "Recognize this device" box is pre-checked, so cookies persist afterward).
+        When someone is watching the session over VNC they can approve in real time —
+        give them a configurable window before giving up.
+        """
+        timeout = int(os.getenv("LINKEDIN_APPROVAL_WAIT_SECONDS", "120"))
+        if timeout <= 0:
+            return False
+        log_warning(
+            "LinkedIn device-approval required — open your LinkedIn mobile app and tap "
+            "'Yes' to confirm this sign-in (watch via VNC). Waiting up to "
+            f"{timeout}s for approval.",
+            action_type="login",
+        )
+        deadline = time.time() + timeout
+        while time.time() < deadline:
+            time.sleep(5)
+            current = driver.current_url
+            if _is_logged_in(current):
+                myprint("Device-approval confirmed — login proceeding")
+                return True
+            if not _is_challenge_url(current):
+                # Left the checkpoint; give the post-approval redirect a moment to settle
+                time.sleep(3)
+                if _is_logged_in(driver.current_url):
+                    myprint("Device-approval confirmed — login proceeding")
+                    return True
+        return False
+
     def _handle_challenge(label: str) -> None:
-        """Try to solve an Arkose challenge; raise if unsolvable."""
+        """Clear a login challenge or raise if it can't be cleared.
+
+        Order: try the automated Arkose/FunCaptcha solver, then fall back to
+        waiting for a manual mobile-app device approval.
+        """
         if solve_arkose_challenge(driver, wait):
             myprint(f"CAPTCHA solved at {label} — continuing login")
             time.sleep(2)
-        else:
-            raise RuntimeError(f"Unsolvable LinkedIn challenge at {label}: {driver.current_url}")
+            return
+        if _wait_for_manual_approval():
+            return
+        raise RuntimeError(f"Unsolvable LinkedIn challenge at {label}: {driver.current_url}")
 
     # Load base domain first so cookies can be set against the right origin
     driver.get(linked_url)
@@ -187,12 +228,44 @@ def login_to_linkedin(driver: WebDriver, wait: WebDriverWait, user_email: str, u
     if _is_challenge_url(driver.current_url):
         _handle_challenge("login-page")
 
-    username_field = get_element_wait_retry(driver, wait, 'username', "Finding Username Field", By.ID)
-    password_field = get_element_wait_retry(driver, wait, 'password', "Finding Password Field", By.ID)
+    # LinkedIn's redesigned login page no longer uses stable id="username"/id="password"
+    # or a [type=submit] button — fields now carry ephemeral React ids and the sign-in
+    # control is a <button type="button"><span>Sign in</span></button>. Match on stable
+    # type/autocomplete attributes (and visible text for the button), keeping the legacy
+    # selectors as fallbacks for any A/B variant still serving the old form. The page also
+    # renders duplicate hidden+visible copies, so we must select the displayed one.
+    username_field = get_visible_element_wait_retry(
+        driver, wait,
+        [(By.CSS_SELECTOR, "input[autocomplete~='username']"),
+         (By.CSS_SELECTOR, "input[name='session_key']"),
+         (By.ID, "username"),
+         (By.CSS_SELECTOR, "input[type='email']")],
+        "Finding Username Field")
+    password_field = get_visible_element_wait_retry(
+        driver, wait,
+        [(By.CSS_SELECTOR, "input[autocomplete~='current-password']"),
+         (By.CSS_SELECTOR, "input[name='session_password']"),
+         (By.ID, "password"),
+         (By.CSS_SELECTOR, "input[type='password']")],
+        "Finding Password Field")
 
+    username_field.clear()
     username_field.send_keys(user_email)
+    password_field.clear()
     password_field.send_keys(user_password)
-    click_element_wait_retry(driver, wait, '//*[@type="submit"]', "Finding Login Button", use_action_chain=True)
+
+    sign_in_button = get_visible_element_wait_retry(
+        driver, wait,
+        [(By.XPATH, "//button[normalize-space()='Sign in']"),
+         (By.CSS_SELECTOR, "button[type='submit']"),
+         (By.CSS_SELECTOR, "button[aria-label='Sign in']"),
+         (By.XPATH, "//*[@type='submit']")],
+        "Finding Sign in Button")
+    wait.until(EC.element_to_be_clickable(sign_in_button))
+    try:
+        sign_in_button.click()
+    except WebDriverException:
+        driver.execute_script("arguments[0].click();", sign_in_button)
 
     # Allow the post-submit redirect to settle, then check for security challenges
     # before waiting for the feed (avoids TimeoutException on 2FA/CAPTCHA pages)

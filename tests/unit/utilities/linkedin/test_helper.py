@@ -16,6 +16,13 @@ def _no_real_sleep():
         yield
 
 
+@pytest.fixture(autouse=True)
+def _no_approval_wait(monkeypatch):
+    """Disable the device-approval wait loop by default — it polls real wall-clock
+    for minutes. Tests that exercise the approval path opt back in explicitly."""
+    monkeypatch.setenv("LINKEDIN_APPROVAL_WAIT_SECONDS", "0")
+
+
 def _make_driver(url: str) -> MagicMock:
     driver = MagicMock()
     driver.current_url = url
@@ -127,8 +134,7 @@ class TestLoginToLinkedinCookiePath:
         with patch(f"{_MODULE}.get_cookies", return_value=None), \
              patch(f"{_MODULE}.load_cookies"), \
              patch(f"{_MODULE}.store_cookies") as mock_store, \
-             patch(f"{_MODULE}.get_element_wait_retry", return_value=mock_field), \
-             patch(f"{_MODULE}.click_element_wait_retry"):
+             patch(f"{_MODULE}.get_visible_element_wait_retry", return_value=mock_field):
             from cqc_lem.utilities.linkedin.helper import login_to_linkedin
             login_to_linkedin(driver, wait, "user@e.com", "pw")
 
@@ -296,14 +302,52 @@ class TestLoginToLinkedinPostSubmitChallenge:
         with patch(f"{_MODULE}.get_cookies", return_value=None), \
              patch(f"{_MODULE}.load_cookies"), \
              patch(f"{_MODULE}.store_cookies"), \
-             patch(f"{_MODULE}.get_element_wait_retry", return_value=mock_field), \
-             patch(f"{_MODULE}.click_element_wait_retry", side_effect=advance_url), \
+             patch(f"{_MODULE}.get_visible_element_wait_retry", return_value=mock_field), \
              patch(f"{_MODULE}.solve_arkose_challenge", return_value=False) as mock_solve:
             with pytest.raises(RuntimeError, match="Unsolvable LinkedIn challenge"):
                 from cqc_lem.utilities.linkedin.helper import login_to_linkedin
                 login_to_linkedin(driver, wait, "user@e.com", "pw")
 
         mock_solve.assert_called_once()
+
+    def test_manual_approval_clears_checkpoint_and_logs_in(self, monkeypatch):
+        """Device-approval checkpoint that clears mid-wait (user taps 'Yes' in the
+        mobile app) → login completes and cookies are persisted."""
+        monkeypatch.setenv("LINKEDIN_APPROVAL_WAIT_SECONDS", "30")
+
+        # url is driven by side effects: gets land on /login, the Sign-in click moves
+        # to the checkpoint, and the first sleep *inside* challenge handling flips to /feed.
+        state = {"url": "https://www.linkedin.com", "handling": False}
+        driver = MagicMock()
+        driver.get_cookies.return_value = [{"name": "li_at"}]
+        driver.find_elements.return_value = []
+        type(driver).current_url = property(lambda self: state["url"])
+        driver.get.side_effect = lambda u: state.__setitem__("url", "https://www.linkedin.com/login")
+
+        mock_field = MagicMock()
+        mock_field.click.side_effect = lambda: state.__setitem__(
+            "url", "https://www.linkedin.com/checkpoint/challenge")
+
+        def fake_solve(*_a, **_k):
+            state["handling"] = True  # entered challenge handling
+            return False
+
+        def sleep_flip(*_a, **_k):
+            if state["handling"]:  # first poll inside the approval wait → user approved
+                state["url"] = "https://www.linkedin.com/feed/"
+
+        wait = _make_wait()
+        with patch(f"{_MODULE}.get_cookies", return_value=None), \
+             patch(f"{_MODULE}.load_cookies"), \
+             patch(f"{_MODULE}.store_cookies") as mock_store, \
+             patch(f"{_MODULE}.get_visible_element_wait_retry", return_value=mock_field), \
+             patch(f"{_MODULE}.solve_arkose_challenge", side_effect=fake_solve) as mock_solve, \
+             patch(f"{_MODULE}.time.sleep", side_effect=sleep_flip):
+            from cqc_lem.utilities.linkedin.helper import login_to_linkedin
+            login_to_linkedin(driver, wait, "user@e.com", "pw")
+
+        mock_solve.assert_called_once()
+        mock_store.assert_called_once()
 
     def test_new_challenge_paths_detected(self):
         """Newly added challenge paths (/captcha/, /security-verification) are caught."""

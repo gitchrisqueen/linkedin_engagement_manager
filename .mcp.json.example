@@ -1,0 +1,12 @@
+{
+  "_comment": "Copy to .mcp.json (gitignored) to enable the Selenium MCP server. Requires `poetry install --with mcp`. SE_REMOTE_URL points at the loopback-mapped selenium-chrome hub on the VPS; tunnel 4444 from a laptop. See docs/SELENIUM_DEBUGGING.md.",
+  "mcpServers": {
+    "selenium-lem": {
+      "command": "poetry",
+      "args": ["run", "python", "tools/selenium_mcp_server.py"],
+      "env": {
+        "SE_REMOTE_URL": "http://127.0.0.1:4444"
+      }
+    }
+  }
+}

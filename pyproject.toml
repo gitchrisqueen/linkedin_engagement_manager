@@ -114,6 +114,15 @@ optional = true
 [tool.poetry.group.lint.dependencies]
 ruff = ">=0.1.5,<0.16.0"
 
+[tool.poetry.group.mcp]
+optional = true
+
+[tool.poetry.group.mcp.dependencies]
+# Powers tools/selenium_mcp_server.py — an MCP server that drives the live
+# selenium-chrome browser (watchable via lemvnc) for interactive debugging.
+# Install with: poetry install --with mcp
+mcp = ">=1.2.0"
+
 [tool.poetry.group.test]
 optional = true
 
