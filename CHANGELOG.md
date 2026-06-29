@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.12.1](https://github.com/christopherqueenconsulting/linkedin_engagement_manager/compare/v0.12.0...v0.12.1) (2026-06-29)
+
+
+### Bug Fixes
+
+* **security:** don't log password-derived data in debug harness ([fb5d41b](https://github.com/christopherqueenconsulting/linkedin_engagement_manager/commit/fb5d41be18931955dcc084535cc7e6e5ffe56e58))
+* **security:** don't log password-derived data in debug harness ([f8319e6](https://github.com/christopherqueenconsulting/linkedin_engagement_manager/commit/f8319e68a51e3bf80e91716d66403b4f3e540ab8))
+
 ## [0.12.0](https://github.com/christopherqueenconsulting/linkedin_engagement_manager/compare/v0.11.0...v0.12.0) (2026-06-29)
 
 
