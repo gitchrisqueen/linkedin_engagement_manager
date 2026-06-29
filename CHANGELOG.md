@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.9.2](https://github.com/christopherqueenconsulting/linkedin_engagement_manager/compare/v0.9.1...v0.9.2) (2026-06-29)
+
+
+### Bug Fixes
+
+* **ci:** verify CDN cache auto-purge on deploy ([20e9018](https://github.com/christopherqueenconsulting/linkedin_engagement_manager/commit/20e9018d12e1c71cb5bbb20154b9021ba9aa3e08))
+* **ci:** verify CDN cache auto-purge on deploy ([3bcf695](https://github.com/christopherqueenconsulting/linkedin_engagement_manager/commit/3bcf695cc82b679833ba982f83f836d2c5b0fd5d))
+
 ## [0.9.1](https://github.com/christopherqueenconsulting/linkedin_engagement_manager/compare/v0.9.0...v0.9.1) (2026-06-29)
 
 
