@@ -91,13 +91,29 @@ def get_docker_driver(headless: bool = True, session_name: str = "ChromeTests", 
         _wait_for_selenium_ready(SELENIUM_HUB_HOST, SELENIUM_HUB_PORT)
         remote_url = f"http://{SELENIUM_HUB_HOST}:{SELENIUM_HUB_PORT}/wd/hub"
 
+    # Per-user geo profile: make the browser's reported location/timezone/locale match
+    # where the user normally logs in, to reduce LinkedIn "new location" challenges.
+    user_timezone = TZ
+    user_locale = "en-US"
+    if user_id is not None:
+        from cqc_lem.utilities.db import get_user_geo
+        geo = get_user_geo(user_id)
+        if geo:
+            if lat is None and geo.get("latitude") is not None:
+                lat, lng = geo["latitude"], geo["longitude"]
+            if geo.get("timezone"):
+                user_timezone = geo["timezone"]
+            if geo.get("locale"):
+                user_locale = geo["locale"]
+
     options = getBaseOptions()
     options.add_argument("--ignore-ssl-errors=yes")
     options.add_argument("--ignore-certificate-errors")
+    options.add_argument(f"--lang={user_locale}")
     if headless:
         options = add_headless_options(options)
 
-    options.set_capability("se:timeZone", TZ)
+    options.set_capability("se:timeZone", user_timezone)
     options.set_capability("se:screenResolution", "1920x1080")
     options.set_capability("se:name", f"CQC_LEM ({session_name})")
 
@@ -105,17 +121,19 @@ def get_docker_driver(headless: bool = True, session_name: str = "ChromeTests", 
     driver.set_window_size(1920, 1080)
 
     if coordinates is None:
-        if lat is None and user_id is not None:
-            from cqc_lem.utilities.db import get_user_location
-            location = get_user_location(user_id)
-            if location:
-                lat, lng = location
         coordinates = {
             "latitude": lat if lat is not None else 30.3321,
             "longitude": lng if lng is not None else -81.6556,
             "accuracy": 100,
         }
+    # Apply geo, timezone and locale overrides at the CDP layer so JS fingerprint
+    # signals (geolocation API, Intl/Date timezone, navigator.language) are consistent.
     driver.execute_cdp_cmd("Emulation.setGeolocationOverride", coordinates)
+    try:
+        driver.execute_cdp_cmd("Emulation.setTimezoneOverride", {"timezoneId": user_timezone})
+        driver.execute_cdp_cmd("Emulation.setLocaleOverride", {"locale": user_locale})
+    except Exception as e:
+        myprint(f"Could not apply timezone/locale override | Error: {e}")
 
     return driver
 
@@ -362,13 +380,13 @@ def get_driver_wait(driver, wait_time: int = None):
                          ])
 
 
-def get_driver_wait_pair(headless=False, session_name: str = "ChromeTests", max_retry=3, coordinates: dict = None):
-    # TODO: Get the coordinates from the user's entry in the database for methods calling
-
-    # Create the driver
+def get_driver_wait_pair(headless=False, session_name: str = "ChromeTests", max_retry=3, coordinates: dict = None,
+                         user_id: int = None):
+    # Create the driver. Passing user_id applies that user's geo/timezone/locale spoofing.
     for attempt in range(max_retry):
         try:
-            driver = get_docker_driver(headless=headless, session_name=session_name, coordinates=coordinates)
+            driver = get_docker_driver(headless=headless, session_name=session_name, coordinates=coordinates,
+                                       user_id=user_id)
             break  # Exit the loop if successful
         except SessionNotCreatedException as e:
             if attempt == max_retry - 1:
