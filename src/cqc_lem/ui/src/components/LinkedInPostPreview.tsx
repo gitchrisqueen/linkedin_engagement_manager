@@ -1,8 +1,84 @@
+import { useState } from 'react'
+
 interface LinkedInPostPreviewProps {
   content: string
   author?: string
   headline?: string
   mediaUrl?: string
+  videoUrl?: string | null
+  slides?: string[] | null
+  postType?: string
+}
+
+function isUrl(value: string): boolean {
+  return /^(https?:)?\/\//.test(value) || value.startsWith('/api/') || value.startsWith('/assets')
+}
+
+function CarouselPreview({ slides }: { slides: string[] }) {
+  const [index, setIndex] = useState(0)
+  const total = slides.length
+  const current = slides[index]
+  const go = (delta: number) => setIndex((i) => (i + delta + total) % total)
+
+  return (
+    <div className="relative bg-gray-900 select-none">
+      {/* LinkedIn renders document/carousel posts as a square page viewer */}
+      <div className="aspect-square w-full flex items-center justify-center overflow-hidden">
+        {isUrl(current) ? (
+          <img
+            src={current}
+            alt={`Slide ${index + 1} of ${total}`}
+            className="w-full h-full object-contain"
+          />
+        ) : (
+          <div className="w-full h-full flex items-center justify-center p-8 text-center bg-gradient-to-br from-blue-700 to-blue-900">
+            <p className="text-white text-lg font-semibold leading-snug whitespace-pre-wrap">{current}</p>
+          </div>
+        )}
+      </div>
+
+      {total > 1 && (
+        <>
+          <button
+            type="button"
+            onClick={(e) => { e.stopPropagation(); go(-1) }}
+            aria-label="Previous slide"
+            className="absolute left-2 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-white/90 text-gray-800 shadow flex items-center justify-center hover:bg-white"
+          >
+            ‹
+          </button>
+          <button
+            type="button"
+            onClick={(e) => { e.stopPropagation(); go(1) }}
+            aria-label="Next slide"
+            className="absolute right-2 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-white/90 text-gray-800 shadow flex items-center justify-center hover:bg-white"
+          >
+            ›
+          </button>
+        </>
+      )}
+
+      {/* Page counter badge, like LinkedIn document posts */}
+      <div className="absolute bottom-2 right-2 bg-black/60 text-white text-xs font-medium px-2 py-0.5 rounded">
+        {index + 1} / {total}
+      </div>
+
+      {/* Dot indicators */}
+      {total > 1 && total <= 12 && (
+        <div className="absolute bottom-2 left-1/2 -translate-x-1/2 flex gap-1.5">
+          {slides.map((_, i) => (
+            <button
+              key={i}
+              type="button"
+              onClick={(e) => { e.stopPropagation(); setIndex(i) }}
+              aria-label={`Go to slide ${i + 1}`}
+              className={`w-1.5 h-1.5 rounded-full transition-colors ${i === index ? 'bg-white' : 'bg-white/40'}`}
+            />
+          ))}
+        </div>
+      )}
+    </div>
+  )
 }
 
 export default function LinkedInPostPreview({
@@ -10,10 +86,17 @@ export default function LinkedInPostPreview({
   author = 'Your Name',
   headline = 'Your Headline',
   mediaUrl,
+  videoUrl,
+  slides,
+  postType,
 }: LinkedInPostPreviewProps) {
   const lines = content.split('\n')
   const preview = lines.slice(0, 3).join('\n')
   const hasMore = lines.length > 3 || content.length > 300
+
+  const showVideo = (postType === 'video' || !!videoUrl) && !!videoUrl
+  const showCarousel = !showVideo && postType === 'carousel' && !!slides && slides.length > 0
+  const showImage = !showVideo && !showCarousel && !!mediaUrl
 
   return (
     <div className="bg-white rounded-lg border border-gray-200 shadow-sm max-w-lg font-sans">
@@ -52,7 +135,20 @@ export default function LinkedInPostPreview({
       </div>
 
       {/* Media */}
-      {mediaUrl && (
+      {showVideo && (
+        <div className="bg-black">
+          <video
+            key={videoUrl ?? undefined}
+            src={videoUrl ?? undefined}
+            controls
+            playsInline
+            preload="metadata"
+            className="w-full max-h-[32rem] object-contain bg-black"
+          />
+        </div>
+      )}
+      {showCarousel && <CarouselPreview slides={slides!} />}
+      {showImage && (
         <div className="bg-gray-100 aspect-video overflow-hidden">
           <img src={mediaUrl} alt="Post media" className="w-full h-full object-cover" />
         </div>
