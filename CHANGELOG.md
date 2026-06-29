@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.8.0](https://github.com/christopherqueenconsulting/linkedin_engagement_manager/compare/v0.7.1...v0.8.0) (2026-06-29)
+
+
+### Features
+
+* **ui:** embed video + carousel in post preview card ([8663f39](https://github.com/christopherqueenconsulting/linkedin_engagement_manager/commit/8663f39d413a96dd31f2cb2d9c9f1641e6835e72))
+* **ui:** embed video + carousel in post preview card ([ee90508](https://github.com/christopherqueenconsulting/linkedin_engagement_manager/commit/ee9050848d33b8fcfe70a0c98c6d0a9a63f0feee))
+
 ## [0.7.1](https://github.com/christopherqueenconsulting/linkedin_engagement_manager/compare/v0.7.0...v0.7.1) (2026-06-28)
 
 
