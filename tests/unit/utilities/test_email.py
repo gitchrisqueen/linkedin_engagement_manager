@@ -153,3 +153,59 @@ class TestSendPinEmailBypass:
         assert success is True
         assert bypassed is True
         mock_smtp_class.assert_not_called()
+
+
+class TestSendLoginApprovalEmail:
+    @patch("cqc_lem.utilities.email.SENDGRID_API_KEY", None)
+    @patch("cqc_lem.utilities.email.SMTP_USER", None)
+    @patch("cqc_lem.utilities.email.SMTP_PASSWORD", None)
+    def test_returns_false_when_no_provider(self):
+        from cqc_lem.utilities.email import send_login_approval_email
+        assert send_login_approval_email("u@e.com") is False
+
+    @patch("cqc_lem.utilities.email.SENDGRID_API_KEY", "sg_test_key")
+    @patch("cqc_lem.utilities.email.SMTP_USER", None)
+    @patch("cqc_lem.utilities.email.SMTP_PASSWORD", None)
+    @patch("sendgrid.SendGridAPIClient")
+    def test_sendgrid_sets_high_priority_headers(self, mock_sg_class):
+        from cqc_lem.utilities.email import send_login_approval_email
+        mock_sg = MagicMock()
+        mock_sg_class.return_value = mock_sg
+
+        sent_messages = []
+        mock_sg.send.side_effect = lambda m: sent_messages.append(m)
+
+        result = send_login_approval_email("u@e.com", vnc_url="https://vnc.example/?x=1")
+
+        assert result is True
+        mock_sg.send.assert_called_once()
+        # High-priority headers must be attached
+        header_blob = str(sent_messages[0].get())
+        assert "X-Priority" in header_blob and "1" in header_blob
+        assert "Importance" in header_blob
+
+    @patch("cqc_lem.utilities.email.SENDGRID_API_KEY", None)
+    @patch("cqc_lem.utilities.email.SMTP_USER", "user@gmail.com")
+    @patch("cqc_lem.utilities.email.SMTP_PASSWORD", "app_password")
+    @patch("cqc_lem.utilities.email.smtplib.SMTP")
+    def test_smtp_sets_high_priority_headers(self, mock_smtp_class):
+        from cqc_lem.utilities.email import send_login_approval_email
+        sent = {}
+        server = MagicMock()
+        server.sendmail.side_effect = lambda frm, to, body: sent.update(body=body)
+        mock_smtp_class.return_value.__enter__.return_value = server
+
+        result = send_login_approval_email("u@e.com")
+
+        assert result is True
+        assert "X-Priority: 1" in sent["body"]
+        assert "Importance: High" in sent["body"]
+
+    @patch("cqc_lem.utilities.email.SENDGRID_API_KEY", None)
+    @patch("cqc_lem.utilities.email.SMTP_USER", "user@gmail.com")
+    @patch("cqc_lem.utilities.email.SMTP_PASSWORD", "app_password")
+    @patch("cqc_lem.utilities.email.smtplib.SMTP")
+    def test_smtp_failure_returns_false(self, mock_smtp_class):
+        from cqc_lem.utilities.email import send_login_approval_email
+        mock_smtp_class.side_effect = Exception("SMTP refused")
+        assert send_login_approval_email("u@e.com") is False

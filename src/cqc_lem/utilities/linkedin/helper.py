@@ -155,14 +155,26 @@ def login_to_linkedin(driver: WebDriver, wait: WebDriverWait, user_email: str, u
         give them a configurable window before giving up.
         """
         timeout = int(os.getenv("LINKEDIN_APPROVAL_WAIT_SECONDS", "120"))
-        if timeout <= 0:
-            return False
         log_warning(
             "LinkedIn device-approval required — open your LinkedIn mobile app and tap "
             "'Yes' to confirm this sign-in (watch via VNC). Waiting up to "
             f"{timeout}s for approval.",
             action_type="login",
         )
+        # Notify the user immediately (high priority) so a human can approve instead of
+        # the run silently stalling. Best-effort — never let email problems break login.
+        if os.getenv("LINKEDIN_APPROVAL_EMAIL_ENABLED", "true").lower() != "false":
+            try:
+                from cqc_lem.utilities.email import send_login_approval_email
+                vnc_url = os.getenv(
+                    "LEMVNC_URL",
+                    "https://lemvnc.christopherqueenconsulting.com/?autoconnect=1&password=secret",
+                )
+                send_login_approval_email(user_email, vnc_url=vnc_url)
+            except Exception as e:
+                log_warning("Failed to send login-approval email", exc=e, action_type="login")
+        if timeout <= 0:
+            return False
         deadline = time.time() + timeout
         while time.time() < deadline:
             time.sleep(5)

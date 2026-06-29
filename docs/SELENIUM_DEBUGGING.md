@@ -67,4 +67,22 @@ After a successful credential submit LinkedIn often shows **"Check your LinkedIn
 tap Yes"** — a device-approval 2FA challenge (not Arkose, so it can't be auto-solved).
 `login_to_linkedin` waits up to `LINKEDIN_APPROVAL_WAIT_SECONDS` (default 120) for you to
 approve from your phone while watching via lemvnc; "Recognize this device" is pre-checked,
-so once approved the stored cookies skip the challenge next time.
+so once approved the stored cookies skip the challenge next time. The moment that challenge
+appears the user is sent a **high-priority email** (`LINKEDIN_APPROVAL_EMAIL_ENABLED`,
+`LEMVNC_URL`) so a human can act instead of the run stalling silently.
+
+## Reducing bot/anomaly flags
+
+`get_docker_driver` applies a stealth profile so LinkedIn is less likely to flag the
+session as automation: `--disable-blink-features=AutomationControlled`,
+`excludeSwitches=[enable-automation]` + `useAutomationExtension=false`, a realistic
+desktop user-agent, and a CDP init script that sets `navigator.webdriver=undefined`,
+aligns `navigator.languages` to the user's locale, and ensures `window.chrome` exists.
+Combined with the per-user geo/timezone/locale overrides, the JS fingerprint is
+consistent and non-automated-looking.
+
+**Honest limitation:** the dominant "logging in from a new location" signal is the
+**egress IP**, not the browser fingerprint. Stealth removes the *automation* tells but a
+datacenter/VPS IP geographically far from where the user normally logs in will still draw
+device-approval challenges. The durable fix is a per-user **residential proxy / VPN egress**
+matched to the user's location (schema groundwork is already in place via the geo fields).
