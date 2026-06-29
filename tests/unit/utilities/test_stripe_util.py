@@ -493,7 +493,6 @@ class TestFetchSubscription:
 
     def test_stripe_object_non_dict_is_converted_to_dict(self):
         """Stripe SDK v5+ returns StripeObject, not dict; fetch_subscription must convert it."""
-        import json
 
         class _FakeStripeObject:
             """Minimal stand-in for stripe.StripeObject (not a dict subclass)."""

@@ -91,5 +91,5 @@ def add_ai_content_credentials(file_path: str) -> bool:
             if os.path.exists(tmp_out):
                 os.remove(tmp_out)
         except OSError:
-            pass
+            pass  # best-effort temp-file cleanup; ignore if it can't be removed
         return False

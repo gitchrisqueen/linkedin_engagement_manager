@@ -60,7 +60,10 @@ class TestAddCredentials:
         fake_c2pa = MagicMock()
         fake_c2pa.Signer.from_callback.return_value = _cm(MagicMock())
         builder = MagicMock()
-        builder.sign_file.side_effect = lambda src, out, signer: open(out, "wb").write(b"signed")
+        def _sign_file(src, out, signer):
+            with open(out, "wb") as fh:
+                fh.write(b"signed")
+        builder.sign_file.side_effect = _sign_file
         fake_c2pa.Builder.return_value = _cm(builder)
 
         with patch("cqc_lem.utilities.c2pa_helper.C2PA_ENABLED", True), \

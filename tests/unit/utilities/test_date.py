@@ -3,7 +3,6 @@
 import datetime
 from datetime import timedelta
 import pytest
-from unittest.mock import patch, MagicMock
 
 from cqc_lem.utilities.date import (
     convert_datetime_to_local_tz, format_year, get_datetime,

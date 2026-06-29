@@ -21,7 +21,7 @@ from cqc_lem.utilities.db import get_post_type_counts, insert_planned_post, upda
     get_user_blog_url, get_user_sitemap_url, get_active_user_ids, get_planned_posts_for_next_week, PostStatus, \
     update_db_post_video_url, update_db_post_status, PostType, get_user_preferences, \
     update_db_post_carousel_slides, get_post_content
-from cqc_lem.utilities.env_constants import API_URL_FINAL, DEFAULT_VIDEO_MODEL, DEFAULT_VIDEO_RATIO, \
+from cqc_lem.utilities.env_constants import API_URL_FINAL, DEFAULT_VIDEO_RATIO, \
     DEFAULT_IMAGE_RATIO, AI_DISCLOSURE_ENABLED, AI_DISCLOSURE_TEXT, \
     STANDARD_VIDEO_MODEL, PREMIUM_VIDEO_MODEL, PREMIUM_TOP_VIDEO_MODEL, \
     PREMIUM_VIDEO_CREDITS, PREMIUM_TOP_VIDEO_CREDITS

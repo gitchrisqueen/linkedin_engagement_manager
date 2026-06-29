@@ -14,6 +14,22 @@ function isUrl(value: string): boolean {
   return /^(https?:)?\/\//.test(value) || value.startsWith('/api/') || value.startsWith('/assets')
 }
 
+// Only allow safe schemes to reach a media `src` — blocks javascript:/vbscript:/etc.
+// so post-derived URLs can't become a DOM-based XSS sink.
+function safeMediaUrl(value: string | null | undefined): string | undefined {
+  if (!value) return undefined
+  if (
+    /^(https?:)?\/\//i.test(value) ||
+    value.startsWith('/api/') ||
+    value.startsWith('/assets') ||
+    value.startsWith('blob:') ||
+    /^data:(image|video)\//i.test(value)
+  ) {
+    return value
+  }
+  return undefined
+}
+
 function CarouselPreview({ slides }: { slides: string[] }) {
   const [index, setIndex] = useState(0)
   const total = slides.length
@@ -26,7 +42,7 @@ function CarouselPreview({ slides }: { slides: string[] }) {
       <div className="aspect-square w-full flex items-center justify-center overflow-hidden">
         {isUrl(current) ? (
           <img
-            src={current}
+            src={safeMediaUrl(current)}
             alt={`Slide ${index + 1} of ${total}`}
             className="w-full h-full object-contain"
           />
@@ -139,7 +155,7 @@ export default function LinkedInPostPreview({
         <div className="bg-black">
           <video
             key={videoUrl ?? undefined}
-            src={videoUrl ?? undefined}
+            src={safeMediaUrl(videoUrl)}
             controls
             playsInline
             preload="metadata"
@@ -150,7 +166,7 @@ export default function LinkedInPostPreview({
       {showCarousel && <CarouselPreview slides={slides!} />}
       {showImage && (
         <div className="bg-gray-100 aspect-video overflow-hidden">
-          <img src={mediaUrl} alt="Post media" className="w-full h-full object-cover" />
+          <img src={safeMediaUrl(mediaUrl)} alt="Post media" className="w-full h-full object-cover" />
         </div>
       )}
 
