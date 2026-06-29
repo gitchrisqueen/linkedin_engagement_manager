@@ -1781,6 +1781,7 @@ if os.path.isdir(_ui_dist):
 
     class _ImmutableStaticFiles(StaticFiles):
         # Vite emits content-hashed filenames, so assets can be cached forever.
+        # (CDN edge cache is also purged on each deploy via build-and-push.yml.)
         async def get_response(self, path, scope):
             response = await super().get_response(path, scope)
             response.headers["Cache-Control"] = "public, max-age=31536000, immutable"
