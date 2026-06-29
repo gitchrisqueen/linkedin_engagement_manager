@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.9.1](https://github.com/christopherqueenconsulting/linkedin_engagement_manager/compare/v0.9.0...v0.9.1) (2026-06-29)
+
+
+### Bug Fixes
+
+* **api:** never cache the SPA index.html shell ([3c6741c](https://github.com/christopherqueenconsulting/linkedin_engagement_manager/commit/3c6741cbd3fab4fd25351c331fa5116de7504ba9))
+* **api:** never cache the SPA index.html shell; cache hashed assets forever ([4346a17](https://github.com/christopherqueenconsulting/linkedin_engagement_manager/commit/4346a175e54460cdcca3b893cbf72e94aee794f2))
+
 ## [0.9.0](https://github.com/christopherqueenconsulting/linkedin_engagement_manager/compare/v0.8.0...v0.9.0) (2026-06-29)
 
 
