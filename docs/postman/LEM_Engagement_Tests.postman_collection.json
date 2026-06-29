@@ -1,0 +1,88 @@
+{
+  "info": {
+    "name": "LEM Engagement Tests",
+    "description": "Trigger comment/reply/DM automation on demand and poll task status. Requires the LEM Prod environment (base_url, api_token, admin_secret, user_id). See docs/TESTING_ENGAGEMENT_API.md.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "auth": {
+    "type": "bearer",
+    "bearer": [{ "key": "token", "value": "{{api_token}}", "type": "string" }]
+  },
+  "variable": [],
+  "item": [
+    {
+      "name": "Comment on feed",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" },
+          { "key": "X-Admin-Secret", "value": "{{admin_secret}}" }
+        ],
+        "url": { "raw": "{{base_url}}/api/admin/test/comment", "host": ["{{base_url}}"], "path": ["api", "admin", "test", "comment"] },
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"user_id\": {{user_id}},\n  \"loop_for_duration\": 300\n}"
+        }
+      }
+    },
+    {
+      "name": "Reply to comments on a post",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" },
+          { "key": "X-Admin-Secret", "value": "{{admin_secret}}" }
+        ],
+        "url": { "raw": "{{base_url}}/api/admin/test/reply", "host": ["{{base_url}}"], "path": ["api", "admin", "test", "reply"] },
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"post_id\": 42,\n  \"loop_for_duration\": 300,\n  \"future_forward\": 0\n}"
+        }
+      }
+    },
+    {
+      "name": "Appreciation DMs to profile viewers",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" },
+          { "key": "X-Admin-Secret", "value": "{{admin_secret}}" }
+        ],
+        "url": { "raw": "{{base_url}}/api/admin/test/dm", "host": ["{{base_url}}"], "path": ["api", "admin", "test", "dm"] },
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"user_id\": {{user_id}},\n  \"loop_for_duration\": 300\n}"
+        }
+      }
+    },
+    {
+      "name": "DM (direct, single profile)",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" },
+          { "key": "X-Admin-Secret", "value": "{{admin_secret}}" }
+        ],
+        "url": { "raw": "{{base_url}}/api/admin/test/dm-direct", "host": ["{{base_url}}"], "path": ["api", "admin", "test", "dm-direct"] },
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"user_id\": {{user_id}},\n  \"profile_url\": \"https://www.linkedin.com/in/some-person/\",\n  \"message\": \"Hi — testing my outreach automation, please ignore.\"\n}"
+        }
+      }
+    },
+    {
+      "name": "Task status",
+      "request": {
+        "method": "GET",
+        "header": [
+          { "key": "X-Admin-Secret", "value": "{{admin_secret}}" }
+        ],
+        "url": {
+          "raw": "{{base_url}}/api/admin/task-status/{{task_id}}",
+          "host": ["{{base_url}}"],
+          "path": ["api", "admin", "task-status", "{{task_id}}"]
+        }
+      }
+    }
+  ]
+}

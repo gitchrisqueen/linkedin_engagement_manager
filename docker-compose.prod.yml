@@ -115,7 +115,12 @@ services:
 
   selenium-chrome:
     # already restart: unless-stopped + 2cpu/4g in the base file
-    ports: !reset []
+    # Bind noVNC (7900) to loopback only so the live browser can be watched via an
+    # SSH tunnel (ssh -L 7900:localhost:7900 …) without exposing it publicly. The
+    # Selenium hub (4444) stays internal to the compose network. For browser-based
+    # access instead, add a vnc.<domain> public hostname in the Cloudflare Zero
+    # Trust dashboard pointing at http://selenium-chrome:7900 (gate with Access).
+    ports: !override ["127.0.0.1:7900:7900"]
 
   litellm:
     # already restart: unless-stopped in the base file
