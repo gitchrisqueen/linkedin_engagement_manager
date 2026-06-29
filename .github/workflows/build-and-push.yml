@@ -61,9 +61,12 @@ jobs:
     name: Deploy to Hostinger VPS
     needs: build-and-push
     runs-on: ubuntu-latest
-    # Protected environment — configure required reviewers in repo settings to
-    # require manual approval before the live box is updated.
+    # Protected environment. The required-reviewer gate was removed so green
+    # releases auto-deploy; re-add reviewers in repo settings to restore it.
     environment: production
+    env:
+      CF_API_TOKEN: ${{ secrets.CF_API_TOKEN }}
+      CF_ZONE_ID: ${{ secrets.CF_ZONE_ID }}
     steps:
       - name: Deploy over SSH
         uses: appleboy/ssh-action@v1
@@ -79,3 +82,19 @@ jobs:
         env:
           GHCR_USER: ${{ github.actor }}
           GHCR_PAT: ${{ secrets.GHCR_PAT }}
+
+      # Purge the CDN so users get the new index.html shell immediately instead
+      # of a cached one pointing at the previous (hashed) bundle. Skips cleanly
+      # if the Cloudflare secrets aren't configured.
+      - name: Purge Cloudflare cache
+        if: ${{ env.CF_API_TOKEN != '' && env.CF_ZONE_ID != '' }}
+        run: |
+          resp=$(curl -sf -X POST \
+            "https://api.cloudflare.com/client/v4/zones/${CF_ZONE_ID}/purge_cache" \
+            -H "Authorization: Bearer ${CF_API_TOKEN}" \
+            -H "Content-Type: application/json" \
+            --data '{"purge_everything":true}')
+          echo "$resp"
+          echo "$resp" | grep -q '"success":true' \
+            && echo "Cloudflare cache purged" \
+            || { echo "Cloudflare purge failed"; exit 1; }
