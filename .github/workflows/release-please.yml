@@ -8,6 +8,7 @@ on:
 permissions:
   contents: write
   pull-requests: write
+  actions: write
 
 jobs:
   release-please:
@@ -19,8 +20,21 @@ jobs:
         with:
           release-type: python
           # Manages the version in pyproject.toml + maintains CHANGELOG.md.
-          # Merging the release PR creates a tag + GitHub Release (vX.Y.Z),
-          # which triggers build-and-push.yml and deploy-vps.yml.
+          # Merging the release PR creates a tag + GitHub Release (vX.Y.Z).
+
+      # The GitHub Release is published by GITHUB_TOKEN, which (by design) does
+      # NOT trigger build-and-push.yml's `release: published` event. Explicitly
+      # dispatch the build so a merged release auto-builds + auto-deploys.
+      # If GITHUB_TOKEN can't dispatch across the boundary, set RELEASE_DISPATCH_TOKEN
+      # (a PAT with actions:write) and it will be used instead.
+      - name: Trigger build & deploy for the new release
+        if: ${{ steps.release.outputs.release_created == 'true' }}
+        env:
+          GH_TOKEN: ${{ secrets.RELEASE_DISPATCH_TOKEN || secrets.GITHUB_TOKEN }}
+        run: |
+          gh workflow run build-and-push.yml \
+            --repo "${{ github.repository }}" \
+            --ref "${{ steps.release.outputs.tag_name }}"
     outputs:
       release_created: ${{ steps.release.outputs.release_created }}
       tag_name: ${{ steps.release.outputs.tag_name }}
