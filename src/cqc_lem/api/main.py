@@ -1779,13 +1779,27 @@ async def assets_compat_redirect(request: Request, file_name: Optional[str] = No
 if os.path.isdir(_ui_dist):
     _spa_index = os.path.join(_ui_dist, "index.html")
 
+    class _ImmutableStaticFiles(StaticFiles):
+        # Vite emits content-hashed filenames, so assets can be cached forever.
+        async def get_response(self, path, scope):
+            response = await super().get_response(path, scope)
+            response.headers["Cache-Control"] = "public, max-age=31536000, immutable"
+            return response
+
     # Serve static assets (JS/CSS/icons) from the dist root
-    app.mount("/assets", StaticFiles(directory=os.path.join(_ui_dist, "assets")), name="spa-assets")
+    app.mount("/assets", _ImmutableStaticFiles(directory=os.path.join(_ui_dist, "assets")), name="spa-assets")
 
     @app.get("/{full_path:path}", response_class=HTMLResponse, include_in_schema=False)
     def serve_spa(full_path: str):
         with open(_spa_index) as fh:
-            return HTMLResponse(content=fh.read())
+            # The HTML shell references hashed asset filenames, so it must NEVER be
+            # cached by browsers or the CDN — otherwise a stale shell points at an
+            # old bundle after every deploy. (Cloudflare must respect this; if a
+            # "Cache Everything" rule overrides it, the rule needs an HTML bypass.)
+            return HTMLResponse(content=fh.read(), headers={
+                "Cache-Control": "no-store, no-cache, must-revalidate, max-age=0",
+                "Pragma": "no-cache",
+            })
 
 
 def send_bytes_range_requests(
