@@ -31,8 +31,9 @@ LOGIN_URL = "https://www.linkedin.com/login"
 
 def inspect(user_id: int, out: str) -> None:
     email, password = get_user_password_pair_by_id(user_id)
-    print(f"[creds] user_id={user_id} email={email!r} "
-          f"password={'<EMPTY>' if not password else f'set(len={len(password)})'}")
+    # Log only whether a password exists — never anything derived from its value.
+    has_password = bool(password)
+    print(f"[creds] user_id={user_id} email={email!r} password_set={has_password}")
     cookies = get_cookies("https://www.linkedin.com", email) if email else None
     print(f"[cookies] count={len(cookies) if cookies else 0}")
 
