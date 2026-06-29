@@ -15,17 +15,20 @@ function isUrl(value: string): boolean {
 }
 
 // Only allow safe schemes to reach a media `src` — blocks javascript:/vbscript:/etc.
-// so post-derived URLs can't become a DOM-based XSS sink.
+// so post-derived URLs can't become a DOM-based XSS sink. Validates via the URL
+// parser and returns the normalized href (parse + scheme allowlist sanitizes the value).
+const SAFE_MEDIA_PROTOCOLS = new Set(['http:', 'https:', 'blob:', 'data:'])
+
 function safeMediaUrl(value: string | null | undefined): string | undefined {
   if (!value) return undefined
-  if (
-    /^(https?:)?\/\//i.test(value) ||
-    value.startsWith('/api/') ||
-    value.startsWith('/assets') ||
-    value.startsWith('blob:') ||
-    /^data:(image|video)\//i.test(value)
-  ) {
-    return value
+  const origin = typeof window !== 'undefined' ? window.location.origin : 'http://localhost'
+  try {
+    const parsed = new URL(value, origin)
+    if (SAFE_MEDIA_PROTOCOLS.has(parsed.protocol)) {
+      return parsed.href
+    }
+  } catch {
+    // not a parseable URL — fall through to undefined
   }
   return undefined
 }
