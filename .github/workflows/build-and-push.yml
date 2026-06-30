@@ -68,12 +68,68 @@ jobs:
       CF_API_TOKEN: ${{ secrets.CF_API_TOKEN }}
       CF_ZONE_ID: ${{ secrets.CF_ZONE_ID }}
     steps:
-      - name: Deploy over SSH
+      # SSH to the VPS can intermittently time out ("dial tcp :22 i/o timeout"), and the
+      # default 10m command_timeout once KILLED `docker compose up` mid-recreation, taking
+      # the stack down. Fix: a larger command_timeout (deploy.sh health-checks + rolls back
+      # within it, so it must not be cut off) plus up to 3 attempts with backoff to ride
+      # out transient SSH failures. deploy.sh is idempotent, so retries are safe.
+      - name: Deploy over SSH (attempt 1)
+        id: deploy1
+        continue-on-error: true
         uses: appleboy/ssh-action@v1
         with:
           host: ${{ secrets.VPS_HOST }}
           username: ${{ secrets.VPS_USER }}
           key: ${{ secrets.VPS_SSH_KEY }}
+          timeout: 60s
+          command_timeout: 25m
+          script_stop: true
+          envs: GHCR_USER,GHCR_PAT
+          script: |
+            cd /opt/lem
+            ./scripts/deploy.sh "${{ needs.build-and-push.outputs.tag }}"
+        env:
+          GHCR_USER: ${{ github.actor }}
+          GHCR_PAT: ${{ secrets.GHCR_PAT }}
+
+      - name: Backoff before deploy retry 2
+        if: ${{ steps.deploy1.outcome == 'failure' }}
+        run: sleep 45
+
+      - name: Deploy over SSH (attempt 2)
+        id: deploy2
+        if: ${{ steps.deploy1.outcome == 'failure' }}
+        continue-on-error: true
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          timeout: 60s
+          command_timeout: 25m
+          script_stop: true
+          envs: GHCR_USER,GHCR_PAT
+          script: |
+            cd /opt/lem
+            ./scripts/deploy.sh "${{ needs.build-and-push.outputs.tag }}"
+        env:
+          GHCR_USER: ${{ github.actor }}
+          GHCR_PAT: ${{ secrets.GHCR_PAT }}
+
+      - name: Backoff before deploy retry 3
+        if: ${{ steps.deploy1.outcome == 'failure' && steps.deploy2.outcome == 'failure' }}
+        run: sleep 90
+
+      - name: Deploy over SSH (attempt 3, final)
+        id: deploy3
+        if: ${{ steps.deploy1.outcome == 'failure' && steps.deploy2.outcome == 'failure' }}
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          timeout: 60s
+          command_timeout: 25m
           script_stop: true
           envs: GHCR_USER,GHCR_PAT
           script: |
