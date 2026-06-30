@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.16.0](https://github.com/christopherqueenconsulting/linkedin_engagement_manager/compare/v0.15.1...v0.16.0) (2026-06-30)
+
+
+### Features
+
+* **ui:** reorganize Account page into clear grouped sections ([624b353](https://github.com/christopherqueenconsulting/linkedin_engagement_manager/commit/624b353d5c922d2d007490f7f79d628f9bfe5d73))
+* **ui:** reorganize Account page into grouped sections ([2b61b8b](https://github.com/christopherqueenconsulting/linkedin_engagement_manager/commit/2b61b8be3c262522dbcedfa7574cd7719e3ae596))
+
 ## [0.15.1](https://github.com/christopherqueenconsulting/linkedin_engagement_manager/compare/v0.15.0...v0.15.1) (2026-06-30)
 
 
