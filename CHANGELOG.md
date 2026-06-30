@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.17.3](https://github.com/christopherqueenconsulting/linkedin_engagement_manager/compare/v0.17.2...v0.17.3) (2026-06-30)
+
+
+### Bug Fixes
+
+* **automation:** make auto-commenting resilient to LinkedIn 429/auth-wall ([27d4e95](https://github.com/christopherqueenconsulting/linkedin_engagement_manager/commit/27d4e958237eaaf96883fe31d6ae53179c014113))
+* **automation:** make auto-commenting resilient to LinkedIn 429/auth-wall ([a2e7280](https://github.com/christopherqueenconsulting/linkedin_engagement_manager/commit/a2e7280ef2c01071a773635f9dd7daedb98e20cd))
+
 ## [0.17.2](https://github.com/christopherqueenconsulting/linkedin_engagement_manager/compare/v0.17.1...v0.17.2) (2026-06-30)
 
 
