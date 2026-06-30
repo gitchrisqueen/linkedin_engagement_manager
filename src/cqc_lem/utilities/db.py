@@ -178,6 +178,60 @@ def store_linkedin_li_at(user_id: int, li_at: str, jsessionid: Optional[str] = N
         return False
 
 
+def has_linkedin_session(user_id: int) -> bool:
+    """True if the user has a stored LinkedIn session cookie (li_at) to log in with."""
+    connection = get_db_connection()
+    cursor = connection.cursor()
+    try:
+        cursor.execute(
+            "SELECT 1 FROM cookies WHERE user_id = %s AND name = 'li_at' LIMIT 1",
+            (user_id,),
+        )
+        return cursor.fetchone() is not None
+    except mysql.connector.Error as err:
+        myprint(f"Could not check linkedin session for user_id {user_id} | Error: {err}")
+        return False
+    finally:
+        cursor.close()
+        connection.close()
+
+
+def get_linkedin_session_email_sent_at(user_id: int):
+    """Return the datetime the last session notification email was sent, or None."""
+    connection = get_db_connection()
+    cursor = connection.cursor()
+    try:
+        cursor.execute(
+            "SELECT linkedin_session_email_sent_at FROM users WHERE id = %s", (user_id,)
+        )
+        row = cursor.fetchone()
+        return row[0] if row else None
+    except mysql.connector.Error as err:
+        myprint(f"Could not read session email timestamp for user_id {user_id} | Error: {err}")
+        return None
+    finally:
+        cursor.close()
+        connection.close()
+
+
+def set_linkedin_session_email_sent_at(user_id: int) -> bool:
+    """Stamp now() as the last session notification email time (throttle)."""
+    connection = get_db_connection()
+    cursor = connection.cursor()
+    try:
+        cursor.execute(
+            "UPDATE users SET linkedin_session_email_sent_at = NOW() WHERE id = %s", (user_id,)
+        )
+        connection.commit()
+        return True
+    except mysql.connector.Error as err:
+        myprint(f"Could not set session email timestamp for user_id {user_id} | Error: {err}")
+        return False
+    finally:
+        cursor.close()
+        connection.close()
+
+
 def add_user(email: str, password: str):
     connection = get_db_connection()
     cursor = connection.cursor()
