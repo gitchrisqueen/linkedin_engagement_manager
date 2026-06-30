@@ -147,6 +147,37 @@ def get_cookies(url: str, user_email: str):
     return cookies
 
 
+def store_linkedin_li_at(user_id: int, li_at: str, jsessionid: Optional[str] = None) -> bool:
+    """Persist a user-supplied LinkedIn session cookie (li_at, optionally JSESSIONID).
+
+    Lets login_to_linkedin resume an already-trusted session instead of doing a fresh
+    password login — which is what triggers LinkedIn's new-device challenge. Reuses the
+    standard cookie store so the existing cookie-first login path picks it up.
+    """
+    email = get_user_email(user_id)
+    if not email:
+        myprint(f"store_linkedin_li_at: no email for user_id {user_id}")
+        return False
+
+    import time
+    expiry = int(time.time()) + 365 * 24 * 60 * 60  # ~1 year; load_cookies re-stamps anyway
+    cookies = [{
+        "name": "li_at", "value": li_at, "domain": ".linkedin.com", "path": "/",
+        "expiry": expiry, "secure": True, "httpOnly": True,
+    }]
+    if jsessionid:
+        cookies.append({
+            "name": "JSESSIONID", "value": jsessionid, "domain": ".linkedin.com",
+            "path": "/", "expiry": expiry, "secure": True, "httpOnly": False,
+        })
+    try:
+        store_cookies(email, cookies)
+        return True
+    except Exception as e:
+        myprint(f"Could not store LinkedIn session cookie for user_id {user_id}: {e}")
+        return False
+
+
 def add_user(email: str, password: str):
     connection = get_db_connection()
     cursor = connection.cursor()

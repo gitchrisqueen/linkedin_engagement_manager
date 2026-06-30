@@ -1,0 +1,16 @@
+{
+  "manifest_version": 3,
+  "name": "LEM LinkedIn Connect",
+  "version": "1.0.0",
+  "description": "One click sends your existing LinkedIn session to LinkedIn Engagement Manager so automation resumes a trusted session (no password login, no new-device challenge).",
+  "permissions": ["cookies", "storage"],
+  "host_permissions": [
+    "https://*.linkedin.com/*",
+    "https://lem.christopherqueenconsulting.com/*",
+    "http://localhost/*"
+  ],
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "LEM LinkedIn Connect"
+  }
+}
