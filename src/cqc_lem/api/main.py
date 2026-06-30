@@ -24,6 +24,7 @@ from cqc_lem.utilities.db import (
     create_session, get_session_user_id, delete_session,
     add_user_by_email, get_user_email, get_user_token_info, store_linkedin_li_at,
     has_linkedin_session, get_user_password_pair_by_id,
+    get_company_linked_in_url_for_user, update_company_linked_in_url_for_user,
     get_user_subscription_info, get_user_preferences, update_user_preferences,
     update_subscription_from_stripe, update_user_linkedin_token,
     get_users_with_stripe_subscriptions,
@@ -278,6 +279,11 @@ class LinkedInCookieRequest(BaseModel):
     session_token: str
     li_at: str
     jsessionid: Optional[str] = None
+
+
+class LinkedInCompanyPageRequest(BaseModel):
+    session_token: str
+    company_linked_in_url: Optional[str] = None
 
 
 class AdminFixVideoUrlsRequest(BaseModel):
@@ -915,6 +921,7 @@ def get_user_settings(session_token: str) -> ResponseModel:
     preferences = get_user_preferences(user_id)
     blog_url = get_user_blog_url(user_id)
     sitemap_url = get_user_sitemap_url(user_id)
+    company_linked_in_url = get_company_linked_in_url_for_user(user_id)
 
     def _iso(dt):
         return dt.isoformat() if dt else None
@@ -933,6 +940,7 @@ def get_user_settings(session_token: str) -> ResponseModel:
         } if preferences else None,
         "blog_url": blog_url,
         "sitemap_url": sitemap_url,
+        "company_linked_in_url": company_linked_in_url,
     })
 
 
@@ -1130,6 +1138,28 @@ def account_readiness_endpoint(session_token: str) -> ResponseModel:
     ]
     ready = all(i["ok"] for i in items if i["required"])
     return ResponseModel(status_code=200, detail={"ready": ready, "items": items})
+
+
+@router.put("/user/company-page")
+def update_company_page_endpoint(request: LinkedInCompanyPageRequest) -> ResponseModel:
+    """Save (or clear) the user's LinkedIn company page URL. The monthly invite
+    automation (1st of each month) sends connection invites to this page for active
+    users; users without one are skipped."""
+    user_id = get_session_user_id(request.session_token)
+    if not user_id:
+        raise HTTPException(status_code=401, detail="Invalid or expired session")
+
+    url = (request.company_linked_in_url or "").strip() or None
+    if url is not None:
+        if not (url.startswith("https://www.linkedin.com/") or url.startswith("https://linkedin.com/")):
+            raise HTTPException(
+                status_code=422,
+                detail="Enter a full LinkedIn company page URL (https://www.linkedin.com/company/...).",
+            )
+
+    if not update_company_linked_in_url_for_user(user_id, url):
+        raise HTTPException(status_code=500, detail="Could not save company page")
+    return ResponseModel(status_code=200, detail="Company page saved" if url else "Company page cleared")
 
 
 @router.post("/billing/create-checkout-session")
