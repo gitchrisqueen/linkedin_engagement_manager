@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.17.1](https://github.com/christopherqueenconsulting/linkedin_engagement_manager/compare/v0.17.0...v0.17.1) (2026-06-30)
+
+
+### Bug Fixes
+
+* **carousel:** no placeholder image fallback; flag 'error' when images unavailable ([5ebf73a](https://github.com/christopherqueenconsulting/linkedin_engagement_manager/commit/5ebf73aefeb1d61faf5b1e9b8a107a1ab15f9784))
+* **carousel:** remove placeholder fallback; flag 'error' when images unavailable ([c12388b](https://github.com/christopherqueenconsulting/linkedin_engagement_manager/commit/c12388b6d4d9936d704aa3d050d13f0549ab746e))
+
 ## [0.17.0](https://github.com/christopherqueenconsulting/linkedin_engagement_manager/compare/v0.16.1...v0.17.0) (2026-06-30)
 
 
