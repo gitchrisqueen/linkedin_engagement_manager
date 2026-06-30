@@ -67,19 +67,9 @@ const INACTIVATE_OPTIONS = [
   { label: 'Never', value: null },
 ]
 
-function StepBadge({ n, active, done }: { n: number; active: boolean; done: boolean }) {
+function SectionHeading({ title }: { title: string }) {
   return (
-    <div
-      className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0 ${
-        done
-          ? 'bg-green-500 text-white'
-          : active
-          ? 'bg-blue-600 text-white'
-          : 'bg-gray-200 text-gray-500'
-      }`}
-    >
-      {done ? '✓' : n}
-    </div>
+    <h2 className="text-xs font-bold uppercase tracking-wide text-gray-400 pt-3 -mb-2">{title}</h2>
   )
 }
 
@@ -262,11 +252,6 @@ export default function Account() {
   const tokenExpiringSoon = tokenStatusData?.is_expiring_soon ?? false
   const tokenExpired = tokenStatusData?.is_expired ?? false
 
-  const step1Done = true
-  const step2Done = isLinkedInConnected
-  const step3Done = !!(blogUrl || sitemapUrl)
-  const allStepsDone = step1Done && step2Done
-
   const showLinkedInSection = !isLinkedInConnected || tokenExpiringSoon || tokenExpired
 
   // Profile save
@@ -420,30 +405,30 @@ export default function Account() {
     <div className="max-w-2xl space-y-6">
       <h1 className="text-2xl font-bold text-gray-800">Account Settings</h1>
 
-      {/* Setup steps — hidden once all required steps are done */}
-      {!allStepsDone && (
-        <div className="bg-blue-50 rounded-lg border border-blue-100 p-4">
-          <p className="text-sm font-semibold text-blue-800 mb-3">Setup Steps</p>
-          <div className="space-y-3">
-            {[
-              { n: 1, label: 'Sign in with your email (done)', done: step1Done },
-              { n: 2, label: 'Connect your LinkedIn account', done: step2Done },
-              { n: 3, label: '(Optional) Add your blog / sitemap for AI content ideas', done: step3Done },
-            ].map(({ n, label, done }) => {
-              const active =
-                n === 1 ? !step1Done : n === 2 ? step1Done && !step2Done : step2Done && !step3Done
-              return (
-                <div key={n} className="flex items-center gap-3">
-                  <StepBadge n={n} active={active || n === 1} done={done} />
-                  <span className={`text-sm ${done ? 'line-through text-gray-400' : 'text-gray-700'}`}>
-                    {label}
+      {/* Account setup checklist — exactly what automation needs, from the readiness API */}
+      {readiness && !readiness.ready && (
+        <div className="bg-amber-50 rounded-lg border border-amber-200 p-4">
+          <p className="text-sm font-semibold text-amber-900 mb-3">Finish account setup</p>
+          <div className="space-y-2">
+            {readiness.items.map((it) => (
+              <div key={it.key} className="flex items-start gap-3">
+                <span className={`mt-0.5 w-5 h-5 rounded-full flex items-center justify-center text-[11px] font-bold flex-shrink-0 ${it.ok ? 'bg-green-500 text-white' : 'bg-gray-200 text-gray-500'}`}>
+                  {it.ok ? '✓' : '!'}
+                </span>
+                <div>
+                  <span className={`text-sm ${it.ok ? 'text-gray-400 line-through' : 'text-gray-800 font-medium'}`}>
+                    {it.label}
+                    {it.required && !it.ok && <span className="text-red-500"> *</span>}
                   </span>
+                  {!it.ok && it.hint && <p className="text-xs text-gray-500">{it.hint}</p>}
                 </div>
-              )
-            })}
+              </div>
+            ))}
           </div>
         </div>
       )}
+
+      <SectionHeading title="Plan & Billing" />
 
       {/* Subscription card */}
       <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 space-y-4">
@@ -550,6 +535,8 @@ export default function Account() {
         </div>
       </div>
 
+      <SectionHeading title="LinkedIn" />
+
       {/* LinkedIn connection — hidden when connected and token healthy */}
       {showLinkedInSection && (
         <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 space-y-4">
@@ -652,104 +639,59 @@ export default function Account() {
         </div>
       )}
 
-      {/* Blog/sitemap inputs — shown during setup, before all steps complete */}
-      {!allStepsDone && (
-        <form onSubmit={handleSave} className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 space-y-4">
-          <h2 className="text-base font-semibold text-gray-700">Optional Setup</h2>
-          <p className="text-sm text-gray-500">
-            Signed in as <span className="font-medium text-gray-800">{email}</span>
+      <SectionHeading title="Content & Profile" />
+
+      {/* Email + content sources the AI uses for post ideas */}
+      <form onSubmit={handleSave} className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 space-y-4">
+        <h2 className="text-base font-semibold text-gray-700">Content &amp; Profile</h2>
+
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
+          <p className="text-sm text-gray-800 bg-gray-50 border border-gray-200 rounded-lg px-3 py-2">
+            {email}
           </p>
+          <p className="text-xs text-green-600 mt-1">✓ Verified email</p>
+        </div>
 
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Blog URL</label>
-            <input
-              type="url"
-              value={blogUrl}
-              onChange={(e) => setBlogUrl(e.target.value)}
-              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-              placeholder="https://yourblog.com"
-            />
-          </div>
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">Blog URL</label>
+          <input
+            type="url"
+            value={blogUrl}
+            onChange={(e) => setBlogUrl(e.target.value)}
+            className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            placeholder="https://yourblog.com"
+          />
+        </div>
 
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Sitemap URL</label>
-            <input
-              type="url"
-              value={sitemapUrl}
-              onChange={(e) => setSitemapUrl(e.target.value)}
-              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-              placeholder="https://yourblog.com/sitemap.xml"
-            />
-            <p className="text-xs text-gray-400 mt-1">Used by AI to generate content ideas from your existing posts.</p>
-          </div>
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">Sitemap URL</label>
+          <input
+            type="url"
+            value={sitemapUrl}
+            onChange={(e) => setSitemapUrl(e.target.value)}
+            className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            placeholder="https://yourblog.com/sitemap.xml"
+          />
+          <p className="text-xs text-gray-400 mt-1">Used by AI to generate content ideas from your existing posts.</p>
+        </div>
 
-          {savedMsg && (
-            <p className={`text-sm font-medium ${saveMutation.isError ? 'text-red-600' : 'text-green-600'}`}>
-              {savedMsg}
-            </p>
-          )}
+        {savedMsg && (
+          <p className={`text-sm font-medium ${saveMutation.isError ? 'text-red-600' : 'text-green-600'}`}>
+            {savedMsg}
+          </p>
+        )}
 
-          <button
-            type="submit"
-            disabled={saveMutation.isPending}
-            className="w-full bg-blue-600 text-white py-2 rounded-lg text-sm font-semibold hover:bg-blue-700 disabled:opacity-50 transition-colors"
-          >
-            {saveMutation.isPending ? 'Saving…' : 'Save'}
-          </button>
-        </form>
-      )}
+        <button
+          type="submit"
+          disabled={saveMutation.isPending}
+          className="w-full bg-blue-600 text-white py-2 rounded-lg text-sm font-semibold hover:bg-blue-700 disabled:opacity-50 transition-colors"
+        >
+          {saveMutation.isPending ? 'Saving…' : 'Save'}
+        </button>
+      </form>
 
-      {/* Full Profile card — shown only when all setup steps are complete */}
-      {allStepsDone && (
-        <form onSubmit={handleSave} className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 space-y-4">
-          <h2 className="text-base font-semibold text-gray-700">Profile</h2>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
-            <p className="text-sm text-gray-800 bg-gray-50 border border-gray-200 rounded-lg px-3 py-2">
-              {email}
-            </p>
-            <p className="text-xs text-green-600 mt-1">✓ Verified email</p>
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Blog URL</label>
-            <input
-              type="url"
-              value={blogUrl}
-              onChange={(e) => setBlogUrl(e.target.value)}
-              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-              placeholder="https://yourblog.com"
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Sitemap URL</label>
-            <input
-              type="url"
-              value={sitemapUrl}
-              onChange={(e) => setSitemapUrl(e.target.value)}
-              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-              placeholder="https://yourblog.com/sitemap.xml"
-            />
-            <p className="text-xs text-gray-400 mt-1">Used by AI to generate content ideas from your existing posts.</p>
-          </div>
-
-          {savedMsg && (
-            <p className={`text-sm font-medium ${saveMutation.isError ? 'text-red-600' : 'text-green-600'}`}>
-              {savedMsg}
-            </p>
-          )}
-
-          <button
-            type="submit"
-            disabled={saveMutation.isPending}
-            className="w-full bg-blue-600 text-white py-2 rounded-lg text-sm font-semibold hover:bg-blue-700 disabled:opacity-50 transition-colors"
-          >
-            {saveMutation.isPending ? 'Saving…' : 'Save Settings'}
-          </button>
-        </form>
-      )}
+      <SectionHeading title="Automation Settings" />
 
       {/* Preferences card */}
       <form onSubmit={handlePrefsSave} className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 space-y-5">
