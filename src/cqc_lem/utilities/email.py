@@ -3,7 +3,7 @@ import secrets
 import smtplib
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
-from typing import Tuple
+from typing import Optional, Tuple
 
 from cqc_lem.utilities.env_constants import (
     SENDGRID_API_KEY,
@@ -158,6 +158,99 @@ def send_login_approval_email(to_email: str, vnc_url: str | None = None) -> bool
             return False
 
     return False
+
+
+def _send_high_priority_email(to_email: str, subject: str, html_content: str) -> bool:
+    """Send a high-priority email via SendGrid (falling back to SMTP). Returns True if dispatched."""
+    has_sendgrid = bool(SENDGRID_API_KEY)
+    has_smtp = bool(SMTP_USER) and bool(SMTP_PASSWORD)
+    if not has_sendgrid and not has_smtp:
+        myprint(f"No email provider configured — cannot send: {subject}")
+        return False
+
+    if has_sendgrid:
+        try:
+            from sendgrid import SendGridAPIClient
+            from sendgrid.helpers.mail import Header, Mail
+
+            message = Mail(from_email=SENDGRID_FROM_EMAIL, to_emails=to_email,
+                           subject=subject, html_content=html_content)
+            message.header = Header("X-Priority", "1")
+            message.header = Header("X-MSMail-Priority", "High")
+            message.header = Header("Importance", "High")
+            SendGridAPIClient(SENDGRID_API_KEY).send(message)
+            myprint(f"Email sent via SendGrid to {to_email}: {subject}")
+            return True
+        except Exception as e:
+            myprint(f"SendGrid send failed for {to_email}: {e}")
+
+    if has_smtp:
+        msg = MIMEMultipart("alternative")
+        msg["Subject"] = subject
+        msg["From"] = SMTP_USER
+        msg["To"] = to_email
+        msg["X-Priority"] = "1"
+        msg["X-MSMail-Priority"] = "High"
+        msg["Importance"] = "High"
+        msg.attach(MIMEText(html_content, "html"))
+        try:
+            with smtplib.SMTP(SMTP_HOST, SMTP_PORT, timeout=15) as server:
+                server.ehlo()
+                server.starttls()
+                server.login(SMTP_USER, SMTP_PASSWORD)
+                server.sendmail(SMTP_USER, to_email, msg.as_string())
+            myprint(f"Email sent via SMTP to {to_email}: {subject}")
+            return True
+        except Exception as e:
+            myprint(f"SMTP send failed for {to_email}: {e}")
+            return False
+
+    return False
+
+
+def _account_url() -> str:
+    import os
+    base = (os.getenv("LEM_APP_URL") or "https://lem.christopherqueenconsulting.com").rstrip("/")
+    return f"{base}/account"
+
+
+def send_connect_linkedin_email(to_email: str, account_url: Optional[str] = None) -> bool:
+    """Email a user who has no validated LinkedIn session, prompting them to connect."""
+    url = account_url or _account_url()
+    html = f"""
+    <html><body>
+    <h2>Connect your LinkedIn to keep automation running</h2>
+    <p>LinkedIn Engagement Manager needs an authorized LinkedIn session to post,
+    comment, and engage on your behalf. Your account doesn't have one yet, so automation
+    can't run.</p>
+    <p>It takes about a minute — open your account and click <strong>Connect LinkedIn</strong>:</p>
+    <p><a href="{url}" style="background:#0a66c2;color:#fff;padding:10px 16px;border-radius:6px;
+    text-decoration:none;">Connect LinkedIn</a></p>
+    <p style="color:#888;font-size:12px;">If you've already connected, you can ignore this email.</p>
+    </body></html>
+    """
+    return _send_high_priority_email(
+        to_email, "⚠️ Action needed: connect your LinkedIn to keep automation running", html)
+
+
+def send_session_revalidation_email(to_email: str, account_url: Optional[str] = None) -> bool:
+    """Email a user whose stored LinkedIn session stopped working, prompting a reconnect."""
+    url = account_url or _account_url()
+    html = f"""
+    <html><body>
+    <h2>Reconnect your LinkedIn session</h2>
+    <p>Your saved LinkedIn session expired or was signed out, so LinkedIn Engagement
+    Manager can no longer act on your behalf — automation is paused until you reconnect.</p>
+    <p>Open your account and reconnect (one click with the browser extension, or paste a
+    fresh session):</p>
+    <p><a href="{url}" style="background:#0a66c2;color:#fff;padding:10px 16px;border-radius:6px;
+    text-decoration:none;">Reconnect LinkedIn</a></p>
+    <p style="color:#888;font-size:12px;">This happens periodically — LinkedIn sessions don't
+    last forever.</p>
+    </body></html>
+    """
+    return _send_high_priority_email(
+        to_email, "⚠️ Action needed: reconnect your LinkedIn session", html)
 
 
 def send_pin_email(

@@ -11,11 +11,12 @@ from cqc_lem.app.run_automation import automate_commenting, automate_profile_vie
     automate_invites_to_company_page_for_user
 from cqc_lem.utilities.db import (
     get_ready_to_post_posts, get_orphaned_scheduled_posts, update_db_post_status,
-    get_active_user_ids, PostStatus,
+    get_active_user_ids, PostStatus, has_linkedin_session,
     get_users_with_stripe_subscriptions, update_subscription_from_stripe,
 )
 from cqc_lem.utilities.env_constants import SELENIUM_KEEP_VIDEOS_X_DAYS, CQC_LEM_POST_TIME_DELTA_MINUTES
 from cqc_lem.utilities.logger import myprint, log_info, log_debug, log_warning
+from cqc_lem.utilities.notifications import notify_linkedin_session
 
 
 
@@ -104,6 +105,23 @@ def auto_appreciate_dms():
         return f"No Active Users"
     else:
         return f"Started Appreciate DM Process for {len(users)} user(s)"
+
+
+@shared_task.task
+def auto_notify_missing_linkedin_session():
+    """Email active users who have no validated LinkedIn session cookie, prompting them
+    to connect — automation can't run without one. Throttled per-user inside
+    notify_linkedin_session, so this can run daily without spamming."""
+    users = get_active_user_ids()
+    notified = 0
+    for user_id in users:
+        try:
+            if not has_linkedin_session(user_id):
+                if notify_linkedin_session(user_id, revalidation=False):
+                    notified += 1
+        except Exception as e:
+            log_warning("Failed to notify missing LinkedIn session", exc=e, user_id=user_id)
+    return f"Notified {notified} of {len(users)} active user(s) missing a LinkedIn session"
 
 
 @shared_task.task

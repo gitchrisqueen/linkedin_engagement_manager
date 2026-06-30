@@ -94,6 +94,10 @@ app.conf.update(
             'task': 'cqc_lem.app.run_scheduler.auto_invite_to_company_pages',
             'schedule': crontab(hour='5', minute='0', day_of_month='1')  # Run on the 1st of the month at 5:00 AM
         },
+        'notify-missing-linkedin-session': {
+            'task': 'cqc_lem.app.run_scheduler.auto_notify_missing_linkedin_session',
+            'schedule': crontab(hour='9', minute='0')  # Daily 9:00 AM — throttled per-user to 1/week
+        },
         'send-appreciation-dms': {
             'task': 'cqc_lem.app.run_scheduler.auto_appreciate_dms',
             'schedule': crontab(hour='8', minute='0')  # Run every day at 8:00 AM

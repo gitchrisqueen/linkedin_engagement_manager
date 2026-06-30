@@ -152,6 +152,38 @@ class TestLoginToLinkedinCookiePath:
         # Cookies stored after successful login
         mock_store.assert_called_once()
 
+    def test_stale_cookie_triggers_revalidation_email(self):
+        """Cookies present but they don't authenticate → auto-detect stale session and
+        email the user to reconnect (revalidation=True)."""
+        state = {"url": "https://www.linkedin.com"}
+        driver = MagicMock()
+        driver.get_cookies.return_value = [{"name": "li_at"}]
+        driver.find_elements.return_value = []
+        type(driver).current_url = property(lambda self: state["url"])
+
+        def on_get(u):
+            if "feed" in u:
+                state["url"] = "https://www.linkedin.com/login"   # stale cookie → bounced
+            elif "login" in u:
+                state["url"] = "https://www.linkedin.com/feed/"   # credential login succeeds
+            else:
+                state["url"] = "https://www.linkedin.com"
+        driver.get.side_effect = on_get
+
+        wait = _make_wait()
+        with patch(f"{_MODULE}.get_cookies", return_value=[{"name": "li_at"}]), \
+             patch(f"{_MODULE}.load_cookies"), \
+             patch(f"{_MODULE}.store_cookies"), \
+             patch(f"{_MODULE}.get_visible_element_wait_retry", return_value=MagicMock()), \
+             patch("cqc_lem.utilities.db.get_user_id", return_value=7), \
+             patch("cqc_lem.utilities.notifications.notify_linkedin_session") as notify:
+            from cqc_lem.utilities.linkedin.helper import login_to_linkedin
+            login_to_linkedin(driver, wait, "user@e.com", "pw")
+
+        notify.assert_called_once()
+        assert notify.call_args.args[0] == 7
+        assert notify.call_args.kwargs.get("revalidation") is True
+
 
 @pytest.mark.unit
 class TestSolveArkoseChallenge:

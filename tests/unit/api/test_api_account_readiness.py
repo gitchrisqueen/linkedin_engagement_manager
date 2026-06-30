@@ -1,0 +1,97 @@
+"""Unit tests for GET /api/user/account-readiness."""
+
+import pytest
+from unittest.mock import patch
+
+pytestmark = pytest.mark.unit
+
+_M = "cqc_lem.api.main"
+
+
+@pytest.fixture(scope="module")
+def client():
+    patches = [
+        patch("cqc_lem.utilities.observability.track_api_call"),
+        patch("cqc_lem.app.run_automation.automate_invites_to_company_page_for_user"),
+        patch("cqc_lem.app.run_automation.automate_reply_commenting"),
+        patch("cqc_lem.app.run_content_plan.auto_create_weekly_content"),
+        patch("cqc_lem.app.aws_test_celery_task.test_get_my_profile"),
+    ]
+    for p in patches:
+        p.start()
+    try:
+        from fastapi.testclient import TestClient
+        from cqc_lem.api.main import app
+        with TestClient(app, raise_server_exceptions=False) as tc:
+            yield tc
+    finally:
+        for p in patches:
+            p.stop()
+
+
+def _patches(*, oauth, session, password, sub_status, lat):
+    return [
+        patch(f"{_M}.get_session_user_id", return_value=42),
+        patch(f"{_M}.get_user_token_info",
+              return_value={"access_token": "tok"} if oauth else None),
+        patch(f"{_M}.has_linkedin_session", return_value=session),
+        patch(f"{_M}.get_user_password_pair_by_id",
+              return_value=("e", "pw" if password else None)),
+        patch(f"{_M}.get_user_subscription_info",
+              return_value={"subscription_status": sub_status}),
+        patch(f"{_M}.get_user_geo", return_value={"latitude": lat} if lat is not None else None),
+    ]
+
+
+def _run(client, **kw):
+    ctxs = _patches(**kw)
+    for c in ctxs:
+        c.start()
+    try:
+        return client.get("/api/user/account-readiness?session_token=tok")
+    finally:
+        for c in ctxs:
+            c.stop()
+
+
+class TestAccountReadiness:
+    def test_ready_when_all_required_ok(self, client):
+        resp = _run(client, oauth=True, session=True, password=False, sub_status="active", lat=1.0)
+        assert resp.status_code == 200
+        d = resp.json()["detail"]
+        assert d["ready"] is True
+
+    def test_session_satisfied_by_password_alone(self, client):
+        resp = _run(client, oauth=True, session=False, password=True, sub_status="trial", lat=None)
+        d = resp.json()["detail"]
+        # location is not required → still ready
+        assert d["ready"] is True
+        item = next(i for i in d["items"] if i["key"] == "linkedin_session")
+        assert item["ok"] is True
+
+    def test_not_ready_when_no_engagement_login(self, client):
+        resp = _run(client, oauth=True, session=False, password=False, sub_status="active", lat=1.0)
+        d = resp.json()["detail"]
+        assert d["ready"] is False
+        item = next(i for i in d["items"] if i["key"] == "linkedin_session")
+        assert item["ok"] is False and item["required"] is True
+
+    def test_not_ready_when_no_oauth(self, client):
+        resp = _run(client, oauth=False, session=True, password=False, sub_status="active", lat=1.0)
+        assert resp.json()["detail"]["ready"] is False
+
+    def test_not_ready_when_subscription_inactive(self, client):
+        resp = _run(client, oauth=True, session=True, password=False, sub_status="canceled", lat=1.0)
+        assert resp.json()["detail"]["ready"] is False
+
+    def test_location_is_optional(self, client):
+        resp = _run(client, oauth=True, session=True, password=False, sub_status="active", lat=None)
+        d = resp.json()["detail"]
+        assert d["ready"] is True
+        loc = next(i for i in d["items"] if i["key"] == "location")
+        assert loc["required"] is False and loc["ok"] is False
+
+    def test_401_invalid_session(self, client):
+        with patch(f"{_M}.get_session_user_id", return_value=None):
+            resp = client.get("/api/user/account-readiness?session_token=bad")
+        assert resp.status_code == 401

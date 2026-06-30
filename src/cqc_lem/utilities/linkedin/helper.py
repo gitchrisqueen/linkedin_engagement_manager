@@ -230,6 +230,18 @@ def login_to_linkedin(driver: WebDriver, wait: WebDriverWait, user_email: str, u
         myprint("Cookies stored to DB!")
         return
 
+    # We had a stored session cookie but it didn't authenticate — it's stale/expired.
+    # Auto-detect this and email the user to reconnect (preferred over password login).
+    if cookies:
+        try:
+            from cqc_lem.utilities.db import get_user_id
+            from cqc_lem.utilities.notifications import notify_linkedin_session
+            uid = get_user_id(user_email)
+            if uid:
+                notify_linkedin_session(uid, revalidation=True)
+        except Exception as e:
+            log_warning("Failed to send session re-validation email", exc=e, action_type="login")
+
     # Cookies missing or expired — do a full credential login
     myprint(f"Logging in to LinkedIn as: {user_email}")
 

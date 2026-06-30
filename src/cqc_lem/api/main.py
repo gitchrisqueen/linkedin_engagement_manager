@@ -23,6 +23,7 @@ from cqc_lem.utilities.db import (
     create_pin_for_email, verify_pin_for_email, delete_pin_for_email,
     create_session, get_session_user_id, delete_session,
     add_user_by_email, get_user_email, get_user_token_info, store_linkedin_li_at,
+    has_linkedin_session, get_user_password_pair_by_id,
     get_user_subscription_info, get_user_preferences, update_user_preferences,
     update_subscription_from_stripe, update_user_linkedin_token,
     get_users_with_stripe_subscriptions,
@@ -1089,6 +1090,46 @@ def store_linkedin_cookie_endpoint(request: LinkedInCookieRequest) -> ResponseMo
         status_code=200,
         detail="LinkedIn session saved. Automation will reuse it and skip the password login.",
     )
+
+
+@router.get("/user/account-readiness")
+def account_readiness_endpoint(session_token: str) -> ResponseModel:
+    """Report whether the account has everything the automation needs (LinkedIn OAuth for
+    posting, a session cookie or password for engagement, an active plan; location is
+    recommended). The UI uses this to mark required fields and gate automation pages."""
+    user_id = get_session_user_id(session_token)
+    if not user_id:
+        raise HTTPException(status_code=401, detail="Invalid or expired session")
+
+    token_info = get_user_token_info(user_id)
+    has_oauth = bool(token_info and token_info.get("access_token"))
+
+    has_session_cookie = has_linkedin_session(user_id)
+    _, li_password = get_user_password_pair_by_id(user_id)
+    has_engagement_login = has_session_cookie or bool(li_password)
+
+    sub = get_user_subscription_info(user_id)
+    sub_status = (sub or {}).get("subscription_status")
+    sub_active = sub_status in ("active", "trial")
+
+    geo = get_user_geo(user_id)
+    has_location = bool(geo and geo.get("latitude") is not None)
+
+    items = [
+        {"key": "email", "label": "Verified email", "ok": True, "required": True,
+         "hint": None},
+        {"key": "linkedin_oauth", "label": "LinkedIn connected (posting)", "ok": has_oauth,
+         "required": True, "hint": "Connect LinkedIn in your account."},
+        {"key": "linkedin_session", "label": "LinkedIn session (engagement)",
+         "ok": has_engagement_login, "required": True,
+         "hint": "Connect your LinkedIn session (cookie) or save your LinkedIn password."},
+        {"key": "subscription", "label": "Active plan", "ok": sub_active, "required": True,
+         "hint": "Start a plan or trial under Subscription."},
+        {"key": "location", "label": "Login location set", "ok": has_location,
+         "required": False, "hint": "Set your login location to reduce LinkedIn challenges."},
+    ]
+    ready = all(i["ok"] for i in items if i["required"])
+    return ResponseModel(status_code=200, detail={"ready": ready, "items": items})
 
 
 @router.post("/billing/create-checkout-session")
