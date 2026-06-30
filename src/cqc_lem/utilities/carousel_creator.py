@@ -191,11 +191,12 @@ def get_default_image_path() -> str:
     return default_image_path
 
 
-def get_pexels_image_path(query: str, default_path: str) -> str:
+def get_pexels_image_path(query: str, default_path: Optional[str] = None) -> Optional[str]:
     """Download a Pexels image matching *query* to a temp file and return its path.
 
-    Falls back to *default_path* when PEXELS_API_KEY is absent or the request
-    fails so that carousel creation never hard-crashes on a network error.
+    Falls back to *default_path* when PEXELS_API_KEY is absent or the request fails.
+    Pass default_path=None to get None back on failure (callers that must NOT post a
+    placeholder — e.g. the carousel poster — rely on this to flag the post instead).
     """
     try:
         from cqc_lem.utilities.pexels_helper import get_photo

@@ -1498,7 +1498,17 @@ def post_to_linkedin(self, user_id: int, post_id: int):
     if post_type == PostType.CAROUSEL:
         slides = get_carousel_slides(post_id)
         myprint(f"Carousel slides ({len(slides)}): {slides}")
-        urn = share_carousel_on_linkedin(user_id, content, slides)
+        # No slides, or no real per-slide images → don't post a placeholder carousel.
+        # Flag the post 'error' so it surfaces for manual/dev fix instead of failing silently.
+        urn = share_carousel_on_linkedin(user_id, content, slides) if slides else None
+        if not urn:
+            update_db_post_status(post_id, PostStatus.ERROR)
+            log_error("Carousel has no real slide images — flagged 'error' for manual fix",
+                      user_id=user_id, post_id=post_id, action_type="post", api_provider="linkedin")
+            insert_new_log(user_id=user_id, action_type=LogActionType.POST, result=LogResultType.FAILURE,
+                           post_id=post_id,
+                           message="Carousel not posted: no real slide images. Status set to 'error'.")
+            return f"Post {post_id} flagged 'error' — carousel had no usable images"
     elif post_type == PostType.VIDEO:
         video_url = get_post_video_url(post_id)
         if video_url:
