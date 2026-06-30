@@ -1,5 +1,15 @@
 # Changelog
 
+## [0.14.0](https://github.com/christopherqueenconsulting/linkedin_engagement_manager/compare/v0.13.0...v0.14.0) (2026-06-30)
+
+
+### Features
+
+* **account:** LinkedIn-session emails + auto-detect + readiness API ([1776eba](https://github.com/christopherqueenconsulting/linkedin_engagement_manager/commit/1776eba628ff4eb966da6641dd557ee2ce27ce36))
+* **account:** LinkedIn-session emails, auto-detect, and account-readiness API ([4382088](https://github.com/christopherqueenconsulting/linkedin_engagement_manager/commit/4382088765a1795df895bdd1635be2965a926545))
+* **linkedin:** session-cookie (li_at) reuse ([f00b36c](https://github.com/christopherqueenconsulting/linkedin_engagement_manager/commit/f00b36c0cd21cb27810141c75e268e4f9ca9449e))
+* **linkedin:** session-cookie (li_at) reuse to skip new-device login challenge ([7c377c9](https://github.com/christopherqueenconsulting/linkedin_engagement_manager/commit/7c377c953b154396e734331e91e75e9429d8d5ee))
+
 ## [0.13.0](https://github.com/christopherqueenconsulting/linkedin_engagement_manager/compare/v0.12.5...v0.13.0) (2026-06-29)
 
 
