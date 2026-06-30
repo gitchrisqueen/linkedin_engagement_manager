@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.15.1](https://github.com/christopherqueenconsulting/linkedin_engagement_manager/compare/v0.15.0...v0.15.1) (2026-06-30)
+
+
+### Bug Fixes
+
+* **ci:** make releases merge-queue-safe and deploys resilient ([6216af3](https://github.com/christopherqueenconsulting/linkedin_engagement_manager/commit/6216af3db83ed6fba7cbb4e4ec03cd05d21a561f))
+* **ci:** merge-queue-safe releases + resilient deploys ([839c788](https://github.com/christopherqueenconsulting/linkedin_engagement_manager/commit/839c78844f2a0f7b1e49b99460e014833ee6372b))
+
 ## [0.15.0](https://github.com/christopherqueenconsulting/linkedin_engagement_manager/compare/v0.14.0...v0.15.0) (2026-06-30)
 
 
