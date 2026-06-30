@@ -1,5 +1,9 @@
-import { NavLink, Outlet, useNavigate } from 'react-router-dom'
+import { NavLink, Outlet, useNavigate, useLocation } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
+import AccountReadinessBanner from './AccountReadinessBanner'
+
+// Pages whose features depend on a fully set-up account — show the readiness banner here.
+const AUTOMATION_PATHS = ['/schedule', '/review', '/avatars']
 
 const navLinks = [
   { to: '/', label: 'Home', end: true },
@@ -12,6 +16,8 @@ const navLinks = [
 export default function Layout() {
   const { user, logout, openLoginModal } = useAuth()
   const navigate = useNavigate()
+  const location = useLocation()
+  const showReadiness = !!user && AUTOMATION_PATHS.some((p) => location.pathname.startsWith(p))
 
   async function handleLogout() {
     await logout()
@@ -64,6 +70,7 @@ export default function Layout() {
         </div>
       </nav>
       <main className="max-w-5xl mx-auto px-4 py-6">
+        {showReadiness && <AccountReadinessBanner />}
         <Outlet />
       </main>
     </div>
