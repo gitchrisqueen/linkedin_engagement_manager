@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.16.1](https://github.com/christopherqueenconsulting/linkedin_engagement_manager/compare/v0.16.0...v0.16.1) (2026-06-30)
+
+
+### Bug Fixes
+
+* **linkedin:** carousel posts no longer crash on missing fallback image ([9a9523e](https://github.com/christopherqueenconsulting/linkedin_engagement_manager/commit/9a9523ec824d37440361cac3abca014855190825))
+* **linkedin:** stop carousel posts crashing on missing fallback image ([afca881](https://github.com/christopherqueenconsulting/linkedin_engagement_manager/commit/afca881cf4a183fbf531e7f20a212399844b57f1))
+
 ## [0.16.0](https://github.com/christopherqueenconsulting/linkedin_engagement_manager/compare/v0.15.1...v0.16.0) (2026-06-30)
 
 
