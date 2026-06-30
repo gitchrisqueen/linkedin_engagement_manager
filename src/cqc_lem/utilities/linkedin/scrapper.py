@@ -66,6 +66,31 @@ def deep_compare(dict1, dict2):
         return dict1 == dict2
 
 
+class ProfileUnavailableError(Exception):
+    """Raised when a LinkedIn profile page can't be parsed (rate-limited, auth-wall,
+    challenge, or a DOM change) — lets callers handle it gracefully instead of
+    crashing with an opaque AttributeError on a None element."""
+
+
+# Signatures of the non-profile pages LinkedIn serves at the same URL (rate-limit
+# error page, guest auth-wall, login/checkpoint). Matched against visible body text.
+_ERROR_PAGE_MARKERS = (
+    "http error 429",
+    "this page isn’t working",
+    "this page isn't working",
+    "too many requests",
+    "join linkedin",
+    "sign up | linkedin",
+    "let’s sign you in",
+    "security verification",
+)
+
+
+def _is_linkedin_error_page(page_text: str) -> bool:
+    low = (page_text or "").lower()
+    return any(marker in low for marker in _ERROR_PAGE_MARKERS)
+
+
 def get_page_source(driver, url, scroll_times=0):
     if url != driver.current_url:
         # Open the profile URL
@@ -77,22 +102,46 @@ def get_page_source(driver, url, scroll_times=0):
     return BeautifulSoup(driver.page_source, "html.parser")
 
 
+def parse_profile_header(source, profile_url, company_name=None) -> dict:
+    """Extract name/title/connection from a parsed profile page (pure, no Selenium).
+
+    Raises ProfileUnavailableError on rate-limit / auth-wall / error pages or when the
+    name can't be located, so callers handle it instead of crashing on a None element.
+    """
+    page_text = source.get_text(" ", strip=True)[:400] if source else ""
+    if not source or _is_linkedin_error_page(page_text):
+        raise ProfileUnavailableError(
+            f"Profile page unavailable (rate-limited/auth-wall/challenge) for {profile_url}: {page_text[:160]!r}")
+
+    # Header container class changes often; fall back to the whole document so a class
+    # rename doesn't break extraction. Then guard every lookup.
+    info = source.find('div', class_='mt2 relative') or source
+
+    name_el = info.find('h1') or source.find('h1')
+    if name_el is None:
+        raise ProfileUnavailableError(f"Could not locate profile name (DOM changed?) for {profile_url}")
+
+    title_el = info.find('div', class_='text-body-medium') or source.select_one('div.text-body-medium')
+    connection = info.find('span', class_='dist-value') or source.find('span', class_='dist-value')
+
+    profile = {'full_name': name_el.get_text().strip()}
+    if company_name:
+        profile['company_name'] = company_name
+    profile['job_title'] = title_el.get_text().lstrip().strip() if title_el else ""
+    if connection:
+        profile['connection'] = connection.get_text().strip()
+    profile['profile_url'] = profile_url
+    return profile
+
+
 # returns LinkedIn profile information
 def returnProfileInfo(driver: webdriver, profile_url, company_name=None, is_main_user=False):
     url = profile_url
     source = get_page_source(driver, url, 0)
-    profile = {}
-    info = source.find('div', class_='mt2 relative')
-    name = info.find('h1', class_='break-words').get_text().strip()
-    title = info.find('div', class_='text-body-medium break-words').get_text().lstrip().strip()
-    connection = info.find('span', class_='dist-value')
-    profile['full_name'] = name
-    if company_name:
-        profile['company_name'] = company_name
-    profile['job_title'] = title
-    if connection:
-        profile['connection'] = connection.get_text().strip()
-    profile['profile_url'] = profile_url
+
+    # Bail out clearly on rate-limit / auth-wall / error pages — parsing these used to
+    # crash with "'NoneType' object has no attribute 'find'" and take down auto-commenting.
+    profile = parse_profile_header(source, profile_url, company_name)
 
     # profile_li = source.find_all('li', class_='artdeco-list__item')
 

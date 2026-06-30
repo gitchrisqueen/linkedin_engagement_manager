@@ -145,6 +145,19 @@ def login_to_linkedin(driver: WebDriver, wait: WebDriverWait, user_email: str, u
     def _is_logged_in(url: str) -> bool:
         return any(p in url for p in _LOGGED_IN_PATHS)
 
+    def _page_is_rate_limited(drv) -> bool:
+        """LinkedIn returns a 429 error page (or a tiny 'This page isn't working' body)
+        at normal URLs when throttled. Detect it from the rendered body text."""
+        try:
+            body = drv.find_element(By.TAG_NAME, "body").text or ""
+        except Exception:
+            return False
+        low = body.lower()
+        if len(body) < 200 and ("429" in low or "this page isn’t working" in low
+                                or "this page isn't working" in low):
+            return True
+        return "http error 429" in low or "too many requests" in low
+
     def _wait_for_manual_approval() -> bool:
         """Poll for a device-approval / 2FA checkpoint to clear.
 
@@ -223,6 +236,15 @@ def login_to_linkedin(driver: WebDriver, wait: WebDriverWait, user_email: str, u
 
     if _is_challenge_url(driver.current_url):
         _handle_challenge("post-cookie-load")
+
+    # LinkedIn serves a "HTTP ERROR 429 / This page isn't working" body at the SAME
+    # /feed/ URL when the account/IP is rate-limited. A naive URL check would treat
+    # that as "logged in" and downstream profile scraping would crash. Detect it and
+    # raise a transient error so callers back off instead of hammering.
+    if _is_logged_in(driver.current_url) and _page_is_rate_limited(driver):
+        raise RuntimeError(
+            "LinkedIn is rate-limiting this session (HTTP 429). Backing off — "
+            "reduce automation frequency and retry later.")
 
     if _is_logged_in(driver.current_url):
         myprint(f"Already logged in! (current URL: {driver.current_url})")

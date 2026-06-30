@@ -18,7 +18,8 @@ from cqc_lem.utilities.db import get_user_password_pair_by_id, get_user_id, inse
     has_engaged_url_with_x_days, get_post_content, get_post_video_url, update_db_post_status, PostStatus, PostType, \
     get_dm_history_for_profile, get_post_status, get_user_blog_url, get_post_type, get_carousel_slides
 from cqc_lem.utilities.linkedin.company_page_inviter import automate_invitations
-from cqc_lem.utilities.linkedin.helper import login_to_linkedin, get_my_profile, get_linkedin_profile_from_url
+from cqc_lem.utilities.linkedin.helper import login_to_linkedin, get_my_profile, get_linkedin_profile_from_url, \
+    load_profile_for_user
 from cqc_lem.utilities.linkedin.poster import share_on_linkedin, share_carousel_on_linkedin
 from cqc_lem.utilities.linkedin.profile import LinkedInProfile
 from cqc_lem.utilities.logger import myprint, log_error, log_info, log_warning
@@ -1435,15 +1436,31 @@ def get_current_profile(user_id: int, session_name: str = "Get Current Profile")
 
     driver, wait = get_driver_wait_pair(session_name=session_name, user_id=user_id)
 
+    # Login first — a failure here (e.g. HTTP 429 rate-limit, expired cookie) is fatal
+    # for this run; abort cleanly so the caller backs off instead of hammering LinkedIn.
     try:
-
         login_to_linkedin(driver, wait, user_email, user_password)
-        my_profile = get_my_profile(driver, wait, user_email, user_password, user_id=user_id)
-
     except Exception as e:
-        log_error("Error while getting updated profile", exc=e, user_id=user_id)
-        quit_gracefully(driver)  # Close the driver
+        log_error("LinkedIn login failed (possibly rate-limited)", exc=e, user_id=user_id)
+        quit_gracefully(driver)
         raise e
+
+    # A live profile refresh can fail independently (auth-wall on the profile view,
+    # transient DOM change) even when the feed is reachable. Don't let that abort the
+    # whole task — fall back to the user's cached profile so commenting can proceed.
+    try:
+        my_profile = get_my_profile(driver, wait, user_email, user_password, user_id=user_id)
+    except Exception as e:
+        log_warning("Live profile refresh failed; falling back to cached profile", exc=e, user_id=user_id)
+        my_profile = None
+
+    if my_profile is None and user_id is not None:
+        my_profile = load_profile_for_user(user_id)
+
+    if my_profile is None:
+        log_error("No profile available (live scrape failed and no cached profile)", user_id=user_id)
+        quit_gracefully(driver)
+        raise RuntimeError("Profile unavailable: live scrape failed and no cached profile to fall back on")
 
     return driver, wait, user_email, my_profile
 
