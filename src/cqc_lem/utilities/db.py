@@ -2408,15 +2408,25 @@ def get_unposted_posts_missing_assets(within_days: int = 14) -> list:
     connection = get_db_connection()
     cursor = connection.cursor()
     try:
+        # Include 'error' so failed posts get a regeneration attempt. A carousel needs
+        # regeneration when its slides are empty OR are plain text titles with no real image
+        # reference — real slides are stored as URLs (https .../api/assets/...png), so the
+        # absence of any image marker means generation never produced images.
         cursor.execute("""
             SELECT id, user_id, post_type, buyer_stage, scheduled_time
             FROM posts
-            WHERE status IN ('approved', 'pending', 'scheduled')
+            WHERE status IN ('approved', 'pending', 'scheduled', 'error')
               AND scheduled_time > NOW()
               AND scheduled_time <= NOW() + INTERVAL %s DAY
               AND (
                     (post_type = 'video'    AND (video_url IS NULL OR video_url = ''))
-                 OR (post_type = 'carousel' AND (carousel_slides IS NULL OR carousel_slides = '' OR carousel_slides = '[]'))
+                 OR (post_type = 'carousel' AND (
+                        carousel_slides IS NULL OR carousel_slides = '' OR carousel_slides = '[]'
+                        OR (carousel_slides NOT LIKE '%%http%%'
+                            AND carousel_slides NOT LIKE '%%/assets%%'
+                            AND carousel_slides NOT LIKE '%%.png%%'
+                            AND carousel_slides NOT LIKE '%%.jpg%%')
+                    ))
               )
             ORDER BY scheduled_time
         """, (within_days,))

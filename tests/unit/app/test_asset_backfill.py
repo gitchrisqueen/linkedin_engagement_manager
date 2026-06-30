@@ -38,7 +38,15 @@ class TestMissingAssetGuard:
 
     def test_carousel_slides_states(self):
         from cqc_lem.app.run_content_plan import _post_missing_required_asset
-        for val, missing in [(None, True), ('[]', True), ('', True), ('["url"]', False)]:
+        cases = [
+            (None, True),
+            ('[]', True),
+            ('', True),
+            ('["Just A Text Title", "Another Title"]', True),  # text slides count as missing now
+            ('["https://x/assets?file_name=images/carousel/5/slide_01.png"]', False),
+            ('["/app/assets/slide_01.png"]', False),
+        ]
+        for val, missing in cases:
             with patch("cqc_lem.utilities.db.get_post_carousel_slides", return_value=val):
                 assert _post_missing_required_asset(5, "carousel", None) is missing
 
