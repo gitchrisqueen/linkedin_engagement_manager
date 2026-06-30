@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.17.2](https://github.com/christopherqueenconsulting/linkedin_engagement_manager/compare/v0.17.1...v0.17.2) (2026-06-30)
+
+
+### Bug Fixes
+
+* **carousel:** self-heal stale/errored carousels into branded slides ([69431c0](https://github.com/christopherqueenconsulting/linkedin_engagement_manager/commit/69431c02577b38d84ea5d5e86c3d9d52e9e79039))
+* **carousel:** self-heal stale/errored carousels into branded slides ([0fd5976](https://github.com/christopherqueenconsulting/linkedin_engagement_manager/commit/0fd5976568e5f75417bc432ff1e11bcacca7f113))
+
 ## [0.17.1](https://github.com/christopherqueenconsulting/linkedin_engagement_manager/compare/v0.17.0...v0.17.1) (2026-06-30)
 
 
