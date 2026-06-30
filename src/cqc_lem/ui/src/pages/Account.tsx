@@ -3,6 +3,8 @@ import { useSearchParams } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import api from '../api/client'
 import { useAuth } from '../contexts/AuthContext'
+import { useAccountReadiness } from '../hooks/useAccountReadiness'
+import LinkedInSessionCard from '../components/LinkedInSessionCard'
 
 const LI_AUTH_URL = '/api/auth/linkedin/'
 
@@ -91,6 +93,8 @@ export default function Account() {
   const { user, sessionToken } = useAuth()
   const email = user?.email ?? ''
   const queryClient = useQueryClient()
+  const { data: readiness } = useAccountReadiness()
+  const sessionOk = readiness?.items.find((i) => i.key === 'linkedin_session')?.ok ?? false
 
   const [searchParams, setSearchParams] = useSearchParams()
   const [blogUrl, setBlogUrl] = useState(localStorage.getItem('lem_blog_url') || '')
@@ -444,7 +448,9 @@ export default function Account() {
       {/* Subscription card */}
       <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 space-y-4">
         <div className="flex items-center justify-between">
-          <h2 className="text-base font-semibold text-gray-700">Subscription</h2>
+          <h2 className="text-base font-semibold text-gray-700">
+            Subscription <span className="text-red-500">*</span>
+          </h2>
           <span className={`text-xs font-semibold px-2.5 py-1 rounded-full ${TIER_COLORS[tier] ?? TIER_COLORS.free_trial}`}>
             {TIER_LABELS[tier] ?? tier}
           </span>
@@ -547,7 +553,12 @@ export default function Account() {
       {/* LinkedIn connection — hidden when connected and token healthy */}
       {showLinkedInSection && (
         <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 space-y-4">
-          <h2 className="text-base font-semibold text-gray-700">LinkedIn Connection</h2>
+          <h2 className="text-base font-semibold text-gray-700">
+            LinkedIn Connection <span className="text-red-500">*</span>
+            <span className="ml-2 text-[11px] font-semibold text-red-600 bg-red-50 px-2 py-0.5 rounded">
+              Required
+            </span>
+          </h2>
 
           {isLinkedInConnected && tokenExpiringSoon && !tokenExpired && (
             <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3 text-sm text-yellow-800">
@@ -587,6 +598,9 @@ export default function Account() {
           </a>
         </div>
       )}
+
+      {/* LinkedIn Session (cookie) — preferred login method; avoids the device challenge */}
+      <LinkedInSessionCard connected={sessionOk} />
 
       {/* LinkedIn Automation Password — always shown when LinkedIn is connected */}
       {isLinkedInConnected && !tokenExpired && (
