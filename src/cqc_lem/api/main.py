@@ -22,7 +22,7 @@ from cqc_lem.utilities.db import (
     get_recent_logs, bulk_update_posts, soft_delete_posts,
     create_pin_for_email, verify_pin_for_email, delete_pin_for_email,
     create_session, get_session_user_id, delete_session,
-    add_user_by_email, get_user_email, get_user_token_info,
+    add_user_by_email, get_user_email, get_user_token_info, store_linkedin_li_at,
     get_user_subscription_info, get_user_preferences, update_user_preferences,
     update_subscription_from_stripe, update_user_linkedin_token,
     get_users_with_stripe_subscriptions,
@@ -271,6 +271,12 @@ class LocationRequest(BaseModel):
 
 class LocationAutocaptureRequest(BaseModel):
     session_token: str
+
+
+class LinkedInCookieRequest(BaseModel):
+    session_token: str
+    li_at: str
+    jsessionid: Optional[str] = None
 
 
 class AdminFixVideoUrlsRequest(BaseModel):
@@ -1056,6 +1062,33 @@ def autocapture_user_location_endpoint(request: LocationAutocaptureRequest, http
         "city": data.get("city"), "country": data.get("country_code") or data.get("country"),
         "timezone": data.get("timezone"), "locale": locale,
     })
+
+
+@router.post("/user/linkedin-cookie")
+def store_linkedin_cookie_endpoint(request: LinkedInCookieRequest) -> ResponseModel:
+    """Store the user's existing LinkedIn session cookie (li_at) so automation resumes
+    an already-trusted session instead of doing a fresh password login — which is what
+    triggers LinkedIn's "Check your app" new-device challenge. The user captures li_at
+    once (one-click extension or paste); see docs/LINKEDIN_COOKIE.md."""
+    user_id = get_session_user_id(request.session_token)
+    if not user_id:
+        raise HTTPException(status_code=401, detail="Invalid or expired session")
+
+    # A cookie value cannot contain whitespace or ';'. Strip optional surrounding quotes.
+    li_at = (request.li_at or "").strip().strip('"')
+    if len(li_at) < 20 or any(c.isspace() for c in li_at) or ";" in li_at:
+        raise HTTPException(
+            status_code=422,
+            detail="Invalid li_at value — paste the full LinkedIn 'li_at' cookie value.",
+        )
+    jsessionid = (request.jsessionid or "").strip() or None
+
+    if not store_linkedin_li_at(user_id, li_at, jsessionid=jsessionid):
+        raise HTTPException(status_code=500, detail="Could not store LinkedIn session")
+    return ResponseModel(
+        status_code=200,
+        detail="LinkedIn session saved. Automation will reuse it and skip the password login.",
+    )
 
 
 @router.post("/billing/create-checkout-session")
