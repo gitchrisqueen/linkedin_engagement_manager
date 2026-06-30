@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.15.0](https://github.com/christopherqueenconsulting/linkedin_engagement_manager/compare/v0.14.0...v0.15.0) (2026-06-30)
+
+
+### Features
+
+* **ui:** account-readiness gating + LinkedIn session card + required marks ([96c3982](https://github.com/christopherqueenconsulting/linkedin_engagement_manager/commit/96c3982fb9613ff5f37b5ee31d70a738a95b5218))
+
 ## [0.14.0](https://github.com/christopherqueenconsulting/linkedin_engagement_manager/compare/v0.13.0...v0.14.0) (2026-06-30)
 
 
