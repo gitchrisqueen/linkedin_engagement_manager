@@ -62,9 +62,11 @@ app.conf.update(
         # },
         'check-scheduled-posts': {
             'task': 'cqc_lem.app.run_scheduler.auto_check_scheduled_posts',
-            # 'schedule': timedelta(minutes=CQC_LEM_POST_TIME_DELTA_MINUTES)  # Run every x minutes
-            'schedule': crontab(minute='0,30')  # Run every hour and half hour
-            # 'schedule': crontab(minute='0')  # Run every hour
+            # Run every 10 min so the 20-min lookahead always covers the next run — no
+            # blind window where a post is picked up only after its time (was '0,30':
+            # a 30-min cadence vs 20-min lookahead left a 10-min gap → posts up to ~10
+            # min late, and any non-:00/:30 scheduled time could slip).
+            'schedule': crontab(minute='*/10')
         },
         'generate-content-plan': {
             'task': 'cqc_lem.app.run_content_plan.auto_generate_content',

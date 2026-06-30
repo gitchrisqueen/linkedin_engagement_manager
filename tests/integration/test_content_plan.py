@@ -44,6 +44,42 @@ class TestPlanContentForUser:
             unique_types = set(inserted_types)
             assert len(unique_types) > 1, f"Expected multiple post types, got only: {unique_types}"
 
+    def test_scheduled_times_converted_from_user_local_to_utc(self, mock_database_connection):
+        """Regression: best-times are the user's LOCAL audience times and must be stored
+        as UTC, so posts fire at the intended local time (not hours off)."""
+        import pytz
+        from cqc_lem.app.run_content_plan import plan_content_for_user
+        from cqc_lem.utilities.utils import get_best_posting_times
+
+        captured = []
+        def cap(user_id, scheduled_time, post_type, buyer_stage):
+            captured.append(scheduled_time)
+            return True
+
+        fixed_now = datetime(2026, 6, 1, 0, 0, 0)
+        with patch('cqc_lem.app.run_content_plan.datetime') as mock_dt, \
+             patch('cqc_lem.app.run_content_plan.get_last_planned_post_date_for_user', return_value=None), \
+             patch('cqc_lem.app.run_content_plan.get_user_timezone', return_value='America/New_York'), \
+             patch('cqc_lem.app.run_content_plan.insert_planned_post', side_effect=cap):
+            mock_dt.now.return_value = fixed_now
+            mock_dt.combine = datetime.combine
+            plan_content_for_user(user_id=1)
+
+        assert captured, "no posts were planned"
+        tz = pytz.timezone('America/New_York')
+        local_best = {t.strftime('%H:%M') for t in get_best_posting_times().values()}
+        for st in captured:
+            # Stored value is naive UTC; converting back to the user's tz must land on a best-time.
+            local = pytz.utc.localize(st).astimezone(tz)
+            assert local.strftime('%H:%M') in local_best, (
+                f"stored {st} (UTC) -> {local} ET, not a configured local best-time"
+            )
+        # ET is offset from UTC, so the stored UTC hour must differ from the naive local hour
+        # for at least one post — proving conversion actually happened (not stored as-is).
+        assert any(
+            st.strftime('%H:%M') not in local_best for st in captured
+        ), "scheduled times were stored unconverted (still local-as-UTC)"
+
 
 @pytest.mark.integration
 class TestAutoGenerateContent:

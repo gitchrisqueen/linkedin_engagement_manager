@@ -7,6 +7,7 @@ from typing import Optional, Tuple
 from urllib.parse import urlparse
 from xml.etree import ElementTree
 
+import pytz
 import requests
 from bs4 import BeautifulSoup
 from cqc_lem import assets_dir
@@ -20,7 +21,7 @@ from cqc_lem.utilities.db import get_post_type_counts, insert_planned_post, upda
     get_planned_posts_for_current_week, get_last_planned_post_date_for_user, get_user_password_pair_by_id, \
     get_user_blog_url, get_user_sitemap_url, get_active_user_ids, get_planned_posts_for_next_week, PostStatus, \
     update_db_post_video_url, update_db_post_status, PostType, get_user_preferences, \
-    update_db_post_carousel_slides, get_post_content
+    update_db_post_carousel_slides, get_post_content, get_user_timezone
 from cqc_lem.utilities.env_constants import API_URL_FINAL, DEFAULT_VIDEO_RATIO, \
     DEFAULT_IMAGE_RATIO, AI_DISCLOSURE_ENABLED, AI_DISCLOSURE_TEXT, \
     STANDARD_VIDEO_MODEL, PREMIUM_VIDEO_MODEL, PREMIUM_TOP_VIDEO_MODEL, \
@@ -168,8 +169,18 @@ def plan_content_for_user(self, user_id: int):
         # Get the best time for the selected date
         post_time = get_best_posting_time(post_date.date())
 
-        # Combine the selected date and time into a single datetime object
+        # get_best_posting_time returns the user's LOCAL audience time (e.g. 2pm). Convert
+        # it from the user's timezone to UTC for storage, because the scheduler treats
+        # stored scheduled_time as UTC. Without this, a 14:00 local post was stored as
+        # 14:00 UTC and fired hours off the intended local time.
         scheduled_datetime = datetime.combine(post_date, post_time)
+        try:
+            user_tz = pytz.timezone(get_user_timezone(user_id))
+            scheduled_datetime = (
+                user_tz.localize(scheduled_datetime).astimezone(pytz.utc).replace(tzinfo=None)
+            )
+        except Exception as e:
+            myprint(f"Timezone conversion failed for user {user_id} — storing as UTC: {e}")
 
         daily_plan.append({
             "scheduled_datetime": scheduled_datetime,
