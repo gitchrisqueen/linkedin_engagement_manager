@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.17.0](https://github.com/christopherqueenconsulting/linkedin_engagement_manager/compare/v0.16.1...v0.17.0) (2026-06-30)
+
+
+### Features
+
+* **company-page:** let users set a LinkedIn company page for monthly invites ([19ac6c0](https://github.com/christopherqueenconsulting/linkedin_engagement_manager/commit/19ac6c0ed633b2ffc96e4fda6083e2981edf2811))
+* **company-page:** user-settable LinkedIn company page + monthly invite gating ([198d9e9](https://github.com/christopherqueenconsulting/linkedin_engagement_manager/commit/198d9e91934e21dfcd5965bbd596431408c48b51))
+
+
+### Bug Fixes
+
+* **scheduler:** post at the user's intended local time + close enqueue gap ([850d83c](https://github.com/christopherqueenconsulting/linkedin_engagement_manager/commit/850d83cfbed7e8a085fc8e602c855dd41c3e7abf))
+* **scheduler:** post at user's local time + close enqueue blind-window ([55616b3](https://github.com/christopherqueenconsulting/linkedin_engagement_manager/commit/55616b32f03177580fee44774bb56c5082bd2035))
+
 ## [0.16.1](https://github.com/christopherqueenconsulting/linkedin_engagement_manager/compare/v0.16.0...v0.16.1) (2026-06-30)
 
 
