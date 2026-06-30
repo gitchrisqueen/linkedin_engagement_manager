@@ -315,7 +315,8 @@ def _post_missing_required_asset(post_id: int, post_type, video_url) -> bool:
     if pt == PostType.CAROUSEL.value:
         from cqc_lem.utilities.db import get_post_carousel_slides
         slides = get_post_carousel_slides(post_id)
-        return not slides or str(slides).strip() in ("", "[]")
+        # Missing if empty OR only text titles (no real slide images generated yet).
+        return not _carousel_slides_are_real_images(slides)
     return False
 
 
@@ -456,9 +457,25 @@ def regenerate_post_video_task(post_id: int):
 
 
 @shared_task.task
+def _carousel_slides_are_real_images(slides) -> bool:
+    """True if carousel slides reference real images (URLs/paths), not plain text titles."""
+    if not slides:
+        return False
+    blob = str(slides)
+    return any(marker in blob for marker in ("http", "/assets", ".png", ".jpg"))
+
+
 def regenerate_post_carousel_task(post_id: int):
-    """Regenerate a carousel post's slide images (used by the asset-backfill safety net)."""
-    from cqc_lem.utilities.db import get_post_user_id, get_post_buyer_stage, update_db_post_content
+    """Regenerate a carousel post's slide images (used by the asset-backfill safety net).
+
+    On success (real slide images produced) it clears an 'error'/stale state back to
+    'approved' so the healed carousel can post. create_carousel_content flags 'error' on
+    failure, so a failed regeneration stays flagged for manual/dev attention.
+    """
+    from cqc_lem.utilities.db import (
+        get_post_user_id, get_post_buyer_stage, update_db_post_content,
+        get_post_carousel_slides, update_db_post_status, get_post_status,
+    )
     user_id = get_post_user_id(post_id)
     if not user_id:
         myprint(f"regenerate_post_carousel_task: no user for post_id={post_id}")
@@ -467,6 +484,12 @@ def regenerate_post_carousel_task(post_id: int):
     content = create_carousel_content(user_id, stage, post_id)
     if content:
         update_db_post_content(post_id, content)
+
+    # If real slide images now exist, heal the post back to 'approved' (e.g. from 'error').
+    if _carousel_slides_are_real_images(get_post_carousel_slides(post_id)):
+        if get_post_status(post_id) != PostStatus.POSTED.value:
+            update_db_post_status(post_id, PostStatus.APPROVED)
+            myprint(f"regenerate_post_carousel_task: post {post_id} healed → approved")
     return content
 
 
