@@ -226,7 +226,7 @@ def share_carousel_on_linkedin(user_id: int, content: str, slide_texts: list[str
     All images are uploaded individually and included as a multi-image ugcPost.
     """
     import os
-    from cqc_lem.utilities.carousel_creator import get_pexels_image_path
+    from cqc_lem.utilities.carousel_creator import get_pexels_image_path, get_default_image_path
 
     restli_client = RestliClient()
     restli_client.session.hooks["response"].append(lambda r: r.raise_for_status())
@@ -238,8 +238,11 @@ def share_carousel_on_linkedin(user_id: int, content: str, slide_texts: list[str
         myprint(f"No LinkedIn credentials found for user {user_id} — cannot post carousel")
         return None
 
-    file_dir = os.path.dirname(os.path.abspath(__file__))
-    default_image_path = os.path.join(file_dir, "..", "carousel_creator", "images", "image.png")
+    # Fallback image used when a slide is a text query and Pexels is unavailable.
+    # get_default_image_path() points at utilities/images/image.png (a real file);
+    # the previous hardcoded ../carousel_creator/images/image.png did not exist and
+    # made every Pexels-miss carousel crash with FileNotFoundError.
+    default_image_path = get_default_image_path()
 
     media_urns = []
     for slide in slide_texts:
@@ -249,6 +252,10 @@ def share_carousel_on_linkedin(user_id: int, content: str, slide_texts: list[str
         else:
             image_path = get_pexels_image_path(slide, default_image_path)
         myprint(f"Carousel slide image: {image_path}")
+        # Never let a missing/purged file crash the whole post — skip the slide instead.
+        if not _is_image_url(image_path) and not os.path.isfile(image_path):
+            myprint(f"Slide image missing on disk — skipping: {image_path}")
+            continue
         urn = upload_media(access_token, linked_sub_id, image_path, "IMAGE")
         if urn:
             media_urns.append(urn)

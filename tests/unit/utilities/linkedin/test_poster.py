@@ -180,6 +180,7 @@ class TestShareCarouselOnLinkedin:
              patch("cqc_lem.utilities.linkedin.poster.get_user_access_token", return_value="tok"), \
              patch("cqc_lem.utilities.linkedin.poster.RestliClient", return_value=self._make_mock_restli()), \
              patch("cqc_lem.utilities.linkedin.poster.upload_media", return_value="urn:li:asset:1") as mock_upload, \
+             patch("os.path.isfile", return_value=True), \
              patch("cqc_lem.utilities.carousel_creator.get_pexels_image_path") as mock_pexels:
             from cqc_lem.utilities.linkedin.poster import share_carousel_on_linkedin
 
@@ -189,19 +190,60 @@ class TestShareCarouselOnLinkedin:
             assert mock_upload.call_count == 2
 
     def test_text_query_slides_use_pexels(self):
-        # get_pexels_image_path is imported lazily inside the function, so patch at source
+        # get_pexels_image_path is imported lazily inside the function, so patch at source.
+        # Return a REAL existing file so the missing-file guard doesn't skip it.
+        from cqc_lem.utilities.carousel_creator import get_default_image_path
         slides = ["enterprise AI", "machine learning"]
-        mock_pexels_path = "/tmp/pexels_image.png"
         with patch("cqc_lem.utilities.linkedin.poster.get_user_linked_sub_id", return_value="abc123"), \
              patch("cqc_lem.utilities.linkedin.poster.get_user_access_token", return_value="tok"), \
              patch("cqc_lem.utilities.linkedin.poster.RestliClient", return_value=self._make_mock_restli()), \
              patch("cqc_lem.utilities.linkedin.poster.upload_media", return_value="urn:li:asset:1"), \
-             patch("cqc_lem.utilities.carousel_creator.get_pexels_image_path", return_value=mock_pexels_path) as mock_pexels:
+             patch("cqc_lem.utilities.carousel_creator.get_pexels_image_path",
+                   return_value=get_default_image_path()) as mock_pexels:
             from cqc_lem.utilities.linkedin.poster import share_carousel_on_linkedin
 
             share_carousel_on_linkedin(user_id=60, content="test", slide_texts=slides)
 
             assert mock_pexels.call_count == 2
+
+    def test_pexels_miss_uses_existing_default_image(self):
+        """Regression (prod incident): a text slide with a Pexels miss falls back to the
+        default image, which MUST exist (was a broken ../carousel_creator/images/image.png
+        path → FileNotFoundError that crashed every such carousel post)."""
+        import os
+        from cqc_lem.utilities.carousel_creator import get_default_image_path
+        default = get_default_image_path()
+        assert os.path.isfile(default), f"default carousel image missing on disk: {default}"
+
+        captured = []
+        with patch("cqc_lem.utilities.linkedin.poster.get_user_linked_sub_id", return_value="abc"), \
+             patch("cqc_lem.utilities.linkedin.poster.get_user_access_token", return_value="tok"), \
+             patch("cqc_lem.utilities.linkedin.poster.RestliClient", return_value=self._make_mock_restli()), \
+             patch("cqc_lem.utilities.linkedin.poster.upload_media",
+                   side_effect=lambda t, s, p, m: captured.append(p) or "urn:li:asset:1") as mock_upload, \
+             patch("cqc_lem.utilities.carousel_creator.get_pexels_image_path", return_value=default):
+            from cqc_lem.utilities.linkedin.poster import share_carousel_on_linkedin
+            result = share_carousel_on_linkedin(user_id=1, content="c", slide_texts=["title a", "title b"])
+
+        assert mock_upload.call_count == 2
+        assert all(p == default for p in captured)
+        assert result == "urn:li:share:999"
+
+    def test_missing_local_slide_file_is_skipped(self):
+        """A local slide whose file was purged is skipped (not a crash); with none left,
+        it falls back to a text-only post."""
+        with patch("cqc_lem.utilities.linkedin.poster.get_user_linked_sub_id", return_value="abc"), \
+             patch("cqc_lem.utilities.linkedin.poster.get_user_access_token", return_value="tok"), \
+             patch("cqc_lem.utilities.linkedin.poster.RestliClient", return_value=self._make_mock_restli()), \
+             patch("cqc_lem.utilities.linkedin.poster.upload_media", return_value="urn:li:asset:1") as mock_upload, \
+             patch("cqc_lem.utilities.linkedin.poster.share_on_linkedin", return_value="urn:li:share:text") as mock_text, \
+             patch("os.path.isfile", return_value=False):
+            from cqc_lem.utilities.linkedin.poster import share_carousel_on_linkedin
+            result = share_carousel_on_linkedin(user_id=1, content="c", slide_texts=["/app/assets/gone_01.png"])
+
+        mock_upload.assert_not_called()
+        mock_text.assert_called_once()
+        assert result == "urn:li:share:text"
 
     def test_returns_none_when_no_credentials(self):
         with patch("cqc_lem.utilities.linkedin.poster.get_user_linked_sub_id", return_value=None), \
