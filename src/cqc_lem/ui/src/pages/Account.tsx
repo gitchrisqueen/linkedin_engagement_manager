@@ -89,6 +89,8 @@ export default function Account() {
   const [searchParams, setSearchParams] = useSearchParams()
   const [blogUrl, setBlogUrl] = useState(localStorage.getItem('lem_blog_url') || '')
   const [sitemapUrl, setSitemapUrl] = useState(localStorage.getItem('lem_sitemap_url') || '')
+  const [companyPage, setCompanyPage] = useState('')
+  const [companyPageMsg, setCompanyPageMsg] = useState<{ ok: boolean; text: string } | null>(null)
   const [liConnectedLocal, setLiConnectedLocal] = useState(
     localStorage.getItem('lem_li_connected') === '1'
   )
@@ -169,6 +171,7 @@ export default function Account() {
           } | null
           blog_url: string | null
           sitemap_url: string | null
+          company_linked_in_url: string | null
         }),
     enabled: !!sessionToken,
     staleTime: 60 * 1000,
@@ -235,6 +238,9 @@ export default function Account() {
       if (apiSitemapUrl) {
         setSitemapUrl(apiSitemapUrl)
         localStorage.setItem('lem_sitemap_url', apiSitemapUrl)
+      }
+      if (settingsData.company_linked_in_url) {
+        setCompanyPage(settingsData.company_linked_in_url)
       }
       setUrlsInitialised(true)
     }
@@ -375,6 +381,23 @@ export default function Account() {
     onError: () => {
       setLiPasswordMsg({ ok: false, text: 'Save failed — please try again.' })
       setTimeout(() => setLiPasswordMsg(null), 5000)
+    },
+  })
+
+  // LinkedIn company page save (used by the monthly company-page invite automation)
+  const companyPageMutation = useMutation({
+    mutationFn: () =>
+      api.put('/user/company-page', {
+        session_token: sessionToken,
+        company_linked_in_url: companyPage.trim() || null,
+      }),
+    onSuccess: () => {
+      setCompanyPageMsg({ ok: true, text: companyPage.trim() ? 'Company page saved.' : 'Company page cleared.' })
+      setTimeout(() => setCompanyPageMsg(null), 4000)
+    },
+    onError: () => {
+      setCompanyPageMsg({ ok: false, text: 'Save failed — use a full linkedin.com/company/… URL.' })
+      setTimeout(() => setCompanyPageMsg(null), 6000)
     },
   })
 
@@ -588,6 +611,44 @@ export default function Account() {
 
       {/* LinkedIn Session (cookie) — preferred login method; avoids the device challenge */}
       <LinkedInSessionCard connected={sessionOk} />
+
+      {/* LinkedIn Company Page — drives the monthly connection-invite automation */}
+      <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 space-y-4">
+        <div>
+          <h2 className="text-base font-semibold text-gray-700">LinkedIn Company Page</h2>
+          <p className="text-xs text-gray-500 mt-1">
+            If you have a LinkedIn company page, add it here. On the 1st of each month LEM
+            invites your connections to follow it (using your monthly invite credits, which
+            reset monthly). Leave blank if you don't have one.
+          </p>
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">Company page URL</label>
+          <input
+            type="url"
+            value={companyPage}
+            onChange={(e) => setCompanyPage(e.target.value)}
+            className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            placeholder="https://www.linkedin.com/company/your-company/"
+          />
+        </div>
+
+        {companyPageMsg && (
+          <p className={`text-sm font-medium ${companyPageMsg.ok ? 'text-green-600' : 'text-red-600'}`}>
+            {companyPageMsg.text}
+          </p>
+        )}
+
+        <button
+          type="button"
+          onClick={() => companyPageMutation.mutate()}
+          disabled={companyPageMutation.isPending}
+          className="w-full bg-blue-600 text-white py-2 rounded-lg text-sm font-semibold hover:bg-blue-700 disabled:opacity-50 transition-colors"
+        >
+          {companyPageMutation.isPending ? 'Saving…' : 'Save Company Page'}
+        </button>
+      </div>
 
       {/* LinkedIn Automation Password — always shown when LinkedIn is connected */}
       {isLinkedInConnected && !tokenExpired && (

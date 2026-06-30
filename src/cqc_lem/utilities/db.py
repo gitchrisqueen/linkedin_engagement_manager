@@ -1455,6 +1455,26 @@ def get_company_linked_in_url_for_user(user_id: int):
     return company_linked_in_url[0] if company_linked_in_url else None
 
 
+def update_company_linked_in_url_for_user(user_id: int, company_linked_in_url: Optional[str]) -> bool:
+    """Set (or clear, when None/empty) the user's LinkedIn company page URL used by the
+    monthly company-page invite automation."""
+    connection = get_db_connection()
+    cursor = connection.cursor()
+    try:
+        cursor.execute(
+            "UPDATE users SET company_linked_in_url = %s WHERE id = %s",
+            (company_linked_in_url or None, user_id),
+        )
+        connection.commit()
+        return cursor.rowcount >= 0
+    except mysql.connector.Error as err:
+        myprint(f"Could not update company linked in url for user {user_id} | Error: {err}")
+        return False
+    finally:
+        cursor.close()
+        connection.close()
+
+
 def get_recent_logs(user_id: int, limit: int = 20) -> list:
     connection = get_db_connection()
     cursor = connection.cursor(dictionary=True)

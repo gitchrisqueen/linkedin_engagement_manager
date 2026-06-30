@@ -239,7 +239,8 @@ class TestGetUserSettings:
              patch(f"{_MAIN}.get_user_subscription_info", return_value=sub), \
              patch(f"{_MAIN}.get_user_preferences", return_value=prefs), \
              patch(f"{_MAIN}.get_user_blog_url", return_value="https://blog.example.com"), \
-             patch(f"{_MAIN}.get_user_sitemap_url", return_value="https://blog.example.com/sitemap.xml"):
+             patch(f"{_MAIN}.get_user_sitemap_url", return_value="https://blog.example.com/sitemap.xml"), \
+             patch(f"{_MAIN}.get_company_linked_in_url_for_user", return_value=None):
             resp = client.get(self.BASE, params={"session_token": "valid-tok"})
         assert resp.status_code == 200
         detail = resp.json()["detail"]
@@ -254,7 +255,8 @@ class TestGetUserSettings:
              patch(f"{_MAIN}.get_user_subscription_info", return_value=None), \
              patch(f"{_MAIN}.get_user_preferences", return_value=None), \
              patch(f"{_MAIN}.get_user_blog_url", return_value=None), \
-             patch(f"{_MAIN}.get_user_sitemap_url", return_value=None):
+             patch(f"{_MAIN}.get_user_sitemap_url", return_value=None), \
+             patch(f"{_MAIN}.get_company_linked_in_url_for_user", return_value=None):
             resp = client.get(self.BASE, params={"session_token": "valid-tok"})
         assert resp.status_code == 200
         detail = resp.json()["detail"]

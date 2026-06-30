@@ -779,3 +779,33 @@ class TestOrganizeVideosByNameAndTimestamp:
         assert result == 1
         mock_makedirs.assert_called_once()
         mock_move.assert_called_once()
+
+
+@pytest.mark.unit
+class TestAutoInviteToCompanyPages:
+    """auto_invite_to_company_pages must only invite users who have a company page set."""
+
+    def test_only_users_with_company_page_are_invited(self):
+        with patch(f"{_MOD}.get_active_user_ids", return_value=[1, 2, 3]), \
+             patch(f"{_MOD}.get_company_linked_in_url_for_user",
+                   side_effect=lambda uid: {1: "https://www.linkedin.com/company/a/",
+                                            2: None,
+                                            3: "https://www.linkedin.com/company/c/"}.get(uid)), \
+             patch(f"{_MOD}.automate_invites_to_company_page_for_user") as mock_task:
+            from cqc_lem.app.run_scheduler import auto_invite_to_company_pages
+            result = auto_invite_to_company_pages()
+
+        # Users 1 and 3 have pages; user 2 is skipped.
+        assert mock_task.apply_async.call_count == 2
+        invited = {c.kwargs["kwargs"]["user_id"] for c in mock_task.apply_async.call_args_list}
+        assert invited == {1, 3}
+        assert "2 user(s)" in result
+
+    def test_no_company_pages_returns_early(self):
+        with patch(f"{_MOD}.get_active_user_ids", return_value=[1, 2]), \
+             patch(f"{_MOD}.get_company_linked_in_url_for_user", return_value=None), \
+             patch(f"{_MOD}.automate_invites_to_company_page_for_user") as mock_task:
+            from cqc_lem.app.run_scheduler import auto_invite_to_company_pages
+            result = auto_invite_to_company_pages()
+        mock_task.apply_async.assert_not_called()
+        assert "No active users with a company page" in result

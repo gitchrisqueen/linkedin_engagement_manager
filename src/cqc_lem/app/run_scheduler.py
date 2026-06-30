@@ -12,6 +12,7 @@ from cqc_lem.app.run_automation import automate_commenting, automate_profile_vie
 from cqc_lem.utilities.db import (
     get_ready_to_post_posts, get_orphaned_scheduled_posts, update_db_post_status,
     get_active_user_ids, PostStatus, has_linkedin_session,
+    get_company_linked_in_url_for_user,
     get_users_with_stripe_subscriptions, update_subscription_from_stripe,
 )
 from cqc_lem.utilities.env_constants import SELENIUM_KEEP_VIDEOS_X_DAYS, CQC_LEM_POST_TIME_DELTA_MINUTES
@@ -204,10 +205,17 @@ def auto_invite_to_company_pages():
     # Get all active users and loop through them
     users = get_active_user_ids()
 
+    started = 0
     for user_id in users:
+        # Only invite for users who have actually set a company page — otherwise the
+        # inviter would build "<None>?invite=true" and fail. Invite credits are limited
+        # and reset monthly, which is why this runs on the 1st.
+        if not get_company_linked_in_url_for_user(user_id):
+            log_debug("Skipping company page invites — no company page set",
+                      user_id=user_id, task_name="auto_invite_to_company_pages")
+            continue
+
         log_info(f"Starting company page invites", user_id=user_id, task_name="auto_invite_to_company_pages")
-
-
         automate_invites_to_company_page_for_user.apply_async(kwargs={'user_id': user_id},
                                          retry=True,
                                          retry_policy={
@@ -215,11 +223,12 @@ def auto_invite_to_company_pages():
                                              'interval_start': 60,
                                              'interval_step': 30
                                          })
+        started += 1
 
-    if len(users) == 0:
-        return f"No Active Users"
+    if started == 0:
+        return f"No active users with a company page"
     else:
-        return f"Started Process for {len(users)} user(s)"
+        return f"Started company-page invites for {started} user(s)"
 
 
 
