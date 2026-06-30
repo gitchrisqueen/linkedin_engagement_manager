@@ -95,3 +95,45 @@ class TestPostToLinkedinTypeBranching:
             assert "already posted" in result.lower()
             mock_share.assert_not_called()
             mock_carousel.assert_not_called()
+
+    def test_carousel_without_real_images_flags_error_and_does_not_post(self):
+        """Prod incident: a carousel with no real slide images must be flagged 'error'
+        (not posted with placeholder images)."""
+        from cqc_lem.utilities.db import PostType, PostStatus
+        from cqc_lem.app.run_automation import post_to_linkedin
+
+        with ExitStack() as stack:
+            for target, kwargs in BASE_PATCHES:
+                stack.enter_context(patch(target, **kwargs))
+            stack.enter_context(patch("cqc_lem.app.run_automation.get_post_type", return_value=PostType.CAROUSEL))
+            stack.enter_context(patch("cqc_lem.app.run_automation.get_carousel_slides",
+                                      return_value=["title a", "title b"]))
+            stack.enter_context(patch("cqc_lem.app.run_automation.share_carousel_on_linkedin", return_value=None))
+            stack.enter_context(patch("cqc_lem.app.run_automation.log_error"))
+            mock_status = stack.enter_context(patch("cqc_lem.app.run_automation.update_db_post_status"))
+
+            result = post_to_linkedin.run(1, 10)
+
+        statuses = [c.args[1] for c in mock_status.call_args_list]
+        assert PostStatus.ERROR in statuses
+        assert PostStatus.POSTED not in statuses
+        assert "error" in result.lower()
+
+    def test_carousel_with_no_slides_flags_error(self):
+        """Empty slides → don't even call the poster; flag 'error'."""
+        from cqc_lem.utilities.db import PostType, PostStatus
+        from cqc_lem.app.run_automation import post_to_linkedin
+
+        with ExitStack() as stack:
+            for target, kwargs in BASE_PATCHES:
+                stack.enter_context(patch(target, **kwargs))
+            stack.enter_context(patch("cqc_lem.app.run_automation.get_post_type", return_value=PostType.CAROUSEL))
+            stack.enter_context(patch("cqc_lem.app.run_automation.get_carousel_slides", return_value=[]))
+            stack.enter_context(patch("cqc_lem.app.run_automation.log_error"))
+            mock_carousel = stack.enter_context(patch("cqc_lem.app.run_automation.share_carousel_on_linkedin"))
+            mock_status = stack.enter_context(patch("cqc_lem.app.run_automation.update_db_post_status"))
+
+            post_to_linkedin.run(1, 10)
+
+        mock_carousel.assert_not_called()
+        assert PostStatus.ERROR in [c.args[1] for c in mock_status.call_args_list]

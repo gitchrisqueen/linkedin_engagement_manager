@@ -292,35 +292,18 @@ def create_carousel_content(user_id: int, stage: str, post_id: int = None,
                 myprint(f"PPTX generation failed (non-fatal): {ppt_err}")
         except Exception as img_err:
             myprint(f"Carousel image generation failed: {img_err}")
-            # Fall back to storing slide titles as text for Pexels lookup
-            slide_texts = _extract_slide_texts(carousel_obj)
+            # Do NOT fall back to text/placeholder images — that produced carousels of a
+            # single repeated default image. Flag the post 'error' for manual/dev fix.
             if post_id is not None:
-                update_db_post_carousel_slides(post_id, slide_texts)
+                update_db_post_status(post_id, PostStatus.ERROR)
+                myprint(f"Post {post_id} flagged 'error' — carousel slide images could not be generated.")
 
     elif carousel_obj is None and post_id is not None:
-        # No valid carousel model; store empty list so posting can still proceed as text-only
-        update_db_post_carousel_slides(post_id, [])
+        # Couldn't build a valid carousel model — flag for manual fix rather than degrade.
+        update_db_post_status(post_id, PostStatus.ERROR)
+        myprint(f"Post {post_id} flagged 'error' — could not generate a valid carousel model.")
 
     return post_text
-
-
-def _extract_slide_texts(carousel_obj) -> list[str]:
-    """Return plain text titles from a carousel model as Pexels search fallback."""
-    texts = []
-    for field_name in carousel_obj.model_fields:
-        field_val = getattr(carousel_obj, field_name, None)
-        if field_val is None:
-            continue
-        if isinstance(field_val, list):
-            for item in field_val:
-                t = getattr(item, "title", None) or getattr(item, "content", None) or ""
-                if t:
-                    texts.append(str(t)[:100])
-        else:
-            t = getattr(field_val, "title", None) or getattr(field_val, "content", None) or ""
-            if t:
-                texts.append(str(t)[:100])
-    return texts
 
 
 def _post_missing_required_asset(post_id: int, post_type, video_url) -> bool:

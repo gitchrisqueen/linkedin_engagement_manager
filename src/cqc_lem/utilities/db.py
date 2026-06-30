@@ -67,6 +67,7 @@ class PostStatus(StrEnum):
     REJECTED = 'rejected'
     SCHEDULED = 'scheduled'
     POSTED = 'posted'
+    ERROR = 'error'  # generation/posting failed (e.g. no real carousel images) — needs manual/dev fix
 
 
 # Enum for log actions types

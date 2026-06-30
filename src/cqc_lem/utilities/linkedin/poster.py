@@ -226,7 +226,7 @@ def share_carousel_on_linkedin(user_id: int, content: str, slide_texts: list[str
     All images are uploaded individually and included as a multi-image ugcPost.
     """
     import os
-    from cqc_lem.utilities.carousel_creator import get_pexels_image_path, get_default_image_path
+    from cqc_lem.utilities.carousel_creator import get_pexels_image_path
 
     restli_client = RestliClient()
     restli_client.session.hooks["response"].append(lambda r: r.raise_for_status())
@@ -238,31 +238,35 @@ def share_carousel_on_linkedin(user_id: int, content: str, slide_texts: list[str
         myprint(f"No LinkedIn credentials found for user {user_id} — cannot post carousel")
         return None
 
-    # Fallback image used when a slide is a text query and Pexels is unavailable.
-    # get_default_image_path() points at utilities/images/image.png (a real file);
-    # the previous hardcoded ../carousel_creator/images/image.png did not exist and
-    # made every Pexels-miss carousel crash with FileNotFoundError.
-    default_image_path = get_default_image_path()
-
+    # NO placeholder/default image. Every slide must resolve to a REAL image — a provided
+    # path/URL (the normal case: branded slide PNGs from create_carousel_slide_images) or a
+    # successful Pexels lookup. If ANY slide can't, we do NOT post a placeholder carousel
+    # (which previously repeated a single default image on every slide); the caller flags
+    # the post 'error' for manual/dev fix instead.
     media_urns = []
+    missing = 0
     for slide in slide_texts:
-        if _is_local_image_path(slide) or _is_image_url(slide):
-            # Local file path or URL — upload_media handles both (URLs are downloaded first)
+        if _is_image_url(slide):
+            image_path = slide  # upload_media downloads URLs
+        elif _is_local_image_path(slide) and os.path.isfile(slide):
             image_path = slide
         else:
-            image_path = get_pexels_image_path(slide, default_image_path)
-        myprint(f"Carousel slide image: {image_path}")
-        # Never let a missing/purged file crash the whole post — skip the slide instead.
-        if not _is_image_url(image_path) and not os.path.isfile(image_path):
-            myprint(f"Slide image missing on disk — skipping: {image_path}")
+            image_path = get_pexels_image_path(slide)  # text query; None if Pexels unavailable
+
+        if not image_path or (not _is_image_url(image_path) and not os.path.isfile(image_path)):
+            myprint(f"Carousel slide has no real image (slide={slide!r}) — refusing to use a placeholder")
+            missing += 1
             continue
         urn = upload_media(access_token, linked_sub_id, image_path, "IMAGE")
         if urn:
             media_urns.append(urn)
+        else:
+            missing += 1
 
-    if not media_urns:
-        myprint("No images uploaded for carousel — falling back to text-only post")
-        return share_on_linkedin(user_id, content)
+    # Don't post a partial/placeholder carousel — require a real image for every slide.
+    if missing > 0 or not media_urns:
+        myprint(f"Carousel for user {user_id}: {missing} slide(s) without a real image — not posting (flag error).")
+        return None
 
     media_objects = [ShareMedia(status="READY", media=urn).model_dump() for urn in media_urns]
 
