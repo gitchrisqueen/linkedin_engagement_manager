@@ -522,3 +522,70 @@ class TestRateLimitCircuitBreaker:
             login_to_linkedin(driver, wait, "u@e.com", "pw")
 
         mock_clear.assert_called_once()
+
+
+@pytest.mark.unit
+class TestRedirectLoopRecovery:
+    """Stale cookies from a different egress IP produce a redirect-loop page at /feed/;
+    login must recover via a fresh credential login instead of mistaking it for a 429
+    or for a live session."""
+
+    def _run(self):
+        state = {"url": "https://www.linkedin.com"}
+        body = {"text": ""}
+
+        def on_get(u):
+            if "feed" in u:
+                state["url"] = "https://www.linkedin.com/feed/"
+                body["text"] = ("This page isn't working www.linkedin.com redirected "
+                                "you too many times ERR_TOO_MANY_REDIRECTS")
+            elif "login" in u:
+                state["url"] = "https://www.linkedin.com/login"
+                body["text"] = ""
+            else:
+                state["url"] = "https://www.linkedin.com"
+                body["text"] = ""
+
+        driver = MagicMock()
+        driver.get.side_effect = on_get
+        driver.get_cookies.return_value = [{"name": "li_at", "value": "fresh"}]
+        type(driver).current_url = property(lambda self: state["url"])
+        body_el = MagicMock()
+        type(body_el).text = property(lambda self: body["text"])
+        driver.find_element.return_value = body_el
+
+        signin = MagicMock()
+        def do_click():
+            state["url"] = "https://www.linkedin.com/feed/"
+            body["text"] = ""   # feed loads cleanly after credential login
+        signin.click.side_effect = do_click
+        fields = [MagicMock(), MagicMock(), signin]  # username, password, sign-in
+
+        wait = _make_wait()
+        with patch(f"{_MODULE}.rate_limit_cooldown_remaining", return_value=0), \
+             patch(f"{_MODULE}.mark_rate_limited") as mock_mark, \
+             patch(f"{_MODULE}.clear_rate_limit"), \
+             patch(f"{_MODULE}.get_cookies", return_value=[{"name": "li_at", "value": "stale"}]), \
+             patch(f"{_MODULE}.load_cookies"), \
+             patch(f"{_MODULE}.store_cookies") as mock_store, \
+             patch(f"{_MODULE}.get_visible_element_wait_retry", side_effect=fields):
+            from cqc_lem.utilities.linkedin.helper import login_to_linkedin
+            login_to_linkedin(driver, wait, "user@e.com", "pw")
+        return driver, mock_mark, mock_store
+
+    def test_redirect_loop_clears_cookies_and_reauths(self):
+        driver, mock_mark, mock_store = self._run()
+        # Stale browser cookies dropped, then a fresh credential login navigated to /login
+        driver.delete_all_cookies.assert_called_once()
+        assert any("login" in c.args[0] for c in driver.get.call_args_list), \
+            "expected a fresh credential login navigation to /login"
+
+    def test_redirect_loop_not_treated_as_rate_limit(self):
+        # The redirect page also says "this page isn't working"; it must NOT trip the 429
+        # breaker (checked before the rate-limit heuristic).
+        _, mock_mark, _ = self._run()
+        mock_mark.assert_not_called()
+
+    def test_redirect_loop_recovers_to_successful_login(self):
+        _, _, mock_store = self._run()
+        mock_store.assert_called_once()  # fresh cookies persisted after re-auth
