@@ -272,6 +272,19 @@ def login_to_linkedin(driver: WebDriver, wait: WebDriverWait, user_email: str, u
             return True
         return "http error 429" in low or "too many requests" in low
 
+    def _page_is_redirect_loop(drv) -> bool:
+        """Stored cookies minted from a different egress IP (e.g. after switching to a
+        residential proxy) can make LinkedIn loop on re-auth, serving a browser error
+        page ("redirected you too many times / ERR_TOO_MANY_REDIRECTS"). The URL still
+        looks logged-in (/feed), so detect it from the body to avoid mistaking it for a
+        live session — the fix is to drop the cookies and do a fresh credential login."""
+        try:
+            body = drv.find_element(By.TAG_NAME, "body").text or ""
+        except Exception:
+            return False
+        low = body.lower()
+        return "err_too_many_redirects" in low or "redirected you too many times" in low
+
     def _wait_for_manual_approval() -> bool:
         """Poll for a device-approval / 2FA checkpoint to clear.
 
@@ -364,6 +377,18 @@ def login_to_linkedin(driver: WebDriver, wait: WebDriverWait, user_email: str, u
 
     if _is_challenge_url(driver.current_url):
         _handle_challenge("post-cookie-load")
+
+    # Stored cookies minted from a different egress IP (e.g. after switching to a
+    # residential proxy) can make LinkedIn loop on re-auth, landing on a redirect-error
+    # page that still sits on /feed. Handle this BEFORE the 429 check — the redirect
+    # page also says "this page isn't working", which the rate-limit heuristic would
+    # otherwise misclassify as a 429. Drop the cookies and do a fresh credential login.
+    if cookies and _is_logged_in(driver.current_url) and _page_is_redirect_loop(driver):
+        myprint("Stored session unusable (redirect loop) — clearing cookies and re-authenticating")
+        driver.delete_all_cookies()
+        cookies = None
+        driver.get(login_url)
+        time.sleep(1)
 
     # LinkedIn serves a "HTTP ERROR 429 / This page isn't working" body at the SAME
     # /feed/ URL when the account/IP is rate-limited. A naive URL check would treat
