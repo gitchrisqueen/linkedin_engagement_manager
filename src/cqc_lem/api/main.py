@@ -44,13 +44,15 @@ from cqc_lem.utilities.db import (
     get_post_url_from_log_for_user,
 )
 from cqc_lem.utilities.email import generate_pin, hash_pin, send_pin_email
+from cqc_lem.utilities.linkedin.verification_pin import (
+    extract_pin_from_text, extract_token_from_address, submit_pin_by_token)
 from cqc_lem.utilities.linkedin.token_refresh import (
     get_token_expiry, is_token_expired, is_token_expiring_soon, attempt_token_refresh,
 )
 from cqc_lem.utilities.env_constants import LI_CLIENT_ID, LI_CLIENT_SECRET, LI_REDIRECT_URL, LI_STATE_SALT, ADMIN_SECRET, API_ACCESS_TOKENS, \
     DEFAULT_IMAGE_MODEL, DEFAULT_VIDEO_MODEL, DEFAULT_VIDEO_RATIO
 import requests
-from cqc_lem.utilities.logger import myprint, log_warning
+from cqc_lem.utilities.logger import myprint, log_warning, log_info
 from cqc_lem.utilities.mime_type_helper import get_file_mime_type
 from cqc_lem.utilities.observability import track_api_call
 from cqc_lem.utilities.utils import get_file_extension_from_filepath
@@ -100,7 +102,8 @@ _API_ACCESS_TOKEN_SET = {t.strip() for t in API_ACCESS_TOKENS.split(",") if t.st
 # LinkedIn fetches over an unauthenticated public URL when publishing. The
 # handler (get_assets) is GET-only and path-traversal safe (_find_asset_file
 # rejects .. / separators and only returns real files under assets_dir).
-_PUBLIC_API_PREFIXES = ("/api/auth/", "/api/billing/webhook", "/api/assets")
+_PUBLIC_API_PREFIXES = ("/api/auth/", "/api/billing/webhook", "/api/assets",
+                        "/api/linkedin/verification-pin")
 
 
 def _api_token_required(path: str) -> bool:
@@ -407,6 +410,30 @@ def get_activity(email: str, limit: int = 20) -> ResponseModel:
         for row in logs
     ]
     return ResponseModel(status_code=200, detail=serialized)
+
+
+@router.post("/linkedin/verification-pin/inbound")
+async def linkedin_verification_pin_inbound(request: Request) -> ResponseModel:
+    """SendGrid Inbound Parse webhook: the user's email reply carrying their LinkedIn
+    6-digit code. The tokenized Reply-To (pin+<token>@parse-domain) attributes it to the
+    paused login; we extract the code and hand it to the waiting task. Always 200 so
+    SendGrid doesn't retry-storm on a malformed/unrelated message."""
+    try:
+        form = await request.form()
+    except Exception:
+        return ResponseModel(status_code=200, detail="ignored")
+    to_field = str(form.get("to") or "")
+    envelope = str(form.get("envelope") or "")
+    text = str(form.get("text") or form.get("html") or "")
+    subject = str(form.get("subject") or "")
+    token = extract_token_from_address(to_field) or extract_token_from_address(envelope)
+    pin = extract_pin_from_text(text) or extract_pin_from_text(subject)
+    if not token or not pin:
+        return ResponseModel(status_code=200, detail="ignored")
+    user_id = submit_pin_by_token(token, pin)
+    if user_id:
+        log_info("Received LinkedIn verification PIN via email reply", user_id=user_id)
+    return ResponseModel(status_code=200, detail="accepted" if user_id else "ignored")
 
 
 @router.put("/user/", responses={

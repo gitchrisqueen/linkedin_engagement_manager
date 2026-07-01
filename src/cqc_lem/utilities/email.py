@@ -160,8 +160,10 @@ def send_login_approval_email(to_email: str, vnc_url: str | None = None) -> bool
     return False
 
 
-def _send_high_priority_email(to_email: str, subject: str, html_content: str) -> bool:
-    """Send a high-priority email via SendGrid (falling back to SMTP). Returns True if dispatched."""
+def _send_high_priority_email(to_email: str, subject: str, html_content: str,
+                              reply_to: Optional[str] = None) -> bool:
+    """Send a high-priority email via SendGrid (falling back to SMTP). Returns True if
+    dispatched. `reply_to` sets the Reply-To header (used for the email-reply PIN flow)."""
     has_sendgrid = bool(SENDGRID_API_KEY)
     has_smtp = bool(SMTP_USER) and bool(SMTP_PASSWORD)
     if not has_sendgrid and not has_smtp:
@@ -178,6 +180,9 @@ def _send_high_priority_email(to_email: str, subject: str, html_content: str) ->
             message.header = Header("X-Priority", "1")
             message.header = Header("X-MSMail-Priority", "High")
             message.header = Header("Importance", "High")
+            if reply_to:
+                from sendgrid.helpers.mail import ReplyTo
+                message.reply_to = ReplyTo(reply_to)
             SendGridAPIClient(SENDGRID_API_KEY).send(message)
             myprint(f"Email sent via SendGrid to {to_email}: {subject}")
             return True
@@ -192,6 +197,8 @@ def _send_high_priority_email(to_email: str, subject: str, html_content: str) ->
         msg["X-Priority"] = "1"
         msg["X-MSMail-Priority"] = "High"
         msg["Importance"] = "High"
+        if reply_to:
+            msg["Reply-To"] = reply_to
         msg.attach(MIMEText(html_content, "html"))
         try:
             with smtplib.SMTP(SMTP_HOST, SMTP_PORT, timeout=15) as server:
@@ -206,6 +213,28 @@ def _send_high_priority_email(to_email: str, subject: str, html_content: str) ->
             return False
 
     return False
+
+
+def send_login_pin_request_email(to_email: str, reply_to: str) -> bool:
+    """Ask the user to REPLY with the 6-digit LinkedIn verification code.
+
+    The reply routes back (via SendGrid Inbound Parse) to `reply_to`, whose token
+    attributes it to the paused login. High priority so the user acts before the code
+    expires. Best-effort: returns True only if an email was dispatched.
+    """
+    subject = "⚠️ Reply ASAP with your LinkedIn verification code"
+    html = (
+        "<html><body>"
+        "<h2>We need your LinkedIn verification code</h2>"
+        "<p>LinkedIn asked us to verify this sign-in so your automation can keep running.</p>"
+        "<p><strong>Check your inbox for a separate email from LinkedIn with a 6-digit code, "
+        "then simply <u>reply to THIS email</u> with just that code.</strong></p>"
+        "<p>The code expires quickly — please reply as soon as you can.</p>"
+        "<p style='color:#666;font-size:12px'>Didn't try to sign in? You can ignore this — "
+        "no one can get in without the code.</p>"
+        "</body></html>"
+    )
+    return _send_high_priority_email(to_email, subject, html, reply_to=reply_to)
 
 
 def _account_url() -> str:

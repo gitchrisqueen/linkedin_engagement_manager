@@ -276,3 +276,45 @@ class TestGetUserSettings:
         detail = resp.json()["detail"]
         assert detail["subscription"] is None
         assert detail["preferences"] is None
+
+
+class TestVerificationPinInbound:
+    """SendGrid Inbound Parse webhook that receives the user's PIN reply."""
+    BASE = "/api/linkedin/verification-pin/inbound"
+
+    def test_valid_reply_stores_pin(self, client):
+        with patch(f"{_MAIN}.submit_pin_by_token", return_value=1) as m:
+            resp = client.post(self.BASE, data={
+                "to": "pin+abc123XYZ@parse.example.com",
+                "text": "483920\n\nSent from my phone",
+                "subject": "Re: verification code",
+            })
+        assert resp.status_code == 200
+        assert resp.json()["detail"] == "accepted"
+        m.assert_called_once_with("abc123XYZ", "483920")
+
+    def test_reply_but_unknown_token_ignored(self, client):
+        with patch(f"{_MAIN}.submit_pin_by_token", return_value=None):
+            resp = client.post(self.BASE, data={
+                "to": "pin+stale@parse.example.com", "text": "483920"})
+        assert resp.status_code == 200
+        assert resp.json()["detail"] == "ignored"
+
+    def test_no_token_ignored_without_calling_store(self, client):
+        with patch(f"{_MAIN}.submit_pin_by_token") as m:
+            resp = client.post(self.BASE, data={"to": "someone@else.com", "text": "483920"})
+        assert resp.status_code == 200
+        assert resp.json()["detail"] == "ignored"
+        m.assert_not_called()
+
+    def test_no_pin_ignored(self, client):
+        with patch(f"{_MAIN}.submit_pin_by_token") as m:
+            resp = client.post(self.BASE, data={
+                "to": "pin+abc@parse.example.com", "text": "I can't find the code"})
+        assert resp.json()["detail"] == "ignored"
+        m.assert_not_called()
+
+    def test_endpoint_is_public_no_auth(self, client):
+        # Under the public prefix — must not 401/403 even with no auth header.
+        resp = client.post(self.BASE, data={"to": "x", "text": "y"})
+        assert resp.status_code == 200
