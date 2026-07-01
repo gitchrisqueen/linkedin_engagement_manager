@@ -24,6 +24,16 @@ def _no_approval_wait(monkeypatch):
 
 
 @pytest.fixture(autouse=True)
+def _breaker_closed():
+    """Keep the 429 circuit breaker closed and hermetic by default so login tests
+    never touch Redis. Tests exercising the breaker patch these explicitly."""
+    with patch(f"{_MODULE}.rate_limit_cooldown_remaining", return_value=0), \
+         patch(f"{_MODULE}.mark_rate_limited"), \
+         patch(f"{_MODULE}.clear_rate_limit"):
+        yield
+
+
+@pytest.fixture(autouse=True)
 def _stub_approval_email():
     """Stub the high-priority approval email (lazily imported inside the login flow)
     so tests never touch a real provider; tests can assert on the returned mock."""
@@ -455,3 +465,60 @@ class TestLoginToLinkedinChallengePaths:
              pytest.raises(RuntimeError):
             from cqc_lem.utilities.linkedin.helper import login_to_linkedin
             login_to_linkedin(driver, wait, "u@e.com", "pw")
+
+
+@pytest.mark.unit
+class TestRateLimitCircuitBreaker:
+    """The shared 429 breaker must short-circuit login and record/clear state."""
+
+    def test_open_breaker_skips_navigation(self):
+        """When the breaker is open, login must raise before touching LinkedIn."""
+        driver = _make_driver("https://www.linkedin.com/feed/")
+        wait = _make_wait()
+        from cqc_lem.utilities.linkedin.rate_limit import LinkedInRateLimited
+
+        with patch(f"{_MODULE}.rate_limit_cooldown_remaining", return_value=300), \
+             patch(f"{_MODULE}.mark_rate_limited"), patch(f"{_MODULE}.clear_rate_limit"), \
+             patch(f"{_MODULE}.get_cookies") as mock_cookies, \
+             pytest.raises(LinkedInRateLimited, match="circuit breaker open"):
+            from cqc_lem.utilities.linkedin.helper import login_to_linkedin
+            login_to_linkedin(driver, wait, "u@e.com", "pw")
+
+        driver.get.assert_not_called()
+        mock_cookies.assert_not_called()
+
+    def test_rate_limited_feed_page_opens_breaker(self):
+        """A 429 body served at /feed/ must mark the breaker open and raise."""
+        driver = _make_driver("https://www.linkedin.com/feed/")
+        wait = _make_wait()
+        body_el = MagicMock()
+        body_el.text = "HTTP ERROR 429 Too Many Requests"
+        driver.find_element.return_value = body_el
+        from cqc_lem.utilities.linkedin.rate_limit import LinkedInRateLimited
+
+        with patch(f"{_MODULE}.rate_limit_cooldown_remaining", return_value=0), \
+             patch(f"{_MODULE}.mark_rate_limited") as mock_mark, \
+             patch(f"{_MODULE}.clear_rate_limit") as mock_clear, \
+             patch(f"{_MODULE}.get_cookies", return_value=[{"name": "x"}]), \
+             patch(f"{_MODULE}.load_cookies"), patch(f"{_MODULE}.store_cookies"), \
+             pytest.raises(LinkedInRateLimited, match="rate-limiting"):
+            from cqc_lem.utilities.linkedin.helper import login_to_linkedin
+            login_to_linkedin(driver, wait, "u@e.com", "pw")
+
+        mock_mark.assert_called_once()
+        mock_clear.assert_not_called()
+
+    def test_successful_login_clears_breaker(self):
+        """A clean cookie login must clear any stale breaker state."""
+        driver = _make_driver("https://www.linkedin.com/feed/")
+        wait = _make_wait()
+
+        with patch(f"{_MODULE}.rate_limit_cooldown_remaining", return_value=0), \
+             patch(f"{_MODULE}.mark_rate_limited"), \
+             patch(f"{_MODULE}.clear_rate_limit") as mock_clear, \
+             patch(f"{_MODULE}.get_cookies", return_value=[{"name": "x"}]), \
+             patch(f"{_MODULE}.load_cookies"), patch(f"{_MODULE}.store_cookies"):
+            from cqc_lem.utilities.linkedin.helper import login_to_linkedin
+            login_to_linkedin(driver, wait, "u@e.com", "pw")
+
+        mock_clear.assert_called_once()

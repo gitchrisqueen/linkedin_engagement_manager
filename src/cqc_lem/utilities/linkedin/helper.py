@@ -6,6 +6,8 @@ from cqc_lem.utilities.ai.ai_helper import get_industries_of_profile_from_ai
 from cqc_lem.utilities.db import get_cookies, store_cookies, get_linked_in_profile_by_email, add_linkedin_profile, \
     get_linked_in_profile_by_url, get_linked_in_profile_by_user_id
 from cqc_lem.utilities.linkedin.profile import LinkedInProfile
+from cqc_lem.utilities.linkedin.rate_limit import LinkedInRateLimited, clear_rate_limit, \
+    mark_rate_limited, rate_limit_cooldown_remaining
 from cqc_lem.utilities.linkedin.scrapper import returnProfileInfo
 from cqc_lem.utilities.logger import myprint, log_warning, log_error
 from cqc_lem.utilities.selenium_util import load_cookies, get_element_wait_retry, \
@@ -217,6 +219,14 @@ def login_to_linkedin(driver: WebDriver, wait: WebDriverWait, user_email: str, u
             return
         raise RuntimeError(f"Unsolvable LinkedIn challenge at {label}: {driver.current_url}")
 
+    # Shared 429 circuit breaker: if a recent task already hit LinkedIn's rate limit,
+    # don't navigate at all — re-hitting the feed while throttled prolongs the block.
+    cooldown = rate_limit_cooldown_remaining()
+    if cooldown > 0:
+        raise LinkedInRateLimited(
+            f"LinkedIn 429 circuit breaker open — skipping login for ~{cooldown}s. "
+            "Reduce automation frequency and retry later.")
+
     # Load base domain first so cookies can be set against the right origin
     driver.get(linked_url)
 
@@ -242,12 +252,14 @@ def login_to_linkedin(driver: WebDriver, wait: WebDriverWait, user_email: str, u
     # that as "logged in" and downstream profile scraping would crash. Detect it and
     # raise a transient error so callers back off instead of hammering.
     if _is_logged_in(driver.current_url) and _page_is_rate_limited(driver):
-        raise RuntimeError(
+        mark_rate_limited("429 at feed after cookie load")
+        raise LinkedInRateLimited(
             "LinkedIn is rate-limiting this session (HTTP 429). Backing off — "
             "reduce automation frequency and retry later.")
 
     if _is_logged_in(driver.current_url):
         myprint(f"Already logged in! (current URL: {driver.current_url})")
+        clear_rate_limit()
         store_cookies(user_email, driver.get_cookies())
         myprint("Cookies stored to DB!")
         return
@@ -323,6 +335,7 @@ def login_to_linkedin(driver: WebDriver, wait: WebDriverWait, user_email: str, u
 
     if _is_logged_in(driver.current_url):
         myprint("Login successful!")
+        clear_rate_limit()
         store_cookies(user_email, driver.get_cookies())
         myprint("Cookies stored to DB!")
     else:
