@@ -1,5 +1,8 @@
+import base64
+import io
 import json
 import time
+import zipfile
 from datetime import datetime, timedelta
 from functools import wraps
 from urllib.parse import urlparse
@@ -164,15 +167,51 @@ def get_docker_driver(headless: bool = True, session_name: str = "ChromeTests", 
     return driver
 
 
+def _build_proxy_auth_extension_b64(username: str, password: str) -> str:
+    """Build an in-memory MV3 Chrome extension that answers the proxy's auth challenge.
+
+    Chrome's --proxy-server can't carry credentials, so an authenticated proxy (e.g. a
+    residential provider whose sticky-session + geo target live in the username, like
+    DataImpulse) needs an extension that supplies them via webRequest.onAuthRequired.
+    MV2 background pages are disabled in current Chrome (149+), so this uses an MV3
+    service worker with the `webRequestAuthProvider` permission (which is what re-enables
+    a blocking onAuthRequired listener for a normal extension). Returned base64 zip is
+    passed to options.add_encoded_extension so there are no temp files to clean up.
+    """
+    manifest = {
+        "name": "lem-proxy-auth",
+        "version": "1.0",
+        "manifest_version": 3,
+        "permissions": ["proxy", "webRequest", "webRequestAuthProvider"],
+        "host_permissions": ["<all_urls>"],
+        "background": {"service_worker": "background.js"},
+        "minimum_chrome_version": "108",
+    }
+    # json.dumps escapes the ';' and '.' in the sticky-session username safely.
+    background = (
+        f"const U = {json.dumps(username)};\n"
+        f"const P = {json.dumps(password)};\n"
+        "chrome.webRequest.onAuthRequired.addListener(\n"
+        "  function (details) { return { authCredentials: { username: U, password: P } }; },\n"
+        "  { urls: ['<all_urls>'] },\n"
+        "  ['blocking']\n"
+        ");\n"
+    )
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as z:
+        z.writestr("manifest.json", json.dumps(manifest))
+        z.writestr("background.js", background)
+    return base64.b64encode(buf.getvalue()).decode("ascii")
+
+
 def apply_proxy(options: Options, proxy_url: str) -> None:
     """Route the browser's egress through `proxy_url` (scheme://[user:pass@]host:port).
 
-    Chrome's --proxy-server cannot carry inline credentials, so we pass only
-    scheme://host:port. Auth-less proxies — the free, recommended case (a home exit
-    node via Tailscale/cloudflared, Cloudflare WARP, or an IP-allowlisted proxy) —
-    work directly. Credentialed proxies additionally need an auth-handler extension;
-    see docs/PER_USER_PROXY.md. Best-effort: a malformed URL is logged and ignored
-    rather than failing driver creation.
+    Auth-less proxies (IP-allowlisted, Tailscale/cloudflared exit node) work via a bare
+    --proxy-server=scheme://host:port. Credentialed proxies additionally get an MV3
+    auth-handler extension so Chrome can answer the proxy's 407 challenge (see
+    docs/PER_USER_PROXY.md). Best-effort: a malformed URL is logged and ignored rather
+    than failing driver creation.
     """
     try:
         parsed = urlparse(proxy_url)
@@ -184,10 +223,13 @@ def apply_proxy(options: Options, proxy_url: str) -> None:
         hostport = f"{host}:{parsed.port}" if parsed.port else host
         options.add_argument(f"--proxy-server={scheme}://{hostport}")
         myprint(f"Routing browser egress via proxy {scheme}://{hostport}")
-        if parsed.username:
-            myprint("Proxy URL has inline credentials; --proxy-server cannot carry "
-                    "them. Use an IP-allowlisted proxy or an auth extension "
-                    "(see docs/PER_USER_PROXY.md).")
+        if parsed.username and parsed.password:
+            options.add_encoded_extension(
+                _build_proxy_auth_extension_b64(parsed.username, parsed.password))
+            myprint("Loaded proxy auth extension for credentialed proxy")
+        elif parsed.username:
+            myprint("Proxy URL has a username but no password; sending host:port only. "
+                    "Use user:pass or an IP-allowlisted proxy (see docs/PER_USER_PROXY.md).")
     except Exception as e:
         myprint(f"Could not apply proxy '{proxy_url}': {e}")
 
