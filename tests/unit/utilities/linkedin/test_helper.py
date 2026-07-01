@@ -525,6 +525,65 @@ class TestRateLimitCircuitBreaker:
 
 
 @pytest.mark.unit
+class TestDriveEmailPinChallenge:
+    """The email verification-code challenge path (drive_email_pin_challenge)."""
+
+    def _driver(self, otp=None, buttons=None,
+                body="Enter the verification code we sent to your email"):
+        from selenium.webdriver.common.by import By as _By
+        driver = MagicMock()
+        driver.current_url = "https://www.linkedin.com/checkpoint/challenge/x"
+        body_el = MagicMock(); body_el.text = body
+        driver.find_element.return_value = body_el
+
+        def find_elements(by, sel):
+            if by == _By.XPATH:
+                return buttons or []
+            if by == _By.CSS_SELECTOR and sel == "input[name='pin']":
+                return [otp] if otp is not None else []
+            return []
+        driver.find_elements.side_effect = find_elements
+        return driver
+
+    def test_no_otp_field_returns_false_without_emailing(self):
+        driver = self._driver(otp=None, buttons=[])  # no code field, nothing to click
+        with patch("cqc_lem.utilities.email.send_login_pin_request_email") as mail, \
+             patch("cqc_lem.utilities.db.get_user_id", return_value=1):
+            from cqc_lem.utilities.linkedin.helper import drive_email_pin_challenge
+            assert drive_email_pin_challenge(driver, "u@e.com", lambda url: True) is False
+        mail.assert_not_called()
+
+    def test_success_emails_polls_and_submits(self):
+        otp = MagicMock(); otp.is_displayed.return_value = True
+        submit_btn = MagicMock(); submit_btn.text = "Submit"
+        driver = self._driver(otp=otp, buttons=[submit_btn])
+        with patch("cqc_lem.utilities.db.get_user_id", return_value=7), \
+             patch("cqc_lem.utilities.linkedin.verification_pin.create_pin_request", return_value="tok123"), \
+             patch("cqc_lem.utilities.linkedin.verification_pin.clear_pin"), \
+             patch("cqc_lem.utilities.linkedin.verification_pin.pin_reply_address", return_value="pin+tok123@parse.x"), \
+             patch("cqc_lem.utilities.linkedin.verification_pin.get_pin", return_value="483920"), \
+             patch("cqc_lem.utilities.email.send_login_pin_request_email", return_value=True) as mail:
+            from cqc_lem.utilities.linkedin.helper import drive_email_pin_challenge
+            ok = drive_email_pin_challenge(driver, "u@e.com", lambda url: True)
+        assert ok is True
+        mail.assert_called_once_with("u@e.com", "pin+tok123@parse.x")
+        otp.send_keys.assert_called_once_with("483920")
+
+    def test_pin_never_arrives_returns_false(self):
+        otp = MagicMock(); otp.is_displayed.return_value = True
+        driver = self._driver(otp=otp, buttons=[])
+        with patch("cqc_lem.utilities.db.get_user_id", return_value=7), \
+             patch("cqc_lem.utilities.linkedin.verification_pin.create_pin_request", return_value="tok"), \
+             patch("cqc_lem.utilities.linkedin.verification_pin.clear_pin"), \
+             patch("cqc_lem.utilities.linkedin.verification_pin.pin_reply_address", return_value="a@b"), \
+             patch("cqc_lem.utilities.linkedin.verification_pin.get_pin", return_value=None), \
+             patch("cqc_lem.utilities.email.send_login_pin_request_email", return_value=True), \
+             patch(f"{_MODULE}.time.time", side_effect=[0, 0, 10_000]):  # trip the poll deadline
+            from cqc_lem.utilities.linkedin.helper import drive_email_pin_challenge
+            assert drive_email_pin_challenge(driver, "u@e.com", lambda url: True) is False
+
+
+@pytest.mark.unit
 class TestRedirectLoopRecovery:
     """Stale cookies from a different egress IP produce a redirect-loop page at /feed/;
     login must recover via a fresh credential login instead of mistaking it for a 429

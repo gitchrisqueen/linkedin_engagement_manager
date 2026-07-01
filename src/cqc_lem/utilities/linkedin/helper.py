@@ -128,6 +128,118 @@ def solve_arkose_challenge(driver: WebDriver, wait: WebDriverWait) -> bool:
         return False
 
 
+def _click_by_text(driver, substrings) -> bool:
+    substrings = [s.lower() for s in substrings]
+    for el in driver.find_elements(By.XPATH, "//button|//a|//*[@role='button']"):
+        try:
+            text = (el.text or "").strip().lower()
+        except WebDriverException:
+            continue
+        if text and any(s in text for s in substrings):
+            try:
+                el.click()
+            except WebDriverException:
+                try:
+                    driver.execute_script("arguments[0].click();", el)
+                except WebDriverException:
+                    continue
+            return True
+    return False
+
+
+def _find_visible_otp_input(driver):
+    for sel in ("input[name='pin']", "input[autocomplete='one-time-code']",
+                "#input__email_verification_pin", "input[inputmode='numeric']",
+                "input[type='tel']", "input[maxlength='6']"):
+        vis = [e for e in driver.find_elements(By.CSS_SELECTOR, sel) if e.is_displayed()]
+        if vis:
+            return vis[0]
+    texts = [e for e in driver.find_elements(By.CSS_SELECTOR, "input[type='text']") if e.is_displayed()]
+    return texts[0] if len(texts) == 1 else None
+
+
+def drive_email_pin_challenge(driver, user_email: str, is_logged_in) -> bool:
+    """Clear a LinkedIn login challenge via the email verification-code path.
+
+    LinkedIn's mobile-app "tap Yes" approval is unreliable, so this drives the more
+    dependable email-code flow: navigate to the code-entry screen (which makes LinkedIn
+    email a 6-digit code), email the user asking them to REPLY with it, then poll Redis
+    (populated by the inbound-parse webhook) for the code and submit it. Returns True if
+    login completes. Best-effort: any failure returns False so the caller can fall back.
+    """
+    from cqc_lem.utilities.db import get_user_id
+    from cqc_lem.utilities.linkedin.verification_pin import (
+        clear_pin, create_pin_request, get_pin, pin_reply_address)
+
+    otp = None
+    for _ in range(5):
+        try:
+            body = driver.find_element(By.TAG_NAME, "body").text.lower()
+        except Exception:
+            body = ""
+        otp = _find_visible_otp_input(driver)
+        if otp is not None and any(k in body for k in ("code", "verif", "sent")):
+            break
+        moved = (_click_by_text(driver, ["access to this device"])
+                 or _click_by_text(driver, ["verify using email", "use email"])
+                 or _click_by_text(driver, ["email"])
+                 or _click_by_text(driver, ["send code", "continue", "next", "verify"]))
+        time.sleep(3)
+        if not moved:
+            break
+    otp = _find_visible_otp_input(driver)
+    if otp is None:
+        return False
+
+    user_id = get_user_id(user_email)
+    if not user_id:
+        return False
+    clear_pin(user_id)
+    token = create_pin_request(user_id)
+    try:
+        from cqc_lem.utilities.email import send_login_pin_request_email
+        send_login_pin_request_email(user_email, pin_reply_address(token))
+    except Exception as e:
+        log_warning("Failed to send verification-PIN request email", exc=e, action_type="login")
+
+    try:
+        wait_secs = int(os.getenv("LINKEDIN_PIN_WAIT_SECONDS", "300"))
+    except ValueError:
+        wait_secs = 300
+    log_warning("LinkedIn email verification required — emailed the user to REPLY with the "
+                f"6-digit code; waiting up to {wait_secs}s.", action_type="login")
+    pin = None
+    deadline = time.time() + wait_secs
+    while time.time() < deadline:
+        time.sleep(5)
+        pin = get_pin(user_id)
+        if pin:
+            break
+    if not pin:
+        return False
+
+    # Remember this device so future logins from the same (sticky) IP skip the challenge.
+    for cb in driver.find_elements(By.CSS_SELECTOR, "input[type='checkbox']"):
+        try:
+            if cb.is_displayed() and not cb.is_selected():
+                cb.click()
+        except WebDriverException:
+            pass
+    otp = _find_visible_otp_input(driver) or otp
+    try:
+        otp.clear()
+        otp.send_keys(pin)
+    except WebDriverException:
+        return False
+    clear_pin(user_id)
+    _click_by_text(driver, ["submit", "verify", "next", "done", "confirm", "agree"])
+    time.sleep(5)
+    if is_logged_in(driver.current_url):
+        return True
+    time.sleep(3)
+    return is_logged_in(driver.current_url)
+
+
 def login_to_linkedin(driver: WebDriver, wait: WebDriverWait, user_email: str, user_password: str):
     linked_url = "https://www.linkedin.com"
     feed_url = "https://www.linkedin.com/feed/"
@@ -228,6 +340,12 @@ def login_to_linkedin(driver: WebDriver, wait: WebDriverWait, user_email: str, u
             myprint(f"CAPTCHA solved at {label} — continuing login")
             time.sleep(2)
             return
+        # Prefer the email verification-code path — the mobile-app "tap Yes" approval is
+        # unreliable (often never prompts). Fall back to waiting for a manual approval.
+        if os.getenv("LINKEDIN_EMAIL_PIN_ENABLED", "true").lower() != "false":
+            if drive_email_pin_challenge(driver, user_email, _is_logged_in):
+                myprint(f"Email verification-code cleared challenge at {label}")
+                return
         if _wait_for_manual_approval():
             return
         raise RuntimeError(f"Unsolvable LinkedIn challenge at {label}: {driver.current_url}")

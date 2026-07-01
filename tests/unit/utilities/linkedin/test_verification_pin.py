@@ -1,0 +1,101 @@
+"""Unit tests for the email-reply verification-PIN exchange."""
+
+import pytest
+from unittest.mock import MagicMock, patch
+
+pytestmark = pytest.mark.unit
+
+_MOD = "cqc_lem.utilities.linkedin.verification_pin"
+
+
+@pytest.fixture
+def fake_redis():
+    client = MagicMock()
+    with patch(f"{_MOD}._redis_client", return_value=client):
+        yield client
+
+
+class TestExtractPin:
+    def test_plain_code(self):
+        from cqc_lem.utilities.linkedin.verification_pin import extract_pin_from_text
+        assert extract_pin_from_text("Here you go: 483920") == "483920"
+
+    def test_code_alone(self):
+        from cqc_lem.utilities.linkedin.verification_pin import extract_pin_from_text
+        assert extract_pin_from_text("123456") == "123456"
+
+    def test_ignores_quoted_history(self):
+        from cqc_lem.utilities.linkedin.verification_pin import extract_pin_from_text
+        body = "654321\n\nOn Tue wrote:\n> your code was 999999 last time"
+        assert extract_pin_from_text(body) == "654321"
+
+    def test_ignores_gt_quoted_block(self):
+        from cqc_lem.utilities.linkedin.verification_pin import extract_pin_from_text
+        body = "111222\n> previously 333444"
+        assert extract_pin_from_text(body) == "111222"
+
+    def test_not_seven_or_more_digits(self):
+        from cqc_lem.utilities.linkedin.verification_pin import extract_pin_from_text
+        assert extract_pin_from_text("order 1234567 shipped") is None
+
+    def test_none_and_empty(self):
+        from cqc_lem.utilities.linkedin.verification_pin import extract_pin_from_text
+        assert extract_pin_from_text("") is None
+        assert extract_pin_from_text("no digits here") is None
+
+
+class TestTokenRoundTrip:
+    def test_create_then_submit_by_token(self, fake_redis):
+        store = {}
+        fake_redis.set.side_effect = lambda k, v, ex=None: store.__setitem__(k, v)
+        fake_redis.get.side_effect = lambda k: store.get(k)
+        from cqc_lem.utilities.linkedin.verification_pin import create_pin_request, submit_pin_by_token, get_pin
+        token = create_pin_request(42)
+        assert token
+        uid = submit_pin_by_token(token, "246810")
+        assert uid == 42
+        assert get_pin(42) == "246810"
+
+    def test_submit_unknown_token_returns_none(self, fake_redis):
+        fake_redis.get.return_value = None
+        from cqc_lem.utilities.linkedin.verification_pin import submit_pin_by_token
+        assert submit_pin_by_token("nope", "123456") is None
+
+    def test_bytes_values_decoded(self, fake_redis):
+        fake_redis.get.return_value = b"7"
+        from cqc_lem.utilities.linkedin.verification_pin import submit_pin_by_token
+        assert submit_pin_by_token("tok", "123456") == 7
+
+
+class TestNoRedisFailsOpen:
+    def test_create_returns_token_without_redis(self):
+        with patch(f"{_MOD}._redis_client", return_value=None):
+            from cqc_lem.utilities.linkedin.verification_pin import create_pin_request
+            assert create_pin_request(1)  # still returns a token
+
+    def test_get_pin_none_without_redis(self):
+        with patch(f"{_MOD}._redis_client", return_value=None):
+            from cqc_lem.utilities.linkedin.verification_pin import get_pin
+            assert get_pin(1) is None
+
+    def test_submit_false_without_redis(self):
+        with patch(f"{_MOD}._redis_client", return_value=None):
+            from cqc_lem.utilities.linkedin.verification_pin import submit_pin
+            assert submit_pin(1, "123456") is False
+
+
+class TestGetAndClear:
+    def test_get_pin_decodes_bytes(self, fake_redis):
+        fake_redis.get.return_value = b"135790"
+        from cqc_lem.utilities.linkedin.verification_pin import get_pin
+        assert get_pin(9) == "135790"
+
+    def test_get_pin_swallows_error(self, fake_redis):
+        fake_redis.get.side_effect = RuntimeError("down")
+        from cqc_lem.utilities.linkedin.verification_pin import get_pin
+        assert get_pin(9) is None
+
+    def test_clear_deletes_key(self, fake_redis):
+        from cqc_lem.utilities.linkedin.verification_pin import clear_pin
+        clear_pin(9)
+        fake_redis.delete.assert_called_once_with("linkedin:pin:9")
