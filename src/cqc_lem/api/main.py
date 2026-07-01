@@ -1,7 +1,7 @@
 import json
 import os
 import time
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from enum import IntEnum
 from typing import Dict, List, Union
 from typing import Optional, Any
@@ -361,7 +361,9 @@ def get_dashboard_stats(email: str) -> ResponseModel:
     posts, _ = get_posts(user_id)
     now = datetime.now(timezone.utc)
     week_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
-    week_start = week_start.replace(day=week_start.day - week_start.weekday())
+    # Back up to Monday. Use timedelta, not replace(day=...): naive day subtraction
+    # goes out of range in the first days of a month (e.g. Wed the 1st → day=-1).
+    week_start = week_start - timedelta(days=week_start.weekday())
 
     scheduled_this_week = sum(
         1 for p in posts

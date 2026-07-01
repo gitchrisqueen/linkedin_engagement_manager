@@ -62,6 +62,20 @@ class TestDashboardStats:
         assert detail["pending_review"] == 0
         assert detail["posted_total"] == 0
 
+    def test_start_of_month_does_not_crash(self, client):
+        # Regression: week_start was computed with replace(day=day-weekday()), which
+        # goes out of range in the first days of a month (Wed the 1st → day=-1 → 500).
+        class _FixedDatetime(datetime):
+            @classmethod
+            def now(cls, tz=None):
+                return datetime(2026, 7, 1, tzinfo=tz)  # Wednesday the 1st
+
+        with patch(f"{_MAIN}.get_user_id", return_value=1), \
+             patch(f"{_MAIN}.get_posts", return_value=([], 0)), \
+             patch(f"{_MAIN}.datetime", _FixedDatetime):
+            resp = client.get(self.BASE, params={"email": "user@example.com"})
+        assert resp.status_code == 200
+
     def test_posted_total_counted_correctly(self, client):
         from cqc_lem.utilities.db import PostStatus
         posts = [
