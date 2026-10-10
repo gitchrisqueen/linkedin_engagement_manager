@@ -643,3 +643,55 @@ class TestFollowupLedgerTruth:
             since_last=None)
         defer.assert_not_called()
         dm.apply_async.assert_called_once()
+
+
+class TestBrandFunnelFollowupHold:
+    """Owner ruling 2026-10-10 (#2376, option A): a brand funnel follow-up never sends.
+
+    The funnel's DM ladder is acquisition outbound. A due 'funnel' row for the brand account is
+    STOPPED without a send; a non-brand 'funnel' row and the brand's ordinary ladders still send.
+    """
+
+    def _run(self, user_id, event_type, brand_user_id=""):
+        from cqc_lem.app.engagement.outreach import process_user_followups
+        row = _due(user_id=user_id, event_type=event_type, next_step=1)
+        with patch("cqc_lem.utilities.brand_account.BRAND_USER_ID", brand_user_id), \
+             patch(f"{_OUT}.seconds_since_last_dm_touch", return_value=None), \
+             patch(f"{_OUT}.get_due_followups", return_value=[row]), \
+             patch(f"{_OUT}.get_current_profile",
+                   return_value=(MagicMock(), MagicMock(), "e", MagicMock())), \
+             patch(f"{_OUT}.quit_gracefully"), patch(f"{_OUT}.time.sleep"), \
+             patch(f"{_OUT}.insert_new_log"), \
+             patch(f"{_OUT}.resolve_self_name", return_value="Christopher Queen"), \
+             patch(f"{_OUT}.check_dm_replied", return_value=ThreadState.NOT_REPLIED), \
+             patch(f"{_OUT}.build_dm_from_template", return_value="step-1 follow up") as build, \
+             patch(f"{_OUT}.send_private_dm") as dm, \
+             patch(f"{_OUT}.mark_followup") as mark, \
+             patch(f"{_OUT}.enqueue_next_followup") as enq:
+            result = process_user_followups.run(user_id=user_id)
+        return result, build, dm, mark, enq
+
+    def test_a_brand_funnel_followup_sends_nothing_and_is_stopped(self):
+        result, build, dm, mark, enq = self._run(1, "funnel")
+        dm.apply_async.assert_not_called()
+        build.assert_not_called()                             # not even drafted into a send
+        mark.assert_called_once_with(1, "stopped")
+        enq.assert_not_called()                               # and the ladder does not continue
+        assert "Sent 0" in result
+
+    def test_the_hold_follows_an_overridden_brand_user(self):
+        _result, _build, dm, _mark, _enq = self._run(7, "funnel", brand_user_id="7")
+        dm.apply_async.assert_not_called()
+
+    def test_a_non_brand_funnel_followup_still_sends(self):
+        result, _build, dm, mark, _enq = self._run(2, "funnel")
+        dm.apply_async.assert_called_once()
+        mark.assert_called_once_with(1, "sent")
+        assert "Sent 1" in result
+
+    @pytest.mark.parametrize("event_type", ["profile_viewer", "connection_accepted"])
+    def test_the_brands_ordinary_followups_still_send(self, event_type):
+        result, _build, dm, mark, _enq = self._run(1, event_type)
+        dm.apply_async.assert_called_once()
+        mark.assert_called_once_with(1, "sent")
+        assert "Sent 1" in result

@@ -286,10 +286,45 @@ self-marketing off. What the brand does:
 >   targeting, #486) or `outreach_funnel`. `scan_connection_candidates` still drafts them, always as `pending`
 >   even under `auto_queue`, and `send_connection_request` returns any approved one to `pending` without
 >   sending it;
-> - the comment-first outreach funnel's connect and DM stages (`_fire_funnel_stage`, #399/#623), and with them
->   the funnel DM follow-ups. A held stage goes back to `pending`, keeping its draft, and does not advance.
+> - the comment-first outreach funnel's connect and DM stages (`_fire_funnel_stage`, #399/#623). A held stage
+>   goes back to `pending` with its draft kept and `notes` set to the hold reason, and does not advance;
+> - the funnel's DM follow-up ladder: `process_user_followups` marks a brand `funnel` follow-up `stopped` without
+>   sending it (`dm_followups` has no reason column, so the hold is logged at DEBUG). A reply on that thread is
+>   still read first, so an approval-gated nurture draft can still be filed.
 >
-> **Not held:** feed comments, replies, the funnel's comment stage, DMs to existing connections (appreciation,
+> **How the owner handles a held draft.** Send it by hand on LinkedIn, then close the row in Content Studio:
+> on the **Connections** tab press **Cancel** (`PUT /api/connection_request` with `action=cancel`, or
+> `DELETE /api/connection_request`; both set `canceled`); on the **Outreach** tab press **Cancel**
+> (`PUT /api/outreach/target` with `action=cancel`, or `DELETE /api/outreach/target`; cancels the whole funnel
+> for that person). There is no "mark sent" action. **Approve** on a brand acquisition draft does not send it:
+> the next dispatch or funnel run returns it to `pending`. The Connections tab shows `failure_reason` only on
+> `failed` rows, so the hold reason on a returned row is visible through the API, not on screen.
+>
+> **What held drafts block until the owner closes them.** Held connection drafts stay open (`pending`), and the
+> smart-targeting scan subtracts open rows from the brand's `max_invites_per_day`. So once the held drafts
+> number that cap, the scan files no new sourced drafts. The lanes that still send (profile viewer, roster
+> ladder) leave held acquisition rows out of that count (`brand_account.held_connect_sources`), so they are not
+> starved. Held funnel targets count toward `MAX_OPEN_FUNNEL_TARGETS` (default 25); at that depth the funnel
+> sourcing scan files nothing new. Both limits only throttle drafting for the held lanes.
+>
+> **Counting held rows** (read-only; `<brand_user_id>` is 1 unless `BRAND_USER_ID` is set):
+>
+> ```sql
+> -- Connection requests returned to pending by the hold (sourced drafts that were never approved carry no reason)
+> SELECT COUNT(*) FROM connection_requests
+>  WHERE user_id = <brand_user_id> AND status = 'pending'
+>    AND failure_reason = 'held: brand acquisition outbound is sent by the owner (issue #2376)';
+> -- All open brand acquisition drafts
+> SELECT COUNT(*) FROM connection_requests
+>  WHERE user_id = <brand_user_id> AND status IN ('pending','approved','sending')
+>    AND source IN ('own_post','adjacent_post','outreach_funnel');
+> -- Funnel targets held at the connect or DM stage
+> SELECT COUNT(*) FROM outreach_funnel_targets
+>  WHERE user_id = <brand_user_id> AND status = 'pending'
+>    AND notes = 'held: brand acquisition outbound is sent by the owner (issue #2376)';
+> ```
+>
+> **Not held:** feed comments, replies, the funnel's comment stage, DMs to existing connections (appreciation, the non-funnel
 > follow-ups, nurture), profile-viewer outreach, roster follows and roster connect invites, company-page
 > invites, catch-up touches, seed comments, and connection requests the owner files by hand. These keep the
 > owner's own caps (`engagement_preferences`, seeded per `LAUNCH_PHASE` as described below). No code path sends
@@ -316,7 +351,7 @@ self-marketing off. What the brand does:
    audience.
 5. *[Superseded 2026-10-10 by the owner ruling above (issue #2376): lead detection and scoring still surface
    warm prospects, but no DM agent contacts them as the brand. In code, the only automated prospect DM is the
-   outreach funnel's DM stage, which is held.]* ~~**Self-lead-gen.**~~ Once #482–#486 ship, the brand account's inbound-intent detection + lead scoring surface
+   outreach funnel's DM stage and its follow-up ladder, both held.]* ~~**Self-lead-gen.**~~ Once #482–#486 ship, the brand account's inbound-intent detection + lead scoring surface
    warm prospects (people who commented "how does this work?") into a hot-lead list that the DM agent nurtures to
    signup — LEM eats its own lead-gen dog food.
 

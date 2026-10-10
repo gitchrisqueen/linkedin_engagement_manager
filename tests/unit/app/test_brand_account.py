@@ -157,8 +157,15 @@ class TestAcquisitionOutboundHold:
         from cqc_lem.utilities.connection_targeting import SOURCE_ROSTER
         assert not {SOURCE_ROSTER, CONNECTION_REQUEST_SOURCE_PROFILE_VIEWER} & ACQUISITION_CONNECT_SOURCES
 
+    def test_held_connect_sources_is_brand_only(self):
+        from cqc_lem.utilities.brand_account import ACQUISITION_CONNECT_SOURCES, held_connect_sources
+        with _Patched(_enabled()):
+            assert held_connect_sources(1) == ACQUISITION_CONNECT_SOURCES
+            assert held_connect_sources(2) == frozenset()
+            assert held_connect_sources(None) == frozenset()
+
     @pytest.mark.parametrize("source", ["own_post", "adjacent_post", "outreach_funnel",
-                                        " own_post "])
+                                        " own_post ", "OWN_POST", "Adjacent_Post"])
     def test_brand_acquisition_sources_are_held(self, source):
         from cqc_lem.utilities.brand_account import acquisition_outbound_held
         with _Patched(_enabled()):

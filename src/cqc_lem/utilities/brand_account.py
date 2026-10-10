@@ -144,7 +144,18 @@ def acquisition_outbound_held(user_id: Any, source: Optional[str] = None,
     """
     if not is_brand_user(user_id):
         return False
-    return bool(funnel) or (source or "").strip() in ACQUISITION_CONNECT_SOURCES
+    return bool(funnel) or (source or "").strip().lower() in ACQUISITION_CONNECT_SOURCES
+
+
+def held_connect_sources(user_id: Any) -> frozenset:
+    """The `connection_requests.source` values whose rows can never send for `user_id`.
+
+    The brand account's held acquisition drafts sit at 'pending' until the owner closes them, and an
+    open row is counted against the daily invite budget. Lanes that still SEND (profile viewer,
+    roster ladder) leave these out of that count so the held drafts do not starve them. Empty for
+    every other user.
+    """
+    return ACQUISITION_CONNECT_SOURCES if is_brand_user(user_id) else frozenset()
 
 
 def _over_ceiling(current: Any, ceiling: int) -> Optional[int]:

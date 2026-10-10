@@ -147,13 +147,16 @@ class TestBrandAcquisitionHold:
 
     @pytest.mark.parametrize("stage", ["connect", "dm"])
     def test_the_brand_stage_is_held_and_returned_to_pending(self, stage):
+        from cqc_lem.utilities.brand_account import ACQUISITION_HOLD_REASON
         from cqc_lem.utilities.db import OutreachStatus
         out, m = self._run(1, stage)
         m["inv"].apply_async.assert_not_called()
         m["spd"].apply_async.assert_not_called()
         m["enq"].assert_not_called()                          # no funnel follow-up either
-        m["upd"].assert_not_called()                          # the stage is not advanced
-        m["ust"].assert_called_once_with(1, OutreachStatus.PENDING)
+        # Back to pending with the reason in `notes`; no `stage=` — the stage is not advanced.
+        m["upd"].assert_called_once_with(1, status=OutreachStatus.PENDING,
+                                         notes=ACQUISITION_HOLD_REASON)
+        m["ust"].assert_not_called()
         assert "held" in out
 
     def test_the_hold_follows_an_overridden_brand_user(self):

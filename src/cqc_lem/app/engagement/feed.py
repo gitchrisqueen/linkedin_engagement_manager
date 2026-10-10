@@ -86,6 +86,7 @@ from cqc_lem.utilities.ai.outbound_qa import (
     SURFACE_COMMENT as OUTBOUND_SURFACE_COMMENT,
     refusal_reason as outbound_refusal_reason,
 )
+from cqc_lem.utilities.brand_account import held_connect_sources
 from cqc_lem.utilities.comment_rotation import recent_comment_shapes, record_comment_shape
 from cqc_lem.utilities.connection_targeting import (
     SOURCE_ROSTER,
@@ -2085,7 +2086,8 @@ def roster_connect_budget(user_id: int, prefs: dict) -> int:
         return 0
     remaining = remaining_actions(user_id, ACTION_INVITE, cap,
                                   count_invites_sent_today(user_id)
-                                  + count_open_connection_requests(user_id),
+                                  + count_open_connection_requests(
+                                      user_id, exclude_sources=held_connect_sources(user_id)),
                                   caps=engagement_caps_from_prefs(prefs))
     if remaining <= 0:
         return 0

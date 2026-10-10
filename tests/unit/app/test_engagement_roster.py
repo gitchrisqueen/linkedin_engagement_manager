@@ -1416,6 +1416,19 @@ class TestRosterConnectBudget:
         assert remaining.call_args[0][3] == 3
         assert remaining.call_args[1]["caps"] is not None
 
+    @pytest.mark.parametrize("user_id,excluded", [
+        (1, {"own_post", "adjacent_post", "outreach_funnel"}), (2, set())])
+    def test_held_brand_acquisition_drafts_do_not_starve_the_ladder(self, user_id, excluded):
+        """#2376: the brand's held drafts never send, so only the brand leaves them out."""
+        from cqc_lem.app.engagement import feed as ra
+        with patch("cqc_lem.utilities.brand_account.BRAND_USER_ID", ""), \
+             patch(f"{_FEED}.remaining_actions", return_value=6), \
+             patch(f"{_FEED}.count_invites_sent_today", return_value=0), \
+             patch(f"{_FEED}.count_open_connection_requests", return_value=0) as count:
+            ra.roster_connect_budget(user_id, {"roster_auto_connect": True,
+                                               "max_invites_per_day": 10})
+        assert set(count.call_args.kwargs["exclude_sources"]) == excluded
+
 
 def _queue_env(*, budget=2, hold="", terminal=False, auto_connect=True):
     es = ExitStack()

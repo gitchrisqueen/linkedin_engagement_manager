@@ -103,7 +103,11 @@ from cqc_lem.utilities.ai.outbound_qa import (
     SURFACE_DM as OUTBOUND_SURFACE_DM,
     refusal_reason as outbound_refusal_reason,
 )
-from cqc_lem.utilities.brand_account import ACQUISITION_HOLD_REASON, acquisition_outbound_held
+from cqc_lem.utilities.brand_account import (
+    ACQUISITION_HOLD_REASON,
+    acquisition_outbound_held,
+    held_connect_sources,
+)
 from cqc_lem.utilities.connection_targeting import (
     SOURCE_ADJACENT_POST,
     SOURCE_OWN_POST,
@@ -1295,6 +1299,8 @@ def check_dm_replied(driver, wait, profile_url: str, my_name: str = None,
 # anything: the draft is 'pending' until a human approves it in the UI, and delivery then runs
 # through send_scheduled_dm with the existing per-day DM cap.
 NURTURE_EVENT_TYPE = "nurture"  # dm_templates / dm_followups event_type for this sequence
+# dm_followups event_type the outreach funnel's DM stage enqueues (#399) — held for the brand (#2376)
+FUNNEL_FOLLOWUP_EVENT_TYPE = "funnel"
 # Issue #1815: a thread that never becomes readable used to stay due forever, so every */30min
 # `send-due-dm-followups` beat re-opened it — 48 Chrome sessions a day for a read that never
 # succeeds. A few UNKNOWN reads on the ordinary cadence are left alone (a rotated selector usually
@@ -1668,6 +1674,17 @@ def process_user_followups(self, user_id: int, max_per_run: int = 20):
                 # A nurture re-check with no new reply. Nothing to send: the drafted message is the
                 # operator's to approve, and nurture NEVER auto-sends a template.
                 mark_followup(f["id"], FollowupStatus.STOPPED)
+                continue
+            if str(f["event_type"]) == FUNNEL_FOLLOWUP_EVENT_TYPE and \
+                    acquisition_outbound_held(user_id, funnel=True):
+                # Owner ruling (#2376): a brand funnel follow-up is acquisition outbound, the owner's
+                # to send. dm_followups has no reason column, so the row is STOPPED (terminal — a
+                # pending row would be re-read every run) and the hold reason goes to the log. A
+                # reply on the thread was already handled above, so nurture drafting still works.
+                mark_followup(f["id"], FollowupStatus.STOPPED)
+                log_debug(f"Funnel follow-up {f['id']} stopped: {ACQUISITION_HOLD_REASON}",
+                          user_id=user_id, action_type=LogActionType.FOLLOWUP,
+                          task_name="process_user_followups")
                 continue
             # Issue #2115: two ladder steps a day apart put two near-identical DMs in the same inbox
             # on consecutive days. Deferred, not stopped — the step still goes out once the window
@@ -2340,7 +2357,8 @@ def _profile_viewer_connect_blocked(user_id: int, profile_url: str, viewer_name:
         cap = max(0, int(prefs.get("max_invites_per_day") or 0))
     except (TypeError, ValueError):
         cap = 0
-    if cap - count_invites_sent_today(user_id) - count_open_connection_requests(user_id) <= 0:
+    if cap - count_invites_sent_today(user_id) - count_open_connection_requests(
+            user_id, exclude_sources=held_connect_sources(user_id)) <= 0:
         # DEBUG: the queue holding a day's worth of invites is the cap working, not a fault. The
         # viewer is skipped rather than deferred — `has_engaged_url_with_x_days` already ends this
         # visit, and the analytics page lists them again while they keep visiting.
@@ -3287,8 +3305,10 @@ def _fire_funnel_stage(user_id: int, target: dict) -> str:
     if stage in (OutreachStage.CONNECT, OutreachStage.DM) and \
             acquisition_outbound_held(user_id, funnel=True):
         # Owner ruling (#2376): the brand's funnel connect/DM is the owner's to send. The draft goes
-        # back to 'pending' — still on screen, never fired — so the beat does not re-pick it.
-        update_outreach_target_status(target_id, OutreachStatus.PENDING)
+        # back to 'pending' — still on screen, never fired — so the beat does not re-pick it. The
+        # reason goes in `notes`, a column nothing else writes, so held targets can be counted.
+        update_outreach_target(target_id, status=OutreachStatus.PENDING,
+                               notes=ACQUISITION_HOLD_REASON)
         log_debug(f"Funnel {stage} stage held for the brand account: {ACQUISITION_HOLD_REASON}",
                   user_id=user_id, action_type="outreach_funnel")
         return f"target {target_id}: {stage} {ACQUISITION_HOLD_REASON}"
@@ -3321,7 +3341,7 @@ def _fire_funnel_stage(user_id: int, target: dict) -> str:
             return f"target {target_id}: DM deferred (daily DM cap)"
         send_private_dm.apply_async(kwargs={"user_id": user_id, "profile_url": profile_url,
                                             "message": draft})
-        enqueue_next_followup(user_id, profile_url, first_name, "funnel", 0)
+        enqueue_next_followup(user_id, profile_url, first_name, FUNNEL_FOLLOWUP_EVENT_TYPE, 0)
         update_outreach_target(target_id, stage=OutreachStage.COMPLETED, status=OutreachStatus.ACTED)
         return f"target {target_id}: DM sent -> funnel completed"
     else:
