@@ -103,6 +103,7 @@ from cqc_lem.utilities.ai.outbound_qa import (
     SURFACE_DM as OUTBOUND_SURFACE_DM,
     refusal_reason as outbound_refusal_reason,
 )
+from cqc_lem.utilities.brand_account import ACQUISITION_HOLD_REASON, acquisition_outbound_held
 from cqc_lem.utilities.connection_targeting import (
     SOURCE_ADJACENT_POST,
     SOURCE_OWN_POST,
@@ -3195,6 +3196,10 @@ def scan_connection_candidates(self, user_id: int, max_new: int = None):
         return f"No new connection candidates for user {user_id} (all deduped or below ICP floor)"
 
     status = _target_status_for_mode(mode, prefs)
+    if acquisition_outbound_held(user_id, SOURCE_OWN_POST):
+        # Owner ruling (#2376): the brand's sourced targets are drafts for the owner to send, so
+        # `auto_queue` never files them approved. `send_connection_request` holds them as well.
+        status = ConnectionRequestStatus.PENDING
     topic = terms[0] if terms else None
     filed = 0
     for candidate in candidates:
@@ -3278,6 +3283,15 @@ def _fire_funnel_stage(user_id: int, target: dict) -> str:
         log_warning("Funnel target approved with no draft text; skipping stage",
                     user_id=user_id, action_type="outreach_funnel")
         return f"target {target_id}: skipped {stage} (no draft)"
+
+    if stage in (OutreachStage.CONNECT, OutreachStage.DM) and \
+            acquisition_outbound_held(user_id, funnel=True):
+        # Owner ruling (#2376): the brand's funnel connect/DM is the owner's to send. The draft goes
+        # back to 'pending' — still on screen, never fired — so the beat does not re-pick it.
+        update_outreach_target_status(target_id, OutreachStatus.PENDING)
+        log_debug(f"Funnel {stage} stage held for the brand account: {ACQUISITION_HOLD_REASON}",
+                  user_id=user_id, action_type="outreach_funnel")
+        return f"target {target_id}: {stage} {ACQUISITION_HOLD_REASON}"
 
     if stage == OutreachStage.COMMENT:
         # Same paced budget + account governor the feed walk spends against (issue #626), so the
