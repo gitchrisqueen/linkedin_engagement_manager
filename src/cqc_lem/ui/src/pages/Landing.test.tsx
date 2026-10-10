@@ -191,6 +191,53 @@ describe('honesty (issue #1300)', () => {
     expect(screen.getByText(/no tool can guarantee a LinkedIn account/i)).toBeTruthy()
   })
 
+  // Issue #2366, free-trial scope: posts publish only after approval, engagement is suggestions the
+  // user sends, and sign-in is LinkedIn OAuth. Scoped to the sections that copy change owns.
+  const SCOPED_SECTIONS = ['hero', 'proof', 'how_it_works', 'features', 'safety', 'comparison']
+
+  function scopedText(container: HTMLElement): string {
+    const parts = SCOPED_SECTIONS.map((name) => {
+      const el = container.querySelector(`[data-section="${name}"]`)
+      expect(el, `${name} section is missing`).not.toBeNull()
+      return el?.textContent ?? ''
+    })
+    parts.push(screen.getByRole('contentinfo').textContent ?? '')
+    return parts.join('\n')
+  }
+
+  it('never claims LEM engages, or uses your session, on your behalf', () => {
+    const { container } = renderApp()
+    const text = scopedText(container)
+    for (const claim of [
+      /comments, replies and\s+follows up for you/i,
+      /comments and replies for you/i,
+      /your own (logged-in )?session/i,
+      /running without you/i,
+      /background job/i,
+      /Nothing publishes until/i,
+      /DMs land as drafts/i,
+      /approval-gated/i,
+    ]) {
+      expect(claim.test(text), `the page still matches ${claim}`).toBe(false)
+    }
+  })
+
+  it('states the approval, suggestion and sign-in posture in the hero', () => {
+    const { container } = renderApp()
+    const hero = container.querySelector('[data-section="hero"]')?.textContent ?? ''
+    expect(hero).toMatch(/only after you approve it/i)
+    expect(hero).toMatch(/which you review and send yourself/i)
+    expect(hero).toMatch(/never asks for your LinkedIn password/i)
+  })
+
+  it('states the same posture in the safety section', () => {
+    const { container } = renderApp()
+    const safety = container.querySelector('[data-section="safety"]')?.textContent ?? ''
+    expect(safety).toMatch(/never asks for your LinkedIn password or a session cookie/i)
+    expect(safety).toMatch(/LEM does not send them for you/i)
+    expect(safety).toMatch(/Only after you approve it is it published/i)
+  })
+
   it('carries the trademark and non-affiliation notice', () => {
     const { container } = renderApp()
     expect(container.textContent).toContain('not affiliated with, endorsed by, or sponsored by')

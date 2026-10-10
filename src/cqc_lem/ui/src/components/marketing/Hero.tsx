@@ -5,8 +5,8 @@ import ProductPanel from './ProductPanel'
 import Section from './Section'
 import { scrollToSection } from './scrollToSection'
 
-// The page's ONE `<h1>` (issue #1300). It names both pillars — content and engagement — and the
-// safety posture, because in this category safety is the objection every visitor arrives with and
+// The page's ONE `<h1>` (issue #1300). It names what LEM does — posts it publishes once you approve
+// them, engagement it only suggests (#2366) — and the safety posture, because in this category safety is the objection every visitor arrives with and
 // the strongest pages answer it in the subhead rather than burying it in an FAQ.
 export default function Hero() {
   const { openLoginModal } = useAuth()
@@ -19,12 +19,13 @@ export default function Hero() {
       <div className="grid items-center gap-12 lg:grid-cols-2">
         <div className="min-w-0">
           <h1 className="text-4xl sm:text-5xl font-bold leading-tight tracking-tight text-ink-900">
-            Your LinkedIn content and engagement, running every day — inside the limits you set
+            Your LinkedIn content, written in your voice — published only when you approve it
           </h1>
           <p className="mt-6 text-lg leading-relaxed text-ink-600">
-            LEM writes and schedules a month of posts in your voice, then comments, replies and
-            follows up for you. It works from your own session at a human pace, stops at the caps you
-            choose, and publishes nothing you have not approved.
+            LEM writes and schedules a month of posts in your voice and publishes each one through
+            LinkedIn&apos;s API only after you approve it. It also suggests comments, replies and
+            follow-ups, which you review and send yourself. You connect with LinkedIn sign-in, and
+            LEM never asks for your LinkedIn password.
           </p>
           <div className="mt-8 flex flex-col gap-3 sm:flex-row">
             <CtaButton
