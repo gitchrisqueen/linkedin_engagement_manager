@@ -27,8 +27,11 @@ def _prefs(**over):
 
 
 def _scan(prefs=None, engagers=None, requested=None, open_reqs=0, sent_today=0, facts=None,
-          insert_id=7, max_new=None, adjacent=None):
-    """Run the scan with every I/O boundary mocked; returns (result, insert_mock)."""
+          insert_id=7, max_new=None, adjacent=None, user_id=2):
+    """Run the scan with every I/O boundary mocked; returns (result, insert_mock).
+
+    Defaults to user 2: user 1 is the brand account, whose targets are always drafts (#2376).
+    """
     from cqc_lem.app.engagement import outreach as ra
     patches = {
         "get_engagement_preferences": prefs if prefs is not None else _prefs(),
@@ -46,7 +49,7 @@ def _scan(prefs=None, engagers=None, requested=None, open_reqs=0, sent_today=0, 
          patch(f"{_OUT}.quit_gracefully"):
         profile.return_value = (MagicMock(), MagicMock(), "me@x.com",
                                MagicMock(full_name="Me Myself"))
-        return ra.scan_connection_candidates.run(user_id=1, max_new=max_new), insert
+        return ra.scan_connection_candidates.run(user_id=user_id, max_new=max_new), insert
 
 
 class TestScanGating:
@@ -101,7 +104,7 @@ class TestScanFiling:
         out, insert = _scan()
         assert insert.call_count == 1
         kwargs = insert.call_args.kwargs
-        assert insert.call_args.args == (1, "https://www.linkedin.com/in/jane-doe")
+        assert insert.call_args.args == (2, "https://www.linkedin.com/in/jane-doe")
         assert kwargs["status"] == ConnectionRequestStatus.PENDING
         assert kwargs["recipient_name"] == "Jane Doe"
         assert kwargs["source"] == "own_post"
@@ -113,6 +116,17 @@ class TestScanFiling:
         from cqc_lem.utilities.db import ConnectionRequestStatus
         _out, insert = _scan(prefs=_prefs(connection_targeting_mode="auto_queue"))
         assert insert.call_args.kwargs["status"] == ConnectionRequestStatus.APPROVED
+
+    def test_the_brand_accounts_targets_are_always_drafts(self):
+        """Owner ruling (#2376): brand acquisition targets are drafts, even under auto_queue.
+
+        The owner sends them; the scan still files them, as `pending`.
+        """
+        from cqc_lem.utilities.db import ConnectionRequestStatus
+        with patch("cqc_lem.utilities.brand_account.BRAND_USER_ID", ""):
+            out, insert = _scan(prefs=_prefs(connection_targeting_mode="auto_queue"), user_id=1)
+        assert insert.call_args.kwargs["status"] == ConnectionRequestStatus.PENDING
+        assert "Filed 1" in out
 
     def test_auto_queue_with_pre_review_still_needs_approval(self):
         from cqc_lem.utilities.db import ConnectionRequestStatus

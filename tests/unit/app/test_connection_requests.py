@@ -151,6 +151,58 @@ class TestSendConnectionRequest:
         assert "not sendable" in out
 
 
+class TestBrandAcquisitionHold:
+    """Owner ruling 2026-10-10 (#2376, option A): brand acquisition requests are never auto-sent.
+
+    Every other request — the owner's own manual ones, roster and profile-viewer rows, and every
+    other user's — sends as before.
+    """
+
+    def _send(self, user_id, source, brand_user_id=""):
+        from cqc_lem.app.engagement import invites as ra
+        req = {"id": 3, "user_id": user_id, "recipient_profile_url": "https://x/in/jane",
+               "message": "hi jane", "status": "approved", "recipient_email": None,
+               "source": source}
+        with patch("cqc_lem.utilities.brand_account.BRAND_USER_ID", brand_user_id), \
+             patch("cqc_lem.utilities.db.get_connection_request", return_value=req), \
+             patch("cqc_lem.utilities.db.count_invites_sent_today", return_value=0), \
+             patch(f"{_INV}.get_engagement_preferences", return_value={"max_invites_per_day": 10}), \
+             patch(f"{_INV}.invite_to_connect_now",
+                   return_value=(True, "Connection Request Sent Successfully")) as send, \
+             patch("cqc_lem.utilities.db.update_connection_request_status") as upd, \
+             patch("cqc_lem.utilities.db.record_connection_request_attempt"):
+            out = ra.send_connection_request(3)
+        return out, send, upd
+
+    @pytest.mark.parametrize("source", ["own_post", "adjacent_post", "outreach_funnel"])
+    def test_a_brand_acquisition_request_is_held_and_returned_to_pending(self, source):
+        from cqc_lem.utilities.brand_account import ACQUISITION_HOLD_REASON
+        from cqc_lem.utilities.db import ConnectionRequestStatus
+        out, send, upd = self._send(1, source)
+        send.assert_not_called()
+        upd.assert_called_once_with(3, ConnectionRequestStatus.PENDING,
+                                    failure_reason=ACQUISITION_HOLD_REASON)
+        assert "held" in out
+
+    @pytest.mark.parametrize("source", [None, "", "roster", "profile_viewer"])
+    def test_the_brand_accounts_ordinary_requests_still_send(self, source):
+        out, send, _upd = self._send(1, source)
+        send.assert_called_once()
+        assert "sent" in out
+
+    @pytest.mark.parametrize("source", ["own_post", "adjacent_post", "outreach_funnel"])
+    def test_other_users_acquisition_requests_still_send(self, source):
+        out, send, _upd = self._send(2, source)
+        send.assert_called_once()
+        assert "sent" in out
+
+    def test_the_hold_follows_an_overridden_brand_user(self):
+        _out, send, _upd = self._send(7, "own_post", brand_user_id="7")
+        send.assert_not_called()
+        _out, send, _upd = self._send(1, "own_post", brand_user_id="7")
+        send.assert_called_once()
+
+
 class TestInviteToConnectWrapper:
     def test_deferred_on_throttle(self):
         from cqc_lem.app.engagement import invites as ra

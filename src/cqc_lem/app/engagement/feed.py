@@ -86,6 +86,7 @@ from cqc_lem.utilities.ai.outbound_qa import (
     SURFACE_COMMENT as OUTBOUND_SURFACE_COMMENT,
     refusal_reason as outbound_refusal_reason,
 )
+from cqc_lem.utilities.brand_account import held_connect_sources
 from cqc_lem.utilities.comment_rotation import recent_comment_shapes, record_comment_shape
 from cqc_lem.utilities.connection_targeting import (
     SOURCE_ROSTER,
@@ -2085,7 +2086,8 @@ def roster_connect_budget(user_id: int, prefs: dict) -> int:
         return 0
     remaining = remaining_actions(user_id, ACTION_INVITE, cap,
                                   count_invites_sent_today(user_id)
-                                  + count_open_connection_requests(user_id),
+                                  + count_open_connection_requests(
+                                      user_id, exclude_sources=held_connect_sources(user_id)),
                                   caps=engagement_caps_from_prefs(prefs))
     if remaining <= 0:
         return 0
@@ -2822,6 +2824,25 @@ def _has_sourced_facts(user_id: int) -> bool:
                for entry in entries)
 
 
+_COMMENT_CAP_FALLBACK = 20
+
+
+def _comment_daily_cap(prefs: dict) -> int:
+    """The user's daily comment cap, where an explicit 0 MEANS 0.
+
+    The old `or 20` read a saved 0 as 20, so a user who switched feed commenting off by setting the
+    cap to 0 still got 20 comments a day (found under issue #2376). Only an absent or unreadable
+    value falls back.
+    """
+    raw = (prefs or {}).get("max_comments_per_day")
+    if raw is None:
+        return _COMMENT_CAP_FALLBACK
+    try:
+        return max(0, int(raw))
+    except (TypeError, ValueError):
+        return _COMMENT_CAP_FALLBACK
+
+
 def _comment_allowance_today(user_id: int) -> Optional[int]:
     """Today's remaining comment allowance, or None when it cannot be read (the caller fails open).
 
@@ -2829,7 +2850,7 @@ def _comment_allowance_today(user_id: int) -> Optional[int]:
     """
     try:
         prefs = get_engagement_preferences(user_id)
-        daily_cap = prefs.get("max_comments_per_day") or 20
+        daily_cap = _comment_daily_cap(prefs)
         return remaining_actions(user_id, ACTION_COMMENT, daily_cap, count_comments_today(user_id),
                                  caps=engagement_caps_from_prefs(prefs))
     except Exception as e:
@@ -2860,7 +2881,7 @@ def comment_on_feed_inline(driver, wait, my_profile: LinkedInProfile, user_id: i
         prefs = get_engagement_preferences(user_id)
     if engagers is None:
         engagers = get_recent_engagers(user_id)
-    daily_cap = prefs.get("max_comments_per_day") or 20
+    daily_cap = _comment_daily_cap(prefs)
     # Human pacing (issue #626): today's allowance is a stable random draw from the cap (with
     # weekend asymmetry and occasional rest days), and the account-level governor also caps the
     # COMBINED comment/DM/invite traffic — so a flat "cap comments every day" volume signature
