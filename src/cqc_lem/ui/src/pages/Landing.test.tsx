@@ -193,7 +193,18 @@ describe('honesty (issue #1300)', () => {
 
   // Issue #2366, free-trial scope: posts publish only after approval, engagement is suggestions the
   // user sends, and sign-in is LinkedIn OAuth. Scoped to the sections that copy change owns.
-  const SCOPED_SECTIONS = ['hero', 'proof', 'how_it_works', 'features', 'safety', 'comparison']
+  // Pricing is deliberately absent: its capability list is shared with the account page and is
+  // a separate change.
+  const SCOPED_SECTIONS = [
+    'hero',
+    'proof',
+    'problem',
+    'how_it_works',
+    'features',
+    'safety',
+    'comparison',
+    'final_cta',
+  ]
 
   function scopedText(container: HTMLElement): string {
     const parts = SCOPED_SECTIONS.map((name) => {
@@ -202,6 +213,11 @@ describe('honesty (issue #1300)', () => {
       return el?.textContent ?? ''
     })
     parts.push(screen.getByRole('contentinfo').textContent ?? '')
+    // The FAQ renders its seeded fallback here (the mocked API returns no entries), answers
+    // included — a collapsed answer is `hidden`, not absent, so it still counts as page text.
+    const faq = container.querySelector('#faq')
+    expect(faq, 'faq section is missing').not.toBeNull()
+    parts.push(faq?.textContent ?? '')
     return parts.join('\n')
   }
 
@@ -217,6 +233,11 @@ describe('honesty (issue #1300)', () => {
       /Nothing publishes until/i,
       /DMs land as drafts/i,
       /approval-gated/i,
+      /engages for you/i,
+      /engagement automation/i,
+      /(connect|asks for) your session/i,
+      /session cookies are stored/i,
+      /run the automation/i,
     ]) {
       expect(claim.test(text), `the page still matches ${claim}`).toBe(false)
     }
