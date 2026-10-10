@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.191.0](https://github.com/christopherqueenconsulting/linkedin_engagement_manager/compare/v0.190.0...v0.191.0) (2026-10-10)
+
+
+### Features
+
+* **agent-pipeline:** run every mode under the dontAsk permission profile ([#2365](https://github.com/christopherqueenconsulting/linkedin_engagement_manager/issues/2365)) ([34ebca2](https://github.com/christopherqueenconsulting/linkedin_engagement_manager/commit/34ebca2abe6303cdd908f51c6ed7a300dd3807c0))
+* **demo:** DEMO_MODE refuses every LinkedIn call and shows a demo badge (closes [#2372](https://github.com/christopherqueenconsulting/linkedin_engagement_manager/issues/2372)) ([#2384](https://github.com/christopherqueenconsulting/linkedin_engagement_manager/issues/2384)) ([f557d43](https://github.com/christopherqueenconsulting/linkedin_engagement_manager/commit/f557d439954b2e2d395bb7ce5b11abf7c998cd4e))
+* **scripts:** demo seed script for product recordings (closes [#2371](https://github.com/christopherqueenconsulting/linkedin_engagement_manager/issues/2371)) ([#2383](https://github.com/christopherqueenconsulting/linkedin_engagement_manager/issues/2383)) ([4a2eb80](https://github.com/christopherqueenconsulting/linkedin_engagement_manager/commit/4a2eb80c5743bc7fd7ed00fa36742759bcb49c24))
+
 ## [0.190.0](https://github.com/christopherqueenconsulting/linkedin_engagement_manager/compare/v0.189.1...v0.190.0) (2026-10-10)
 
 
