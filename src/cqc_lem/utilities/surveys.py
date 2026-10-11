@@ -66,7 +66,7 @@ _SURVEYS: dict = {
         "source": str(FeedbackSource.NPS),
         "subject": "Quick one: how likely are you to recommend LEM?",
         "headline": "How likely are you to recommend LEM?",
-        "body": ("You've had your first posts and automated engagement go out. One number, 0–10 — "
+        "body": ("You've had your first post go live with LEM. One number, 0–10 — "
                  "and if you have 10 seconds more, tell us why."),
         "cta_label": "Give a score",
     },

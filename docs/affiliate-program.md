@@ -128,8 +128,8 @@ At 0 the opt-out has no reward consequence at all: leaving takes nothing away, b
 given for joining. `POST /user/affiliate/status` still reports the resulting `trial_ends_at` (read
 back off the user when no reward moved), so the user is told their trial length either way.
 
-- A referral converts on **activation** (the #500 aha moment: a published post AND automated
-  engagement), not on a click and not on a raw signup. A farm of dormant accounts pays nobody.
+- A referral converts on **activation** (the #500 aha moment, since #2373 the first approved
+  post published), not on a click and not on a raw signup. A farm of dormant accounts pays nobody.
 - The cap grants the **remainder** rather than refusing: at 85/90 days, a 14-day reward pays 5.
 - The cap is measured on the ledger **SUM including revocations**, so opting out and back in is free,
   not profitable.

@@ -1,7 +1,8 @@
 """Activation checklist + stalled-user nudges (issue #500).
 
-"Aha" is the first AI post published AND the first automated comment/DM sent under the user's voice,
-within 7 days. Step completion is DERIVED from data we already store (session cookie, engagement
+"Aha" is the first approved post published (issue #2373). Under the free-trial scope posting runs
+through approval and engagement is suggestions only, so a comment or DM can no longer be required —
+and never counts on its own. Step completion is DERIVED from data we already store (session cookie, engagement
 preferences, posts, logs) and the first flip of each step is persisted in `onboarding_state`, so the
 SPA checklist is stable, the PostHog step event fires exactly once, and the nudge clock has a start.
 
@@ -23,7 +24,6 @@ from cqc_lem.utilities.db import (
     get_onboarding_nudges_sent,
     get_onboarding_state,
     get_user_subscription_info,
-    has_automated_engagement,
     has_engagement_preferences,
     has_linkedin_session,
     has_post_with_status,
@@ -38,14 +38,14 @@ STEP_LABELS: dict = {
     OnboardingStep.VOICE_SET: "Set your voice & targeting",
     OnboardingStep.FIRST_POST_APPROVED: "Approve your first post",
     OnboardingStep.CAPS_ENABLED: "Turn on daily engagement",
-    OnboardingStep.ACTIVATED: "Activated — first post live + first auto-engagement",
+    OnboardingStep.ACTIVATED: "Activated — first approved post live",
 }
 STEP_HINTS: dict = {
     OnboardingStep.LINKEDIN_CONNECTED: "Automation can't post or engage without an authorized session.",
     OnboardingStep.VOICE_SET: "Tone, topics, and who to engage with — this is what makes it sound like you.",
     OnboardingStep.FIRST_POST_APPROVED: "Approve a drafted post so your content plan starts publishing.",
     OnboardingStep.CAPS_ENABLED: "Set how many comments and DMs a day you're comfortable with.",
-    OnboardingStep.ACTIVATED: "Nothing to do — this flips on its own once both have happened.",
+    OnboardingStep.ACTIVATED: "Nothing to do — this flips on its own once an approved post publishes.",
 }
 STEP_PATHS: dict = {
     OnboardingStep.LINKEDIN_CONNECTED: "/account",
@@ -124,8 +124,8 @@ _TRIAL_NUDGE: dict = {
     "step": OnboardingStep.ACTIVATED,
     "subject": "Your trial ends soon — let's get your first post live",
     "headline": "Your trial ends in a few days",
-    "body": ("You haven't seen LEM actually run yet. Finish the last setup step and your first post "
-             "plus your first automated comment can go out before the trial is up."),
+    "body": ("You haven't seen LEM actually run yet. Approve a drafted post and your first post "
+             "can go live before the trial is up."),
     "cta_label": "Finish setup",
     "cta_path": "/account",
 }
@@ -150,8 +150,8 @@ def evaluate_steps(user_id: int) -> dict:
         OnboardingStep.FIRST_POST_APPROVED: has_post_with_status(
             user_id, (PostStatus.APPROVED, PostStatus.SCHEDULED, PostStatus.POSTED)),
         OnboardingStep.CAPS_ENABLED: caps_enabled,
-        # The aha moment: a published post AND automation having engaged in the user's voice.
-        OnboardingStep.ACTIVATED: posted and has_automated_engagement(user_id),
+        # The aha moment: the first approved post published (#2373). A comment or DM never counts.
+        OnboardingStep.ACTIVATED: posted,
     }
 
 
