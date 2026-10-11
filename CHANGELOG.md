@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.193.0](https://github.com/christopherqueenconsulting/linkedin_engagement_manager/compare/v0.192.0...v0.193.0) (2026-10-11)
+
+
+### Features
+
+* **analytics:** PostHog trial-test dashboard over existing funnel events ([2767541](https://github.com/christopherqueenconsulting/linkedin_engagement_manager/commit/27675413bbc430bae450edc70742c6113fa5fb8f)), closes [#2374](https://github.com/christopherqueenconsulting/linkedin_engagement_manager/issues/2374)
+* **analytics:** PostHog trial-test dashboard over existing funnel events (closes [#2374](https://github.com/christopherqueenconsulting/linkedin_engagement_manager/issues/2374)) ([#2395](https://github.com/christopherqueenconsulting/linkedin_engagement_manager/issues/2395)) ([2767541](https://github.com/christopherqueenconsulting/linkedin_engagement_manager/commit/27675413bbc430bae450edc70742c6113fa5fb8f))
+* **onboarding:** activation means the first approved post is published (closes [#2373](https://github.com/christopherqueenconsulting/linkedin_engagement_manager/issues/2373)) ([#2391](https://github.com/christopherqueenconsulting/linkedin_engagement_manager/issues/2391)) ([3ca7023](https://github.com/christopherqueenconsulting/linkedin_engagement_manager/commit/3ca70234bfc892001ecda127d5ef2455bbb0a618))
+
 ## [0.192.0](https://github.com/christopherqueenconsulting/linkedin_engagement_manager/compare/v0.191.0...v0.192.0) (2026-10-11)
 
 
