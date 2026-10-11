@@ -88,9 +88,11 @@ guardrails (caps, outbound volume, price display) switch atomically. Advancing a
 ### A.3 Fully-automated onboarding & activation (no human)
 
 **"Aha moment" (activation) definition:** a user reaches activation when, within their first 7 days, LEM has
-**published their first AI post AND landed their first automated feed comment/DM under the user's own voice
-settings** — i.e. they have seen LEM *act on LinkedIn for them*. This is the single event the whole funnel
-optimizes toward.
+**published their first approved post** — i.e. they have seen LEM *act on LinkedIn for them*. This is the single
+event the whole funnel optimizes toward. Since #2373 a comment or DM is **not** required and never counts on its
+own: under the free-trial scope (owner rulings 2026-10-10) posting runs through approval and engagement is
+suggestions only, so an engagement-gated activation could never fire for a trial account. The evaluator is
+`evaluate_steps` in `utilities/onboarding.py` — a `posted` post is the whole test.
 
 **Activation checklist** (rendered in the SPA, state persisted server-side, emitted to PostHog as each step
 completes):
@@ -98,8 +100,8 @@ completes):
 1. Connect LinkedIn session (cookie/extension) — reuses the LinkedIn Connect extension + verification-PIN flow.
 2. Set voice/tone + targeting in `Account.tsx` (`engagement_preferences`).
 3. Approve the first AI-generated post from the 30-day plan (`run_content_plan.py`).
-4. Enable feed commenting + DM caps.
-5. **Activated:** first post published + first comment/DM sent.
+4. Enable feed commenting + DM caps (still a checklist step; not part of activation).
+5. **Activated:** first approved post published.
 
 **Automated nudges for stalled users** — a new beat task `auto_onboarding_nudges` (daily, mirrors
 `auto_notify_missing_linkedin_session` throttling) inspects each trial user's checklist state and sends the next

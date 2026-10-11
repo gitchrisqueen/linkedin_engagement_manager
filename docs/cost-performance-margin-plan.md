@@ -179,7 +179,7 @@ Sourced from `post_stats`, `logs`, `post_engagers`, `commented_posts`, `comment_
   follow-ups — from `logs.action_type` (already snapshotted).
 - **Reciprocity:** engagers gained (`post_engagers`), comment-back rate.
 - **Funnel/outcomes:** profile views → connections → leads/DMs → replies (outreach funnel).
-- **Lifecycle:** activation (first successful post + first comment), weekly active automation,
+- **Lifecycle:** activation (first approved post published — #2373 dropped the first-comment half), weekly active automation,
   retention (subscription active + automation not paused).
 
 ### B.2 System aggregate & the metrics that only get better with scale
