@@ -90,7 +90,11 @@ from cqc_lem.utilities.db import (
     update_scheduled_dm_status,
     update_subscription_from_stripe,
 )
-from cqc_lem.utilities.engagement_mode import read_engagement_mode, skip_browser_lane
+from cqc_lem.utilities.engagement_mode import (
+    read_engagement_mode,
+    resolve_engagement_mode,
+    skip_browser_lane,
+)
 from cqc_lem.utilities.engagement_window import (
     PRE_POST_COMMENT_LEAD_MINUTES,
     PRE_POST_SKIP_PAST_WINDOW,
@@ -182,6 +186,20 @@ def _browser_lane_users(user_ids: list, task_name: str) -> list:
     is logged at DEBUG by `skip_browser_lane`.
     """
     return [uid for uid in user_ids if not skip_browser_lane(uid, task_name)]
+
+
+def _orphan_is_suggest_only(user_id: int, task_name: str, what: str) -> bool:
+    """True when an orphaned row belongs to a suggest-only account and must not be re-queued (#2367).
+
+    Its send task skips without changing the row, so a re-queue would leave it orphaned and the
+    reaper would warn about it every beat, for working behaviour. The row's status is left alone.
+    `resolve_engagement_mode` fails closed, so an unreadable mode skips too.
+    """
+    if resolve_engagement_mode(user_id) is not EngagementMode.SUGGEST:
+        return False
+    log_debug(f"Orphaned {what} not re-queued — suggest-only account", user_id=user_id,
+              task_name=task_name)
+    return True
 
 
 def _stagger_due(user_id: int, fanout: Tuple[str, int, int], task_name: str) -> bool:
@@ -443,6 +461,8 @@ def auto_check_scheduled_dms(self):
     orphaned = get_orphaned_scheduled_dms(lookback_hours=_DM_ORPHAN_LOOKBACK_HOURS)
     requeued_users: set = set()
     for dm_id, scheduled_time, user_id in orphaned:
+        if _orphan_is_suggest_only(user_id, "auto_check_scheduled_dms", "scheduled DM"):
+            continue
         if user_id in requeued_users:
             log_debug(f"Orphaned scheduled DM {dm_id} held for a later beat — one re-queue per user per run",
                       user_id=user_id, task_name="auto_check_scheduled_dms")
@@ -524,15 +544,19 @@ def auto_check_connection_requests(self):
     # mirrors the orphaned-DM recovery. The lookback gap avoids racing an in-flight task — which is
     # why the dispatch countdown above is clamped to stay inside it.
     orphaned = get_orphaned_connection_requests(lookback_hours=_CONNECTION_ORPHAN_LOOKBACK_HOURS)
+    requeued = 0
     for request_id, user_id in orphaned:
+        if _orphan_is_suggest_only(user_id, "auto_check_connection_requests", "connection request"):
+            continue
         log_warning(f"Re-queueing orphaned connection request {request_id}",
                     user_id=user_id, task_name="auto_check_connection_requests")
         update_connection_request_status(request_id, ConnectionRequestStatus.SENDING)
         send_connection_request.apply_async(kwargs={'request_id': request_id})
+        requeued += 1
 
-    if dispatched == 0 and len(orphaned) == 0:
+    if dispatched == 0 and requeued == 0:
         return "No Connection Requests to Send"
-    return f"Dispatched {dispatched} connection request(s); re-queued {len(orphaned)} orphaned"
+    return f"Dispatched {dispatched} connection request(s); re-queued {requeued} orphaned"
 
 
 @shared_task.task
@@ -2015,6 +2039,8 @@ def auto_check_catchup_touches():
     orphaned = get_orphaned_catchup_touches(lookback_hours=_CATCHUP_ORPHAN_LOOKBACK_HOURS)
     requeued_users: set = set()
     for touch_id, user_id in orphaned:
+        if _orphan_is_suggest_only(user_id, task_name, "catch-up touch"):
+            continue
         if user_id in requeued_users:
             log_debug(f"Orphaned catch-up touch {touch_id} held for a later beat — one re-queue per user per run",
                       user_id=user_id, task_name=task_name)

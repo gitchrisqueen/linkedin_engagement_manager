@@ -529,6 +529,62 @@ class TestDispatchers:
         req_status.assert_not_called()
         touch_status.assert_not_called()
 
+    # (beat, orphan reader, orphan row, send task) — the three reapers that re-queue a lost send.
+    _ORPHAN_REAPERS = [
+        ("auto_check_scheduled_dms", "get_orphaned_scheduled_dms", (5, datetime(2026, 10, 1), 2),
+         "send_scheduled_dm"),
+        ("auto_check_connection_requests", "get_orphaned_connection_requests", (5, 2),
+         "send_connection_request"),
+        ("auto_check_catchup_touches", "get_orphaned_catchup_touches", (5, 2), "send_catchup_touch"),
+    ]
+
+    def _run_reaper(self, task, reader, row, dispatched, state):
+        from cqc_lem.app import run_scheduler
+
+        with patch(_MODE, **state), \
+             patch(f"{_SCHED}._skip_if_throttled", return_value=False), \
+             patch(f"{_SCHED}.get_due_scheduled_dms", return_value=[]), \
+             patch(f"{_SCHED}.get_approved_connection_requests", return_value=[]), \
+             patch(f"{_SCHED}.get_approved_catchup_touches", return_value=[]), \
+             patch(f"{_SCHED}.get_orphaned_scheduled_dms", return_value=[]), \
+             patch(f"{_SCHED}.get_orphaned_connection_requests", return_value=[]), \
+             patch(f"{_SCHED}.get_orphaned_catchup_touches", return_value=[]), \
+             patch(f"{_SCHED}.{reader}", return_value=[row]), \
+             patch(f"{_SCHED}.report_catchup_run"), \
+             patch(f"{_SCHED}.count_pending_catchup_touches", return_value=0), \
+             patch(f"{_SCHED}.update_scheduled_dm_status") as dm_status, \
+             patch(f"{_SCHED}.update_connection_request_status") as req_status, \
+             patch(f"{_SCHED}.update_catchup_touch_status", return_value=True) as touch_status, \
+             patch(f"{_SCHED}.log_warning") as warn, \
+             patch(f"{_SCHED}.{dispatched}") as send:
+            getattr(run_scheduler, task).run()
+        return send, warn, (dm_status, req_status, touch_status)
+
+    @pytest.mark.parametrize("state", [{"return_value": _state("suggest")},
+                                       {"return_value": _state("automate", "trial", "free_trial")},
+                                       {"return_value": None}],
+                             ids=["suggest", "trial", "unreadable"])
+    @pytest.mark.parametrize("task,reader,row,dispatched", _ORPHAN_REAPERS,
+                             ids=[r[0] for r in _ORPHAN_REAPERS])
+    def test_a_suggest_accounts_orphan_is_not_requeued_and_warns_nothing(self, task, reader, row,
+                                                                         dispatched, state):
+        """Its send task skips without touching the row, so a re-queue would warn every beat."""
+        send, warn, statuses = self._run_reaper(task, reader, row, dispatched, state)
+        send.apply_async.assert_not_called()
+        warn.assert_not_called()
+        for status in statuses:
+            status.assert_not_called()  # the row is left exactly as it was
+
+    @pytest.mark.parametrize("task,reader,row,dispatched", _ORPHAN_REAPERS,
+                             ids=[r[0] for r in _ORPHAN_REAPERS])
+    def test_an_automate_accounts_orphan_is_still_requeued(self, task, reader, row, dispatched):
+        send, warn, _statuses = self._run_reaper(task, reader, row, dispatched,
+                                                 {"return_value": _state("automate")})
+        row_key = {"send_scheduled_dm": "dm_id", "send_connection_request": "request_id",
+                   "send_catchup_touch": "touch_id"}[dispatched]
+        send.apply_async.assert_called_once_with(kwargs={row_key: 5})
+        warn.assert_called_once()
+
 
 _FEED = "cqc_lem.app.engagement.feed"
 _URL = "https://www.linkedin.com/feed/update/urn:li:ugcPost:7479519458164695040/"
