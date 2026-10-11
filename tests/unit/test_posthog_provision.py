@@ -43,9 +43,9 @@ def _tile_by_name(name):
 
 
 class TestSpecs:
-    def test_three_consolidated_dashboards(self):
+    def test_four_consolidated_dashboards(self):
         names = [spec["name"] for spec in php.build_specs()]
-        assert names == [php.DASH_HEALTH, php.DASH_GROWTH, php.DASH_CHANNELS]
+        assert names == [php.DASH_HEALTH, php.DASH_GROWTH, php.DASH_CHANNELS, php.DASH_TRIAL]
         assert all(spec["tiles"] for spec in php.build_specs())
 
     def test_tile_names_are_globally_unique(self):
@@ -253,7 +253,7 @@ class TestReportSchedule:
 class TestPlanActions:
     def test_empty_project_creates_everything(self):
         actions = php.plan_actions(php.build_specs(), {}, {})
-        assert sum(1 for a in actions if a["action"] == "create_dashboard") == 3
+        assert sum(1 for a in actions if a["action"] == "create_dashboard") == len(php.build_specs())
         assert all(a["action"] in ("create_dashboard", "create_insight") for a in actions)
 
     def test_matching_state_is_unchanged(self):
@@ -435,6 +435,91 @@ class TestChannelDashboard:
         assert "properties.ref" in sql
 
 
+class TestTrialDashboard:
+    """Issue #2374: the "Trial test" dashboard over the existing funnel events."""
+
+    def _spec(self):
+        return next(spec for spec in php.build_specs() if spec["name"] == php.DASH_TRIAL)
+
+    def _tile(self, prefix):
+        return next(t for t in self._spec()["tiles"] if t["name"].startswith(prefix))
+
+    def test_carries_exactly_the_four_trial_tiles(self):
+        names = [tile["name"] for tile in self._spec()["tiles"]]
+        assert names == ["Trial — Signups by utm_source (90d)",
+                         "Trial — Activation within 7 days, by trial cohort",
+                         "Trial — Week-2 retention, by trial cohort",
+                         "Trial — Trial to paid, by trial cohort"]
+
+    def test_reads_only_existing_funnel_and_spa_events(self):
+        # No new instrumentation: every event the trial tiles read is already emitted.
+        events = set()
+        for tile in self._spec()["tiles"]:
+            events |= set(re.findall(r"'(\$?[a-z_]+)'", _sql(tile))) & {
+                "signup_completed", "trial_started", "activated", "subscription_started",
+                "post_approved", "$pageview", "api_call"}
+        assert events == {"signup_completed", "trial_started", "activated",
+                          "subscription_started", "post_approved", "$pageview"}
+        assert events <= set(php.SOURCE_EVENTS)
+
+    def test_every_property_read_is_coerced_to_a_string(self):
+        # docs/kpi-dashboards.md: PostHog matches on the ingested type, so a property a tile groups
+        # or filters on is read through toString() — never compared raw.
+        for tile in self._spec()["tiles"]:
+            sql = _sql(tile)
+            for match in re.finditer(r"properties\.(\w+)", sql):
+                before = sql[:match.start()]
+                assert before.endswith("toString("), f"{tile['name']}: raw {match.group(0)}"
+
+    def test_signups_tile_groups_on_utm_source_with_an_untagged_bucket(self):
+        sql = _sql(self._tile("Trial — Signups"))
+        assert "event = 'signup_completed'" in sql
+        assert "coalesce(nullIf(toString(properties.utm_source), ''), '(none)') AS source" in sql
+        assert "GROUP BY source" in sql
+
+    def test_activation_counts_only_closed_7_day_windows(self):
+        sql = _sql(self._tile("Trial — Activation"))
+        assert "event = 'activated'" in sql
+        assert "HAVING started <= now() - INTERVAL 7 DAY" in sql
+        assert "a.activated_at <= t.started + INTERVAL 7 DAY" in sql
+
+    def test_week2_retention_reads_days_7_to_13_and_skips_the_userless_api_call(self):
+        sql = _sql(self._tile("Trial — Week-2 retention"))
+        assert "HAVING started <= now() - INTERVAL 14 DAY" in sql
+        assert "e.timestamp >= t.started + INTERVAL 7 DAY" in sql
+        assert "e.timestamp < t.started + INTERVAL 14 DAY" in sql
+        # api_call is emitted without a user, so it lands on "anonymous" and cannot show a return.
+        assert "api_call" not in sql
+
+    def test_trial_to_paid_counts_only_trials_that_have_ended(self):
+        sql = _sql(self._tile("Trial — Trial to paid"))
+        assert "event = 'subscription_started'" in sql
+        assert "HAVING started <= now() - INTERVAL 14 DAY" in sql
+        assert "p.paid_at >= t.started" in sql
+
+    def test_cohort_tiles_plot_a_percentage_per_cohort_week(self):
+        for prefix, column in (("Trial — Activation", "activated_7d_pct"),
+                               ("Trial — Week-2 retention", "week2_retention_pct"),
+                               ("Trial — Trial to paid", "trial_to_paid_pct")):
+            settings = self._tile(prefix)["query"]["chartSettings"]
+            assert settings["xAxis"]["column"] == "cohort_week"
+            assert [y["column"] for y in settings["yAxis"]] == [column]
+
+    def test_rerun_against_a_provisioned_trial_dashboard_is_a_no_op(self):
+        spec = self._spec()
+        existing = {tile["name"]: {"id": 900 + i, "query": tile["query"],
+                                   "description": tile["description"], "dashboards": [14]}
+                    for i, tile in enumerate(spec["tiles"])}
+        actions = php.plan_actions([spec], {php.DASH_TRIAL: 14}, existing)
+        assert php.pending(actions) == []
+
+    def test_empty_project_creates_the_dashboard_then_its_tiles(self):
+        actions = php.plan_actions([self._spec()], {}, {})
+        assert actions[0] == {"action": "create_dashboard", "dashboard": php.DASH_TRIAL,
+                              "description": self._spec()["description"]}
+        assert [a["action"] for a in actions[1:]] == ["create_insight"] * 4
+
+
 class TestConversionGoals:
     def test_signup_goal_reads_the_browser_event_not_the_api_one(self):
         spec = next(s for s in php.conversion_goal_specs() if s["name"] == php.GOAL_SIGNUP)
@@ -509,7 +594,7 @@ class TestApplyActions:
         client.create_subscription.return_value = 44
         client.create_action.return_value = 55
         client.list_dashboards.return_value = {php.DASH_HEALTH: 11, php.DASH_GROWTH: 12,
-                                               php.DASH_CHANNELS: 13}
+                                               php.DASH_CHANNELS: 13, php.DASH_TRIAL: 14}
         return client
 
     def test_goal_actions_are_applied_and_dry_run_writes_nothing(self):
@@ -542,7 +627,7 @@ class TestApplyActions:
         client = self._client()
         actions = php.plan_actions(php.build_specs(), {}, {})
         php.apply_actions(client, actions, dry_run=False)
-        assert client.create_dashboard.call_count == 3
+        assert client.create_dashboard.call_count == len(php.build_specs())
         assert client.create_insight.call_count == len(_all_tiles())
         # Every insight lands on the id the create returned, not on a re-listed guess.
         assert all(call.args[1] == 11 for call in client.create_insight.call_args_list[:1])
