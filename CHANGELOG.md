@@ -1,5 +1,15 @@
 # Changelog
 
+## [0.192.0](https://github.com/christopherqueenconsulting/linkedin_engagement_manager/compare/v0.191.0...v0.192.0) (2026-10-11)
+
+
+### Features
+
+* **accounts:** start new accounts with post approval on ([#2366](https://github.com/christopherqueenconsulting/linkedin_engagement_manager/issues/2366) defaults) ([22959cc](https://github.com/christopherqueenconsulting/linkedin_engagement_manager/commit/22959ccb31be80a145a30cb151b11ced21a2bcc5))
+* **accounts:** start new accounts with post approval on (defaults half of [#2366](https://github.com/christopherqueenconsulting/linkedin_engagement_manager/issues/2366)) ([#2388](https://github.com/christopherqueenconsulting/linkedin_engagement_manager/issues/2388)) ([22959cc](https://github.com/christopherqueenconsulting/linkedin_engagement_manager/commit/22959ccb31be80a145a30cb151b11ced21a2bcc5))
+* **ai:** soft daily AI spend cap per free-trial user (closes [#2378](https://github.com/christopherqueenconsulting/linkedin_engagement_manager/issues/2378)) ([#2385](https://github.com/christopherqueenconsulting/linkedin_engagement_manager/issues/2385)) ([e58da51](https://github.com/christopherqueenconsulting/linkedin_engagement_manager/commit/e58da51a5f6a0045768db3dcf85d0133ff948372))
+* **brand:** hold brand acquisition outbound at 0; owner sends ([#2376](https://github.com/christopherqueenconsulting/linkedin_engagement_manager/issues/2376)) ([#2389](https://github.com/christopherqueenconsulting/linkedin_engagement_manager/issues/2389)) ([69b2247](https://github.com/christopherqueenconsulting/linkedin_engagement_manager/commit/69b2247efc65165d60896a8423911ed9369e0175))
+
 ## [0.191.0](https://github.com/christopherqueenconsulting/linkedin_engagement_manager/compare/v0.190.0...v0.191.0) (2026-10-10)
 
 
