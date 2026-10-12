@@ -1,5 +1,24 @@
 # Changelog
 
+## [0.194.0](https://github.com/christopherqueenconsulting/linkedin_engagement_manager/compare/v0.193.0...v0.194.0) (2026-10-12)
+
+
+### Features
+
+* **marketing:** UTM links for the three demo videos (closes [#2379](https://github.com/christopherqueenconsulting/linkedin_engagement_manager/issues/2379)) ([#2407](https://github.com/christopherqueenconsulting/linkedin_engagement_manager/issues/2407)) ([6445353](https://github.com/christopherqueenconsulting/linkedin_engagement_manager/commit/6445353cf21be08f8e8c38f17321bf6e69d71d53))
+
+
+### Bug Fixes
+
+* **agent-pipeline:** sweep lane processes that outlive their lane ([#2416](https://github.com/christopherqueenconsulting/linkedin_engagement_manager/issues/2416)) ([94c577c](https://github.com/christopherqueenconsulting/linkedin_engagement_manager/commit/94c577c45f35d4e3d888c5b91676e2f02e4a445b))
+* **billing:** stop generation and publishing when a free trial ends (closes [#2380](https://github.com/christopherqueenconsulting/linkedin_engagement_manager/issues/2380)) ([#2408](https://github.com/christopherqueenconsulting/linkedin_engagement_manager/issues/2408)) ([12ab264](https://github.com/christopherqueenconsulting/linkedin_engagement_manager/commit/12ab26440f6c406f841028436633d3dbe90d049c))
+* **engagement:** end the run cleanly when the Chrome tab crashes (closes [#2393](https://github.com/christopherqueenconsulting/linkedin_engagement_manager/issues/2393), [#2402](https://github.com/christopherqueenconsulting/linkedin_engagement_manager/issues/2402), [#2403](https://github.com/christopherqueenconsulting/linkedin_engagement_manager/issues/2403)) ([#2409](https://github.com/christopherqueenconsulting/linkedin_engagement_manager/issues/2409)) ([c855616](https://github.com/christopherqueenconsulting/linkedin_engagement_manager/commit/c855616c0956adcbf35180e05869930f7d898c1d))
+* **engagement:** re-ground the roster follow control on the 2026-10 activity page (closes [#2399](https://github.com/christopherqueenconsulting/linkedin_engagement_manager/issues/2399)) ([#2404](https://github.com/christopherqueenconsulting/linkedin_engagement_manager/issues/2404)) ([bf5bf21](https://github.com/christopherqueenconsulting/linkedin_engagement_manager/commit/bf5bf21d30d59b40cb83b7940ca00d3ed69776e0))
+* **feed:** claim group-feed comment composer by page-read post ownership ([#2398](https://github.com/christopherqueenconsulting/linkedin_engagement_manager/issues/2398)) ([8da7e8c](https://github.com/christopherqueenconsulting/linkedin_engagement_manager/commit/8da7e8c6ea62cb70d16d632fab18fe14340b0373))
+* **feed:** claim group-feed comment composer by page-read post ownership (refs [#2398](https://github.com/christopherqueenconsulting/linkedin_engagement_manager/issues/2398)) ([#2401](https://github.com/christopherqueenconsulting/linkedin_engagement_manager/issues/2401)) ([8da7e8c](https://github.com/christopherqueenconsulting/linkedin_engagement_manager/commit/8da7e8c6ea62cb70d16d632fab18fe14340b0373))
+* **sdui:** grade the permalink_comment probe so the sweep stops reading it as unmeasured (closes [#2400](https://github.com/christopherqueenconsulting/linkedin_engagement_manager/issues/2400)) ([#2405](https://github.com/christopherqueenconsulting/linkedin_engagement_manager/issues/2405)) ([4522f6f](https://github.com/christopherqueenconsulting/linkedin_engagement_manager/commit/4522f6f6c49bd256f5eab80043c965f8a5b9e785))
+* **watchdog:** dedupe alert emails, log events locally, turn off click tracking ([#2417](https://github.com/christopherqueenconsulting/linkedin_engagement_manager/issues/2417)) ([b4de4dc](https://github.com/christopherqueenconsulting/linkedin_engagement_manager/commit/b4de4dcbce64111243ae7b5b0ac3d605f93ae20d))
+
 ## [0.193.0](https://github.com/christopherqueenconsulting/linkedin_engagement_manager/compare/v0.192.0...v0.193.0) (2026-10-11)
 
 
