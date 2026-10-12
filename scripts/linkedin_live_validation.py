@@ -2006,6 +2006,10 @@ def message_thread_verdict(reading: Optional[dict]) -> str:
     """
     reading = dict(reading or {})
     if not reading.get("opened"):
+        if compose_screen_only(reading):
+            return ("every route that clicked landed on the empty full-page compose screen — the "
+                    "shape a person with NO prior thread renders, which the ladder rejects by "
+                    "design (#1851); re-probe a person with a thread before calling this drift")
         if reading.get("routes_skipped"):
             return ("no direct route opened a thread — the profile-side routes are the finding; the "
                     "last-resort messaging-search route was skipped (it types a name into a box)")
@@ -2017,6 +2021,20 @@ def message_thread_verdict(reading: Optional[dict]) -> str:
         return (f"opened via {route}, but no LinkedIn display name is saved for this user "
                 f"(reply state = unknown — set it under Settings > Setup & Connection)")
     return f"opened via {route}"
+
+
+def compose_screen_only(reading: Optional[dict]) -> bool:
+    """Did every traced click land on the empty full-page compose screen (issue #2325)?
+
+    That is the one reading the ladder rejects by design — a person with no prior thread — so a walk
+    made only of it is named as such instead of being read as selector drift. False when nothing was
+    clicked, or when any click rendered something else.
+    """
+    surfaces = [click.get("surface") or {}
+                for route in (reading or {}).get("route_trace") or []
+                for click in route.get("clicks") or [] if click.get("clicked")]
+    return bool(surfaces) and all(s.get("reason") == "compose_screen_without_messages"
+                                  for s in surfaces)
 
 
 def message_thread_state(reading: Optional[dict]) -> str:
@@ -6812,6 +6830,13 @@ def probe_message_thread(driver, profile_url: str, person_name: str = "", self_n
     """#731: walk the message-thread resolution ladder against a REAL profile and report which route
     resolved, which surface rendered (overlay vs full page), and what the reply reader then sees.
 
+    #2325: the walk is TRACED, so `route_trace` carries, per route, every candidate control each scan
+    saw (aria-label present or absent, shown, belongs-to-target verdict), every element the route
+    chose, and the post-click surface (URL path, composer, event count, and `is_open_thread`'s
+    verdict with its reason). `degree` is the top card's badge, `unknown` when none was readable —
+    never guessed. `windows` is the tab count before and after the walk; the ladder owns its windows
+    (#1796), so anything but one-and-one is a leak.
+
     `self_name` is the saved LinkedIn display name, so the probe also answers the OTHER half of a
     live reply check: does the name the user typed into Settings actually match what LinkedIn writes
     on their own messages? A mismatch reads as UNKNOWN in production and silently stops follow-ups.
@@ -6837,9 +6862,10 @@ def probe_message_thread(driver, profile_url: str, person_name: str = "", self_n
         ROUTE_MESSAGING_SEARCH, open_message_thread, profile_urn_from_page, read_last_sender)
 
     wait = WebDriverWait(driver, 10)
+    windows_before = _window_count(driver)
     try:
         opened = open_message_thread(driver, wait, profile_url, person_name=person_name or None,
-                                     skip_routes=(ROUTE_MESSAGING_SEARCH,))
+                                     skip_routes=(ROUTE_MESSAGING_SEARCH,), trace=True)
     except ReadOnlyViolation as e:
         return graded({"profile_url": profile_url, "opened": False, "route": None,
                        "read_only_blocked": str(e)}, STATE_UNKNOWN,
@@ -6853,12 +6879,23 @@ def probe_message_thread(driver, profile_url: str, person_name: str = "", self_n
                "surface": opened.surface,
                "events": opened.events,
                "composer": opened.composer,
+               "degree": opened.degree or "unknown",
+               "route_trace": list(opened.route_trace),
+               "windows": {"before": windows_before, "after": _window_count(driver)},
                "self_name": self_name or "",
                "profile_urn": profile_urn_from_page(driver, profile_url)}
     sleep(1)
     reading["last_sender"] = read_last_sender(driver) if opened.opened else ""
     reading["reply_state"] = _reply_state(reading)
     return graded(reading, message_thread_state(reading), message_thread_verdict(reading))
+
+
+def _window_count(driver) -> Optional[int]:
+    """How many tabs the driver holds — None when unreadable, never a guessed number."""
+    try:
+        return len(driver.window_handles)
+    except Exception:
+        return None
 
 
 def _reply_state(reading: dict) -> str:

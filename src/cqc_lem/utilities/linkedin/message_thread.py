@@ -59,8 +59,8 @@ import re
 import time
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Collection, Optional
-from urllib.parse import quote, unquote
+from typing import Callable, Collection, Optional
+from urllib.parse import quote, unquote, urlparse
 
 from bs4 import BeautifulSoup
 from selenium.common import NoSuchElementException, StaleElementReferenceException, WebDriverException
@@ -70,7 +70,7 @@ from selenium.webdriver.remote.webdriver import WebDriver
 from selenium.webdriver.remote.webelement import WebElement
 from selenium.webdriver.support.wait import WebDriverWait
 
-from cqc_lem.utilities.linkedin.helper import can_open_dm_thread
+from cqc_lem.utilities.linkedin.helper import can_open_dm_thread, connection_degree
 from cqc_lem.utilities.linkedin.scrapper import _degree_from_source
 from cqc_lem.utilities.logger import log_debug, log_info, log_warning
 from cqc_lem.utilities.selenium_util import find_first
@@ -218,6 +218,10 @@ class ThreadOpen:
     surface: Optional[str] = None
     tried: list[str] = field(default_factory=list)
     skipped: list[str] = field(default_factory=list)
+    # The top card's degree badge ('1st' / '2nd' / '3rd+'), None when it was absent or unreadable.
+    degree: Optional[str] = None
+    # Per-route evidence, filled only when the walk is asked to `trace` (the live probe, #2325).
+    route_trace: list[dict] = field(default_factory=list)
 
     def __bool__(self) -> bool:
         """True when the ladder verified an open thread."""
@@ -520,6 +524,31 @@ def is_open_thread(reading: Optional[dict]) -> bool:
     return reading.get("surface") == SURFACE_OVERLAY
 
 
+# Why `is_open_thread` reached its verdict — the probe's vocabulary, so these are stable strings.
+OPEN_REASON_EVENTS = "message_events"
+OPEN_REASON_EMPTY_OVERLAY = "empty_overlay_thread"
+OPEN_REASON_COMPOSE_SCREEN = "compose_screen_without_messages"
+OPEN_REASON_NOTHING = "nothing_rendered"
+
+
+def open_thread_reason(reading: Optional[dict]) -> str:
+    """Which branch of `is_open_thread` decided this reading (issue #2325).
+
+    `compose_screen_without_messages` is the #1851 rejection: the full-page compose screen, which a
+    person with no prior thread lands on by design. Reporting it by name is what lets a live probe
+    tell that case apart from a route that rendered nothing at all.
+    """
+    if not reading:
+        return OPEN_REASON_NOTHING
+    if reading.get("events"):
+        return OPEN_REASON_EVENTS
+    if not reading.get("composer"):
+        return OPEN_REASON_NOTHING
+    if reading.get("surface") == SURFACE_OVERLAY:
+        return OPEN_REASON_EMPTY_OVERLAY
+    return OPEN_REASON_COMPOSE_SCREEN
+
+
 def _verified_reading(reading: Optional[dict]) -> Optional[dict]:
     """The reading a ladder route may report as success — None when only a composer rendered.
 
@@ -669,23 +698,49 @@ def _rehome_reading(driver: WebDriver, ledger: _WindowLedger, timeout: float) ->
     return _verified_reading(_wait_thread_open(driver, timeout))
 
 
-def _grade_after_action(driver: WebDriver, ledger: _WindowLedger, timeout: float) -> Optional[dict]:
+def _surface_evidence(driver: WebDriver, reading: dict, new_windows: int) -> dict:
+    """What one click/navigation rendered, as the live probe reports it (issue #2325).
+
+    Only the URL PATH is kept: the query carries the person's URN, which identifies them and adds
+    nothing to telling a thread view from the compose screen.
+    """
+    try:
+        path = urlparse(str(driver.current_url or "")).path
+    except WebDriverException:
+        path = ""
+    return {"url_path": path, "new_windows": new_windows,
+            "events": int(reading.get("events") or 0), "composer": bool(reading.get("composer")),
+            "surface": reading.get("surface"), "open_thread": is_open_thread(reading),
+            "reason": open_thread_reason(reading)}
+
+
+def _grade_after_action(driver: WebDriver, ledger: _WindowLedger, timeout: float,
+                        record: Optional[dict] = None) -> Optional[dict]:
     """Verify the outcome of ONE click/navigation, on whichever window it rendered in.
 
     If the action opened windows, the newest is where the outcome is graded — the driver reading the
     tab it was already on is how a thread that opened fine was scored as a miss (#1796). Whatever
     the verdict, the windows the action opened are closed and the driver is back on the original
     before this returns: a verified thread is re-homed there (`_rehome_reading`), a miss just tidied.
+
+    `record`, when given, receives the post-click surface reading under `surface` — the evidence a
+    traced walk reports, taken on the window the outcome was graded on.
     """
     opened = _windows_opened_since(driver, ledger)
     if not opened:
-        return _verified_reading(_wait_thread_open(driver, timeout))
+        reading = _wait_thread_open(driver, timeout)
+        if record is not None:
+            record["surface"] = _surface_evidence(driver, reading, 0)
+        return _verified_reading(reading)
     try:
         driver.switch_to.window(opened[-1])
     except WebDriverException as e:
         log_debug("Could not switch to the window a message-thread route opened", exc=e,
                   action_type="followup")
-    verified = _verified_reading(_wait_thread_open(driver, timeout))
+    reading = _wait_thread_open(driver, timeout)
+    if record is not None:
+        record["surface"] = _surface_evidence(driver, reading, len(opened))
+    verified = _verified_reading(reading)
     if verified:
         return _rehome_reading(driver, ledger, timeout)
     _close_opened_windows(driver, ledger)
@@ -743,18 +798,66 @@ def _control_belongs_to_target(element: WebElement, person_name: Optional[str],
     return False
 
 
-def _visible_elements(root, locators: list[tuple[str, str]], accept=None) -> list[WebElement]:
+# A traced walk records at most this many candidates per locator rung — the rail can be long.
+_TRACE_CANDIDATES_PER_RUNG = 12
+
+
+def candidate_evidence(element: WebElement, locator: str,
+                       accept: Optional[Callable[[WebElement], bool]] = None) -> dict:
+    """One candidate control as a traced walk reports it (issue #2325). Every read is best-effort.
+
+    `aria_label_present` is the #1796 discriminator itself: the target's own Message anchor has NO
+    aria-label attribute (None), while a rail stranger's carries `Message <Name>`. `belongs_to_target`
+    is None when the route applies no attribution gate (the More-menu openers).
+    """
+    def _attr(name: str) -> Optional[str]:
+        try:
+            value = element.get_attribute(name)
+        except (StaleElementReferenceException, WebDriverException):
+            return None
+        return None if value is None else str(value)
+
+    label = _attr("aria-label")
+    href = _attr("href")
+    try:
+        tag = str(element.tag_name or "")
+    except (StaleElementReferenceException, WebDriverException, AttributeError):
+        tag = ""
+    try:
+        text = " ".join(str(element.text or "").split())[:60]
+    except (StaleElementReferenceException, WebDriverException):
+        text = ""
+    belongs = None
+    if accept is not None:
+        try:
+            belongs = bool(accept(element))
+        except (StaleElementReferenceException, WebDriverException):
+            belongs = False
+    return {"locator": locator, "tag": tag, "text": text,
+            "aria_label_present": label is not None, "aria_label": (label or "")[:80],
+            "href_path": urlparse(href).path if href else "",
+            "shown": _is_shown(element), "belongs_to_target": belongs}
+
+
+def _visible_elements(root, locators: list[tuple[str, str]], accept=None,
+                      seen: Optional[list] = None) -> list[WebElement]:
     """Shown matches (that `accept` allows) from the FIRST locator that yields any, in document order.
 
     The ladder needs a fail-FAST scan, so this never waits (routes get their patience in the
     post-click verification instead). A rung whose every match is hidden or refused by `accept`
     yields nothing and the next rung is tried — a positional `[0]` never wins by document order.
+
+    `seen`, when given, collects `candidate_evidence` for every match of every rung scanned — the
+    hidden and refused ones included, because those are what a traced walk exists to show.
     """
     for find_by, value in locators:
         try:
             found = root.find_elements(find_by, value)
         except (WebDriverException, StaleElementReferenceException, NoSuchElementException):
             continue
+        if seen is not None:
+            seen.extend(candidate_evidence(el, value, accept)
+                        for el in (found or [])[:_TRACE_CANDIDATES_PER_RUNG])
         visible = [el for el in found or []
                    if _is_shown(el) and (accept is None or accept(el))]
         if visible:
@@ -775,43 +878,63 @@ def _click(driver: WebDriver, element: WebElement) -> bool:
             return False
 
 
+def _trace_click(trace: Optional[dict], chosen: dict) -> Optional[dict]:
+    """Open one click record on a traced route; None (record nothing) on an untraced walk."""
+    if trace is None:
+        return None
+    record = {"chosen": chosen, "clicked": False}
+    trace.setdefault("clicks", []).append(record)
+    return record
+
+
 def _try_control(driver: WebDriver, locators: list[tuple[str, str]], root=None,
-                 timeout: float = THREAD_RENDER_TIMEOUT_SECONDS, accept=None) -> Optional[dict]:
+                 timeout: float = THREAD_RENDER_TIMEOUT_SECONDS, accept=None,
+                 trace: Optional[dict] = None) -> Optional[dict]:
     """Click each accepted, shown control in turn; return the verification reading once one opens.
 
     `accept` is the attribution gate (`_control_belongs_to_target`): a candidate it refuses is never
     clicked, even when it is the only match. Every click is graded through `_grade_after_action`,
     so a click that opened a window has it closed again before the next candidate is tried.
+
+    `trace` (a traced walk's per-route dict) collects the candidates seen, each element chosen, and
+    what its click rendered.
     """
-    for element in _visible_elements(root if root is not None else driver, locators, accept):
+    seen = trace.setdefault("candidates", []) if trace is not None else None
+    for element in _visible_elements(root if root is not None else driver, locators, accept, seen):
+        record = _trace_click(trace, candidate_evidence(element, "chosen", accept)
+                              if trace is not None else {})
         ledger = _window_ledger(driver)
         if not _click(driver, element):
             continue
-        verified = _grade_after_action(driver, ledger, timeout)
+        if record is not None:
+            record["clicked"] = True
+        verified = _grade_after_action(driver, ledger, timeout, record)
         if verified:
             return verified
     return None
 
 
-def _try_overflow(driver: WebDriver, timeout: float, accept=None) -> Optional[dict]:
+def _try_overflow(driver: WebDriver, timeout: float, accept=None,
+                  trace: Optional[dict] = None) -> Optional[dict]:
     """LinkedIn demotes Message into the top-card **More** menu for some profiles/states.
 
     Several 'More' controls can share a page, so each is opened in turn and routes 1-2 re-run
     inside it, under the same attribution gate.
     """
-    for menu in _visible_elements(driver, _MORE_LOCATORS):
+    menus_seen = trace.setdefault("menus", []) if trace is not None else None
+    for menu in _visible_elements(driver, _MORE_LOCATORS, seen=menus_seen):
         if not _click(driver, menu):
             continue
         time.sleep(_POLL_SECONDS)
         for locators in (_ANCHOR_LOCATORS, _TEXT_NODE_LOCATORS):
-            reading = _try_control(driver, locators, timeout=timeout, accept=accept)
+            reading = _try_control(driver, locators, timeout=timeout, accept=accept, trace=trace)
             if reading:
                 return reading
     return None
 
 
 def _try_direct_url(driver: WebDriver, timeout: float, urn: Optional[str] = None,
-                    profile_url: str = "") -> Optional[dict]:
+                    profile_url: str = "", trace: Optional[dict] = None) -> Optional[dict]:
     """The strongest fallback: navigate straight to the compose URL built from the person's URN.
 
     Nothing depends on a rendered control at all.
@@ -831,15 +954,22 @@ def _try_direct_url(driver: WebDriver, timeout: float, urn: Optional[str] = None
     Message anchor lands on this same compose screen and could reproduce it one route earlier.
     """
     urn = urn or profile_urn_from_page(driver, profile_url)
+    if trace is not None:
+        trace["urn_found"] = bool(urn)
     if not urn:
         return None
+    record = _trace_click(trace, {"locator": "compose_url_for(urn)", "href_path":
+                                  urlparse(COMPOSE_URL).path})
     ledger = _window_ledger(driver)
     driver.get(compose_url_for(urn))
-    return _grade_after_action(driver, ledger, timeout)
+    if record is not None:
+        record["clicked"] = True
+    return _grade_after_action(driver, ledger, timeout, record)
 
 
 def _try_messaging_search(driver: WebDriver, wait: WebDriverWait, person_name: Optional[str],
-                          profile_url: str, timeout: float) -> Optional[dict]:
+                          profile_url: str, timeout: float,
+                          trace: Optional[dict] = None) -> Optional[dict]:
     """Slowest route, and the only one that works when the profile page offers nothing.
 
     Opens /messaging/, searches the person by name, and opens the matching conversation.
@@ -887,13 +1017,30 @@ def _try_messaging_search(driver: WebDriver, wait: WebDriverWait, person_name: O
             continue  # it names SOMEBODY ELSE — never guess past that
         elif not (name_matches(name, text) or name_matches(derived, text)):
             continue
+        record = _trace_click(trace, {"locator": "conversation row", "text": " ".join(text.split())[:60]})
         ledger = _window_ledger(driver)
         if not _click(driver, item):
             continue
-        verified = _grade_after_action(driver, ledger, timeout)
+        if record is not None:
+            record["clicked"] = True
+        verified = _grade_after_action(driver, ledger, timeout, record)
         if verified:
             return verified
     return None
+
+
+def _read_profile_degree(driver: WebDriver, profile_url: str = "") -> Optional[str]:
+    """The just-rendered profile's raw top-card degree badge — None when the read itself failed.
+
+    '' (no badge rendered) and None (unreadable) both mean UNKNOWN to every caller; they are kept
+    apart only so the failed read is logged.
+    """
+    try:
+        return _degree_from_source(BeautifulSoup(driver.page_source, "html.parser"))
+    except Exception as e:
+        log_debug("Could not read the profile's connection degree; trying every route", exc=e,
+                  profile_url=profile_url, action_type="followup")
+        return None
 
 
 def _profile_side_routes_worth_trying(driver: WebDriver, profile_url: str = "") -> bool:
@@ -910,19 +1057,15 @@ def _profile_side_routes_worth_trying(driver: WebDriver, profile_url: str = "") 
     connectable", so a selector drift here costs back the four wasted attempts it was meant to
     save, and never a missed follow-up.
     """
-    try:
-        degree = _degree_from_source(BeautifulSoup(driver.page_source, "html.parser"))
-    except Exception as e:
-        log_debug("Could not read the profile's connection degree; trying every route", exc=e,
-                  profile_url=profile_url, action_type="followup")
-        return True
-    return can_open_dm_thread(degree)
+    degree = _read_profile_degree(driver, profile_url)
+    return True if degree is None else can_open_dm_thread(degree)
 
 
 def open_message_thread(driver: WebDriver, wait: WebDriverWait, profile_url: str,
                         person_name: Optional[str] = None, user_id: Optional[int] = None,
                         timeout: float = THREAD_RENDER_TIMEOUT_SECONDS,
-                        skip_routes: Optional[Collection[str]] = None) -> ThreadOpen:
+                        skip_routes: Optional[Collection[str]] = None,
+                        trace: bool = False) -> ThreadOpen:
     """Open this person's 1:1 message thread, walking every known route until one VERIFIABLY works.
 
     Routes, in order: profile anchor → tag-agnostic 'Message' text node → the top-card More menu →
@@ -952,6 +1095,11 @@ def open_message_thread(driver: WebDriver, wait: WebDriverWait, profile_url: str
     anyone else is three guaranteed misses and a full page render for nothing. An unreadable badge
     changes nothing here — every route is still tried, exactly as before this existed.
 
+    The badge itself is returned as `ThreadOpen.degree`. `trace=True` (the live probe, issue #2325)
+    also fills `ThreadOpen.route_trace` with one dict per route — the candidates each scan saw, every
+    element it chose, and what each click rendered — at the cost of a few extra attribute reads per
+    candidate, which is why production walks leave it off.
+
     Every route exhausted is the EXPECTED outcome for anyone this account cannot message this way
     (not a 1st-degree connection, InMail-only, messaging restricted) — not evidence the selectors
     rotted (same reasoning as `open_addressed_composer`'s `composer_missing`, issue #1710). The
@@ -973,21 +1121,23 @@ def open_message_thread(driver: WebDriver, wait: WebDriverWait, profile_url: str
         return _control_belongs_to_target(element, person_name, profile_url)
 
     attempts = (
-        (ROUTE_ANCHOR, lambda: _try_control(driver, _ANCHOR_LOCATORS, timeout=timeout,
-                                            accept=belongs)),
-        (ROUTE_TEXT_NODE, lambda: _try_control(driver, _TEXT_NODE_LOCATORS, timeout=timeout,
-                                               accept=belongs)),
-        (ROUTE_OVERFLOW, lambda: _try_overflow(driver, timeout, accept=belongs)),
-        (ROUTE_DIRECT_URL, lambda: _try_direct_url(driver, timeout, urn, profile_url)),
-        (ROUTE_MESSAGING_SEARCH, lambda: _try_messaging_search(driver, wait, person_name,
-                                                               profile_url, timeout)),
+        (ROUTE_ANCHOR, lambda rt: _try_control(driver, _ANCHOR_LOCATORS, timeout=timeout,
+                                               accept=belongs, trace=rt)),
+        (ROUTE_TEXT_NODE, lambda rt: _try_control(driver, _TEXT_NODE_LOCATORS, timeout=timeout,
+                                                  accept=belongs, trace=rt)),
+        (ROUTE_OVERFLOW, lambda rt: _try_overflow(driver, timeout, accept=belongs, trace=rt)),
+        (ROUTE_DIRECT_URL, lambda rt: _try_direct_url(driver, timeout, urn, profile_url, trace=rt)),
+        (ROUTE_MESSAGING_SEARCH, lambda rt: _try_messaging_search(driver, wait, person_name,
+                                                                  profile_url, timeout, trace=rt)),
     )
     skip = set(skip_routes or ())
     unknown = skip - set(ROUTES)
     if unknown:
         raise ValueError(f"skip_routes names unknown route(s): {sorted(unknown)}; valid ids are "
                          f"{list(ROUTES)}")
-    if not _profile_side_routes_worth_trying(driver, profile_url):
+    raw_degree = _read_profile_degree(driver, profile_url)
+    result.degree = connection_degree(raw_degree or "")
+    if raw_degree is not None and not can_open_dm_thread(raw_degree):
         profile_side = {ROUTE_ANCHOR, ROUTE_TEXT_NODE, ROUTE_OVERFLOW} - skip
         if profile_side:
             log_debug(f"{profile_url} is not 1st degree — skipping the profile-side Message "
@@ -1000,14 +1150,19 @@ def open_message_thread(driver: WebDriver, wait: WebDriverWait, profile_url: str
                       action_type="followup")
             continue
         result.tried.append(route)
+        route_trace = {"route": route} if trace else None
+        if route_trace is not None:
+            result.route_trace.append(route_trace)
         ledger = _window_ledger(driver)
         try:
-            reading = attempt()
+            reading = attempt(route_trace)
         except Exception as e:
             # One broken route must never end the ladder — that is the failure this module exists
             # to stop. Record it and keep walking.
             log_warning(f"Message-thread route '{route}' raised", exc=e, user_id=user_id,
                         action_type="followup", profile_url=profile_url)
+            if route_trace is not None:
+                route_trace["error"] = type(e).__name__
             continue
         finally:
             # Belt and braces over the per-click grading: whatever the route left open — a More

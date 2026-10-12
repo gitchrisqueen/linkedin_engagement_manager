@@ -1175,3 +1175,114 @@ class TestTargetScopedControls:
 
     def test_an_unparseable_size_is_left_to_is_displayed(self):
         assert mt._is_shown(FakeElement(size={"width": "wide", "height": None})) is True
+
+
+class TestTracedWalk:
+    """Issue #2325: a traced walk reports, per route, what each scan saw, what it chose, and what the
+    click rendered — enough to tell the #1851 no-prior-thread compose screen apart from drift.
+    """
+
+    FIRST_DEGREE_SOURCE = "<main><span>1st</span></main>"
+    COMPOSE_URL = "https://www.linkedin.com/messaging/compose/?profileUrn=urn%3Ali%3Afsd_profile%3AX"
+
+    def _lands_on_compose(self, driver):
+        """A click that navigates to the standalone compose screen: a composer, zero events."""
+        def _handler():
+            driver.urls.append(self.COMPOSE_URL)
+            driver.thread = {"events": 0, "composer": True, "overlay": False}
+        return _handler
+
+    def _walk(self, driver, **kwargs):
+        return mt.open_message_thread(driver, MagicMock(), PROFILE, person_name="Jane Doe",
+                                      timeout=0, skip_routes=(mt.ROUTE_MESSAGING_SEARCH,),
+                                      trace=True, **kwargs)
+
+    def test_the_no_prior_thread_compose_screen_is_reported_by_name_on_every_route(self):
+        d = FakeDriver(page_source=self.FIRST_DEGREE_SOURCE + PAGE_MODEL)
+        own = FakeElement({"href": COMPOSE_HREF}, on_click=self._lands_on_compose(d))
+        stranger = FakeElement({"href": COMPOSE_HREF, "aria-label": "Message Ali Raza"},
+                               on_click=self._lands_on_compose(d))
+        hidden = FakeElement({"href": COMPOSE_HREF}, size={"width": 0, "height": 0})
+        d.dom[MAIN_ANCHOR] = [hidden, own, stranger]
+        result = self._walk(d)
+
+        assert not result.opened
+        assert result.degree == "1st"
+        routes = {rt["route"]: rt for rt in result.route_trace}
+        assert list(routes) == [mt.ROUTE_ANCHOR, mt.ROUTE_TEXT_NODE, mt.ROUTE_OVERFLOW,
+                                mt.ROUTE_DIRECT_URL]
+
+        anchor = routes[mt.ROUTE_ANCHOR]
+        seen = anchor["candidates"]
+        assert [c["aria_label_present"] for c in seen] == [False, False, True]
+        assert [c["shown"] for c in seen] == [False, True, True]
+        assert [c["belongs_to_target"] for c in seen] == [True, True, False]
+        assert all(c["href_path"] == "/messaging/compose/" for c in seen)
+        # Only the target's own, shown anchor was chosen — never the hidden duplicate or the rail.
+        assert len(anchor["clicks"]) == 1
+        click = anchor["clicks"][0]
+        assert click["clicked"] and click["chosen"]["aria_label_present"] is False
+        assert click["surface"] == {"url_path": "/messaging/compose/", "new_windows": 0,
+                                    "events": 0, "composer": True, "surface": mt.SURFACE_PAGE,
+                                    "open_thread": False,
+                                    "reason": mt.OPEN_REASON_COMPOSE_SCREEN}
+
+        direct = routes[mt.ROUTE_DIRECT_URL]
+        assert direct["urn_found"] is True
+        assert direct["clicks"][0]["surface"]["reason"] == mt.OPEN_REASON_COMPOSE_SCREEN
+        assert own.clicked == 1 and stranger.clicked == 0 and hidden.clicked == 0
+
+    def test_a_route_that_opens_a_thread_reports_the_events_reason(self):
+        d = FakeDriver(page_source=self.FIRST_DEGREE_SOURCE)
+        d.dom[MAIN_ANCHOR] = [FakeElement({"href": COMPOSE_HREF}, on_click=_opens(d, events=3))]
+        result = self._walk(d)
+        assert result.opened and result.route == mt.ROUTE_ANCHOR
+        [anchor] = result.route_trace
+        assert anchor["clicks"][0]["surface"]["open_thread"] is True
+        assert anchor["clicks"][0]["surface"]["reason"] == mt.OPEN_REASON_EVENTS
+
+    def test_the_overflow_route_records_the_menus_it_saw(self):
+        d = FakeDriver(page_source=self.FIRST_DEGREE_SOURCE)
+        d.dom[(By.CSS_SELECTOR, "main button[aria-label^='More actions']")] = [
+            FakeElement({"aria-label": "More actions"})]
+        result = self._walk(d)
+        overflow = next(rt for rt in result.route_trace if rt["route"] == mt.ROUTE_OVERFLOW)
+        assert overflow["menus"][0]["aria_label"] == "More actions"
+        assert overflow["menus"][0]["belongs_to_target"] is None
+
+    def test_a_raising_route_is_traced_with_its_error(self):
+        d = FakeDriver(page_source=self.FIRST_DEGREE_SOURCE)
+        with patch.object(mt, "_try_overflow", side_effect=RuntimeError("boom")):
+            result = self._walk(d)
+        overflow = next(rt for rt in result.route_trace if rt["route"] == mt.ROUTE_OVERFLOW)
+        assert overflow["error"] == "RuntimeError"
+
+    def test_an_untraced_walk_records_nothing_and_still_reads_the_degree(self):
+        # Production leaves `trace` off: no per-candidate attribute reads, same verdicts.
+        d = FakeDriver(page_source=self.FIRST_DEGREE_SOURCE)
+        d.dom[MAIN_ANCHOR] = [FakeElement({"href": COMPOSE_HREF}, on_click=_opens(d))]
+        result = mt.open_message_thread(d, MagicMock(), PROFILE, timeout=0)
+        assert result.opened and result.route_trace == []
+        assert result.degree == "1st"
+
+    def test_an_absent_badge_is_none_never_guessed(self):
+        d = FakeDriver(page_source="<main><span>Some other text</span></main>")
+        assert self._walk(d).degree is None
+
+    def test_open_thread_reason_names_every_branch(self):
+        assert mt.open_thread_reason(None) == mt.OPEN_REASON_NOTHING
+        assert mt.open_thread_reason({"events": 0, "composer": False}) == mt.OPEN_REASON_NOTHING
+        assert mt.open_thread_reason({"events": 2}) == mt.OPEN_REASON_EVENTS
+        assert mt.open_thread_reason({"events": 0, "composer": True,
+                                      "surface": mt.SURFACE_OVERLAY}) == mt.OPEN_REASON_EMPTY_OVERLAY
+        assert mt.open_thread_reason({"events": 0, "composer": True,
+                                      "surface": mt.SURFACE_PAGE}) == mt.OPEN_REASON_COMPOSE_SCREEN
+
+    def test_candidate_evidence_survives_a_stale_element(self):
+        class _Stale(FakeElement):
+            def get_attribute(self, name):
+                raise WebDriverException("stale")
+
+        ev = mt.candidate_evidence(_Stale(), "loc", accept=lambda el: el.get_attribute("x"))
+        assert ev["aria_label_present"] is False and ev["belongs_to_target"] is False
+        assert ev["href_path"] == ""
