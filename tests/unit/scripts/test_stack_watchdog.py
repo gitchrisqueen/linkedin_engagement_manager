@@ -1,6 +1,8 @@
 """Regression tests for the backup-freshness check in scripts/stack_watchdog.sh (#1090)."""
 
+import json
 import os
+import re
 import subprocess
 import time
 from pathlib import Path
@@ -403,3 +405,232 @@ class TestOffsiteBackupFreshness:
         assert result.returncode == 0, result.stderr + result.stdout
         assert "down=1" in result.stdout
         assert "backup:offsite:stale:50h" in result.stdout
+
+
+class TestAlertDedupe:
+    """Email dedupe, the local event log and the SendGrid payload (`report`).
+
+    One outage used to send an identical email on every 5-minute run while it lasted. Each test
+    drives `report` with a fixed `down`/`recovered` set, a fake clock and a `curl` stub that records
+    every payload it is handed, so "how many emails" is a line count rather than an inference.
+    """
+
+    DOWN = "tunnel-origin:http://172.18.0.1:8420:6in600s"
+    T0 = 1_800_000_000
+
+    @staticmethod
+    def _bindir(tmp_path: Path) -> Path:
+        """A `curl` stub that appends each `-d` payload (compact JSON, one line) to $CURL_LOG."""
+        bindir = tmp_path / "bin"
+        bindir.mkdir(exist_ok=True)
+        stub = bindir / "curl"
+        stub.write_text(
+            "#!/usr/bin/env bash\n"
+            'prev=""\n'
+            'for a in "$@"; do\n'
+            '  if [[ "$prev" == "-d" ]]; then printf "%s\\n" "$a" >> "$CURL_LOG"; fi\n'
+            '  prev="$a"\n'
+            "done\n"
+            "exit 0\n",
+            encoding="utf-8",
+        )
+        stub.chmod(0o755)
+        return bindir
+
+    def _report(
+        self,
+        tmp_path: Path,
+        *,
+        now: int,
+        down: list[str] | None = None,
+        recovered: list[str] | None = None,
+        pre: str = "",
+        extra_env: dict[str, str] | None = None,
+    ) -> subprocess.CompletedProcess[str]:
+        env = os.environ.copy()
+        for var in ("WATCHDOG_ALERT_EMAIL", "WATCHDOG_REMINDER_SECONDS", "WATCHDOG_EVENT_FILE"):
+            env.pop(var, None)
+        env["LEM_DIR"] = str(tmp_path)
+        env["LEM_ENV_FILE"] = str(tmp_path / ".env")
+        env["WATCHDOG_STATE_DIR"] = str(tmp_path / "state")
+        env["WATCHDOG_SH"] = str(WATCHDOG_SH)
+        env["CURL_LOG"] = str(tmp_path / "curl.log")
+        env["FAKE_NOW"] = str(now)
+        env["PATH"] = f"{self._bindir(tmp_path)}:{env['PATH']}"
+        env.update(extra_env or {})
+        (tmp_path / ".env").write_text(
+            "POSTHOG_API_KEY=\nSENDGRID_API_KEY=sg-test\nSENDGRID_FROM_EMAIL=alerts@realcompany.com\n"
+            "WATCHDOG_ALERT_EMAIL=ops@realcompany.com\n",
+            encoding="utf-8",
+        )
+        down_arr = " ".join(f"'{d}'" for d in (down or []))
+        rec_arr = " ".join(f"'{r}'" for r in (recovered or []))
+        return subprocess.run(
+            [
+                "bash",
+                "-c",
+                'source "$WATCHDOG_SH"; now() { echo "$FAKE_NOW"; }; '
+                f"down=({down_arr}); recovered=({rec_arr}); {pre} report",
+            ],
+            capture_output=True,
+            text=True,
+            env=env,
+        )
+
+    @staticmethod
+    def _emails(tmp_path: Path) -> list[dict]:
+        log = tmp_path / "curl.log"
+        if not log.exists():
+            return []
+        return [json.loads(line) for line in log.read_text(encoding="utf-8").splitlines() if line]
+
+    @staticmethod
+    def _events(tmp_path: Path) -> list[dict]:
+        f = tmp_path / "state" / "events.jsonl"
+        if not f.exists():
+            return []
+        return [json.loads(line) for line in f.read_text(encoding="utf-8").splitlines() if line]
+
+    def test_first_down_emails_once_and_writes_a_down_event(self, tmp_path: Path) -> None:
+        result = self._report(tmp_path, down=[self.DOWN], now=self.T0)
+        assert result.returncode == 1, result.stderr + result.stdout
+
+        emails = self._emails(tmp_path)
+        assert len(emails) == 1
+        assert emails[0]["subject"].startswith("[LEM] stack watchdog DOWN:")
+
+        events = self._events(tmp_path)
+        assert len(events) == 1
+        event = events[0]
+        assert set(event) == {"ts", "check", "host", "state", "detail"}
+        assert event["check"] == "tunnel-origin"
+        assert event["state"] == "DOWN"
+        assert event["detail"] == self.DOWN
+        assert event["host"]
+        assert re.fullmatch(r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z", event["ts"])
+        # Readable by a non-root account.
+        assert ((tmp_path / "state" / "events.jsonl").stat().st_mode & 0o777) == 0o644
+
+    def test_second_run_within_the_reminder_interval_sends_nothing(self, tmp_path: Path) -> None:
+        self._report(tmp_path, down=[self.DOWN], now=self.T0)
+        # Same check, different token (the error count moved), five minutes later.
+        result = self._report(
+            tmp_path, down=["tunnel-origin:http://172.18.0.1:8420:9in600s"], now=self.T0 + 300
+        )
+        assert result.returncode == 1, result.stderr + result.stdout
+        assert len(self._emails(tmp_path)) == 1
+        assert len(self._events(tmp_path)) == 1
+
+    def test_run_after_the_reminder_interval_sends_one_reminder(self, tmp_path: Path) -> None:
+        self._report(tmp_path, down=[self.DOWN], now=self.T0)
+        self._report(tmp_path, down=[self.DOWN], now=self.T0 + 300)
+        result = self._report(tmp_path, down=[self.DOWN], now=self.T0 + 3600)
+        assert result.returncode == 1, result.stderr + result.stdout
+        # The reminder resets the clock: the very next run is quiet again.
+        self._report(tmp_path, down=[self.DOWN], now=self.T0 + 3900)
+
+        emails = self._emails(tmp_path)
+        assert len(emails) == 2
+        assert emails[1]["subject"].startswith("[LEM] stack watchdog STILL DOWN:")
+        assert [e["state"] for e in self._events(tmp_path)] == ["DOWN", "DOWN"]
+
+    def test_reminder_interval_is_configurable(self, tmp_path: Path) -> None:
+        extra = {"WATCHDOG_REMINDER_SECONDS": "600"}
+        self._report(tmp_path, down=[self.DOWN], now=self.T0, extra_env=extra)
+        self._report(tmp_path, down=[self.DOWN], now=self.T0 + 300, extra_env=extra)
+        self._report(tmp_path, down=[self.DOWN], now=self.T0 + 600, extra_env=extra)
+        assert len(self._emails(tmp_path)) == 2
+
+    def test_clearing_writes_recovered_and_sends_one_recovered_email(self, tmp_path: Path) -> None:
+        self._report(tmp_path, down=[self.DOWN], now=self.T0)
+        result = self._report(tmp_path, recovered=["tunnel-origin"], now=self.T0 + 900)
+        assert result.returncode == 0, result.stderr + result.stdout
+        # Nothing left to say: the run after a recovery is silent.
+        self._report(tmp_path, now=self.T0 + 1200)
+
+        emails = self._emails(tmp_path)
+        assert len(emails) == 2
+        assert emails[1]["subject"].startswith("[LEM] stack watchdog RECOVERED:")
+        events = self._events(tmp_path)
+        assert [(e["check"], e["state"]) for e in events] == [
+            ("tunnel-origin", "DOWN"),
+            ("tunnel-origin", "RECOVERED"),
+        ]
+
+    def test_a_check_that_clears_without_a_recovered_token_still_recovers(self, tmp_path: Path) -> None:
+        """A backup check never reports `recovered`; it simply stops being down."""
+        self._report(tmp_path, down=["backup:db:stale:50h"], now=self.T0)
+        self._report(tmp_path, now=self.T0 + 300)
+        events = self._events(tmp_path)
+        assert [(e["check"], e["state"]) for e in events] == [
+            ("backup-db", "DOWN"),
+            ("backup-db", "RECOVERED"),
+        ]
+        assert len(self._emails(tmp_path)) == 2
+
+    def test_an_unreadable_check_is_not_recovered(self, tmp_path: Path) -> None:
+        """A skipped tunnel check is not evidence of recovery; its alert state must survive."""
+        self._report(tmp_path, down=[self.DOWN], now=self.T0)
+        result = self._report(tmp_path, pre="unknown=(tunnel-origin);", now=self.T0 + 300)
+        assert result.returncode == 0, result.stderr + result.stdout
+        assert [e["state"] for e in self._events(tmp_path)] == ["DOWN"]
+        assert len(self._emails(tmp_path)) == 1
+        assert (tmp_path / "state" / "alert-tunnel-origin.state").exists()
+
+    def test_failed_send_is_retried_next_run(self, tmp_path: Path) -> None:
+        """An undelivered DOWN email must not be mistaken for a delivered one and suppressed."""
+        failing = tmp_path / "failbin"
+        failing.mkdir()
+        (failing / "curl").write_text("#!/usr/bin/env bash\nexit 22\n", encoding="utf-8")
+        (failing / "curl").chmod(0o755)
+        env = os.environ.copy()
+        result = self._report(
+            tmp_path, down=[self.DOWN], now=self.T0, extra_env={"PATH": f"{failing}:{env['PATH']}"}
+        )
+        assert "WARN: SendGrid send failed" in result.stdout
+        self._report(tmp_path, down=[self.DOWN], now=self.T0 + 300)
+        emails = self._emails(tmp_path)
+        assert len(emails) == 1
+        assert emails[0]["subject"].startswith("[LEM] stack watchdog DOWN:")
+        # Still one DOWN event: the retry is an email, not a new state change.
+        assert len(self._events(tmp_path)) == 1
+
+    def test_event_file_write_failure_does_not_change_the_exit_code(self, tmp_path: Path) -> None:
+        # A directory where the file should be: every append fails.
+        blocked = tmp_path / "blocked"
+        blocked.mkdir()
+        result = self._report(
+            tmp_path, down=[self.DOWN], now=self.T0, extra_env={"WATCHDOG_EVENT_FILE": str(blocked)}
+        )
+        assert result.returncode == 1, result.stderr + result.stdout
+        assert "WARN: could not append to event file" in result.stdout
+        assert len(self._emails(tmp_path)) == 1
+
+    def test_event_file_is_capped(self, tmp_path: Path) -> None:
+        state = tmp_path / "state"
+        state.mkdir()
+        (state / "events.jsonl").write_text('{"old":1}\n' * 2000, encoding="utf-8")
+        self._report(tmp_path, down=[self.DOWN], now=self.T0)
+        lines = (state / "events.jsonl").read_text(encoding="utf-8").splitlines()
+        assert len(lines) == 2000
+        assert json.loads(lines[-1])["state"] == "DOWN"
+
+    def test_payload_disables_click_tracking_and_stays_plain_text(self, tmp_path: Path) -> None:
+        self._report(tmp_path, down=[self.DOWN], now=self.T0)
+        payload = self._emails(tmp_path)[0]
+        assert payload["tracking_settings"] == {"click_tracking": {"enable": False, "enable_text": False}}
+        assert [c["type"] for c in payload["content"]] == ["text/plain"]
+
+    def test_heal_emails_once_and_writes_a_healed_event(self, tmp_path: Path) -> None:
+        result = self._report(tmp_path, pre="healed=(celery_beat);", now=self.T0)
+        assert result.returncode == 0, result.stderr + result.stdout
+        emails = self._emails(tmp_path)
+        assert len(emails) == 1
+        assert emails[0]["subject"].startswith("[LEM] stack watchdog AUTO-STARTED:")
+        assert [(e["check"], e["state"]) for e in self._events(tmp_path)] == [("celery_beat", "HEALED")]
+
+    def test_nothing_down_sends_nothing(self, tmp_path: Path) -> None:
+        result = self._report(tmp_path, now=self.T0)
+        assert result.returncode == 0, result.stderr + result.stdout
+        assert self._emails(tmp_path) == []
+        assert self._events(tmp_path) == []
