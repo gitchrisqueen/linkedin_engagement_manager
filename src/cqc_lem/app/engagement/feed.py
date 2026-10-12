@@ -1510,7 +1510,9 @@ def _roster_activity_url(profile_url: str) -> str:
 # connection and folds the toggle elsewhere, leaving only the shortened "Message <first>" action or a
 # 1st-degree badge, the same page-native signal `_CONNECT_STATE_JS` already trusts. Route C only ever
 # READS that signal — no control names the target there either, so nothing is clicked — and answers
-# 'following'. A miss on all three routes returns 'unknown' and NOTHING is clicked — fail closed,
+# 'following'. Route D (#2399), tried between B and C, reads the owner's own post-card author
+# header ("<Name> Verified Profile Following") once the 2026-10 <aside> top card dropped every
+# follow signal. A miss on every route returns 'unknown' and NOTHING is clicked — fail closed,
 # exactly like the comment affordance above.
 _FOLLOW_CONTROL_JS = r"""
 const SLUG = (arguments[0] || '').toLowerCase(), NAME = (arguments[1] || '')
@@ -1525,9 +1527,16 @@ const named = (text, verb) => {
   const rest = text.slice(verb.length + 1).trim();
   return rest === NAME || rest.startsWith(NAME + ' ');
 };
+// Since 2026-10 a top-card toggle can also read "Following, click to unfollow <Name>" (#2399): the
+// verb that names the owner is the one AFTER "click to", so that tail is matched as well.
+const clickTail = (text) => {
+  const i = text.lastIndexOf('click to ');
+  return i >= 0 ? text.slice(i + 'click to '.length) : '';
+};
 const readState = (text) => {
-  if (named(text, 'following') || named(text, 'unfollow')) return 'following';
-  if (named(text, 'follow')) return 'not_following';
+  if (named(text, 'following') || named(text, 'unfollow')
+      || named(clickTail(text), 'unfollow')) return 'following';
+  if (named(text, 'follow') || named(clickTail(text), 'follow')) return 'not_following';
   return null;
 };
 const shown = (el) => { const r = el.getBoundingClientRect(); return !!(r.width && r.height); };
@@ -1567,6 +1576,24 @@ if (SLUG) {
 
 const hit = controls(document);
 if (hit) return hit;  // Route B — any owner-named control on the page.
+
+// Route D (#2399) — since 2026-10 the activity page's top card is an <aside> carrying only a bare
+// "Message" link: no Follow toggle, no 1st badge, no shortened "Message <first>". The follow state
+// survives on the owner's OWN post cards, whose author header is labelled
+// "<Name> Verified Profile Following" (visible text "<Name> • Following") — the same slot a
+// not-followed author fills with "<Name> … Profile 3rd+" plus a "Follow <Name>" button, which
+// Routes A/B already take. Read only: it names a state, never a control, so nothing is clicked. The
+// label must START with the owner's name and END on "profile following" (live: "Verified Profile",
+// "Executive Top Voice Profile"), so a header naming anyone else, or prose that merely mentions the
+// owner, never answers.
+for (const el of document.querySelectorAll('[aria-label]')) {
+  if (!shown(el)) continue;
+  const text = norm(el.getAttribute('aria-label'));
+  if (!text.startsWith(NAME + ' ')) continue;
+  const rest = text.slice(NAME.length + 1).split(' ');
+  if (rest.length <= 8 && rest[rest.length - 1] === 'following'
+      && (rest.length === 1 || rest[rest.length - 2] === 'profile')) return ['following', null];
+}
 
 // Route C (#1979) — since 2026-09 a 1st-degree connection's activity page top card renders no
 // Follow/Unfollow toggle AT ALL: a shortened "Message <first>" replaces it, exactly the
@@ -1689,11 +1716,12 @@ def _follow_control_crosscheck_sel(owner: str) -> str:
     exists for. It is a PARTLY independent read, and the limit is worth stating, because
     `zero_walk` warns that grading a chain against its own selector proves nothing: this is a CSS
     prefix match on the raw attribute, so it is independent of the chain's element filter
-    (`button, [role='button']`), its `shown()` visibility test, its normalisation and all three
-    route walks — but it shares the chain's one remaining assumption, that the label READS
-    `"<verb> <owner>"`. So a rotated ROUTE still escalates in-lane, while a rotated LABEL SHAPE
-    answers zero to both questions and stays quiet here. That residual is covered on purpose, not
-    by accident: the Monday sweep's `roster_follow` probe
+    (`button, [role='button']`), its `shown()` visibility test, its normalisation and every
+    route walk — but it shares the chain's one remaining assumption, that the label READS
+    `"<verb> <owner>"`, `"… click to <verb> <owner>"` or Route D's `"<owner> … Following"`. So a
+    rotated ROUTE still escalates in-lane, while a rotated LABEL SHAPE answers zero to both
+    questions and stays quiet here. That residual is covered on purpose, not by accident: the
+    Monday sweep's `roster_follow` probe
     (`scripts/linkedin_live_validation.py::roster_follow_state`) still grades this surface against
     the page's POST CARDS, and `sdui_drift_issues.py` files its own issue — the false positives
     that anchor produces are read by a human against the probe's `visible_controls`, which is the
@@ -1701,8 +1729,12 @@ def _follow_control_crosscheck_sel(owner: str) -> str:
     Do not "align" that probe with this selector without replacing the detection it carries.
     """
     escaped = " ".join(str(owner).split()).replace("\\", "\\\\").replace('"', '\\"')
-    return ", ".join(f'[aria-label^="{verb} {escaped}" i]'
-                     for verb in ("Follow", "Following", "Unfollow"))
+    # #2399: the "click to (un)follow" toggle shape, then Route D's post-card author header.
+    return ", ".join([*(f'[aria-label^="{verb} {escaped}" i]'
+                        for verb in ("Follow", "Following", "Unfollow")),
+                      f'[aria-label$="click to unfollow {escaped}" i]',
+                      f'[aria-label$="click to follow {escaped}" i]',
+                      f'[aria-label^="{escaped} " i][aria-label$=" Following" i]'])
 
 
 def _resolve_follow_control(driver: WebDriver, profile_url: str,

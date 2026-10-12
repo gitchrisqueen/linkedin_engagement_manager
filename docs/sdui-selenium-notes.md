@@ -737,6 +737,34 @@ exists at all. A genuine miss on all three routes is now cross-checked against t
 real drift on a page that plainly has content escalates instead of reading identically to an
 ordinary quiet page forever.
 
+## The activity-page top card lost every follow signal; the owner's own post cards carry it (#2399)
+
+Live-grounded 2026-10-12 (user 1, debug node, read-only probe) against four targets after the weekly
+sweep graded `hamelhusain` as `drift` with 21 posts on the page. What the DOM looks like now:
+
+- **The top card is an `<aside aria-label="Sidebar">`** holding name, headline, a `Followers N`
+  count and a bare `<a href="/messaging/compose/?profileUrn=…">Message</a>`. On `hamelhusain` and
+  `arvidkahl` there is no Follow/Following toggle, no `1st` badge and no shortened
+  `Message <first>`, so Routes A, B and C all miss — the shape the drift issue reported.
+- **The owner's own post cards carry the state.** Each card's author header is a `<div>` labelled
+  `"<Name> <badges> Profile <relationship>"` (visible text `"<Name> • <relationship>"`):
+  `Hamel Husain Verified Profile Following`, `Andrew Ng Executive Top Voice Profile Following`,
+  `Satya Nadella Executive Top Voice Profile 3rd+`. A not-followed author's card also renders a
+  `Follow <Name>` button, which Route B already resolves (Satya: `not_following`).
+- **Some top cards DO keep a toggle, in a new label shape:** `andrewyng` renders
+  `<button aria-label="Following, click to unfollow Andrew Ng">Following</button>`. The old
+  `named(text, 'following')` test needs `"following "`, so the comma form was invisible too.
+
+The fix, in `_FOLLOW_CONTROL_JS`: `readState` also matches the verb after `"click to "`, and a new
+read-only **Route D** — tried after A/B (an explicit control still wins) and before C — accepts an
+`[aria-label]` that STARTS with the owner's name and ENDS on `profile following`, answering
+`following` with no element. Another author's header never starts with the owner's name, and a
+label that merely mentions the owner without the `… profile following` tail never answers.
+`_follow_control_crosscheck_sel` gained both shapes, so the zero-walk cross-check sees them too.
+After the fix all four targets grade `ok` (`hamelhusain`/`arvidkahl` following via Route D,
+`andrewyng` following via the toggle, `satyanadella` not following via `Follow Satya Nadella`).
+`TestFollowControlJsAgainstLiveShapes` runs the JS itself under `node` against these four shapes.
+
 ## The feed share-box composer is a non-button clickable (#1107)
 
 Live-grounded 2026-08-08 (`/feed/`, user 1): the share-box trigger renders the text
