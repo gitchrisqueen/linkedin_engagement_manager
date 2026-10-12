@@ -1,6 +1,7 @@
 """Print the tagged trial link for each of the three demo videos' YouTube descriptions (issue #2379).
 
-    PYTHONPATH=src poetry run python scripts/demo_video_links.py
+    export BRAND_SIGNUP_URL=...   # the BRAND_SIGNUP_URL value in the production deployment's .env
+    poetry run python scripts/demo_video_links.py
 
 The three demo videos are the recordings of the three scenes `scripts/seed_demo_account.py` seeds
 (`demo1`, `demo2`, `demo3`; see `docs/demo-recording.md`). Each one gets the same link a tutorial
@@ -9,9 +10,11 @@ video's description gets from `description_with_cta`: the trial signup URL, tagg
 `campaign_for_tutorial(<scene>)`. Nothing is spelled by hand, so a breakdown by campaign reads these
 videos the same way it reads every other tutorial.
 
-The landing page is whatever this environment configures (`BRAND_SIGNUP_URL`, else
-`PUBLIC_BASE_URL`), so run it where the production values are set. With neither set there is no link
-to publish: the script prints nothing to stdout and exits 2.
+The landing page is `BRAND_SIGNUP_URL`, else `PUBLIC_BASE_URL`, read from the process environment
+only: the script never loads a `.env` file, and `scripts/` is not in the production image. So export
+one of the two in the shell first, copying the value from the production deployment's `.env` (if
+only `PUBLIC_BASE_URL` is set there, export that instead). With neither set there is no link to
+publish: the script prints nothing to stdout, names both variables on stderr and exits 2.
 
 Output is one tab-separated line per video: the scene, a tab, then the URL.
 """

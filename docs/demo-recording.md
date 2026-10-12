@@ -150,3 +150,9 @@ facade and the pure gate-finding builders. It turns off PostHog flag loading and
 own process, and it creates the account without a Stripe customer.
 `tests/unit/scripts/test_seed_demo_account.py` runs every scene and the teardown with all sockets
 blocked, and checks in a fresh interpreter that no Selenium or LinkedIn client module is imported.
+
+## Description links
+
+The trial link for each video's YouTube description comes from `scripts/demo_video_links.py`
+(UTM-tagged, one line per scene). It reads `BRAND_SIGNUP_URL` (else `PUBLIC_BASE_URL`) from the shell
+only, so export the production value first; its docstring has the exact steps.
