@@ -1591,8 +1591,8 @@ for (const el of document.querySelectorAll('[aria-label]')) {
   const text = norm(el.getAttribute('aria-label'));
   if (!text.startsWith(NAME + ' ')) continue;
   const rest = text.slice(NAME.length + 1).split(' ');
-  if (rest.length <= 8 && rest[rest.length - 1] === 'following'
-      && (rest.length === 1 || rest[rest.length - 2] === 'profile')) return ['following', null];
+  if (rest.length >= 2 && rest.length <= 8 && rest[rest.length - 1] === 'following'
+      && rest[rest.length - 2] === 'profile') return ['following', null];
 }
 
 // Route C (#1979) — since 2026-09 a 1st-degree connection's activity page top card renders no

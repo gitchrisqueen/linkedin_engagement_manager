@@ -1253,14 +1253,14 @@ class TestFollowControlJsAgainstLiveShapes:
     _ASIDE = {"tag": "ASIDE", "attrs": {"aria-label": "Sidebar"}, "children": [
         {"tag": "A", "attrs": {"href": "/messaging/compose/?profileUrn=x"}, "text": "Message"}]}
 
-    def _run(self, dom, name, slug="target"):
+    def _run(self, dom: list[dict], name: str, slug: str = "target") -> tuple:
         from cqc_lem.app.engagement.feed import _FOLLOW_CONTROL_JS
         spec = {"js": _FOLLOW_CONTROL_JS, "args": [slug, name], "dom": dom}
         out = subprocess.run(["node", "-e", _FAKE_DOM_HARNESS], input=json.dumps(spec),
                              capture_output=True, text=True, timeout=30, check=True)
         return tuple(json.loads(out.stdout))
 
-    def _author_header(self, label, follow_button=None):
+    def _author_header(self, label: str, follow_button: str | None = None) -> dict:
         children = [{"tag": "DIV", "attrs": {"aria-label": label}}]
         if follow_button:
             children.append({"tag": "BUTTON", "attrs": {"aria-label": follow_button}, "text": "Follow"})
@@ -1290,6 +1290,11 @@ class TestFollowControlJsAgainstLiveShapes:
     def test_someone_elses_following_header_never_answers_for_the_owner(self):
         # A reshared card's author is followed; the page owner is not shown as followed anywhere.
         dom = [self._ASIDE, self._author_header("Shaikh Quader Verified Profile Following")]
+        assert self._run(dom, "Hamel Husain") == ("unknown", None)
+
+    def test_a_bare_name_following_label_without_the_profile_slot_is_not_a_header(self):
+        # Only the grounded "<Name> … Profile Following" shape answers; "<Name> Following" is ungrounded.
+        dom = [self._ASIDE, self._author_header("Hamel Husain Following")]
         assert self._run(dom, "Hamel Husain") == ("unknown", None)
 
     def test_a_label_that_merely_starts_with_the_owner_and_ends_following_is_not_a_header(self):
