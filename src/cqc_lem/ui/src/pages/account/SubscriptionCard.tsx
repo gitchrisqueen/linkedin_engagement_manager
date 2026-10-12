@@ -3,7 +3,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import api from '../../api/client'
 import { useAuth } from '../../contexts/useAuth'
 import SettingsCard from '../../components/SettingsCard'
-import { PAID_PLANS, PLANS, monthlyPriceLabel, takePlanIntent } from '../../constants/plans'
+import { PLANS, SHOWN_PAID_PLANS, monthlyPriceLabel, takePlanIntent } from '../../constants/plans'
 
 // Labels and prices come from the shared PLANS constant (issue #1300). This card is the LIVE
 // checkout surface, so it and the landing page disagreeing about a price is the expensive version
@@ -133,8 +133,10 @@ export default function SubscriptionCard() {
       {!isPaidPlan && hasStripeCustomer && (
         <div className="space-y-2">
           <p className="text-xs text-gray-500 font-medium uppercase tracking-wide">Upgrade your plan</p>
-          <div className="grid grid-cols-3 gap-2">
-            {PAID_PLANS.map((plan) => (
+          {/* Labels above read every tier (a subscriber on a hidden one still sees its name); the
+              offer reads only the shown ones (issue #2370 pricing test). */}
+          <div className={`grid gap-2 ${SHOWN_PAID_PLANS.length > 1 ? 'grid-cols-3' : 'grid-cols-1'}`}>
+            {SHOWN_PAID_PLANS.map((plan) => (
               <button
                 key={plan.tier}
                 onClick={() => checkoutMutation.mutate(plan.tier)}

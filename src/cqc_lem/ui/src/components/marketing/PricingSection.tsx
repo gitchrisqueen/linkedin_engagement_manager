@@ -1,5 +1,5 @@
 import { useAuth } from '../../contexts/useAuth'
-import { INCLUDED_IN_EVERY_PLAN, PLANS, TRIAL_DAYS, rememberPlanIntent } from '../../constants/plans'
+import { INCLUDED_IN_EVERY_PLAN, SHOWN_PLANS, TRIAL_DAYS, rememberPlanIntent } from '../../constants/plans'
 import { EVENTS, capture } from '../../utils/analytics'
 import CtaButton from './CtaButton'
 import { IncludedMark } from './Icon'
@@ -24,8 +24,14 @@ export default function PricingSection() {
         lede={`Start with a ${TRIAL_DAYS}-day free trial on any plan. No credit card required.`}
       />
 
-      <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
-        {PLANS.map((plan) => (
+      {/* `SHOWN_PLANS`, not `PLANS`: during the pricing test (issue #2370) this is the trial plus the
+          recommended plan, so two cards sit centred rather than in half of a four-column row. */}
+      <div
+        className={`grid gap-6 sm:grid-cols-2 ${
+          SHOWN_PLANS.length > 2 ? 'lg:grid-cols-4' : 'mx-auto max-w-3xl'
+        }`}
+      >
+        {SHOWN_PLANS.map((plan) => (
           <div
             key={plan.tier}
             data-testid={`plan-${plan.tier}`}

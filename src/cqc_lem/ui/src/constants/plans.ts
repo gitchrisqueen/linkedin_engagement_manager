@@ -64,8 +64,23 @@ export const PLANS: readonly Plan[] = [
   },
 ] as const
 
-/** The paid tiers, in the order the account page offers them as an upgrade. */
+/** Every paid tier, shown or not. The backend checkout still accepts each of these (issue #2370). */
 export const PAID_PLANS: readonly Plan[] = PLANS.filter((plan) => plan.tier !== 'free_trial')
+
+// Pricing test (issue #2370): while the free trial is being tested, every pricing surface offers the
+// trial plus the ONE recommended plan. The other tiers have no feature gate behind them yet, so
+// offering them asks a visitor to choose between prices for the same product. They stay defined
+// above — existing subscribers on them keep their label and their checkout — and setting this to
+// `false` is the whole un-hide.
+export const PRICING_TEST_ACTIVE = true
+
+/** The plans a pricing surface lists, in order. Read this, never `PLANS`, to render options. */
+export const SHOWN_PLANS: readonly Plan[] = PRICING_TEST_ACTIVE
+  ? PLANS.filter((plan) => plan.tier === 'free_trial' || plan.recommended)
+  : PLANS
+
+/** The paid plans the account page offers as an upgrade, in order. */
+export const SHOWN_PAID_PLANS: readonly Plan[] = SHOWN_PLANS.filter((plan) => plan.tier !== 'free_trial')
 
 export function planFor(tier: PlanTier): Plan {
   const plan = PLANS.find((p) => p.tier === tier)
@@ -120,15 +135,14 @@ export function takePlanIntent(): PlanTier | null {
 }
 
 /**
- * The prices as one sentence, for prose that has to name all three.
+ * The shown paid prices as one sentence, for prose that has to name them.
  *
- * The FAQ fallback answer uses it so the seeded copy can never drift from the pricing section.
+ * The FAQ fallback answer uses it so the seeded copy can never drift from the pricing section —
+ * including which plans that section offers (issue #2370).
  */
 export function paidPricingSentence(): string {
-  const [starter, professional, enterprise] = PAID_PLANS
-  return (
-    `After the trial, ${starter.label} is ${starter.price}/month, ` +
-    `${professional.label} is ${professional.price}/month and ` +
-    `${enterprise.label} is ${enterprise.price}/month.`
-  )
+  const parts = SHOWN_PAID_PLANS.map((plan) => `${plan.label} is ${plan.price}/month`)
+  const list =
+    parts.length <= 1 ? parts.join('') : `${parts.slice(0, -1).join(', ')} and ${parts[parts.length - 1]}`
+  return `After the trial, ${list}.`
 }
