@@ -3939,8 +3939,10 @@ class TestPermalinkCommentProbe:
         assert "DIFFERENT post" in verdict
 
     def test_top_card_fallback_still_reports_the_composer_it_reached(self):
-        """The 2026-10-12 sweep: the top card's URN was unreadable, production fell back to it, and
-        the composer resolved — the verdict stopped at the fallback and never said so (#2400).
+        """The 2026-10-12 sweep (#2400).
+
+        The top card's URN was unreadable, production fell back to it, and the composer resolved —
+        the verdict stopped at the fallback and never said so.
         """
         verdict = llv.permalink_comment_verdict(
             {"cards_found": 3, "permalink_urn": self._URN, "top_card_urn": None,
@@ -3980,8 +3982,10 @@ class TestPermalinkCommentProbe:
         assert llv.permalink_comment_state(reading) == "unknown"
 
     def test_a_resolved_composer_is_no_longer_summarised_as_unknown(self):
-        """The #2400 blind spot end to end: the sweep summary reads `state`, and the probe never
-        set one — so three weeks of resolved composers were filed as unmeasured.
+        """The #2400 blind spot, end to end.
+
+        The sweep summary reads `state`, and the probe never set one — so three weeks of resolved
+        composers were filed as unmeasured.
         """
         reading = {"cards_found": 3, "card_resolved": True, "card_matched_urn": True,
                    "comment_action": {"text": "Comment"}, "composer": {"role": "textbox"}}
