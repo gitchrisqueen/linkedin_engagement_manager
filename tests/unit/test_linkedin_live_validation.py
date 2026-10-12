@@ -3916,16 +3916,19 @@ class TestPermalinkCommentProbe:
 
     def test_verdict_names_a_resolved_composer(self):
         verdict = llv.permalink_comment_verdict(
-            {"cards_found": 2, "permalink_urn": self._URN, "card_matched_urn": True,
+            {"cards_found": 2, "permalink_urn": self._URN, "card_resolved": True,
+             "card_matched_urn": True,
              "comment_action": {"text": "Comment"}, "composer": {"role": "textbox"}})
         assert "composer resolved" in verdict
+        assert "falls back" not in verdict
 
     def test_no_card_is_the_drift_verdict(self):
         assert "posts nothing" in llv.permalink_comment_verdict({"cards_found": 0})
 
     def test_a_composer_that_never_mounts_names_the_regression(self):
         verdict = llv.permalink_comment_verdict(
-            {"cards_found": 1, "permalink_urn": self._URN, "card_matched_urn": True,
+            {"cards_found": 1, "permalink_urn": self._URN, "card_resolved": True,
+             "card_matched_urn": True,
              "comment_action": {"text": "Comment"}, "composer": None})
         assert "#966" in verdict
 
@@ -3934,6 +3937,61 @@ class TestPermalinkCommentProbe:
             {"cards_found": 3, "permalink_urn": self._URN, "card_matched_urn": False,
              "top_card_urn": "urn:li:activity:7000000000000000002"})
         assert "DIFFERENT post" in verdict
+
+    def test_top_card_fallback_still_reports_the_composer_it_reached(self):
+        """The 2026-10-12 sweep (#2400).
+
+        The top card's URN was unreadable, production fell back to it, and the composer resolved —
+        the verdict stopped at the fallback and never said so.
+        """
+        verdict = llv.permalink_comment_verdict(
+            {"cards_found": 3, "permalink_urn": self._URN, "top_card_urn": None,
+             "card_resolved": True, "card_matched_urn": False,
+             "comment_action": {"text": "Comment"}, "composer": {"role": "textbox"}})
+        assert "falls back to the top card" in verdict
+        assert "composer resolved" in verdict
+
+    @pytest.mark.parametrize("reading, state", [
+        # What every sweep since #1770 actually read — a composer resolved, graded `unknown` (#2400).
+        ({"cards_found": 3, "card_resolved": True, "card_matched_urn": True,
+          "comment_action": {"text": "Comment"}, "composer": {"role": "textbox"}}, "ok"),
+        ({"cards_found": 3, "card_resolved": True, "card_matched_urn": False,
+          "comment_action": {"text": "Comment"}, "composer": {"role": "textbox"}}, "ok"),
+        ({"cards_found": 1, "card_resolved": True,
+          "comment_action": {"text": "Comment"}, "composer": None}, "drift"),
+        ({"cards_found": 1, "card_resolved": True, "comment_action": None}, "drift"),
+        ({"cards_found": 0, "visible_controls": ["Comment", "Repost"]}, "drift"),
+        ({"cards_found": 0, "visible_controls": ["Comment on Jane's post"]}, "drift"),
+        ({"cards_found": 0, "visible_controls": ["5 comments", "Comments", "Me"]}, "unknown"),
+        ({"cards_found": 0}, "unknown"),
+        ({}, "unknown"),
+        (None, "unknown"),
+    ])
+    def test_state_grades_what_production_would_reach(self, reading, state):
+        assert llv.permalink_comment_state(reading) == state
+
+    def test_a_card_from_another_post_on_the_permalink_is_drift(self):
+        reading = {"cards_found": 3, "card_resolved": False, "permalink_urn": self._URN,
+                   "url": self._URL, "top_card_urn": "urn:li:activity:7000000000000000002"}
+        assert llv.permalink_comment_state(reading) == "drift"
+
+    def test_a_redirect_away_from_the_permalink_grounds_nothing(self):
+        reading = {"cards_found": 3, "card_resolved": False, "permalink_urn": self._URN,
+                   "url": "https://www.linkedin.com/feed/",
+                   "top_card_urn": "urn:li:activity:7000000000000000002"}
+        assert llv.permalink_comment_state(reading) == "unknown"
+
+    def test_a_resolved_composer_is_no_longer_summarised_as_unknown(self):
+        """The #2400 blind spot, end to end.
+
+        The sweep summary reads `state`, and the probe never set one — so three weeks of resolved
+        composers were filed as unmeasured.
+        """
+        reading = {"cards_found": 3, "card_resolved": True, "card_matched_urn": True,
+                   "comment_action": {"text": "Comment"}, "composer": {"role": "textbox"}}
+        reading["state"] = llv.permalink_comment_state(reading)
+        summary = llv.sweep_summary({"permalink_comment": reading})
+        assert summary["ok"] == ["permalink_comment"] and summary["unknown"] == []
 
     def test_probe_reports_the_card_the_action_and_the_composer(self, monkeypatch):
         driver = MagicMock()
@@ -3956,6 +4014,7 @@ class TestPermalinkCommentProbe:
         assert reading["card_resolved"] is True and reading["card_matched_urn"] is True
         assert reading["composer"] is not None
         assert "composer resolved" in reading["verdict"]
+        assert reading["state"] == "ok"
 
     def test_probe_says_so_when_no_card_carries_a_comment_action(self, monkeypatch):
         driver = MagicMock()
@@ -3969,6 +4028,7 @@ class TestPermalinkCommentProbe:
         assert reading["cards_found"] == 0 and reading["card_resolved"] is False
         assert reading["composer"] is None
         assert "posts nothing" in reading["verdict"]
+        assert reading["state"] == "unknown"
 
     def test_permalink_comment_alone_is_enough_to_probe(self, monkeypatch):
         monkeypatch.setattr("cqc_lem.utilities.linkedin.session.get_current_profile",

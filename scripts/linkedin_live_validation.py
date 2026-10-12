@@ -2634,6 +2634,37 @@ def probe_newsletter_edition(driver, edition_url: str, sleep=time.sleep) -> dict
     return graded(reading, newsletter_edition_state(reading), verdict)
 
 
+# A post's own Comment action, by its visible label — "Comment" or "Comment on <name>'s post", never
+# the "5 comments" count. The page-native half of the no-card cross-check below.
+_COMMENT_CONTROL_LABEL_RE = re.compile(r"^comment(?:$|\s+on\b)", re.I)
+
+
+def permalink_comment_state(reading: Optional[dict]) -> str:
+    """Three-state grade for one permalink reading.
+
+    The probe shipped without one, so every sweep summarised it as `unknown` while it was resolving
+    a composer (#2400). `ok` is exactly what production needs: a card it would pick, a Comment action on it, and a
+    composer that mounts. A card that rendered with a Comment action but no composer is the #966
+    regression, so `drift`. No card at all is `drift` only when the page itself shows a Comment
+    control the card walk missed — otherwise the page never rendered (or comments are off) and it
+    grounds nothing.
+    """
+    reading = dict(reading or {})
+    if not reading.get("cards_found"):
+        shown = any(_COMMENT_CONTROL_LABEL_RE.match(str(label).strip())
+                    for label in reading.get("visible_controls") or [])
+        return STATE_DRIFT if shown else STATE_UNKNOWN
+    if not reading.get("card_resolved"):
+        # Only reachable when the top card provably belongs to another post. On the post's own
+        # permalink that is a URN reader that lost the post — unless LinkedIn redirected elsewhere.
+        wanted = str(reading.get("permalink_urn") or "").lower()
+        landed = str(reading.get("url") or "").lower()
+        return STATE_DRIFT if wanted and wanted in landed else STATE_UNKNOWN
+    if not reading.get("comment_action") or not reading.get("composer"):
+        return STATE_DRIFT
+    return STATE_OK
+
+
 def permalink_comment_verdict(reading: dict) -> str:
     """What one permalink reading proves about the #966 comment path.
 
@@ -2645,18 +2676,19 @@ def permalink_comment_verdict(reading: dict) -> str:
     if not reading.get("cards_found"):
         return ("no card carrying a comment action rendered — production logs a FAILURE and posts "
                 "nothing (comments may be restricted on this post, or the card walk has drifted)")
-    if not reading.get("card_matched_urn") and reading.get("permalink_urn"):
-        if reading.get("top_card_urn"):
-            return ("the top card belongs to a DIFFERENT post than the permalink — production "
-                    "refuses to comment rather than comment on a recommendation")
-        return ("no card claimed the permalink's URN and the top card's URN is unreadable — "
-                "production falls back to the top card")
+    if not reading.get("card_resolved"):
+        return ("the top card belongs to a DIFFERENT post than the permalink — production "
+                "refuses to comment rather than comment on a recommendation")
+    # The top-card fallback is a working path, not a failure — say so, then grade what it reached.
+    fallback = ("no card claimed the permalink's URN and the top card's URN is unreadable, so "
+                "production falls back to the top card; "
+                if reading.get("permalink_urn") and not reading.get("card_matched_urn") else "")
     if not reading.get("comment_action"):
-        return "no Comment action on the resolved card — production cannot open a composer"
+        return fallback + "no Comment action on the resolved card — production cannot open a composer"
     if not reading.get("composer"):
-        return ("Comment action clicked but no composer resolved for this card — production skips "
-                "the post; this is the #966 failure mode returning")
-    return "composer resolved on the permalink card — production would type and submit here"
+        return (fallback + "Comment action clicked but no composer resolved for this card — "
+                "production skips the post; this is the #966 failure mode returning")
+    return fallback + "composer resolved on the permalink card — production would type and submit here"
 
 
 def probe_permalink_comment(driver, post_url: str,
@@ -2731,8 +2763,7 @@ def probe_permalink_comment(driver, post_url: str,
                 # failed Escape must not mask the evidence this probe exists to report.
                 pass
 
-    reading["verdict"] = permalink_comment_verdict(reading)
-    return reading
+    return graded(reading, permalink_comment_state(reading), permalink_comment_verdict(reading))
 
 
 def roster_follow_verdict(reading: dict) -> str:
