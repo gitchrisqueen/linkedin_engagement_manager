@@ -44,12 +44,33 @@ REMINDER_SECONDS="${WATCHDOG_REMINDER_SECONDS:-3600}"
 # One JSON object per line, one line per state change or reminder — the local, machine-readable
 # record of what the email said. STATE_DIR is world-readable, so a non-root account can read it.
 EVENT_FILE="${WATCHDOG_EVENT_FILE:-${STATE_DIR}/events.jsonl}"
+# Trim with headroom: once past MAX, keep the newest KEEP. The trim replaces the file (a new inode),
+# so it should be rare; a consumer follows the file by NAME (`tail -F`), never by byte offset.
 EVENT_FILE_MAX_LINES=2000
+EVENT_FILE_KEEP_LINES=1000
 
 log() { echo "[watchdog $(date -u +%Y-%m-%dT%H:%M:%SZ)] $*"; }
 now() { date -u +%s; }
 
-mkdir -p "$STATE_DIR" 2>/dev/null || { log "FATAL: cannot create $STATE_DIR"; exit 1; }
+( umask 022; mkdir -p "$STATE_DIR" ) 2>/dev/null || { log "FATAL: cannot create $STATE_DIR"; exit 1; }
+
+# This runs as root and writes, trims and deletes files in STATE_DIR. If anyone else could write the
+# directory, they could plant a symlink there and point a root write at any file on the box — so
+# refuse to run rather than trust it.
+state_dir_is_safe() {
+  local owner mode
+  [[ -d "$STATE_DIR" && ! -L "$STATE_DIR" ]] || return 1
+  owner="$(stat -c %u "$STATE_DIR" 2>/dev/null)"
+  mode="$(stat -c %a "$STATE_DIR" 2>/dev/null)"
+  [[ "$owner" == "$(id -u)" && "$mode" =~ ^[0-7]+$ ]] || return 1
+  (( (8#$mode & 8#022) == 0 ))
+}
+if ! state_dir_is_safe; then
+  log "FATAL: ${STATE_DIR} must be a directory owned by uid $(id -u) and not group/world-writable"
+  # 2, not 1: the unit treats 1 as "something is down" (SuccessExitStatus=0 1). A watchdog that
+  # cannot run must show as a FAILED unit, not as a routine report.
+  exit 2
+fi
 
 env_value() {  # $1 = key, $2 = default
   [[ -r "$ENVF" ]] || { echo "${2:-}"; return 0; }
@@ -332,6 +353,9 @@ check_tunnel_origins() {
 
   # Name the origin so the alert points at the rule to fix rather than at "the tunnel".
   origins="$(grep -o 'originService=[^ ]*' <<< "$logs" | sed 's/originService=//' | sort -u | paste -sd, -)"
+  # An originService URL may carry credentials (`http://user:pass@host`); they must never reach the
+  # event file, the email or PostHog.
+  origins="$(sed -E 's#://[^/@,]*@#://#g' <<< "$origins")"
   origins="${origins:-unknown}"
 
   if [[ ! -f "$marker" ]]; then
@@ -370,7 +394,7 @@ alert_key() {  # $1 = down/recovered token
 # Append one JSON line. A failed write is logged and swallowed: the event file is a record of the
 # run, and losing a line must never change whether the run alerts or what it exits with.
 emit_event() {  # $1 = check key, $2 = DOWN|RECOVERED|HEALED, $3 = detail
-  local line lines
+  local line lines tmp
   line="$(jq -cn --arg ts "$(date -u +%Y-%m-%dT%H:%M:%SZ)" --arg check "$1" \
             --arg host "${HOSTNAME:-$(hostname 2>/dev/null)}" --arg state "$2" --arg detail "$3" \
             '{ts:$ts,check:$check,host:$host,state:$state,detail:$detail}' 2>/dev/null)"
@@ -382,33 +406,44 @@ emit_event() {  # $1 = check key, $2 = DOWN|RECOVERED|HEALED, $3 = detail
     log "WARN: could not append to event file ${EVENT_FILE}"
     return 0
   fi
-  chmod 0644 "$EVENT_FILE" 2>/dev/null || true
+  [[ -L "$EVENT_FILE" ]] || chmod 0644 "$EVENT_FILE" 2>/dev/null || true
   lines="$(wc -l 2>/dev/null < "$EVENT_FILE")"
   if [[ "$lines" =~ ^[0-9]+$ ]] && (( lines > EVENT_FILE_MAX_LINES )); then
-    if ( umask 022; tail -n "$EVENT_FILE_MAX_LINES" "$EVENT_FILE" > "${EVENT_FILE}.tmp" ) 2>/dev/null \
-        && mv -f "${EVENT_FILE}.tmp" "$EVENT_FILE" 2>/dev/null; then
-      chmod 0644 "$EVENT_FILE" 2>/dev/null || true
+    # mktemp, never a fixed `<file>.tmp`: an unpredictable name in a directory only we can write.
+    tmp="$(mktemp "${STATE_DIR}/.events.XXXXXX" 2>/dev/null)"
+    if [[ -n "$tmp" ]] && tail -n "$EVENT_FILE_KEEP_LINES" "$EVENT_FILE" > "$tmp" 2>/dev/null \
+        && chmod 0644 "$tmp" 2>/dev/null && mv -f "$tmp" "$EVENT_FILE" 2>/dev/null; then
+      :
     else
-      rm -f "${EVENT_FILE}.tmp" 2>/dev/null
+      [[ -n "$tmp" ]] && rm -f "$tmp" 2>/dev/null
       log "WARN: could not trim event file ${EVENT_FILE}"
     fi
   fi
   return 0
 }
 
-# alert-<key>.state holds `<first_down_epoch> <last_notified_epoch> <emailed 0|1>`.
-#   emailed=0  the DOWN email has not been delivered yet, so every run retries it.
-#   emailed=1  delivered; the next email for this key is a reminder, due REMINDER_SECONDS later.
+# alert-<key>.state holds `<first_down_epoch> <last_notified_epoch> <emailed 0|1> <pending>`.
+#   emailed=0           the DOWN email has not been delivered yet, so every run retries it.
+#   emailed=1           delivered; the next email for this key is a reminder, due REMINDER_SECONDS
+#                       after the last DELIVERED one.
+#   pending=reminder    a reminder is due and its DOWN event is written; retry the email until sent.
+#   pending=recovered   cleared and its RECOVERED event is written; retry the email until sent, then
+#                       the file is removed.
+# A clock moves only when an email that names this check is delivered.
 alert_state_file() { echo "$STATE_DIR/alert-$1.state"; }
 
-write_alert_state() {  # $1 = key, $2 = first, $3 = last, $4 = emailed
-  { echo "$2 $3 $4" > "$(alert_state_file "$1")"; } 2>/dev/null \
+write_alert_state() {  # $1 = key, $2 = first, $3 = last, $4 = emailed, $5 = pending
+  { echo "$2 $3 $4 ${5:--}" > "$(alert_state_file "$1")"; } 2>/dev/null \
     || log "WARN: could not write alert state for $1"
+}
+
+clear_alert_state() {  # $1 = key
+  rm -f "$(alert_state_file "$1")" 2>/dev/null || log "WARN: could not clear alert state for $1"
 }
 
 report() {
   # ── Report ───────────────────────────────────────────────────────────────────────
-  local now_s key sf first last emailed t kind subject body
+  local now_s key sf first last emailed pending t kind subject body
   local -A down_detail=() unknown_set=() recovered_token=() alert_first=()
   local -a new_down=() reminders=() cleared=() cleared_emailed=()
   now_s=$(now)
@@ -422,42 +457,48 @@ report() {
 
   # A check that is down (already past its grace window): the first sighting writes a DOWN event and
   # emails; an undelivered DOWN email is retried; a delivered one is reminded at most once per
-  # REMINDER_SECONDS, and each reminder is also a DOWN event.
+  # REMINDER_SECONDS, and each reminder is also one DOWN event.
   for key in "${!down_detail[@]}"; do
     sf="$(alert_state_file "$key")"
-    first="" last="" emailed=""
-    [[ -f "$sf" ]] && read -r first last emailed _ 2>/dev/null < "$sf"
-    if ! [[ "$first" =~ ^[0-9]+$ ]]; then
-      first="$now_s"; last="$now_s"; emailed=0
+    first="" last="" emailed="" pending=""
+    [[ -f "$sf" ]] && read -r first last emailed pending _ 2>/dev/null < "$sf"
+    [[ "$last" =~ ^[0-9]+$ ]] || last=0
+    [[ "$emailed" == "1" ]] || emailed=0
+    if ! [[ "$first" =~ ^[0-9]+$ ]] || [[ "$pending" == "recovered" ]]; then
+      # New incident — including one that went down again before its RECOVERED email got out.
+      first="$now_s"; last="$now_s"; emailed=0; pending="-"
       emit_event "$key" DOWN "${down_detail[$key]}"
       new_down+=("$key")
-    else
-      [[ "$last" =~ ^[0-9]+$ ]] || last=0
-      [[ "$emailed" == "1" ]] || emailed=0
-      if [[ "$emailed" == "0" ]]; then
-        new_down+=("$key")
-      elif (( now_s - last >= REMINDER_SECONDS )); then
-        last="$now_s"
-        emit_event "$key" DOWN "${down_detail[$key]}"
-        reminders+=("$key")
-      fi
+    elif [[ "$emailed" == "0" ]]; then
+      new_down+=("$key")
+    elif [[ "$pending" == "reminder" ]]; then
+      reminders+=("$key")
+    elif (( now_s - last >= REMINDER_SECONDS )); then
+      pending="reminder"
+      emit_event "$key" DOWN "${down_detail[$key]}"
+      reminders+=("$key")
     fi
-    write_alert_state "$key" "$first" "$last" "$emailed"
+    write_alert_state "$key" "$first" "$last" "$emailed" "$pending"
     alert_first["$key"]="$first"
   done
 
   # A check with alert state that is no longer down has cleared, unless it could not be read this
-  # run (an unreadable check is not evidence of recovery).
+  # run (an unreadable check is not evidence of recovery). Its state is removed at once if it never
+  # emailed DOWN; otherwise only after the RECOVERED email is delivered.
   for sf in "$STATE_DIR"/alert-*.state; do
     [[ -f "$sf" ]] || continue
     key="${sf##*/alert-}"; key="${key%.state}"
     [[ -n "${down_detail[$key]:-}" || -n "${unknown_set[$key]:-}" ]] && continue
-    first="" last="" emailed=""
-    read -r first last emailed _ 2>/dev/null < "$sf"
-    emit_event "$key" RECOVERED "${recovered_token[$key]:-$key}"
+    first="" last="" emailed="" pending=""
+    read -r first last emailed pending _ 2>/dev/null < "$sf"
     cleared+=("$key")
-    [[ "$emailed" == "1" ]] && cleared_emailed+=("$key")
-    rm -f "$sf" 2>/dev/null || log "WARN: could not clear alert state for $key"
+    [[ "$pending" == "recovered" ]] || emit_event "$key" RECOVERED "${recovered_token[$key]:-$key}"
+    if [[ "$emailed" == "1" ]]; then
+      write_alert_state "$key" "$first" "$last" 1 recovered
+      cleared_emailed+=("$key")
+    else
+      clear_alert_state "$key"
+    fi
   done
 
   for t in "${healed[@]}"; do emit_event "$(alert_key "$t")" HEALED "$t"; done
@@ -529,7 +570,8 @@ healthcheck never executes and its restart policy never fires. Check the last de
   cd ${LEM_DIR} && ${COMPOSE} ps -a"
       fi
       # Plain text with click tracking OFF: SendGrid otherwise rewrites every URL in the body into a
-      # tracking redirect, which hides the real address an alert names.
+      # tracking redirect, which hides the real address an alert names. `-f` makes a non-2xx a
+      # failure, so an email SendGrid refused is retried rather than recorded as sent.
       if curl -sf -m 20 -X POST https://api.sendgrid.com/v3/mail/send \
           -H "Authorization: Bearer ${SG_KEY}" -H 'Content-Type: application/json' \
           -d "$(jq -cn --arg to "$TO" --arg from "$FROM" --arg s "$subject" --arg b "$body" \
@@ -537,12 +579,14 @@ healthcheck never executes and its restart policy never fires. Check the last de
                   subject:$s,content:[{type:"text/plain",value:$b}],
                   tracking_settings:{click_tracking:{enable:false,enable_text:false}}}')" \
           >/dev/null 2>&1; then
-        # Delivered: every check this email listed as down counts as notified.
-        for key in "${!down_detail[@]}"; do
-          write_alert_state "$key" "${alert_first[$key]}" "$now_s" 1
+        # Delivered. Only the checks this email was SENT FOR move their clocks; a check that is
+        # still down but was not due keeps its own reminder schedule.
+        for key in "${new_down[@]}" "${reminders[@]}"; do
+          write_alert_state "$key" "${alert_first[$key]}" "$now_s" 1 -
         done
+        for key in "${cleared_emailed[@]}"; do clear_alert_state "$key"; done
       else
-        log "WARN: SendGrid send failed"
+        log "WARN: SendGrid send failed — will retry next run"
       fi
     else
       log "WARN: SendGrid not configured (need SENDGRID_API_KEY, SENDGRID_FROM_EMAIL, WATCHDOG_ALERT_EMAIL)"
