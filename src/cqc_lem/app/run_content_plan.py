@@ -282,6 +282,7 @@ from cqc_lem.utilities.quality_gates import (
     slop_finding,
 )
 from cqc_lem.utilities.selenium_util import get_driver_wait_pair, quit_gracefully
+from cqc_lem.utilities.trial_access import trial_lapsed
 from cqc_lem.utilities.utils import (
     apply_schedule_jitter,
     create_folder_if_not_exists,
@@ -5706,6 +5707,15 @@ def _top_up_buffer_for_user(user_id: int, requested: bool = False) -> None:
     and doubling LLM/video spend. The lock serialises them; the loser skips (its own next run
     re-reads the counts). Fails OPEN when Redis is down — same trade-off as the Selenium tasks.
     """
+    # A free trial that ended with no paid plan (issue #2380) stops generation outright. The beat
+    # walks every user with a planned slot, not only the active ones, so this is the gate — not the
+    # fan-out. DEBUG: a lapsed trial being skipped every night is the designed answer.
+    if trial_lapsed(user_id):
+        log_debug("Content top-up skipped: the free trial has ended", user_id=user_id,
+                  task_name="auto_create_weekly_content")
+        _close_out_empty_run(user_id, requested, ContentGenerationEmptyReason.TRIAL_ENDED)
+        return
+
     # The free-trial daily AI cap (issue #2378) pauses this run until the next UTC day — checked
     # before the lock, so a paused user neither generates nor holds the lock. A user who clicked
     # Generate is told why; the beat run just resumes tomorrow.

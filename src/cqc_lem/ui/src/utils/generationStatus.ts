@@ -10,6 +10,7 @@ export type GenerationEmptyReason =
   | 'no_planned_slots'
   | 'already_running'
   | 'daily_ai_limit'
+  | 'trial_ended'
 
 export interface GenerationStatus {
   state: GenerationState
@@ -55,6 +56,14 @@ export function emptyRunExplanation(
   const bufferDays = d.buffer_days ?? 5
   const days = `${bufferDays} ${bufferDays === 1 ? 'day' : 'days'}`
 
+  if (s.reason === 'trial_ended') {
+    return {
+      headline: 'Your free trial has ended',
+      detail:
+        'New posts are no longer generated or published. Upgrade your plan on the Account page ' +
+        'and your planned posts are generated on the next run.',
+    }
+  }
   if (s.reason === 'daily_ai_limit') {
     return {
       headline: 'Daily AI limit reached',

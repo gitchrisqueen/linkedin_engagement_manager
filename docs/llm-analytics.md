@@ -412,3 +412,30 @@ a misfire.
 - **Rollback:** no migration is involved. Set `FREE_TRIAL_DAILY_AI_CAP_USD=0` and recreate the
   services above, or redeploy the prior release tag. The Redis keys expire on their own within 2
   days.
+
+## Free-trial end (issue #2380)
+
+The daily cap above limits a RUNNING trial. Once `users.trial_ends_at` has passed and the user holds
+no paid subscription (`subscription_status` not `active` / `past_due`), generation and publishing
+stop outright. The predicate is `trial_lapsed()` in `utilities/trial_access.py`; nothing else
+re-derives it.
+
+- **Engagement lanes** need no new gate: they fan out over `get_active_user_ids()`, whose SQL
+  already drops a `trial` row past its `trial_ends_at`.
+- **Generation:** `_top_up_buffer_for_user` (the beat AND the Generate button) checks it first. The
+  beat walks every user with a planned slot, not only active users, so the fan-out is not the gate.
+  A requested run closes with the `trial_ended` reason, which the SPA explains.
+- **Publishing:** `auto_check_scheduled_posts` leaves a lapsed user's post `approved` and does not
+  dispatch it (DEBUG: it recurs every scan by design). `post_to_linkedin` re-checks, because a post
+  queued with an `eta` before the trial ended, or re-queued as an orphan, reaches it afterwards. It
+  puts the post back to `approved` with no approver, which is a re-queue and not an approval (#2116).
+  If the user upgrades within the scheduler's 24h lookback, the post goes out on a later scan.
+- **Account page:** `SubscriptionCard.tsx` shows the expiry notice once the end instant passes, for
+  any unpaid status. It is decided on the instant, not on a rounded day count.
+- **Newsletters:** `_topup_newsletter_drafts_for_user` generates nothing and
+  `_publish_next_due_edition_for_user` dispatches nothing for a lapsed user. Both beats walk
+  newsletter-enabled users rather than active ones, so they need the gate too. An edition keeps its
+  status and slot.
+- **Fails open:** an unreadable subscription row is not evidence that the trial ended.
+- **Not gated here:** an inline API generation call (variants, a carousel preview) is still bounded
+  only by the daily cap.
