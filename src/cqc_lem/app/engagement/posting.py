@@ -218,6 +218,7 @@ from cqc_lem.utilities.selenium_util import (
     note_tab_crash,
     quit_gracefully,
 )
+from cqc_lem.utilities.trial_access import trial_lapsed
 
 __all__ = [
     # The publishing tasks and the sweeps that follow them. `run_scheduler` and `api/*` import each
@@ -2526,6 +2527,16 @@ def post_to_linkedin(self, user_id: int, post_id: int):
                     user_id=user_id, post_id=post_id, task_name="post_to_linkedin")
         return f"Post {post_id} publishes natively — skipped"
 
+    # A free trial that ended with no paid plan publishes nothing (issue #2380). The scheduler stops
+    # dispatching for such a user; this is the cross-check for a post queued with an eta before the
+    # trial ended, and for the orphan re-queue. The post goes back to APPROVED with no actor — a
+    # re-queue, not an approval (#2116) — so it publishes on the next scan after the user upgrades.
+    if trial_lapsed(user_id):
+        update_db_post_status(post_id, PostStatus.APPROVED)
+        log_info("Post not published: the free trial has ended", user_id=user_id, post_id=post_id,
+                 task_name="post_to_linkedin")
+        return f"Post {post_id} not published — free trial ended"
+
     # Login and publish post to LinkedIn
     user_email, user_password = get_user_password_pair_by_id(user_id)
     log_info(f"Posting to LinkedIn as user: {user_email}")
@@ -2808,6 +2819,14 @@ def auto_publish_occasion_post(self, user_id: int, post_id: int):
         log_debug("Native occasion publishing is off — leaving the draft for the author",
                   user_id=user_id, post_id=post_id, task_name=task_name)
         return "Native occasion publishing is off"
+
+    # A free trial that ended with no paid plan publishes nothing (issue #2380) — the native
+    # composer is a publish path too. Nothing is claimed, so the draft stays APPROVED and goes out on
+    # a later scan if the user upgrades. DEBUG: every scan meets the same draft until then.
+    if trial_lapsed(user_id):
+        log_debug("Occasion post not published: the free trial has ended", user_id=user_id,
+                  post_id=post_id, task_name=task_name)
+        return f"Post {post_id} not published — free trial ended"
 
     # Cross-checks at the choke point, in the same spirit as post_to_linkedin's: the dispatcher's
     # query already filters on all three, so any of them failing here means some OTHER caller

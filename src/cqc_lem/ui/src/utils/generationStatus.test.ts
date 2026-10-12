@@ -87,6 +87,12 @@ describe('emptyRunExplanation', () => {
     expect(e?.detail).toContain('00:00 UTC')
   })
 
+  it('explains a run stopped because the free trial ended (issue #2380)', () => {
+    const e = emptyRunExplanation(status({ reason: 'trial_ended' }), TZ)
+    expect(e?.headline).toBe('Your free trial has ended')
+    expect(e?.detail).toContain('no longer generated or published')
+  })
+
   it('stays out of the way when posts were generated', () => {
     expect(
       emptyRunExplanation(status({ total: 2, completed: 2, reason: 'buffer_full' }), TZ),
