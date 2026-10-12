@@ -267,6 +267,7 @@ from cqc_lem.utilities.selenium_util import (
     get_element_wait_retry,
     getText,
     is_tab_crashed,
+    log_lane_failure,
     quit_gracefully,
     wait_for_ajax,
 )
@@ -1920,9 +1921,15 @@ def automate_appreciation_dms_for_user(self, user_id: int, loop_for_duration: in
         result = {"status": "rate_limited", "found": found, "sent": sent,
                   "message": f"Skipped — rate limited: {e}"}
     except Exception as e:
-        log_error("Error while sending appreciation DMs", exc=e, user_id=user_id, task_name="automate_appreciation_dms_for_user", action_type="dm")
-        result = {"status": "error", "found": found, "sent": sent,
-                  "message": f"Error while sending appreciation DMs: {e}"}
+        # This task logs in directly (not via `get_current_profile`), so nothing upstream has
+        # reported a crashed tab yet: it warns here, once, and escalates only on repeat (#2403).
+        if log_lane_failure("Error while sending appreciation DMs", e,
+                            task_name="automate_appreciation_dms_for_user", user_id=user_id,
+                            action_type="dm"):
+            message = "Appreciation DMs stopped — the browser tab crashed"
+        else:
+            message = f"Error while sending appreciation DMs: {e}"
+        result = {"status": "error", "found": found, "sent": sent, "message": message}
     finally:
         quit_gracefully(driver)
 

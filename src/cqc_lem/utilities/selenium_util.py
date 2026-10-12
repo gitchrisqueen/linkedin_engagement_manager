@@ -59,7 +59,7 @@ from cqc_lem.utilities.env_constants import (  # noqa: F401
     isTrue,
 )
 
-from cqc_lem.utilities.logger import log_debug, log_info, log_warning
+from cqc_lem.utilities.logger import log_debug, log_error, log_info, log_warning
 from cqc_lem.utilities.utils import get_aws_device_farm_url
 
 # Last-resort geolocation when a session has no user_id and therefore no stored Login Location.
@@ -128,6 +128,43 @@ def is_tab_crashed(exc: BaseException) -> bool:
         message = (getattr(exc, "msg", None) or str(exc) or "").lower()
         return any(marker in message for marker in _TAB_CRASHED_MARKERS)
     return False
+
+
+def log_lane_failure(message: str, exc: BaseException, *, task_name: str,
+                     crash_logged_upstream: bool = False, **context) -> bool:
+    """Log the failure that ended a Selenium lane's run at the level its cause earns.
+
+    A crashed tab (`is_tab_crashed`) is an expected transient — the renderer was OOM-killed — and
+    ends the run the same way whatever the lane was doing, so it is a WARNING that escalates only
+    if it recurs, never an immediate `$exception` (issues #2393, #2402, #2403). Every other cause
+    keeps the `log_error` the lane always used. The caller must already have stopped using the
+    driver: a dead tab fails every later navigation, so this is never a cue to retry.
+
+    The warning names `task_name` so each lane keeps its own escalation key — the call-site half of
+    that key is this function for every lane, so the message is what tells them apart.
+
+    Args:
+        message: The lane's own ERROR message, used verbatim for every non-crash cause.
+        exc: The exception that ended the run.
+        task_name: The lane's task name — part of the crash message and the log context.
+        crash_logged_upstream: True when the layer that raised already warned about this crash —
+            `get_current_profile` does for one on the first login navigation (#1749) — so this
+            logs it at DEBUG rather than filing the same occurrence twice.
+        **context: Structured log fields (`user_id`, `action_type`, ...).
+
+    Returns:
+        True when the run ended on a crashed tab, so the caller can say so in its result.
+    """
+    if not is_tab_crashed(exc):
+        log_error(message, exc=exc, task_name=task_name, **context)
+        return False
+    if crash_logged_upstream:
+        log_debug(f"Browser tab crashed — ending {task_name} (already reported where detected)",
+                  exc=exc, task_name=task_name, **context)
+    else:
+        log_warning(f"Browser tab crashed — ending {task_name}", exc=exc, task_name=task_name,
+                    **context)
+    return True
 
 
 # What the Grid's node-side HTTP relay says when it fails to deliver ONE command (issue #1784) —
