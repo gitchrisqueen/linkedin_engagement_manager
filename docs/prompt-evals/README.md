@@ -5,6 +5,12 @@ One row per prompt@version × model per run; written by `scripts/benchmark_promp
 <!-- LEADERBOARD:BEGIN -->
 | Date | Run | Tier | Model | Role | Contract | First draft | Judge | p50 | Verdict |
 |---|---|---|---|---|---|---|---|---|---|
+| 2026-10-12 | `pe-20261012-b68015` | classify.dm_reply_intent@2 | `openai/gpt-oss:20b` | champion | 1.0 | 1.0 | — | — | pass |
+| 2026-10-12 | `pe-20261012-b68015` | classify.dm_reply_intent@2 | `openai/gpt-4o-mini` | fallback | 1.0 | 1.0 | — | — | pass |
+| 2026-10-12 | `pe-20261012-b68015` | classify.dm_reply_intent@2 | `openai/gpt-5.4-mini` | candidate | 1.0 | 1.0 | — | — | pass |
+| 2026-10-12 | `pe-20261012-b68015` | classify.lead_intent@2 | `openai/gpt-oss:20b` | champion | 0.925 | 0.925 | — | — | fail |
+| 2026-10-12 | `pe-20261012-b68015` | classify.lead_intent@2 | `openai/gpt-4o-mini` | fallback | 0.95 | 0.95 | — | — | pass |
+| 2026-10-12 | `pe-20261012-b68015` | classify.lead_intent@2 | `openai/gpt-5.4-mini` | candidate | 0.95 | 0.95 | — | — | pass |
 | 2026-10-08 | `pe-20261008-0250fe` | classify.dm_reply_intent@1 | `openai/gpt-oss:20b` | champion | 1.0 (+35 no output) | 1.0 | — | — | fail |
 | 2026-10-08 | `pe-20261008-0250fe` | classify.dm_reply_intent@1 | `openai/gpt-4o-mini` | fallback | 1.0 | 1.0 | — | — | pass |
 | 2026-10-08 | `pe-20261008-0250fe` | classify.dm_reply_intent@1 | `openai/gpt-5.4-mini` | candidate | 1.0 | 1.0 | — | — | pass |
