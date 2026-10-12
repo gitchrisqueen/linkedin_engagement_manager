@@ -102,8 +102,7 @@ branch and anything outside `work/`. Log lines: `worktree sweep: …` in `logs/v
 **Orphaned lane processes are swept too** (`v2/lemd/orphans.py`). `killpg` reaches a lane's process
 group only, and a lane's tools start commands in NEW sessions (an agent's shell tool) or groups
 (`timeout`). Lane tool processes started that way (a `pytest -n 8` and its workers, a `timeout … graft
-build`) outlived their lanes as orphans inside the daemon's cgroup and held enough memory to throttle
-the other services in that cgroup, the webhook receiver included. Two call sites:
+build`) outlived their lanes as orphans inside the daemon's cgroup and kept holding memory inside lem-agent.slice (MemoryHigh=2G, MemoryMax=3G), which the webhook receiver shares. Two call sites:
 `Supervisor.reap()` sweeps `work/<branch>` when an agent lane it dispatched with a known branch ends
 (finished or killed; cwd or an absolute argv path may match), and `Daemon.sweep_orphans()` sweeps
 every `work/` tree no live lane owns once per pass (cwd only). A process is signalled only when it has

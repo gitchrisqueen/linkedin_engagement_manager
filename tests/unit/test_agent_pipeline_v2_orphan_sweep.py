@@ -93,7 +93,7 @@ def test_kills_only_orphans_inside_the_lane_worktree(world) -> None:
 
 
 def test_argv_path_inside_worktree_counts(world) -> None:
-    """The measured `timeout 180 graft build <wt>` ran from the base dir, not the worktree."""
+    """A `timeout 180 graft build <wt>` run from the base dir, not the worktree."""
     fp, work, lane, other = world
     fp.add(10, ppid=1, cwd="/srv/base", argv=("timeout", "180", "graft", "build", str(lane)))
     assert fp.sweep(roots=[lane]).terminated == [10]

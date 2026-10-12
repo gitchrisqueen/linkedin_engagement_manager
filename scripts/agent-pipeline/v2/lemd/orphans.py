@@ -4,7 +4,8 @@
 not enough on its own: tools inside a lane (an agent's shell tool, `timeout`) start commands in NEW
 sessions or process groups, so they escape the group. Lane tool processes started that way (a
 `pytest -n 8` and its workers, a `timeout … graft build`) outlived their lanes as orphans inside the
-daemon's cgroup and held enough memory to throttle the other services in that cgroup.
+daemon's cgroup and kept holding memory inside lem-agent.slice (MemoryHigh=2G, MemoryMax=3G),
+which the webhook receiver shares.
 
 A process is swept only when ALL of these hold:
 
