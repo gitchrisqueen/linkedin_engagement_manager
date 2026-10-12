@@ -12,6 +12,7 @@ from typing import Optional
 from cqc_lem.utilities.db import (
     get_linkedin_session_email_sent_at,
     get_user_email,
+    get_user_subscription_info,
     set_linkedin_session_email_sent_at,
 )
 from cqc_lem.utilities.email import (
@@ -20,6 +21,12 @@ from cqc_lem.utilities.email import (
     send_session_revalidation_email,
 )
 from cqc_lem.utilities.logger import log_info, log_warning
+from cqc_lem.utilities.trial_copy import is_trial_subscription
+
+
+def _is_trial_account(user_id: int) -> bool:
+    """Whether this user's emails get the trial wording (issue #2375); unreadable counts as trial."""
+    return is_trial_subscription(get_user_subscription_info(user_id))
 
 
 def notify_linkedin_session(user_id: int, revalidation: bool = False) -> bool:
@@ -41,7 +48,7 @@ def notify_linkedin_session(user_id: int, revalidation: bool = False) -> bool:
         return False
 
     sent = (send_session_revalidation_email(email) if revalidation
-            else send_connect_linkedin_email(email))
+            else send_connect_linkedin_email(email, trial=_is_trial_account(user_id)))
     if sent:
         set_linkedin_session_email_sent_at(user_id)
         log_info(f"Sent LinkedIn session {'re-validation' if revalidation else 'connect'} "
@@ -80,7 +87,8 @@ def notify_linkedin_token_expiring(user_id: int, days_remaining: Optional[int] =
         email = get_user_email(user_id)
         if email:
             from cqc_lem.utilities.email import send_linkedin_token_expiring_email
-            sent = send_linkedin_token_expiring_email(email, days_remaining, expires_on)
+            sent = send_linkedin_token_expiring_email(email, days_remaining, expires_on,
+                                                      trial=_is_trial_account(user_id))
         if sent:
             log_info("Sent LinkedIn token-expiring notice", user_id=user_id,
                      action_type="token_expiry")
