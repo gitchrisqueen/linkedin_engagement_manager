@@ -479,6 +479,33 @@ while (el && el.parentElement && d < 6) {
 return scope;
 """
 
+# Which post a mounted composer belongs to, read off the PAGE rather than off the box's label
+# (#2398). The live group feed labels the post's own comment box "Text editor for creating content"
+# — no "creating comment" in it — and on a post whose comment section renders below the
+# marker-bounded scope the page-wide fallback then had no way to claim it. The box's nearest
+# ancestor carrying a post URN is the post it belongs to (the feed-update container holds it as
+# `data-urn`), unless a comment's own container (`data-id="urn:li:comment:…"`) comes first: that
+# box is a reply under someone else's comment. A box inside an `aside` or a dialog (the messaging
+# overlay, the share modal) is never an inline post composer.
+_COMPOSER_OWNER_JS = r"""
+const POST = /urn:li:(?:activity|ugcPost|share):\d+/i;
+const box = arguments[0];
+if (!box) return null;
+if (box.closest && box.closest("aside, [role='dialog']")) return 'outside';
+let el = box.parentElement, d = 0;
+while (el && d < 25) {
+  const ident = (el.getAttribute('data-id') || '') + ' ' + (el.getAttribute('data-urn') || '');
+  if (/urn:li:comment:/i.test(ident)) return 'reply';
+  for (const a of (el.attributes || [])) {
+    const m = POST.exec(a.value || '');
+    if (m) return 'post|' + m[0];
+  }
+  el = el.parentElement; d++;
+}
+return 'unowned';
+"""
+_COMPOSER_UNOWNED = "unowned"
+
 
 def _post_author_from_card(card) -> str:
     """Return the author name from the card's 'Hide post by <Name>' control aria-label."""
@@ -842,15 +869,58 @@ def _composer_in_post_scope(driver: WebDriver, card: WebElement, anchor: dict) -
     labelled = [c for c in candidates if _is_post_comment_box(c[0])]
     if page_wide and not labelled:
         # Unlike the scope-bounded widening above (proven to contain at most one post), the
-        # page-wide search has NO ownership bound at all — an unlabelled candidate here can be a
+        # page-wide search has NO positional ownership bound — an unlabelled candidate here can be a
         # reply box under a stranger's comment on any post already loaded on the page, not just
-        # this one. `_reply_composer_for_comment` (#883) covers that same gap with an ownership
-        # check (`_comment_container`); a post has no equivalent container to check against, so the
-        # only safe answer page-wide is: require the "creating comment" label, or skip.
-        return None
+        # this one. So an unlabelled box needs PROOF it is ours: it sits under this post's own URN
+        # container and under no comment (#2398 — the live label no longer says "comment" at all).
+        # No proof, no box: skip the post.
+        labelled = _owned_by_post(driver, card, candidates)
+        if not labelled:
+            return None
     bottom = anchor["y"] + anchor["height"]
     best = min(labelled or candidates, key=lambda br: abs(br[1]["y"] - bottom), default=None)
     return None if best is None else best[0]
+
+
+def _composer_owner(driver: WebDriver, box: WebElement) -> str | None:
+    """'reply', 'outside', 'unowned', or the lowercased post URN a mounted composer sits under.
+
+    None means the page could not be asked — never the same answer as 'unowned'.
+    """
+    try:
+        found = driver.execute_script(_COMPOSER_OWNER_JS, box)
+    except Exception:
+        return None
+    if found in ("reply", "outside", _COMPOSER_UNOWNED):
+        return found
+    m = _URN_RE.search(found) if isinstance(found, str) else None
+    return m.group(0).lower() if m else None
+
+
+def _owned_by_post(driver: WebDriver, card: WebElement, candidates: list) -> list:
+    """The candidates provably mounted under THIS post's own URN container, and no comment's."""
+    post_urn = _feed_post_container_urn(card, driver=driver)
+    if not post_urn:
+        return []
+    return [c for c in candidates if _composer_owner(driver, c[0]) == post_urn]
+
+
+def _unowned_composer_count(driver: WebDriver, anchor: dict) -> int | None:
+    """How many rendered composers at or below this post the page holds that NO post owns.
+
+    The page-native cross-check behind a composer miss (#2398, #1013): a box that mounted after our
+    Comment click and that the ownership walk cannot attribute to any post — or to a comment, or to
+    an overlay — is the resolver going blind, not a post without a composer. None when unreadable.
+    """
+    count = 0
+    for box, rect in _visible_composers(driver):
+        if rect["y"] < anchor["y"] - _COMPOSER_ABOVE_SLACK_PX:
+            continue
+        owner = _composer_owner(driver, box)
+        if owner is None:
+            return None
+        count += owner == _COMPOSER_UNOWNED
+    return count
 
 
 def _post_composer_for_card(driver: WebDriver, card: WebElement,
@@ -864,10 +934,12 @@ def _post_composer_for_card(driver: WebDriver, card: WebElement,
     — 408 in 18h, every one on a group feed. Widening is bounded by `_single_post_scope`, so the
     search area provably contains one post, which is the invariant #876 actually needs.
 
-    A miss is an expected no-op: the box never opened, so the caller skips the post and releases its
-    claim. It is logged DEBUG here, once, the way `_reply_composer_for_comment` logs its own — the
-    per-card `log_warning` it replaces escalated into a filed defect for a skip we already handle.
+    A miss is an expected no-op only when the page agrees: the box never opened, so the caller skips
+    the post and releases its claim, logged DEBUG once, the way `_reply_composer_for_comment` logs
+    its own. When the page still holds a composer below this post that no post owns, the zero is
+    the resolver's blindness, not the post's — that is graded as drift (#2398), which warns.
     """
+    anchor = None
     for _ in range(_COMPOSER_MOUNT_POLLS):
         anchor = _visible_rect(card)
         if anchor is None:
@@ -878,7 +950,13 @@ def _post_composer_for_card(driver: WebDriver, card: WebElement,
         if composer is not None:
             return composer
         time.sleep(_COMPOSER_MOUNT_POLL_SECONDS)
-    log_debug("No comment composer opened on this post card", action_type="comment", user_id=user_id)
+    unowned = _unowned_composer_count(driver, anchor)
+    if unowned:
+        _zw.grade_zero_walk(unowned, "Post comment composer resolver", action_type="comment",
+                            user_id=user_id)
+    else:
+        log_debug("No comment composer opened on this post card", action_type="comment",
+                  user_id=user_id)
     return None
 
 
