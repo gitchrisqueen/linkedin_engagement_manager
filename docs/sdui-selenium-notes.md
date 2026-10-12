@@ -969,7 +969,39 @@ problem (#883): every visible `role=textbox` on the PAGE, never above this post 
 above-filter), nearest to its bottom edge wins. No box of ours (in card, in scope, or on the page,
 all within that bound) = skip the post.
 
-A miss is an expected no-op and is logged DEBUG *inside* the resolver, like the reply one — the
+**Issue #2398 — the page-wide fallback now proves ownership instead of trusting a label.** The
+weekly drift sweep (2026-10, group 115435, user 1, `--group-feed-composer`) read the live group
+feed as follows:
+
+| Reading | Live value |
+|---|---|
+| Comment action | `button[aria-label='Comment']`, `type=submit`, text `Comment` — 1 hit per card; `aria-label^='Comment on'` and `data-testid*='comment-button'` 0 |
+| Post identity | `data-urn="urn:li:activity:<id>"` on an ancestor 2–3 levels above the card, plus `data-view-tracking-scope` carrying the same URN 4–5 levels up |
+| Existing comment | `article[data-id="urn:li:comment:(groupPost:<group>-<id>…)"]` inside the comment section |
+| Post's own comment box | `div[role=textbox]`, `aria-label="Text editor for creating content"` — **no "creating comment" in it** |
+| Resolution | 2 of 3 cards resolved, both from the widened scope; the third mounted a box (page textboxes 1→2) outside `_single_post_scope` — its comment section carries a comment's own text node, a per-post marker, so the scope stopped at the card |
+
+That third card is the #1777 sibling render again, and the page-wide fallback rejected the box only
+because its label no longer says "comment". The share modal uses the same label, so the label proves
+nothing either way. The fallback now accepts an unlabelled box only when the page says it is ours
+(`_COMPOSER_OWNER_JS`): walking up from the box, the nearest post URN on any attribute must equal
+the card's own container URN (`_feed_post_container_urn`), with no `data-id`/`data-urn` naming a
+`urn:li:comment:` on the way (a reply box), and the box not inside an `aside` or a dialog (the
+messaging overlay, the share modal). No card URN means no proof, and the post is skipped.
+
+A miss logs DEBUG *inside* the resolver only when the page agrees. Before treating the zero as
+"nothing to do", `_unowned_composer_count` counts the rendered boxes at or below the post that no
+post, comment or overlay owns. A non-zero count means the resolver has gone blind (the ownership
+walk lost its URN attribute), so it is graded `drift` through `zero_walk.grade_zero_walk` and warns.
+A box owned by a different post or by a comment is an ordinary miss. An unreadable owner grounds
+nothing (DEBUG).
+
+The same reading found a second card on that post: a comment's text node (the same
+`expandable-text-box` marker) walked up to the comment section, whose nearest "Comment" control is
+the composer's own submit button. It keys to the same activity URN, so the at-most-once claim
+stops a second comment, but its "content" is a stranger's comment, not the post.
+
+A miss the page agrees with is an expected no-op, logged DEBUG *inside* the resolver like the reply one — the
 per-card `log_warning` it replaced escalated to ERROR and filed a defect for a post we skip by
 design. It polls `_COMPOSER_MOUNT_POLLS` times rather than burning
 `WAIT_DEFAULT_TIMEOUT x (MAX_WAIT_RETRY + 1)` (~35s) on a card that never opened one.
