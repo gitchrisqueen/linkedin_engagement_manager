@@ -31,7 +31,7 @@ import time
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from . import db, policy, posthog
+from . import db, orphans, policy, posthog
 
 LOG = logging.getLogger("lemd.dispatch")
 
@@ -48,6 +48,8 @@ REFUSALS = frozenset({EX_TRUST, EX_BUDGET, EX_BUSY, EX_SETUP})
 #: never holds a slot a merge-enable is waiting for. `SWEEP_MODE` is the child's mode AND the name
 #: `collect()` sees — it is not an item mode and never reaches `decide()`.
 MAINT_POOL = "maint"
+#: The orphan sweep's live off switch under `state/`; `LEMD_ORPHAN_SWEEP=0` is the restart-time one.
+ORPHAN_SWEEP_OFF = "ORPHAN_SWEEP_OFF"
 SWEEP_MODE = "sweep"
 
 
@@ -66,6 +68,9 @@ class Child:
     started: float
     log_path: Path | None = None
     killed: bool = False
+    #: The branch the daemon dispatched with, when it knew it. Names the lane's worktree for the
+    #: post-lane orphan sweep; `None` leaves that lane to the per-pass idle sweep.
+    branch: str | None = None
     env: dict[str, str] = field(default_factory=dict, repr=False)
 
     @property
@@ -83,6 +88,11 @@ class Supervisor:
         self.conn = conn
         self.children: list[Child] = []
         self.actions = Path(cfg.base) / "v2" / "actions"
+        # Same resolution as `actions/common.sh`, so the sweep and the actions agree on `work/`.
+        # realpath: /proc/<pid>/cwd is always resolved, so a symlinked base must be too.
+        self.work_root = Path(os.path.realpath(os.environ.get("WORKROOT") or Path(cfg.base) / "work"))
+        #: Injectable for tests; the real one reads /proc and signals.
+        self.orphan_sweep = orphans.sweep
 
     # ------------------------------------------------------------------ coexistence
 
@@ -175,7 +185,8 @@ class Supervisor:
 
     def _spawn(self, argv: list[str], *, pool: str, mode: str, kind: str, number: int,
                item_id: int | None, timeout_s: int, log_name: str | None = None,
-               extra_env: dict[str, str] | None = None) -> Child | None:
+               extra_env: dict[str, str] | None = None,
+               branch: str | None = None) -> Child | None:
         """Start one action detached into its own process group.
 
         `log_name` pins the log file for a RECURRING action: the default per-spawn name is right
@@ -222,7 +233,7 @@ class Supervisor:
         child = Child(
             proc=proc, pool=pool, mode=mode, kind=kind, number=number, item_id=item_id,
             run_id=run_id, deadline=time.time() + timeout_s, started=time.time(),
-            log_path=log_path,
+            log_path=log_path, branch=branch or None,
         )
         self.children.append(child)
         LOG.info("spawned %s pid=%s timeout=%ss log=%s", child.label, proc.pid, timeout_s, log_path)
@@ -236,7 +247,7 @@ class Supervisor:
         timeout_s = policy.timeout_for(mode, occupancy=self.occupancy)
         argv = [str(self.actions / "agent_run.sh"), mode, kind, str(number), branch or ""]
         return self._spawn(argv, pool="agent", mode=mode, kind=kind, number=number,
-                           item_id=item_id, timeout_s=timeout_s)
+                           item_id=item_id, timeout_s=timeout_s, branch=branch)
 
     def dispatch_gh(self, *, action: str, kind: str, number: int, args: list[str],
                     item_id: int | None) -> Child | None:
@@ -314,8 +325,99 @@ class Supervisor:
                 db.finish_run(self.conn, child.run_id, rc)
             LOG.info("%s finished rc=%s in %.0fs%s", child.label, rc, now - child.started,
                      " (killed on deadline)" if child.killed else "")
+            self._sweep_lane(child)
             done.append((child, rc))
         return done
+
+    # ------------------------------------------------------------------ orphan sweep
+
+    def lane_worktree(self, branch: str | None) -> Path | None:
+        """`work/<branch>` for a lane, or None when the branch is unknown or escapes `work/`."""
+        if not branch:
+            return None
+        wt = Path(os.path.normpath(self.work_root / branch))
+        root = os.path.normpath(self.work_root)
+        if not str(wt).startswith(root.rstrip("/") + "/"):
+            return None
+        return wt
+
+    def orphan_sweep_enabled(self) -> bool:
+        """False when `LEMD_ORPHAN_SWEEP=0` or `state/ORPHAN_SWEEP_OFF` exists; stops this sweep only."""
+        if not getattr(self.cfg, "orphan_sweep", True):
+            return False
+        return not (Path(self.cfg.base) / "state" / ORPHAN_SWEEP_OFF).exists()
+
+    def _live_lanes(self) -> list[orphans.LiveLane] | None:
+        """Every run still in flight, or None when the run table cannot be read.
+
+        An agent lane whose worktree the daemon cannot name (branch resolved inside the action) is
+        `must_place`: the idle sweep must find it in `work/` first. So is EVERY adopted run, whatever
+        its mode — conservative on purpose: an adopted gh action holds the idle sweep back for the
+        seconds it runs, and the pool sets stay in one literal (`in_pool`) the drift tests parse.
+        """
+        lanes = [
+            orphans.LiveLane(pid=c.proc.pid,
+                             must_place=c.pool == "agent" and self.lane_worktree(c.branch) is None)
+            for c in self.children if c.proc is not None
+        ]
+        mine = {lane.pid for lane in lanes}
+        try:
+            rows = self.conn.execute(
+                "SELECT pid, pid_start FROM runs WHERE ended_at IS NULL AND pid IS NOT NULL"
+            ).fetchall()
+            for row in rows:
+                pid = int(row["pid"])
+                if pid in mine or not db.pid_alive(pid, row["pid_start"]):
+                    continue
+                lanes.append(orphans.LiveLane(pid=pid, must_place=True))
+        except Exception as exc:  # noqa: BLE001 - an unknown protection list means no sweep
+            LOG.warning("orphan sweep skipped: could not read live runs (%s)", exc)
+            return None
+        return lanes
+
+    def _active_worktrees(self) -> list[Path]:
+        """Worktrees of agent lanes still running, which every sweep must leave alone."""
+        out = []
+        for c in self.children:
+            wt = self.lane_worktree(c.branch)
+            if wt is not None:
+                out.append(wt)
+        return out
+
+    def _sweep_lane(self, child: Child) -> None:
+        """Terminate what a finished agent lane left running in its own worktree.
+
+        `killpg` reaches the lane's process group only; commands an agent's tools start in a new
+        session survive it. A lane whose branch the daemon never knew is left to `sweep_idle_orphans`.
+        """
+        if child.pool != "agent" or not self.orphan_sweep_enabled():
+            return
+        wt = self.lane_worktree(child.branch)
+        if wt is None:
+            return
+        lanes = self._live_lanes()
+        if lanes is None:
+            return
+        self.orphan_sweep(roots=[wt], exclude_roots=self._active_worktrees(), lanes=lanes,
+                          work_root=self.work_root, match_argv=True,
+                          reason=f"after {child.label}")
+
+    def sweep_idle_orphans(self, *, v1_busy: int = 0) -> None:
+        """Once per pass: terminate orphans in any `work/` tree no running lane owns.
+
+        Catches processes from lanes that ended before this existed, under an earlier daemon, or
+        whose branch was resolved inside the action. Skipped while v1 ticks are running, because
+        their lanes are invisible to this supervisor, and skipped for the pass when a live agent
+        lane cannot be placed in a worktree. cwd only: an argv path is not evidence here.
+        """
+        if v1_busy > 0 or not self.orphan_sweep_enabled():
+            return
+        lanes = self._live_lanes()
+        if lanes is None:
+            return
+        self.orphan_sweep(roots=[self.work_root], exclude_roots=self._active_worktrees(),
+                          lanes=lanes, work_root=self.work_root, require_placement=True,
+                          match_argv=False, reason="idle worktrees")
 
     def _record_lane(self, child: Child) -> None:
         """Fold the child's reported lane into its run row.

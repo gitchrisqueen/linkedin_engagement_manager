@@ -51,6 +51,8 @@ collect          reap finished runs                 ← runs even while PAUSED, 
                                                       would strand claims and branch locks
 sweep_worktrees  spawn actions/sweep.sh             ← also while PAUSED; at most hourly, by the
                                                       locks/.worktree-sweep stamp (#2041)
+sweep_orphans    TERM/KILL orphans in idle work/ trees  ← also while PAUSED; never in shadow mode;
+                                                      off: state/ORPHAN_SWEEP_OFF
 ── if PAUSED: stop here ──
 drain_events     webhook rows  → items.dirty=1      (≤200 per pass)
 reconcile        GitHub labels → the queue          (600s; 120s only if silent AND drifting)
@@ -96,6 +98,36 @@ idle pipeline would never sweep), and it would sit on the run's critical path af
 charged. What is removable is unchanged — `release_worktree` still refuses a dirty tree, a claimed
 branch and anything outside `work/`. Log lines: `worktree sweep: …` in `logs/v2-actions-*.log`.
 `tests/unit/test_agent_pipeline_v2_worktree_sweep.py` pins the wiring end to end.
+
+**Orphaned lane processes are swept too** (`v2/lemd/orphans.py`). `killpg` reaches a lane's process
+group only, and a lane's tools start commands in NEW sessions (an agent's shell tool) or groups
+(`timeout`). Lane tool processes started that way (a `pytest -n 8` and its workers, a `timeout … graft
+build`) outlived their lanes as orphans inside the daemon's cgroup and kept holding memory inside lem-agent.slice (MemoryHigh=2G, MemoryMax=3G), which the webhook receiver shares. Two call sites:
+`Supervisor.reap()` sweeps `work/<branch>` when an agent lane it dispatched with a known branch ends
+(finished or killed; cwd or an absolute argv path may match), and `Daemon.sweep_orphans()` sweeps
+every `work/` tree no live lane owns once per pass (cwd only). A process is signalled only when it has
+the daemon's uid, it matches inside the target tree, and **every ancestor up to init matches too**, so
+a running lane's own processes never qualify: the action runs in the pipeline base, outside `work/`.
+Live lanes are protected twice: their descendants are never signalled, and every `work/` tree in which
+a descendant of a live lane (this daemon's children or a live `runs` row, so a branch resolved inside
+the action and a run adopted after a restart both count) has its cwd is excluded. The idle sweep
+does nothing for the pass when a live agent lane with no known branch, or any adopted run, cannot be
+placed in a tree that way, while v1 ticks hold a slot (their lanes are invisible here), or when the
+`runs` table cannot be read (WARNING; the post-lane sweep skips too). The daemon and its ancestors are never touched. TERM, 10s grace, then KILL, each re-checking the process
+start time so a recycled pid is never signalled; an unreadable `/proc` entry is skipped, and nothing in
+the sweep can raise into the loop.
+
+**The boundary it does not draw:** the daemon runs as the operator's uid, so ANY detached same-uid
+process (`nohup`, `setsid`, `disown`, a background job that outlived its session, possibly a tmux or
+screen server started there) whose cwd is under `work/` WILL be terminated once no lane owns that
+tree. `work/` is the daemon's alone; interactive work goes in `.claude/worktrees/`.
+
+Off switch for this sweep alone: `LEMD_ORPHAN_SWEEP=0` in `config.env` (read at restart) or
+the sentinel `state/ORPHAN_SWEEP_OFF` under the pipeline base (not
+`v2/state/`; read every pass). One INFO line per sweep that signalled anything, in `logs/lemd.log`:
+`orphan sweep (…): terminated N process(es) pids=[…] killed_after_grace=[…] detail=[pid:comm:cwd|argv:root, …]`
+— `comm` comes from `/proc/<pid>/stat`, never the command line. It adds no `decide()` branch.
+`tests/unit/test_agent_pipeline_v2_orphan_sweep.py` runs it against a fake `/proc`.
 
 ---
 
@@ -745,8 +777,12 @@ scripts/agent-pipeline/status.sh       # what is it doing
 tail -f logs/lemd.log                  # the loop
 jq . logs/lemd-decisions.ndjson | tail # every decision, with its reason
 sqlite3 v2/state/queue.db 'select kind,number,state,pending_mode from items where state!="merged"'
-touch PAUSED                           # stop everything (shared with v1)
-v2/rollback.sh                         # hand dispatch back to v1
+touch PAUSED                           # stop STARTING work (shared with v1); reaping, the
+                                       #   worktree sweep and the orphan sweep keep running
+touch state/ORPHAN_SWEEP_OFF           # stop the orphan sweep only (or LEMD_ORPHAN_SWEEP=0 + restart)
+v2/rollback.sh                         # hand dispatch back to v1 — stops the daemon (and so every
+                                       #   v2 sweep) and, as a side effect, RE-ENABLES v1 dispatch;
+                                       #   not an off switch for anything else
 ```
 
 **Root-run units execute root-owned copies.** The two root units never execute a file from the
@@ -760,7 +796,8 @@ installer as root from a root-owned clone of `main` — it refuses a checkout an
 and compare the sha256 lines it prints. The pipeline user's own copies (`lib/gh_app_token.sh`, sourced
 by `tick.sh` and `v2/actions/common.sh`) are unchanged.
 
-**Pause vs retire.** `PAUSED` stops both runners. `V1_RETIRED` demotes v1 to the failsafe cron and is
+**Pause vs retire.** `PAUSED` stops both runners starting work; the daemon still reaps and runs the
+worktree and orphan sweeps. `V1_RETIRED` demotes v1 to the failsafe cron and is
 what `cutover.sh` writes — deliberately not `PAUSED`, because `tick.sh` exits unconditionally on
 PAUSED and that would disable the failsafe too.
 
