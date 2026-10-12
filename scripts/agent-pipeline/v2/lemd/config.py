@@ -118,6 +118,9 @@ class Config:
     #: (#2041). Read against the SAME stamp file `sweep_stale_worktrees` keeps, and exported to the
     #: child as `WORKTREE_SWEEP_INTERVAL`, so the daemon's clock and the function's guard agree.
     worktree_sweep_interval: int
+    #: The orphan-process sweep (`lemd.orphans`). `LEMD_ORPHAN_SWEEP=0` turns it off at the next
+    #: restart; `state/ORPHAN_SWEEP_OFF` turns it off live. Nothing else stops with it.
+    orphan_sweep: bool
     #: Shadow mode: observe and log decisions, mutate nothing. The migration runs here for >=3 days.
     shadow: bool
     raw: dict[str, str] = field(default_factory=dict, repr=False)
@@ -174,6 +177,7 @@ def load(base: str | Path | None = None) -> Config:
         usage_probe_interval=_int(env, "LEMD_USAGE_PROBE_INTERVAL", 900),
         drain_seconds=_int(env, "LEMD_DRAIN_SECONDS", 20),
         worktree_sweep_interval=_int(env, "LEMD_WORKTREE_SWEEP_INTERVAL", 3600),
+        orphan_sweep=_str(env, "LEMD_ORPHAN_SWEEP", "1") not in ("0", "false", "no"),
         shadow=_str(env, "LEMD_SHADOW", "1") not in ("0", "false", "no"),
         raw=env,
     )

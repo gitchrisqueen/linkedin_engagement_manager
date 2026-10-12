@@ -1029,6 +1029,8 @@ class Daemon:
         if self.cfg.shadow:
             return
         try:
+            if not self.sup.orphan_sweep_enabled():
+                return
             self.sup.sweep_idle_orphans(v1_busy=self.sup.v1_slots_busy())
         except Exception as exc:  # noqa: BLE001 - fail open
             LOG.warning("orphan sweep skipped: %s", exc)
