@@ -2804,6 +2804,14 @@ def auto_publish_occasion_post(self, user_id: int, post_id: int):
                   user_id=user_id, post_id=post_id, task_name=task_name)
         return "Native occasion publishing is off"
 
+    # A free trial that ended with no paid plan publishes nothing (issue #2380) — the native
+    # composer is a publish path too. Nothing is claimed, so the draft stays APPROVED and goes out on
+    # a later scan if the user upgrades. DEBUG: every scan meets the same draft until then.
+    if trial_lapsed(user_id):
+        log_debug("Occasion post not published: the free trial has ended", user_id=user_id,
+                  post_id=post_id, task_name=task_name)
+        return f"Post {post_id} not published — free trial ended"
+
     # Cross-checks at the choke point, in the same spirit as post_to_linkedin's: the dispatcher's
     # query already filters on all three, so any of them failing here means some OTHER caller
     # reached this task with a row it must never touch.

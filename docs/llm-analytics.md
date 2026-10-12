@@ -430,6 +430,8 @@ re-derives it.
   queued with an `eta` before the trial ended, or re-queued as an orphan, reaches it afterwards. It
   puts the post back to `approved` with no approver, which is a re-queue and not an approval (#2116).
   If the user upgrades within the scheduler's 24h lookback, the post goes out on a later scan.
+  `auto_publish_occasion_post` (the native composer) refuses before it claims the row, so an
+  occasion draft also stays `approved`.
 - **Account page:** `SubscriptionCard.tsx` shows the expiry notice once the end instant passes, for
   any unpaid status. It is decided on the instant, not on a rounded day count.
 - **Newsletters:** `_topup_newsletter_drafts_for_user` generates nothing and

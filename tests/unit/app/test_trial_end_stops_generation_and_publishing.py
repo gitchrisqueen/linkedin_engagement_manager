@@ -184,6 +184,24 @@ class TestPostToLinkedInRefusesAfterTrialEnd:
         mocks["share_on_linkedin"].assert_called_once()
 
 
+class TestOccasionNativePublishRefusesAfterTrialEnd:
+    def test_ended_trial_occasion_draft_is_not_claimed_or_published(self):
+        """The native composer is a publish path too: nothing claimed, the draft stays APPROVED."""
+        from cqc_lem.app.engagement.posting import auto_publish_occasion_post
+
+        with patch(f"{_POSTING}.flag_enabled", return_value=True), \
+             patch(_READ, return_value=_ended()), \
+             patch(f"{_POSTING}.get_post_status") as status, \
+             patch(f"{_POSTING}.update_db_post_status") as write, \
+             patch(f"{_POSTING}.acquire_run_lock") as lock:
+            result = auto_publish_occasion_post.run(1, 5)
+
+        assert "free trial ended" in result
+        status.assert_not_called()
+        write.assert_not_called()
+        lock.assert_not_called()
+
+
 # --- newsletters: generation and publishing ---------------------------------------------------
 
 _DB = "cqc_lem.utilities.db"
