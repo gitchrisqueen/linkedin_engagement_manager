@@ -215,6 +215,7 @@ from cqc_lem.utilities.selenium_util import (
     click_first,
     find_first,
     is_tab_crashed,
+    note_tab_crash,
     quit_gracefully,
 )
 
@@ -1580,12 +1581,17 @@ def _run_comment_followups_sweep(user_id: int) -> str:
         release_run_lock(lock_name, lock_token)
         return "Skipped — rate limited"
     except Exception as e:
-        log_error("Error starting follow-up sweep", exc=e, user_id=user_id, task_name="sweep_comment_followups")
+        # A tab that crashed on the first login navigation was already warned about by
+        # `get_current_profile`; this wrapper only notes it (#2393).
+        if not note_tab_crash(e, task_name="sweep_comment_followups", crash_logged_upstream=True,
+                              user_id=user_id):
+            log_error("Error starting follow-up sweep", exc=e, user_id=user_id,
+                      task_name="sweep_comment_followups")
         release_run_lock(lock_name, lock_token)
         return f"Failed to start follow-up sweep: {e}"
+    reacted = replied = leads = filtered = 0
     try:
         synthesis = get_or_create_profile_synthesis(user_id, my_profile)
-        reacted = replied = leads = filtered = 0
         filtered_reasons: Counter = Counter()
         for row in posts:
             key = row.get("post_key")
@@ -1600,11 +1606,21 @@ def _run_comment_followups_sweep(user_id: int) -> str:
                 filtered += r.get("filtered", 0)
                 filtered_reasons.update(r.get("filtered_reasons") or {})
             except Exception as e:
+                if is_tab_crashed(e):
+                    # The renderer died, so every later post would fail on the same dead tab and
+                    # warn once each — one crash recurring into a grouped $exception (#2393). End
+                    # the sweep instead; what already shipped is recorded per post.
+                    raise
                 log_warning("Follow-up: post failed", exc=e, user_id=user_id,
                             task_name="sweep_comment_followups")
         _log_filter_summary(filtered_reasons, filtered, user_id, task_name="sweep_comment_followups")
         return (f"Follow-ups: reacted {reacted}, replied {replied}, leads {leads}, "
                 f"filtered {filtered} across {len(posts)} post(s)")
+    except Exception as e:
+        if not note_tab_crash(e, task_name="sweep_comment_followups", user_id=user_id):
+            raise  # unchanged: any other fault still fails the task and is filed by the Celery hook
+        return (f"Follow-ups stopped — browser tab crashed: reacted {reacted}, replied {replied}, "
+                f"leads {leads} before the crash")
     finally:
         quit_gracefully(driver)
         release_run_lock(lock_name, lock_token)

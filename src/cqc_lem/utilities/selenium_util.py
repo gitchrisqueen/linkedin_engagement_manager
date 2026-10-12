@@ -130,6 +130,44 @@ def is_tab_crashed(exc: BaseException) -> bool:
     return False
 
 
+def note_tab_crash(exc: BaseException, *, task_name: str, crash_logged_upstream: bool = False,
+                   **context) -> bool:
+    """Log a crashed tab that ended a Selenium lane's run, and say whether it was one.
+
+    A crashed tab (`is_tab_crashed`) is an expected transient — the renderer was OOM-killed — and
+    ends the run the same way whatever the lane was doing, so it is a WARNING that escalates only
+    if it recurs, never an immediate `$exception` (issues #2393, #2402, #2403). Anything else is
+    NOT logged here: the lane keeps its own `log_error` call, so the log line still names the
+    lane's function rather than this helper. The caller must already have stopped using the
+    driver: a dead tab fails every later navigation, so this is never a cue to retry.
+
+    The warning names `task_name` so each lane keeps its own escalation key — the call-site half of
+    that key is this function for every lane, so the message is what tells them apart. On-call can
+    grep the persistent log for `Browser tab crashed — ending`.
+
+    Args:
+        exc: The exception that ended the run.
+        task_name: The lane's task name — part of the crash message and the log context.
+        crash_logged_upstream: True when the layer that raised already warned about this crash —
+            `get_current_profile` does for one on the first login navigation (#1749) — so this
+            logs it at DEBUG rather than filing the same occurrence twice.
+        **context: Structured log fields (`user_id`, `action_type`, ...).
+
+    Returns:
+        True when the run ended on a crashed tab (now logged); False when the caller must log `exc`
+        itself.
+    """
+    if not is_tab_crashed(exc):
+        return False
+    if crash_logged_upstream:
+        log_debug(f"Browser tab crashed — ending {task_name} (already reported where detected)",
+                  exc=exc, task_name=task_name, **context)
+    else:
+        log_warning(f"Browser tab crashed — ending {task_name}", exc=exc, task_name=task_name,
+                    **context)
+    return True
+
+
 # What the Grid's node-side HTTP relay says when it fails to deliver ONE command (issue #1784) —
 # e.g. `POST .../execute/sync` answering with `java.io.UncheckedIOException: Failed to execute
 # request`. Distinct from `_SESSION_GONE_MARKERS` (the session id itself was rejected) and from
