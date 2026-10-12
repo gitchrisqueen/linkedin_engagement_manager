@@ -249,30 +249,30 @@ def _token_status(connected: bool, expiry, expired: bool) -> dict:
     return {"connected": connected, "token_expiry_date": expiry, "is_expired": expired}
 
 
-class TestOAuthTokenUsable:
+class TestHasOAuthToken:
     _RESOLVE = "cqc_lem.utilities.linkedin.token_refresh.resolve_token_status"
 
     @pytest.mark.parametrize("status,expected", [
         (_token_status(False, None, True), False),
         (_token_status(True, "2026-12-01T00:00:00+00:00", False), True),
-        (_token_status(True, "2026-09-01T00:00:00+00:00", True), False),
-        (_token_status(True, None, True), None),
+        (_token_status(True, "2026-09-01T00:00:00+00:00", True), True),
+        (_token_status(True, None, True), True),
     ])
-    def test_reads_the_resolved_state_without_renewing(self, status, expected):
-        from cqc_lem.utilities.linkedin.token_refresh import oauth_token_usable
+    def test_any_stored_token_counts_expired_or_not(self, status, expected):
+        from cqc_lem.utilities.linkedin.token_refresh import has_oauth_token
         with patch(self._RESOLVE, return_value=status) as resolve:
-            assert oauth_token_usable(7) is expected
+            assert has_oauth_token(7) is expected
         resolve.assert_called_once_with(7, auto_refresh=False)
 
     def test_an_unreadable_state_is_unknown(self):
-        from cqc_lem.utilities.linkedin.token_refresh import oauth_token_usable
+        from cqc_lem.utilities.linkedin.token_refresh import has_oauth_token
         with patch(self._RESOLVE, side_effect=RuntimeError("db down")), \
              patch("cqc_lem.utilities.linkedin.token_refresh.log_warning"):
-            assert oauth_token_usable(7) is None
+            assert has_oauth_token(7) is None
 
 
 class TestLinkedInConnected:
-    _USABLE = "cqc_lem.utilities.linkedin.token_refresh.oauth_token_usable"
+    _USABLE = "cqc_lem.utilities.linkedin.token_refresh.has_oauth_token"
 
     def _connected(self, cookie: bool, status, usable):
         with patch.object(onboarding, "has_linkedin_session", return_value=cookie), \
@@ -282,7 +282,7 @@ class TestLinkedInConnected:
             return onboarding.linkedin_connected(7), oauth
 
     @pytest.mark.parametrize("usable,expected", [(True, True), (None, True), (False, False)])
-    def test_a_trial_without_a_cookie_counts_its_oauth_token(self, usable, expected):
+    def test_a_trial_without_a_cookie_counts_any_stored_oauth_token(self, usable, expected):
         connected, _ = self._connected(False, "trial", usable)
         assert connected is expected
 
@@ -327,6 +327,19 @@ class TestMissingSessionBeat:
 
     def test_a_trial_with_an_unreadable_token_gets_no_connect_email(self):
         self._run(cookie=False, status="trial", usable=None).assert_not_called()
+
+    def test_a_trial_with_an_expired_token_gets_no_connect_email(self):
+        # Expiry is the authorization-expired email's job, so the real reader runs here.
+        from cqc_lem.app import run_scheduler
+        expired = _token_status(True, "2026-09-01T00:00:00+00:00", True)
+        with patch.object(run_scheduler, "get_active_user_ids", return_value=[7]), \
+             patch.object(run_scheduler, "notify_linkedin_session", return_value=True) as notify, \
+             patch.object(onboarding, "has_linkedin_session", return_value=False), \
+             patch.object(onboarding, "get_user_subscription_info",
+                          return_value={"subscription_status": "trial"}), \
+             patch(TestHasOAuthToken._RESOLVE, return_value=expired):
+            run_scheduler.auto_notify_missing_linkedin_session()
+        notify.assert_not_called()
 
     def test_a_trial_with_neither_still_gets_it(self):
         self._run(cookie=False, status="trial", usable=False).assert_called_once_with(

@@ -156,9 +156,10 @@ def linkedin_connected(user_id: int, trial: Optional[bool] = None) -> bool:
     """Whether this user has connected LinkedIn, for the onboarding step and the connect email.
 
     A stored `li_at` session counts for everyone. A trial account connects by OAuth only, so for a
-    trial a usable OAuth token counts too, and so does a token whose state cannot be read: telling
-    a connected trial account it isn't connected is the failure this avoids (issue #2375). A paid
-    account still needs the session cookie, which the engagement lanes log in with.
+    trial any stored OAuth token counts too, expired or not (expiry is the authorization email's
+    to report), and so does a token state that cannot be read: telling a connected trial account
+    it isn't connected is the failure this avoids (issue #2375). A paid account still needs the
+    session cookie, which the engagement lanes log in with.
 
     Args:
         user_id: The user to check.
@@ -173,8 +174,8 @@ def linkedin_connected(user_id: int, trial: Optional[bool] = None) -> bool:
         trial = is_trial_subscription(get_user_subscription_info(user_id))
     if not trial:
         return False
-    from cqc_lem.utilities.linkedin.token_refresh import oauth_token_usable
-    return oauth_token_usable(user_id) is not False
+    from cqc_lem.utilities.linkedin.token_refresh import has_oauth_token
+    return has_oauth_token(user_id) is not False
 
 
 def evaluate_steps(user_id: int) -> dict:
