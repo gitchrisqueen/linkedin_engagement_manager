@@ -301,10 +301,13 @@ def send_login_pin_request_email(to_email: str, reply_to: str) -> bool:
 
 
 def send_reply_forward_confirmation_email(to_email: str, verify_url: Optional[str],
-                                          code: Optional[str]) -> bool:
+                                          code: Optional[str], trial: bool = False) -> bool:
     """Forward Gmail's forwarding-confirmation to the user so they can finish it from their OWN
     signed-in browser (the most reliable way — a server-side click may not complete Gmail's flow).
     The confirmation was delivered to our reply+<token> address, so the user never saw it.
+
+    A trial account does not get automated replies, so its wording says only what forwarding
+    does — deliver LinkedIn's notification emails to LEM — and promises no auto-reply (#2375).
     """
     if not verify_url and not code:
         return False
@@ -316,19 +319,27 @@ def send_reply_forward_confirmation_email(to_email: str, verify_url: Optional[st
                  f'pending address): <strong style="font-size:16px">{code}</strong></p>') if code else ""
     link_line = (f'<p style="color:#666;font-size:12px;word-break:break-all">Button not working? '
                  f'Copy this link: {verify_url}</p>') if verify_url else ""
+    if trial:
+        headline = "Confirm LinkedIn notification forwarding"
+        purpose = ("You added our address as a Gmail forwarding destination so LEM receives your "
+                   "LinkedIn notification emails.")
+        subject = "Confirm your LinkedIn notification forwarding"
+    else:
+        headline = "Confirm comment-reply forwarding"
+        purpose = ("You added our address as a Gmail forwarding destination so we can auto-reply to "
+                   "comments on your LinkedIn posts.")
+        subject = "Confirm your LinkedIn comment-reply forwarding"
     html = (
         "<html><body style=\"font-family:Arial,Helvetica,sans-serif;color:#222;\">"
-        "<h2>Confirm comment-reply forwarding</h2>"
-        "<p>You added our address as a Gmail forwarding destination so we can auto-reply to comments "
-        "on your LinkedIn posts. Gmail sent a confirmation to that address (which you can't see), so "
+        f"<h2>{headline}</h2>"
+        f"<p>{purpose} Gmail sent a confirmation to that address (which you can't see), so "
         "we're passing it to you.</p>"
         f"{button}{code_line}{link_line}"
         "<p style='color:#666;font-size:12px'>If your forwarding already shows as confirmed in Gmail, "
         "you can ignore this email.</p>"
         "</body></html>"
     )
-    return _dispatch_email(to_email, "Confirm your LinkedIn comment-reply forwarding", html,
-                           high_priority=True)
+    return _dispatch_email(to_email, subject, html, high_priority=True)
 
 
 def _account_url() -> str:
@@ -349,7 +360,7 @@ def send_connect_linkedin_email(to_email: str, account_url: Optional[str] = None
         headline = "Connect your LinkedIn so your approved posts can publish"
         purpose = ("LinkedIn Engagement Manager needs your LinkedIn connected to publish the posts\n"
                    "    you approve. Your account isn't connected yet, so nothing can publish.")
-        subject = "⚠️ Action needed: connect your LinkedIn so your approved posts can publish"
+        subject = "Action needed: connect your LinkedIn so your approved posts can publish"
     else:
         headline = "Connect your LinkedIn to keep automation running"
         purpose = ("LinkedIn Engagement Manager needs an authorized LinkedIn session to post,\n"

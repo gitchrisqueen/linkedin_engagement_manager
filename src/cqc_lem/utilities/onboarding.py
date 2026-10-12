@@ -138,6 +138,7 @@ _TRIAL_NUDGE: dict = {
 _TRIAL_NUDGE_COPY: dict = {
     NUDGE_CONNECT: {
         "subject": "Connect LinkedIn so your approved posts can publish",
+        "headline": "First step: connect LinkedIn",
         "body": ("Your account is ready, but LinkedIn isn't connected yet — so your approved posts "
                  "can't publish. It takes about a minute from your account page."),
     },
@@ -151,6 +152,31 @@ _TRIAL_NUDGE_COPY: dict = {
 NUDGE_COOLDOWN_HOURS = 24
 
 
+def linkedin_connected(user_id: int, trial: Optional[bool] = None) -> bool:
+    """Whether this user has connected LinkedIn, for the onboarding step and the connect email.
+
+    A stored `li_at` session counts for everyone. A trial account connects by OAuth only, so for a
+    trial a usable OAuth token counts too, and so does a token whose state cannot be read: telling
+    a connected trial account it isn't connected is the failure this avoids (issue #2375). A paid
+    account still needs the session cookie, which the engagement lanes log in with.
+
+    Args:
+        user_id: The user to check.
+        trial: Whether the account is on the trial; read off its subscription when None.
+
+    Returns:
+        True when the user should be treated as connected.
+    """
+    if has_linkedin_session(user_id):
+        return True
+    if trial is None:
+        trial = is_trial_subscription(get_user_subscription_info(user_id))
+    if not trial:
+        return False
+    from cqc_lem.utilities.linkedin.token_refresh import oauth_token_usable
+    return oauth_token_usable(user_id) is not False
+
+
 def evaluate_steps(user_id: int) -> dict:
     """Live truth for each checklist step, derived from what the user has actually done."""
     prefs = get_engagement_preferences(user_id)
@@ -162,7 +188,7 @@ def evaluate_steps(user_id: int) -> dict:
     caps_enabled = configured and (int(prefs.get("max_comments_per_day") or 0) > 0
                                    or int(prefs.get("max_dms_per_day") or 0) > 0)
     return {
-        OnboardingStep.LINKEDIN_CONNECTED: has_linkedin_session(user_id),
+        OnboardingStep.LINKEDIN_CONNECTED: linkedin_connected(user_id),
         OnboardingStep.VOICE_SET: voice_set,
         OnboardingStep.FIRST_POST_APPROVED: has_post_with_status(
             user_id, (PostStatus.APPROVED, PostStatus.SCHEDULED, PostStatus.POSTED)),

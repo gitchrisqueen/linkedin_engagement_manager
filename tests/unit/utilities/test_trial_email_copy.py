@@ -17,6 +17,7 @@ from cqc_lem.utilities.email import (
     send_connect_linkedin_email,
     send_linkedin_token_expiring_email,
     send_onboarding_nudge_email,
+    send_reply_forward_confirmation_email,
 )
 from cqc_lem.utilities.trial_copy import (
     automated_engagement_phrases,
@@ -114,6 +115,13 @@ class TestOnboardingNudges:
             "You haven't seen LEM actually run yet. Approve a drafted post and your first post "
             "can go live before the trial is up.")
 
+    def test_trial_connect_headline_does_not_say_one_step_left(self):
+        nudge = onboarding._for_audience(onboarding._STEP_NUDGES[0], trial=True)
+        assert nudge["headline"] == "First step: connect LinkedIn"
+        rendered = _render_nudge(nudge).lower()
+        assert "one step left" not in rendered
+        assert "anything can run" not in rendered
+
     def test_select_nudge_hands_a_trial_account_the_trial_copy(self):
         steps = {step: False for step in OnboardingStep}
         nudge = onboarding.select_nudge(steps, started_at=NOW - timedelta(hours=25), now=NOW,
@@ -169,7 +177,8 @@ class TestConnectLinkedInEmail:
     def test_trial_wording_is_clean(self):
         rendered = _sent(send_connect_linkedin_email, "u@example.com", trial=True)
         assert automated_engagement_phrases(rendered) == []
-        assert "connect your LinkedIn so your approved posts can publish" in rendered
+        assert rendered.startswith(
+            "Action needed: connect your LinkedIn so your approved posts can publish\n")
 
     def test_paid_wording_is_unchanged(self):
         rendered = _sent(send_connect_linkedin_email, "u@example.com")
@@ -216,3 +225,144 @@ class TestTokenExpiringEmail:
                    return_value=True) as send:
             assert notifications.notify_linkedin_token_expiring(7, 0) is True
         assert send.call_args.kwargs == {"trial": expected}
+
+
+class TestReplyForwardConfirmationEmail:
+    _URL = "https://mail.google.com/mail/vf-x"
+
+    def test_trial_wording_is_clean(self):
+        rendered = _sent(send_reply_forward_confirmation_email, "u@example.com", self._URL,
+                         "55667788", trial=True)
+        assert automated_engagement_phrases(rendered) == []
+        assert rendered.startswith("Confirm your LinkedIn notification forwarding\n")
+        assert "so LEM receives your LinkedIn notification emails." in rendered
+        assert self._URL in rendered and "55667788" in rendered
+
+    def test_paid_wording_is_unchanged(self):
+        rendered = _sent(send_reply_forward_confirmation_email, "u@example.com", self._URL, None)
+        assert rendered.startswith("Confirm your LinkedIn comment-reply forwarding\n")
+        assert "so we can auto-reply to comments on your LinkedIn posts" in rendered
+        assert promises_automated_engagement(rendered)
+
+
+def _token_status(connected: bool, expiry, expired: bool) -> dict:
+    return {"connected": connected, "token_expiry_date": expiry, "is_expired": expired}
+
+
+class TestOAuthTokenUsable:
+    _RESOLVE = "cqc_lem.utilities.linkedin.token_refresh.resolve_token_status"
+
+    @pytest.mark.parametrize("status,expected", [
+        (_token_status(False, None, True), False),
+        (_token_status(True, "2026-12-01T00:00:00+00:00", False), True),
+        (_token_status(True, "2026-09-01T00:00:00+00:00", True), False),
+        (_token_status(True, None, True), None),
+    ])
+    def test_reads_the_resolved_state_without_renewing(self, status, expected):
+        from cqc_lem.utilities.linkedin.token_refresh import oauth_token_usable
+        with patch(self._RESOLVE, return_value=status) as resolve:
+            assert oauth_token_usable(7) is expected
+        resolve.assert_called_once_with(7, auto_refresh=False)
+
+    def test_an_unreadable_state_is_unknown(self):
+        from cqc_lem.utilities.linkedin.token_refresh import oauth_token_usable
+        with patch(self._RESOLVE, side_effect=RuntimeError("db down")), \
+             patch("cqc_lem.utilities.linkedin.token_refresh.log_warning"):
+            assert oauth_token_usable(7) is None
+
+
+class TestLinkedInConnected:
+    _USABLE = "cqc_lem.utilities.linkedin.token_refresh.oauth_token_usable"
+
+    def _connected(self, cookie: bool, status, usable):
+        with patch.object(onboarding, "has_linkedin_session", return_value=cookie), \
+             patch.object(onboarding, "get_user_subscription_info",
+                          return_value={"subscription_status": status}), \
+             patch(self._USABLE, return_value=usable) as oauth:
+            return onboarding.linkedin_connected(7), oauth
+
+    @pytest.mark.parametrize("usable,expected", [(True, True), (None, True), (False, False)])
+    def test_a_trial_without_a_cookie_counts_its_oauth_token(self, usable, expected):
+        connected, _ = self._connected(False, "trial", usable)
+        assert connected is expected
+
+    def test_a_paid_account_still_needs_the_cookie(self):
+        connected, oauth = self._connected(False, "active", True)
+        assert connected is False
+        oauth.assert_not_called()
+
+    def test_the_cookie_counts_for_everyone(self):
+        connected, oauth = self._connected(True, "active", False)
+        assert connected is True
+        oauth.assert_not_called()
+
+    def test_the_onboarding_step_uses_it(self):
+        with patch.object(onboarding, "has_linkedin_session", return_value=False), \
+             patch.object(onboarding, "get_user_subscription_info",
+                          return_value={"subscription_status": "trial"}), \
+             patch(self._USABLE, return_value=True), \
+             patch.object(onboarding, "get_engagement_preferences", return_value={}), \
+             patch.object(onboarding, "has_engagement_preferences", return_value=False), \
+             patch.object(onboarding, "has_post_with_status", return_value=False):
+            steps = onboarding.evaluate_steps(7)
+        assert steps[OnboardingStep.LINKEDIN_CONNECTED] is True
+
+
+class TestMissingSessionBeat:
+    """The daily connect-email beat, end to end below `notify_linkedin_session`."""
+
+    def _run(self, cookie: bool, status, usable):
+        from cqc_lem.app import run_scheduler
+        with patch.object(run_scheduler, "get_active_user_ids", return_value=[7]), \
+             patch.object(run_scheduler, "notify_linkedin_session", return_value=True) as notify, \
+             patch.object(onboarding, "has_linkedin_session", return_value=cookie), \
+             patch.object(onboarding, "get_user_subscription_info",
+                          return_value={"subscription_status": status}), \
+             patch(TestLinkedInConnected._USABLE, return_value=usable):
+            run_scheduler.auto_notify_missing_linkedin_session()
+        return notify
+
+    def test_a_trial_connected_by_oauth_gets_no_connect_email(self):
+        self._run(cookie=False, status="trial", usable=True).assert_not_called()
+
+    def test_a_trial_with_an_unreadable_token_gets_no_connect_email(self):
+        self._run(cookie=False, status="trial", usable=None).assert_not_called()
+
+    def test_a_trial_with_neither_still_gets_it(self):
+        self._run(cookie=False, status="trial", usable=False).assert_called_once_with(
+            7, revalidation=False)
+
+    def test_a_paid_account_without_a_cookie_still_gets_it(self):
+        self._run(cookie=False, status="active", usable=True).assert_called_once_with(
+            7, revalidation=False)
+
+    def test_a_cookie_session_gets_nothing(self):
+        self._run(cookie=True, status="active", usable=False).assert_not_called()
+
+
+class TestConnectNudgeForAnOAuthTrial:
+    def test_an_oauth_connected_trial_is_not_sent_the_connect_nudge(self):
+        with patch.object(onboarding, "has_linkedin_session", return_value=False), \
+             patch.object(onboarding, "get_user_subscription_info",
+                          return_value={"subscription_status": "trial"}), \
+             patch(TestLinkedInConnected._USABLE, return_value=True), \
+             patch.object(onboarding, "get_engagement_preferences", return_value={}), \
+             patch.object(onboarding, "has_engagement_preferences", return_value=False), \
+             patch.object(onboarding, "has_post_with_status", return_value=False):
+            steps = onboarding.evaluate_steps(7)
+        nudge = onboarding.select_nudge(steps, started_at=NOW - timedelta(hours=60), now=NOW,
+                                        trial=True)
+        assert nudge["key"] == onboarding.NUDGE_VOICE
+
+    def test_a_trial_with_neither_still_gets_the_connect_nudge(self):
+        with patch.object(onboarding, "has_linkedin_session", return_value=False), \
+             patch.object(onboarding, "get_user_subscription_info",
+                          return_value={"subscription_status": "trial"}), \
+             patch(TestLinkedInConnected._USABLE, return_value=False), \
+             patch.object(onboarding, "get_engagement_preferences", return_value={}), \
+             patch.object(onboarding, "has_engagement_preferences", return_value=False), \
+             patch.object(onboarding, "has_post_with_status", return_value=False):
+            steps = onboarding.evaluate_steps(7)
+        nudge = onboarding.select_nudge(steps, started_at=NOW - timedelta(hours=60), now=NOW,
+                                        trial=True)
+        assert nudge["key"] == onboarding.NUDGE_CONNECT
