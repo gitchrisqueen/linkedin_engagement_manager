@@ -1793,7 +1793,9 @@ def generate_nurture_dm(their_message: str, intent: str, profile: "LinkedInProfi
         you were not shown. No hard sell, no hype, no links,
         no hashtags, no emoji spam, no "just following up" or "circling back". Never repeat a message
         you have already sent them.
-        2-4 sentences, under 300 characters. Output ONLY the message text.""",
+        Open with the substance of your reply, never with a filler opener such as "Sure",
+        "Absolutely", "Of course", "Certainly" or "Thanks for".
+        2-4 sentences, under 300 characters — a hard limit. Output ONLY the message text.""",
     }
     ctx = format_recipient_context(recipient_context)
     if history:
