@@ -254,7 +254,7 @@ from cqc_lem.utilities.selenium_util import (
     is_grid_relay_error,
     is_session_lost,
     is_tab_crashed,
-    log_lane_failure,
+    note_tab_crash,
     quit_gracefully,
     wait_for_ajax,
 )
@@ -2629,8 +2629,16 @@ def comment_on_roster_posts(ctx: FeedRunContext, max_posts: int) -> dict:
             if is_tab_crashed(e):
                 # A dead renderer fails every later target the same way, warning once each until
                 # it escalates (#2402). End the walk AND the run: the feed walk after it would hit
-                # the same dead tab, so the task-level catch reports it once.
-                raise
+                # the same dead tab, so the task-level catch reports it once. The blocked visits
+                # already observed are still recorded first — they are facts from pages that did
+                # load — and a failure doing so never replaces the crash being re-raised.
+                try:
+                    _record_blocked_visits(user_id, blocked_visits, stats["targets_visited"])
+                except Exception as record_error:
+                    log_warning("Could not record roster blocked visits before ending on a "
+                                "crashed tab", exc=record_error, user_id=user_id,
+                                action_type="comment", task_name="comment_on_roster_posts")
+                raise e
             log_warning("Could not open roster target's activity page", exc=e, user_id=user_id,
                         action_type="comment", task_name="comment_on_roster_posts")
             continue
@@ -4679,9 +4687,10 @@ def automate_commenting(self, user_id: int, loop_for_duration: int = None, futur
     except Exception as e:
         # A tab that crashed on the first login navigation was already warned about by
         # `get_current_profile`; this wrapper only notes it (#2402).
-        log_lane_failure("Error while getting profile for auto commenting", e,
-                         task_name="automate_commenting", crash_logged_upstream=True,
-                         user_id=user_id)
+        if not note_tab_crash(e, task_name="automate_commenting", crash_logged_upstream=True,
+                              user_id=user_id):
+            log_error("Error while getting profile for auto commenting", exc=e, user_id=user_id,
+                      task_name="automate_commenting")
         release_run_lock(lock_name, lock_token)
         return f"Failed to start auto commenting: {e}"
 
@@ -4733,10 +4742,11 @@ def automate_commenting(self, user_id: int, loop_for_duration: int = None, futur
     except Exception as e:
         # A crashed tab mid-walk is a warning that escalates on repeat, not an immediate defect
         # (#2402); the run ends here either way and the self-requeue is skipped with it.
-        if log_lane_failure("Error while automating commenting", e, task_name="automate_commenting",
-                            user_id=user_id):
+        if note_tab_crash(e, task_name="automate_commenting", user_id=user_id):
             result = "Automate Commenting stopped — the browser tab crashed"
         else:
+            log_error("Error while automating commenting", exc=e, user_id=user_id,
+                      task_name="automate_commenting")
             result = f"Error while automating commenting: {e}"
     finally:
         quit_gracefully(driver)  # Close the driver

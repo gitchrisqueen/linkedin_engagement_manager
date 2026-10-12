@@ -59,7 +59,7 @@ from cqc_lem.utilities.env_constants import (  # noqa: F401
     isTrue,
 )
 
-from cqc_lem.utilities.logger import log_debug, log_error, log_info, log_warning
+from cqc_lem.utilities.logger import log_debug, log_info, log_warning
 from cqc_lem.utilities.utils import get_aws_device_farm_url
 
 # Last-resort geolocation when a session has no user_id and therefore no stored Login Location.
@@ -130,21 +130,22 @@ def is_tab_crashed(exc: BaseException) -> bool:
     return False
 
 
-def log_lane_failure(message: str, exc: BaseException, *, task_name: str,
-                     crash_logged_upstream: bool = False, **context) -> bool:
-    """Log the failure that ended a Selenium lane's run at the level its cause earns.
+def note_tab_crash(exc: BaseException, *, task_name: str, crash_logged_upstream: bool = False,
+                   **context) -> bool:
+    """Log a crashed tab that ended a Selenium lane's run, and say whether it was one.
 
     A crashed tab (`is_tab_crashed`) is an expected transient — the renderer was OOM-killed — and
     ends the run the same way whatever the lane was doing, so it is a WARNING that escalates only
-    if it recurs, never an immediate `$exception` (issues #2393, #2402, #2403). Every other cause
-    keeps the `log_error` the lane always used. The caller must already have stopped using the
+    if it recurs, never an immediate `$exception` (issues #2393, #2402, #2403). Anything else is
+    NOT logged here: the lane keeps its own `log_error` call, so the log line still names the
+    lane's function rather than this helper. The caller must already have stopped using the
     driver: a dead tab fails every later navigation, so this is never a cue to retry.
 
     The warning names `task_name` so each lane keeps its own escalation key — the call-site half of
-    that key is this function for every lane, so the message is what tells them apart.
+    that key is this function for every lane, so the message is what tells them apart. On-call can
+    grep the persistent log for `Browser tab crashed — ending`.
 
     Args:
-        message: The lane's own ERROR message, used verbatim for every non-crash cause.
         exc: The exception that ended the run.
         task_name: The lane's task name — part of the crash message and the log context.
         crash_logged_upstream: True when the layer that raised already warned about this crash —
@@ -153,10 +154,10 @@ def log_lane_failure(message: str, exc: BaseException, *, task_name: str,
         **context: Structured log fields (`user_id`, `action_type`, ...).
 
     Returns:
-        True when the run ended on a crashed tab, so the caller can say so in its result.
+        True when the run ended on a crashed tab (now logged); False when the caller must log `exc`
+        itself.
     """
     if not is_tab_crashed(exc):
-        log_error(message, exc=exc, task_name=task_name, **context)
         return False
     if crash_logged_upstream:
         log_debug(f"Browser tab crashed — ending {task_name} (already reported where detected)",

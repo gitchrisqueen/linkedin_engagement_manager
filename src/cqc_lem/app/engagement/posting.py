@@ -215,7 +215,7 @@ from cqc_lem.utilities.selenium_util import (
     click_first,
     find_first,
     is_tab_crashed,
-    log_lane_failure,
+    note_tab_crash,
     quit_gracefully,
 )
 
@@ -1583,8 +1583,10 @@ def _run_comment_followups_sweep(user_id: int) -> str:
     except Exception as e:
         # A tab that crashed on the first login navigation was already warned about by
         # `get_current_profile`; this wrapper only notes it (#2393).
-        log_lane_failure("Error starting follow-up sweep", e, task_name="sweep_comment_followups",
-                         crash_logged_upstream=True, user_id=user_id)
+        if not note_tab_crash(e, task_name="sweep_comment_followups", crash_logged_upstream=True,
+                              user_id=user_id):
+            log_error("Error starting follow-up sweep", exc=e, user_id=user_id,
+                      task_name="sweep_comment_followups")
         release_run_lock(lock_name, lock_token)
         return f"Failed to start follow-up sweep: {e}"
     reacted = replied = leads = filtered = 0
@@ -1615,10 +1617,8 @@ def _run_comment_followups_sweep(user_id: int) -> str:
         return (f"Follow-ups: reacted {reacted}, replied {replied}, leads {leads}, "
                 f"filtered {filtered} across {len(posts)} post(s)")
     except Exception as e:
-        if not is_tab_crashed(e):
+        if not note_tab_crash(e, task_name="sweep_comment_followups", user_id=user_id):
             raise  # unchanged: any other fault still fails the task and is filed by the Celery hook
-        log_lane_failure("Follow-up sweep failed", e, task_name="sweep_comment_followups",
-                         user_id=user_id)
         return (f"Follow-ups stopped — browser tab crashed: reacted {reacted}, replied {replied}, "
                 f"leads {leads} before the crash")
     finally:

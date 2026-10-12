@@ -93,42 +93,38 @@ class TestIsGridRelayError:
         assert is_grid_relay_error(exc) is False
 
 
-class TestLogLaneFailure:
-    """The ONE level decision for a lane's run-ending failure (#2393, #2402, #2403)."""
+class TestNoteTabCrash:
+    """The ONE crash decision for a lane's run-ending failure (#2393, #2402, #2403)."""
 
     _SU = "cqc_lem.utilities.selenium_util"
 
     def _call(self, exc, **kw):
-        from cqc_lem.utilities.selenium_util import log_lane_failure
+        from cqc_lem.utilities.selenium_util import note_tab_crash
         with patch(f"{self._SU}.log_debug") as debug, \
-             patch(f"{self._SU}.log_warning") as warning, \
-             patch(f"{self._SU}.log_error") as error:
-            crashed = log_lane_failure("Lane failed", exc, task_name="some_lane", user_id=7, **kw)
-        return crashed, debug, warning, error
+             patch(f"{self._SU}.log_warning") as warning:
+            crashed = note_tab_crash(exc, task_name="some_lane", user_id=7, **kw)
+        return crashed, debug, warning
 
     def test_a_crashed_tab_is_one_warning_naming_the_lane(self):
         exc = WebDriverException("Message: tab crashed")
-        crashed, debug, warning, error = self._call(exc)
+        crashed, debug, warning = self._call(exc)
         assert crashed is True
         warning.assert_called_once()
         assert warning.call_args.args[0] == "Browser tab crashed — ending some_lane"
         assert warning.call_args.kwargs == {"exc": exc, "task_name": "some_lane", "user_id": 7}
         debug.assert_not_called()
-        error.assert_not_called()
 
     def test_a_crash_already_reported_upstream_is_debug(self):
-        crashed, debug, warning, error = self._call(WebDriverException("tab crashed"),
-                                                    crash_logged_upstream=True)
+        crashed, debug, warning = self._call(WebDriverException("tab crashed"),
+                                             crash_logged_upstream=True)
         assert crashed is True
         debug.assert_called_once()
         warning.assert_not_called()
-        error.assert_not_called()
 
     @pytest.mark.parametrize("exc", [WebDriverException("Unable to find session with ID: abc"),
                                      RuntimeError("boom")])
-    def test_anything_else_keeps_the_lanes_error(self, exc):
-        crashed, debug, warning, error = self._call(exc, crash_logged_upstream=True)
+    def test_anything_else_is_left_to_the_lane_and_logs_nothing(self, exc):
+        crashed, debug, warning = self._call(exc, crash_logged_upstream=True)
         assert crashed is False
-        error.assert_called_once_with("Lane failed", exc=exc, task_name="some_lane", user_id=7)
         debug.assert_not_called()
         warning.assert_not_called()

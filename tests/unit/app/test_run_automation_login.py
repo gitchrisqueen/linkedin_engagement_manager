@@ -24,9 +24,7 @@ _PATCH_LOG_ERROR = f"{_OUT}.log_error"
 _PATCH_LOG_WARNING = f"{_OUT}.log_warning"
 _FEED = "cqc_lem.app.engagement.feed"
 _FEED_GET_PROFILE = f"{_FEED}.get_current_profile"
-# `automate_commenting`'s run-level failure is logged by the shared `log_lane_failure` (#2402), so
-# its ERROR is read — and must be patched — where that helper lives.
-_FEED_LOG_ERROR = "cqc_lem.utilities.selenium_util.log_error"
+_FEED_LOG_ERROR = f"{_FEED}.log_error"
 _POST = "cqc_lem.app.engagement.posting"
 _POST_GET_PROFILE = f"{_POST}.get_current_profile"
 _POST_LOG_ERROR = f"{_POST}.log_error"
