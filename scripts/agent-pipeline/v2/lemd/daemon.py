@@ -1005,6 +1005,9 @@ class Daemon:
         # that finished work is still holding — and a pause is when an operator is most likely to
         # be looking at the box and asking why 8.7 GB of merged trees are still there.
         self.sweep_worktrees()
+        # And so do orphaned processes: a lane's tools can start commands in a new session that
+        # killpg never reaches, and those hold memory until something terminates them.
+        self.sweep_orphans()
         if self.cfg.is_paused():
             LOG.info("PAUSED file present — observing nothing this pass")
             return
@@ -1016,6 +1019,19 @@ class Daemon:
         self.observe_dirty()
         self.sweep_ttls()
         self.act()
+
+    def sweep_orphans(self) -> None:
+        """Terminate processes left running in `work/` trees no live lane owns (`lemd.orphans`).
+
+        Never in shadow mode, which mutates nothing; never raises, because housekeeping must not be
+        what stops a pass from acting.
+        """
+        if self.cfg.shadow:
+            return
+        try:
+            self.sup.sweep_idle_orphans(v1_busy=self.sup.v1_slots_busy())
+        except Exception as exc:  # noqa: BLE001 - fail open
+            LOG.warning("orphan sweep skipped: %s", exc)
 
     #: Minimum seconds between two ATTEMPTS to spawn the sweep. Only matters when a spawn fails or
     #: the action exits without touching its stamp (no gh credential, say): without it the loop

@@ -51,6 +51,7 @@ collect          reap finished runs                 ← runs even while PAUSED, 
                                                       would strand claims and branch locks
 sweep_worktrees  spawn actions/sweep.sh             ← also while PAUSED; at most hourly, by the
                                                       locks/.worktree-sweep stamp (#2041)
+sweep_orphans    TERM/KILL orphans in idle work/ trees  ← also while PAUSED; never in shadow mode
 ── if PAUSED: stop here ──
 drain_events     webhook rows  → items.dirty=1      (≤200 per pass)
 reconcile        GitHub labels → the queue          (600s; 120s only if silent AND drifting)
@@ -96,6 +97,23 @@ idle pipeline would never sweep), and it would sit on the run's critical path af
 charged. What is removable is unchanged — `release_worktree` still refuses a dirty tree, a claimed
 branch and anything outside `work/`. Log lines: `worktree sweep: …` in `logs/v2-actions-*.log`.
 `tests/unit/test_agent_pipeline_v2_worktree_sweep.py` pins the wiring end to end.
+
+**Orphaned lane processes are swept too** (`v2/lemd/orphans.py`). `killpg` reaches a lane's process
+group only, and a lane's tools start commands in NEW sessions (an agent's shell tool) or groups
+(`timeout`). Measured: a lane's `pytest -n 8` and a `timeout 180 graft build` outlived their lanes as
+PPID-1 orphans for one to two days, ~2.4 GB, inside the daemon's cgroup, and that pushed the service
+slice past `MemoryHigh` and throttled every service in it, the webhook receiver included. Two call
+sites: `Supervisor.reap()` sweeps `work/<branch>` when an agent lane it dispatched with a known branch
+ends (finished or killed), and `Daemon.sweep_orphans()` sweeps every `work/` tree no running lane owns
+once per pass (skipped while v1 ticks hold a slot, since their lanes are invisible here). A process is
+signalled only when it has the daemon's uid, its cwd or an absolute argv path is inside the target
+tree, and **every ancestor up to init is too**: a live lane always has an ancestor outside its
+worktree (the action runs in the pipeline base), and so does an interactive shell, so neither ever
+qualifies. The daemon, its ancestors and descendants of a running child are never touched. TERM, 10s
+grace, then KILL, each re-checking the process start time so a recycled pid is never signalled. An
+unreadable `/proc` entry is skipped, and nothing in the sweep can raise into the loop. Log line:
+`orphan sweep (…): terminated N process(es) pids=[…]` — pids only, never command lines. It adds no
+`decide()` branch. `tests/unit/test_agent_pipeline_v2_orphan_sweep.py` runs it against a fake `/proc`.
 
 ---
 
