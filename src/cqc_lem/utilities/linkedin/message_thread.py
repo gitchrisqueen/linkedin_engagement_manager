@@ -73,7 +73,7 @@ from selenium.webdriver.support.wait import WebDriverWait
 from cqc_lem.utilities.linkedin.helper import can_open_dm_thread
 from cqc_lem.utilities.linkedin.scrapper import _degree_from_source
 from cqc_lem.utilities.logger import log_debug, log_info, log_warning
-from cqc_lem.utilities.selenium_util import find_first
+from cqc_lem.utilities.selenium_util import find_first, is_tab_crashed
 
 MESSAGING_URL = "https://www.linkedin.com/messaging/"
 COMPOSE_URL = "https://www.linkedin.com/messaging/compose/"
@@ -456,6 +456,11 @@ def thread_reading(driver: WebDriver) -> dict:
     try:
         raw = driver.execute_script(_THREAD_STATE_JS) or {}
     except Exception as e:  # a JS failure is a failed READ, never a failed run
+        if is_tab_crashed(e):
+            # A crashed tab is not a failed read — it is the end of the session. Swallowing it here
+            # made `_wait_thread_open` re-poll the dead tab and warn on every poll, which escalated
+            # into a `$exception` within one run (issue #2421). The lane ends the run instead.
+            raise
         log_warning("Could not read message-thread state", exc=e, action_type="followup")
         return {"events": 0, "composer": False, "surface": None}
     try:
@@ -958,11 +963,17 @@ def open_message_thread(driver: WebDriver, wait: WebDriverWait, profile_url: str
     caller (`check_dm_replied`) already turns this into `ThreadState.UNKNOWN` and skips the
     follow-up, so it is logged at DEBUG, not a WARNING that would recur into a `RecurringWarning`
     for working refusal-to-follow-up-blind behavior (issue #1752).
+
+    A crashed tab (`is_tab_crashed`) is the one failure the ladder does NOT absorb: it re-raises, so
+    the lane ends its run once instead of every later route and poll warning on the same dead tab
+    (issue #2421).
     """
     result = ThreadOpen()
     try:
         driver.get(profile_url)
     except WebDriverException as e:
+        if is_tab_crashed(e):
+            raise  # the session is over, not this person's thread (issue #2421)
         log_warning("Could not open the profile to reach its message thread", exc=e,
                     user_id=user_id, action_type="followup", profile_url=profile_url)
         return result
@@ -1004,6 +1015,10 @@ def open_message_thread(driver: WebDriver, wait: WebDriverWait, profile_url: str
         try:
             reading = attempt()
         except Exception as e:
+            if is_tab_crashed(e):
+                # ...but a crashed tab is not a broken route: every later route fails on the same
+                # dead tab, so walking on only adds a warning per route (issue #2421).
+                raise
             # One broken route must never end the ladder — that is the failure this module exists
             # to stop. Record it and keep walking.
             log_warning(f"Message-thread route '{route}' raised", exc=e, user_id=user_id,

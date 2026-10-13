@@ -185,6 +185,22 @@ class TestThreadReading:
         d = FakeDriver(thread={"events": "lots", "composer": False, "overlay": False})
         assert mt.thread_reading(d)["events"] == 0
 
+    def test_a_crashed_tab_raises_instead_of_reading_as_closed(self):
+        # Issue #2421: swallowing a crash let `_wait_thread_open` re-poll the dead tab and warn on
+        # every poll, which escalated into a `$exception` within one follow-up run.
+        d = MagicMock()
+        d.execute_script.side_effect = WebDriverException("tab crashed\n  (Session info: chrome=153)")
+        with patch.object(mt, "log_warning") as warn, pytest.raises(WebDriverException):
+            mt.thread_reading(d)
+        warn.assert_not_called()
+
+    def test_a_crashed_tab_ends_the_wait_on_the_first_poll(self):
+        d = MagicMock()
+        d.execute_script.side_effect = WebDriverException("tab crashed")
+        with pytest.raises(WebDriverException):
+            mt._wait_thread_open(d, timeout=60)
+        assert d.execute_script.call_count == 1
+
 
 class TestWaitThreadOpen:
     """A bare composer must not end the wait.
@@ -491,6 +507,24 @@ class TestLadderContract:
         d.dom[(By.CSS_SELECTOR, "main a[href*='/messaging/compose/']")] = [hidden]
         result = mt.open_message_thread(d, MagicMock(), PROFILE, timeout=0)
         assert not result.opened
+
+    def test_a_crashed_tab_ends_the_ladder_without_a_warning_per_route(self):
+        # Issue #2421: every later route fails on the same dead tab, so walking on only warned once
+        # per route. The crash re-raises for the lane to end its run on ONE warning.
+        d = FakeDriver()
+        with patch.object(mt, "_try_control",
+                          side_effect=WebDriverException("tab crashed")) as route, \
+             patch.object(mt, "log_warning") as warn, pytest.raises(WebDriverException):
+            mt.open_message_thread(d, MagicMock(), PROFILE, timeout=0)
+        assert route.call_count == 1
+        warn.assert_not_called()
+
+    def test_a_crashed_tab_on_the_profile_navigation_raises(self):
+        d = FakeDriver()
+        d.get = MagicMock(side_effect=WebDriverException("tab crashed"))
+        with patch.object(mt, "log_warning") as warn, pytest.raises(WebDriverException):
+            mt.open_message_thread(d, MagicMock(), PROFILE, timeout=0)
+        warn.assert_not_called()
 
     def test_a_navigation_failure_returns_closed_rather_than_raising(self):
         d = FakeDriver()

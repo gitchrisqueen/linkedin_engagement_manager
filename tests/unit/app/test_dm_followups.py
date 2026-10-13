@@ -196,6 +196,47 @@ class TestProcessUserFollowups:
         warn.assert_not_called()
         err.assert_not_called()
 
+    def _run_with_reads(self, *reads):
+        """Run two due rows whose thread reads are `reads` (a state, or an exception to raise)."""
+        from cqc_lem.app.engagement.outreach import process_user_followups
+        with patch(f"{_OUT}.get_due_followups",
+                   return_value=[_due(), _due(id=2, profile_url="https://x/in/joe")]), \
+             patch(f"{_OUT}.get_current_profile",
+                   return_value=(MagicMock(), MagicMock(), "e", MagicMock())), \
+             patch(f"{_OUT}.quit_gracefully") as quit_driver, patch(f"{_OUT}.time.sleep"), \
+             patch(f"{_OUT}.insert_new_log"), \
+             patch(f"{_OUT}.resolve_self_name", return_value="Christopher Queen"), \
+             patch(f"{_OUT}.check_dm_replied", side_effect=list(reads)) as check, \
+             patch(f"{_OUT}.seconds_since_last_dm_touch", return_value=None), \
+             patch(f"{_OUT}.outbound_refusal_reason", return_value=None), \
+             patch(f"{_OUT}.build_dm_from_template", return_value="follow up msg"), \
+             patch(f"{_OUT}.send_private_dm") as dm, \
+             patch(f"{_OUT}.mark_followup") as mark, \
+             patch(f"{_OUT}.enqueue_next_followup"), \
+             patch(f"{_OUT}.log_error") as err, \
+             patch("cqc_lem.utilities.selenium_util.log_warning") as crash_warn:
+            result = process_user_followups.run(user_id=1)
+        return result, {"quit": quit_driver, "check": check, "dm": dm, "mark": mark, "err": err,
+                        "crash_warn": crash_warn}
+
+    def test_tab_crashed_mid_run_ends_the_run_on_one_warning(self):
+        # Issue #2421: the tab died after login, inside the thread-read loop. That used to warn on
+        # every poll of every route and escalate into a `$exception`; it now ends the run once.
+        from selenium.common.exceptions import WebDriverException
+        crash = WebDriverException("tab crashed\n  (Session info: chrome=153.0.8010.47)")
+        result, m = self._run_with_reads(ThreadState.NOT_REPLIED, crash)
+        assert "Browser tab crashed" in result and "sent 1" in result
+        m["dm"].apply_async.assert_called_once()  # the row read before the crash still went out
+        m["mark"].assert_called_once_with(1, "sent")  # the crashed row stays 'pending'
+        m["crash_warn"].assert_called_once()
+        assert "process_user_followups" in m["crash_warn"].call_args.args[0]
+        m["err"].assert_not_called()
+        m["quit"].assert_called_once()
+
+    def test_any_other_fault_mid_run_still_raises(self):
+        with pytest.raises(RuntimeError):
+            self._run_with_reads(RuntimeError("db gone"))
+
     def test_rate_limited_getting_profile_logs_debug_not_warning_or_error(self):
         # Issue #1940: `LinkedInRateLimited` is a known, self-clearing back-off (429 breaker,
         # manual pause, or a per-account challenge-unsolvable cooldown, ~175s). This task is
@@ -515,6 +556,17 @@ class TestCheckDmReplied:
         with patch(f"{_OUT}.open_message_thread", side_effect=RuntimeError("boom")):
             assert check_dm_replied(MagicMock(), MagicMock(), "https://x/in/b",
                                     my_name="Me") is ThreadState.UNKNOWN
+
+    def test_a_crashed_tab_is_not_an_unknown_thread(self):
+        # Issue #2421: a dead tab says nothing about THIS thread — it ends the run, so it re-raises
+        # for `process_user_followups` rather than warning once per remaining row.
+        from selenium.common.exceptions import WebDriverException
+
+        from cqc_lem.app.engagement.outreach import check_dm_replied
+        with patch(f"{_OUT}.open_message_thread", side_effect=WebDriverException("tab crashed")), \
+             patch(f"{_OUT}.log_warning") as warn, pytest.raises(WebDriverException):
+            check_dm_replied(MagicMock(), MagicMock(), "https://x/in/b", my_name="Me")
+        warn.assert_not_called()
 
 
 class _EmptyComposeDriver:
