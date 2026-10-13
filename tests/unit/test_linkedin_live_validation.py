@@ -5139,6 +5139,56 @@ class TestCardUrnEvidence:
 
 
 @pytest.mark.unit
+class TestRosterCardUrnEvidence:
+    """#2422: the roster activity page reports the same per-card URN evidence as the group walk."""
+
+    def test_reads_evidence_for_the_first_cards_only(self, monkeypatch):
+        boxes = [MagicMock() for _ in range(5)]
+        driver = MagicMock()
+        driver.find_elements.return_value = boxes
+        monkeypatch.setattr("cqc_lem.utilities.linkedin.cards._card_for_textbox",
+                            lambda d, box: None if box is boxes[0] else box)
+        seen = []
+        monkeypatch.setattr(llv, "card_urn_evidence",
+                            lambda d, card: seen.append(card) or {"key_source": "hash"})
+        readings = llv.roster_card_urn_evidence(driver, max_cards=2)
+        assert readings == [{"key_source": "hash"}, {"key_source": "hash"}]
+        assert seen == boxes[1:3]
+
+    def test_a_card_walk_that_raises_skips_that_card(self, monkeypatch):
+        driver = MagicMock()
+        driver.find_elements.return_value = [MagicMock()]
+
+        def _boom(*_a):
+            raise RuntimeError("stale")
+        monkeypatch.setattr("cqc_lem.utilities.linkedin.cards._card_for_textbox", _boom)
+        assert llv.roster_card_urn_evidence(driver) == []
+
+    def test_an_enumeration_failure_is_reported_not_raised(self):
+        driver = MagicMock()
+        driver.find_elements.side_effect = RuntimeError("session gone")
+        readings = llv.roster_card_urn_evidence(driver)
+        assert readings[0]["error"].startswith("card enumeration failed: RuntimeError")
+
+    def test_probe_roster_follow_carries_it(self, monkeypatch):
+        monkeypatch.setattr("cqc_lem.app.engagement.feed._resolve_follow_control",
+                            lambda d, u: ("following", None))
+        monkeypatch.setattr("cqc_lem.app.engagement.feed._activity_page_owner_name", lambda d: "Ann")
+        monkeypatch.setattr(llv, "visible_button_labels", lambda d: [])
+        monkeypatch.setattr(llv, "roster_card_urn_evidence", lambda d: [{"key_source": "card"}])
+        driver = MagicMock()
+        driver.find_elements.return_value = []
+        reading = llv.probe_roster_follow(driver, "https://www.linkedin.com/in/ann/",
+                                          sleep=lambda _s: None)
+        assert reading["urn_evidence"] == [{"key_source": "card"}]
+
+    def test_the_capture_is_declared_so_a_stale_pipe_is_detectable(self):
+        assert llv._PROBE_CAPABILITY_SYMBOLS["roster_follow.urn_evidence"] == \
+            "roster_card_urn_evidence"
+        assert "roster_follow.urn_evidence" in llv.probe_script_reading()["capabilities"]
+
+
+@pytest.mark.unit
 class TestFirstDegreeReading:
     def test_it_is_productions_own_read(self, monkeypatch):
         monkeypatch.setattr("cqc_lem.app.engagement.invites._profile_is_first_degree", lambda d: True)

@@ -160,6 +160,14 @@ URN-shaped attribute to read at all. So the hash-keyed share on the `Engagement 
 likely comes from the home feed, and possibly the roster pages (this probe did not read those). It
 does not come from group-feed post cards. Read the ≥ 80% target from group runs only.
 
+The roster pages went the same way (#2422). Every `Engagement scan:` line through 2026-10-06 keyed
+roster posts on `card`; from 2026-10-07, the week the activity page was rebuilt (#2399), not one
+did, and only an occasional `/feed/update/` anchor (`permalink`) saved a card from the hash. Three
+scans in a row with no URN at all is what fires `No activity URN on ANY feed post examined this
+scan`. `--roster-follow <url>` now reports `urn_evidence` for the page's first three post cards,
+the same capture as the group walk, so the next rung is grounded from a live reading rather than
+guessed.
+
 ## Replies on our own posts, and the seed comment (`sweep_reply_comments`, `auto_seed_comment_on_post`)
 
 Two different jobs on the user's own post: **seed** the thread, then **answer** it.
