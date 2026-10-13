@@ -5142,8 +5142,14 @@ class TestCardUrnEvidence:
 class TestRosterCardUrnEvidence:
     """#2422: the roster activity page reports the same per-card URN evidence as the group walk."""
 
+    @staticmethod
+    def _box(text: str = "a post body long enough to be examined"):
+        box = MagicMock()
+        box.text = text
+        return box
+
     def test_reads_evidence_for_the_first_cards_only(self, monkeypatch):
-        boxes = [MagicMock() for _ in range(5)]
+        boxes = [self._box() for _ in range(5)]
         driver = MagicMock()
         driver.find_elements.return_value = boxes
         monkeypatch.setattr("cqc_lem.utilities.linkedin.cards._card_for_textbox",
@@ -5155,9 +5161,33 @@ class TestRosterCardUrnEvidence:
         assert readings == [{"key_source": "hash"}, {"key_source": "hash"}]
         assert seen == boxes[1:3]
 
+    def test_short_boxes_are_skipped_like_the_roster_pass(self, monkeypatch):
+        short, long_ = self._box("Like"), self._box()
+        driver = MagicMock()
+        driver.find_elements.return_value = [short, long_]
+        monkeypatch.setattr("cqc_lem.utilities.linkedin.cards._card_for_textbox", lambda d, box: box)
+        seen = []
+        monkeypatch.setattr(llv, "card_urn_evidence",
+                            lambda d, card: seen.append(card) or {"key_source": "hash"})
+        llv.roster_card_urn_evidence(driver)
+        assert seen == [long_]
+
+    def test_one_card_reached_from_two_boxes_is_read_once(self, monkeypatch):
+        boxes = [self._box() for _ in range(3)]
+        shared, other = MagicMock(), MagicMock()
+        driver = MagicMock()
+        driver.find_elements.return_value = boxes
+        monkeypatch.setattr("cqc_lem.utilities.linkedin.cards._card_for_textbox",
+                            lambda d, box: other if box is boxes[2] else shared)
+        seen = []
+        monkeypatch.setattr(llv, "card_urn_evidence",
+                            lambda d, card: seen.append(card) or {"key_source": "hash"})
+        assert len(llv.roster_card_urn_evidence(driver)) == 2
+        assert seen == [shared, other]
+
     def test_a_card_walk_that_raises_skips_that_card(self, monkeypatch):
         driver = MagicMock()
-        driver.find_elements.return_value = [MagicMock()]
+        driver.find_elements.return_value = [self._box()]
 
         def _boom(*_a):
             raise RuntimeError("stale")

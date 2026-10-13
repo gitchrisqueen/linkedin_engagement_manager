@@ -2859,11 +2859,14 @@ def roster_card_urn_evidence(driver, max_cards: int = _ROSTER_URN_EVIDENCE_CARDS
     """#2422: `card_urn_evidence` for the first post cards on a roster target's activity page.
 
     Cards are resolved the way `comment_on_roster_posts` resolves them (`_card_for_textbox` over
-    `_FEED_POST_TEXT_SEL`), so `key_source` is the key that pass would write. Reads attributes only.
+    `_FEED_POST_TEXT_SEL`, skipping text boxes under 20 chars), so `key_source` is the key that pass
+    would write. A card reached from a second text box (a reshare renders two) is read once, or one
+    post could fill every slot. Reads attributes only.
     """
     from cqc_lem.utilities.linkedin.cards import _FEED_POST_TEXT_SEL, _card_for_textbox
 
     readings: list = []
+    cards: list = []
     try:
         boxes = list(driver.find_elements(By.CSS_SELECTOR, _FEED_POST_TEXT_SEL))
     except Exception as e:
@@ -2872,10 +2875,13 @@ def roster_card_urn_evidence(driver, max_cards: int = _ROSTER_URN_EVIDENCE_CARDS
         if len(readings) >= max_cards:
             break
         try:
+            if len((box.text or "").strip()) < 20:
+                continue
             card = _card_for_textbox(driver, box)
         except Exception:
             card = None
-        if card is not None:
+        if card is not None and card not in cards:
+            cards.append(card)
             readings.append(card_urn_evidence(driver, card))
     return readings
 
