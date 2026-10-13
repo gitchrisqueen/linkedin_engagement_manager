@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.195.0](https://github.com/christopherqueenconsulting/linkedin_engagement_manager/compare/v0.194.0...v0.195.0) (2026-10-13)
+
+
+### Features
+
+* **probe:** report per-card URN evidence on the roster activity page (refs [#2422](https://github.com/christopherqueenconsulting/linkedin_engagement_manager/issues/2422)) ([#2423](https://github.com/christopherqueenconsulting/linkedin_engagement_manager/issues/2423)) ([6bf188f](https://github.com/christopherqueenconsulting/linkedin_engagement_manager/commit/6bf188f62170f275eba539864d9e035b9f93d763))
+
+
+### Bug Fixes
+
+* **outreach:** end the follow-up run once on a crashed tab mid thread-read ([38d8e2d](https://github.com/christopherqueenconsulting/linkedin_engagement_manager/commit/38d8e2da24c026689d65b7350c479488c42be3ad))
+* **outreach:** end the follow-up run once on a crashed tab mid thread-read (closes [#2421](https://github.com/christopherqueenconsulting/linkedin_engagement_manager/issues/2421)) ([#2424](https://github.com/christopherqueenconsulting/linkedin_engagement_manager/issues/2424)) ([38d8e2d](https://github.com/christopherqueenconsulting/linkedin_engagement_manager/commit/38d8e2da24c026689d65b7350c479488c42be3ad))
+
 ## [0.194.0](https://github.com/christopherqueenconsulting/linkedin_engagement_manager/compare/v0.193.0...v0.194.0) (2026-10-12)
 
 
