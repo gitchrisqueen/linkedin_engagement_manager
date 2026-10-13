@@ -518,6 +518,7 @@ _PROBE_CAPABILITY_SYMBOLS = {
     "appreciation_sources.mention_dom": "mention_card_dom_evidence",
     "feed_sort.selector_evidence": "_feed_sort_evidence_scan",
     "group_feed_composer.urn_evidence": "card_urn_evidence",
+    "roster_follow.urn_evidence": "roster_card_urn_evidence",
     "composer.share_box_dom": "share_box_dom_evidence",
     "composer.share_box_activation": "share_box_activation_ladder",
     "composer.drift_verdict": "composer_drift_verdict",
@@ -2813,6 +2814,10 @@ def probe_roster_follow(driver, profile_url: str,
     STRICTLY read-only — it resolves the control and describes it. Nothing is clicked, so no account
     is followed by running this. That is the point: the clicker must not ship before a live run has
     shown that this resolver finds the right button on the real page.
+
+    Each run also reports `urn_evidence` for the page's first post cards: the roster pass comments
+    off this same page, and since 2026-10-07 every roster comment has keyed on the content hash
+    (#2422), so this is the reading a new key-chain rung is grounded from.
     """
     from cqc_lem.app.engagement.feed import _activity_page_owner_name, _resolve_follow_control, _roster_activity_url
     from cqc_lem.utilities.linkedin.cards import _FEED_POST_TEXT_SEL
@@ -2840,8 +2845,45 @@ def probe_roster_follow(driver, profile_url: str,
                "posts_on_page": posts,
                # The live labels the next locator pass would be written from — a bare "not found"
                # is not re-groundable.
-               "visible_controls": visible_button_labels(driver)}
+               "visible_controls": visible_button_labels(driver),
+               "urn_evidence": roster_card_urn_evidence(driver)}
     return graded(reading, roster_follow_state(reading), roster_follow_verdict(reading))
+
+
+# Enough cards to tell "this page carries no URN" from "one card did not"; each reading is bounded
+# by `_CARD_URN_EVIDENCE_JS`'s own cap.
+_ROSTER_URN_EVIDENCE_CARDS = 3
+
+
+def roster_card_urn_evidence(driver, max_cards: int = _ROSTER_URN_EVIDENCE_CARDS) -> list:
+    """#2422: `card_urn_evidence` for the first post cards on a roster target's activity page.
+
+    Cards are resolved the way `comment_on_roster_posts` resolves them (`_card_for_textbox` over
+    `_FEED_POST_TEXT_SEL`, skipping text boxes under 20 chars), so `key_source` is the key that pass
+    would write. A card reached from a second text box (a reshare renders two) is read once, or one
+    post could fill every slot. Reads attributes only.
+    """
+    from cqc_lem.utilities.linkedin.cards import _FEED_POST_TEXT_SEL, _card_for_textbox
+
+    readings: list = []
+    cards: list = []
+    try:
+        boxes = list(driver.find_elements(By.CSS_SELECTOR, _FEED_POST_TEXT_SEL))
+    except Exception as e:
+        return [{"error": f"card enumeration failed: {type(e).__name__}: {e}"[:200]}]
+    for box in boxes:
+        if len(readings) >= max_cards:
+            break
+        try:
+            if len((box.text or "").strip()) < 20:
+                continue
+            card = _card_for_textbox(driver, box)
+        except Exception:
+            card = None
+        if card is not None and card not in cards:
+            cards.append(card)
+            readings.append(card_urn_evidence(driver, card))
+    return readings
 
 
 # The recommendations read is NEW in #1007, so the DEPLOYED image this probe is piped into has no
