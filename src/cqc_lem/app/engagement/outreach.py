@@ -1289,6 +1289,8 @@ def check_dm_replied(driver, wait, profile_url: str, my_name: str = None,
             return ThreadState.NOT_REPLIED  # we spoke last → no reply yet
         return ThreadState.REPLIED  # someone other than us spoke last → they replied
     except Exception as e:
+        if is_tab_crashed(e):
+            raise  # not this thread's state — the session is over; the run ends (issue #2421)
         log_warning("Reply-detection failed (treating as UNKNOWN)", exc=e, user_id=user_id,
                     action_type="followup")
         return ThreadState.UNKNOWN
@@ -1730,6 +1732,16 @@ def process_user_followups(self, user_id: int, max_per_run: int = 20):
             sent += 1
             enqueue_next_followup(user_id, f["profile_url"], f["first_name"], f["event_type"], f["next_step"])
             time.sleep(random.uniform(5, 12))
+    except Exception as e:
+        # A crashed tab ends the run: every later thread read fails on the same dead tab. It is an
+        # expected transient (one escalating WARNING), not a fresh `$exception` (issue #2421). The
+        # rows not reached stay 'pending' for the next run. Anything else still raises unlogged
+        # here, so the Celery failure hook stays its one report.
+        if not note_tab_crash(e, task_name="process_user_followups", user_id=user_id,
+                              action_type=LogActionType.FOLLOWUP):
+            raise
+        return (f"Browser tab crashed — sent {sent} follow-up(s), drafted {nurtured} nurture "
+                f"reply(ies) before it")
     finally:
         quit_gracefully(driver)
     return (f"Sent {sent} follow-up(s); drafted {nurtured} nurture reply(ies); "
@@ -2805,8 +2817,11 @@ def send_dm_now(user_id: int, profile_url: str, message: str, person_name: str =
 
     except Exception as e:
         # ERROR, not myprint: this lane failed silently for weeks because every send logged its
-        # failure at INFO, which never reaches PostHog and so never escalated (issue #1030).
-        log_error("DM send failed", exc=e, user_id=user_id, action_type="dm")
+        # failure at INFO, which never reaches PostHog and so never escalated (issue #1030). A
+        # crashed tab — which the message-thread reader now re-raises (issue #2421) — is the
+        # expected transient that WARNs once instead.
+        if not note_tab_crash(e, task_name="send_dm_now", user_id=user_id, action_type="dm"):
+            log_error("DM send failed", exc=e, user_id=user_id, action_type="dm")
 
     finally:
         # Update DB logs with DM Sent
