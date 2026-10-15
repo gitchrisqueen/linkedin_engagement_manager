@@ -93,7 +93,7 @@ watchdog = ">=5.0.3,<7.0.0"
 optional = true
 
 [tool.poetry.group.lint.dependencies]
-ruff = ">=0.1.5,<0.17.0"
+ruff = ">=0.1.5,<0.18.0"
 mypy = ">=1.11,<3.0"
 
 [tool.poetry.group.mcp]
@@ -132,7 +132,7 @@ pyyaml = "^6.0"
 # `test_baseline_matches_the_real_count` (nightly `-m slow`) runs ruff, and that lane installs
 # `--with test` only, so without it here `poetry run ruff` is "Command not found" (#2111). Same
 # pin as the `lint` group — keep the two in step.
-ruff = ">=0.1.5,<0.17.0"
+ruff = ">=0.1.5,<0.18.0"
 
 
 [tool.coverage.run]
