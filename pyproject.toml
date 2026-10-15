@@ -168,6 +168,11 @@ exclude_lines = [
 # line-too-long errors against code that has always been written to 120 — the flood that made the
 # lint step advisory (`continue-on-error`) and so hid every real defect behind it.
 line-length = 120
+# The interpreter floor (`python = ">=3.12"` above). Ruff does not read Poetry's dependency table, so
+# without this it guesses a default — and the guess decides what isort files as stdlib: 0.16 guessed
+# py310 and filed `tomllib` (3.11+) as third-party, 0.17 does not, so one import sorted differently
+# under each and the ratchet moved on an unchanged tree.
+target-version = "py312"
 
 [tool.ruff.lint]
 select = [
