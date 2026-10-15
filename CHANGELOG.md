@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.195.1](https://github.com/christopherqueenconsulting/linkedin_engagement_manager/compare/v0.195.0...v0.195.1) (2026-10-15)
+
+
+### Bug Fixes
+
+* **outreach:** stop counting the user's own link as a second person on a mention card (closes [#2426](https://github.com/christopherqueenconsulting/linkedin_engagement_manager/issues/2426)) ([#2427](https://github.com/christopherqueenconsulting/linkedin_engagement_manager/issues/2427)) ([ddcb709](https://github.com/christopherqueenconsulting/linkedin_engagement_manager/commit/ddcb70973dc96d60abef0857fa7b2114a1e35bc0))
+
 ## [0.195.0](https://github.com/christopherqueenconsulting/linkedin_engagement_manager/compare/v0.194.0...v0.195.0) (2026-10-13)
 
 
