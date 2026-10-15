@@ -3270,6 +3270,13 @@ def probe_appreciation_sources(driver, user_id: int, profile_url: str = "",
         sleep(5)
         read, card_source = read_cards
         own_norm = _normalize_profile_url(own or "")
+        own_match = re.search(r"/in/[^/?#]+", own_norm)
+        own_slug = own_match.group(0).lower() if own_match else ""
+        # Production skips the account's own link and thanks the next one (#2426). An image whose
+        # `_card_person` predates that would name the account itself, so it is only asked to when
+        # it can.
+        person_kwargs = ({"exclude": own_norm}
+                         if "exclude" in inspect.signature(_card_person).parameters else {})
         cards = read(driver, own_url=own_norm)
         rows, dated = [], 0
         for card in cards:
@@ -3279,10 +3286,12 @@ def probe_appreciation_sources(driver, user_id: int, profile_url: str = "",
             age_days = age_of(text)
             if age_days is not None:
                 dated += 1
-            person_url, name = _card_person(card, person_locators)
+            person_url, name = _card_person(card, person_locators, **person_kwargs)
             # A mention card links the account it mentions (#2426), and production never thanks
             # the account itself.
-            is_self = bool(own_norm) and person_url == own_norm
+            person_match = re.search(r"/in/[^/?#]+", person_url or "")
+            is_self = bool(own_slug) and bool(person_match) and \
+                person_match.group(0).lower() == own_slug
             # Same fallback production uses, so a blank `name` here means the DM really would say
             # "Hi there" — not that the probe read the card differently.
             if not name and name_of is not None:

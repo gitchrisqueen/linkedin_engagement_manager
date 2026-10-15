@@ -1556,6 +1556,40 @@ class TestAppreciationSourcesProbe:
         # Worst-wins: a rotated mentions chain is the whole report's state.
         assert report["state"] == llv.STATE_DRIFT
 
+    def test_a_mention_card_linking_the_account_reports_the_actor_production_thanks(self):
+        """#2426: production skips the account's own link and thanks the next; the probe agrees."""
+        from unittest.mock import patch
+
+        own_link, actor = MagicMock(), MagicMock()
+        own_link.get_attribute.return_value = "https://www.linkedin.com/in/Me/"
+        own_link.text = "Me"
+        actor.get_attribute.return_value = "https://www.linkedin.com/in/jane"
+        actor.text = "Jane Doe"
+        card = MagicMock()
+        card.text = "Jane Doe mentioned you in a comment\n@Me great point\n2h"
+        card.find_elements.return_value = [own_link, actor]
+        driver = _fake_driver(current_url="https://www.linkedin.com/notifications/")
+        driver.execute_script.return_value = {"rows": [], "anchors": 0, "page_dated": False}
+
+        def _cards(locators):
+            from cqc_lem.app.engagement.outreach import _MENTION_CARD_LOCATORS
+            return [card] if locators is _MENTION_CARD_LOCATORS else []
+
+        with patch("cqc_lem.utilities.selenium_util.find_all_first",
+                   side_effect=lambda d, locators, *a, **k: _cards(locators)), \
+             patch("cqc_lem.app.engagement.outreach.find_all_first",
+                   side_effect=lambda d, locators, *a, **k: _cards(locators)), \
+             patch("cqc_lem.utilities.db.has_appreciation_touch", return_value=False), \
+             patch("cqc_lem.app.engagement.outreach.getText", side_effect=lambda el: el.text):
+            report = llv.probe_appreciation_sources(driver, 1, "https://www.linkedin.com/in/me/",
+                                                    sleep=lambda s: None)
+
+        rows = report["mentions"]["rows"]
+        assert [(r["profile_url"], r["is_self"]) for r in rows] == [
+            ("https://www.linkedin.com/in/jane", False)]
+        assert [p["profile_url"] for p in report["mentions"]["people"]] == [
+            "https://www.linkedin.com/in/jane"]
+
     def test_probe_reads_both_surfaces_and_never_claims_a_ledger_row(self, monkeypatch):
         """It grounds the PRODUCTION card reads + parsers (the scrapers themselves are gated
         off until this run happens), and it must stay read-only.

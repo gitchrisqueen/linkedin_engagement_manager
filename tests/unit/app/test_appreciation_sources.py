@@ -695,6 +695,13 @@ class TestMentionCardLinkingTheUserIsStillACard:
         got, _ = self._run([card], profile_url=self._OWN)
         assert got == {"https://www.linkedin.com/in/harold-sams": "Harold Sams"}
 
+    def test_the_own_link_is_matched_on_slug_not_spelling(self):
+        """A stored URL can differ from the card's href in case or host; it is still the user."""
+        card = self._card(("https://www.linkedin.com/in/christopher-queen/?trk=x", "Christopher Queen"),
+                          ("https://www.linkedin.com/in/harold-sams", "Harold Sams"))
+        got, _ = self._run([card], profile_url="http://linkedin.com/in/Christopher-Queen")
+        assert got == {"https://www.linkedin.com/in/harold-sams": "Harold Sams"}
+
     def test_the_stored_url_stands_in_without_leaving_the_page(self):
         card = self._card((self._OWN, "Christopher Queen"),
                           ("https://www.linkedin.com/in/harold-sams", "Harold Sams"))

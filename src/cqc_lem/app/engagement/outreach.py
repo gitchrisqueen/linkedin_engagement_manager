@@ -843,8 +843,10 @@ def _card_person(card: WebElement, locators: list, exclude: str = "") -> tuple:
 
     `exclude` is the user's own profile URL: a mention card links the user it mentions (#2426), and
     that link is never the person to thank. Otherwise the FIRST link still decides, so a company
-    actor is still skipped rather than replaced by somebody named in the quoted text.
+    actor is still skipped rather than replaced by somebody named in the quoted text. Matched on the
+    slug, as the climb does: a stored URL can differ from the card's href in case or host.
     """
+    own_slug = _profile_slug(exclude)
     for find_by, value in locators:
         try:
             links = card.find_elements(find_by, value)
@@ -856,7 +858,7 @@ def _card_person(card: WebElement, locators: list, exclude: str = "") -> tuple:
                 raw_name = (getText(link) or "").strip().split("\n")[0]
             except (StaleElementReferenceException, NoSuchElementException, WebDriverException):
                 return "", ""
-            if exclude and _normalize_profile_url(href) == exclude:
+            if own_slug and _profile_slug(href) == own_slug:
                 continue
             if "/in/" not in href:
                 return "", ""
