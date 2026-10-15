@@ -1176,6 +1176,23 @@ class TestMentionCardReadCopy:
         assert source == "script"
         assert read is llv._carried_mention_cards
 
+    def test_an_image_whose_read_predates_2426_is_graded_by_the_carried_copy(self, monkeypatch):
+        """Without `own_url` the image would count the account's own link as a second person."""
+        from cqc_lem.app.engagement import outreach as ra
+
+        monkeypatch.setattr(ra, "_mention_cards", lambda driver, user_id=None: [])
+        read, source = llv.mention_cards_read()
+        assert source == "script"
+        assert read is llv._carried_mention_cards
+
+    def test_the_carried_copy_passes_the_accounts_own_slug(self):
+        driver = MagicMock()
+        driver.execute_script.return_value = []
+        with patch("cqc_lem.utilities.selenium_util.find_all_first", return_value=[]):
+            llv._carried_mention_cards(driver, own_url="https://www.linkedin.com/in/Me%2DToo/")
+            llv._carried_mention_cards(driver)
+        assert [c.args[1] for c in driver.execute_script.call_args_list] == ["/in/me-too", ""]
+
     def test_the_carried_copy_tries_the_named_rungs_before_the_climb(self):
         driver = MagicMock()
         card = MagicMock()
@@ -1538,6 +1555,40 @@ class TestAppreciationSourcesProbe:
         assert mentions["crosscheck_source"] in ("image", "script")
         # Worst-wins: a rotated mentions chain is the whole report's state.
         assert report["state"] == llv.STATE_DRIFT
+
+    def test_a_mention_card_linking_the_account_reports_the_actor_production_thanks(self):
+        """#2426: production skips the account's own link and thanks the next; the probe agrees."""
+        from unittest.mock import patch
+
+        own_link, actor = MagicMock(), MagicMock()
+        own_link.get_attribute.return_value = "https://www.linkedin.com/in/Me/"
+        own_link.text = "Me"
+        actor.get_attribute.return_value = "https://www.linkedin.com/in/jane"
+        actor.text = "Jane Doe"
+        card = MagicMock()
+        card.text = "Jane Doe mentioned you in a comment\n@Me great point\n2h"
+        card.find_elements.return_value = [own_link, actor]
+        driver = _fake_driver(current_url="https://www.linkedin.com/notifications/")
+        driver.execute_script.return_value = {"rows": [], "anchors": 0, "page_dated": False}
+
+        def _cards(locators):
+            from cqc_lem.app.engagement.outreach import _MENTION_CARD_LOCATORS
+            return [card] if locators is _MENTION_CARD_LOCATORS else []
+
+        with patch("cqc_lem.utilities.selenium_util.find_all_first",
+                   side_effect=lambda d, locators, *a, **k: _cards(locators)), \
+             patch("cqc_lem.app.engagement.outreach.find_all_first",
+                   side_effect=lambda d, locators, *a, **k: _cards(locators)), \
+             patch("cqc_lem.utilities.db.has_appreciation_touch", return_value=False), \
+             patch("cqc_lem.app.engagement.outreach.getText", side_effect=lambda el: el.text):
+            report = llv.probe_appreciation_sources(driver, 1, "https://www.linkedin.com/in/me/",
+                                                    sleep=lambda s: None)
+
+        rows = report["mentions"]["rows"]
+        assert [(r["profile_url"], r["is_self"]) for r in rows] == [
+            ("https://www.linkedin.com/in/jane", False)]
+        assert [p["profile_url"] for p in report["mentions"]["people"]] == [
+            "https://www.linkedin.com/in/jane"]
 
     def test_probe_reads_both_surfaces_and_never_claims_a_ledger_row(self, monkeypatch):
         """It grounds the PRODUCTION card reads + parsers (the scrapers themselves are gated
