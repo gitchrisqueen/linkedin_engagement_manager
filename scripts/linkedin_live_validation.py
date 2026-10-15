@@ -70,6 +70,7 @@ not render is ``unknown`` and is never filed as a defect.
 """
 
 import argparse
+import inspect
 import json
 import re
 import sys
@@ -3049,12 +3050,15 @@ def mention_card_dom_evidence(driver) -> dict:
 # it ships is exactly how the ladder it replaces shipped dead (#1007, now #2065).
 FALLBACK_MENTION_CARDS_JS = r"""
 const SENTENCE = /\b(mentioned|tagged)\s+you\b/i;
+const SENTENCES = /\b(mentioned|tagged)\s+you\b/gi;
 const MAX_CLIMB = 15;
+const OWN = String(arguments[0] || '').toLowerCase();
 const root = document.querySelector('main') || document.body;
 if (!root) return [];
 const slug = (a) => {
   const m = ((a.getAttribute('href') || '') || (a.href || '')).match(/\/in\/[^/?#]+/);
-  return m ? decodeURIComponent(m[0]).toLowerCase() : '';
+  const s = m ? decodeURIComponent(m[0]).toLowerCase() : '';
+  return s === OWN ? '' : s;
 };
 const cards = [];
 const seen = new Set();
@@ -3066,6 +3070,7 @@ for (const anchor of root.querySelectorAll('a[href*="/in/"]')) {
     if (parent === root || parent.tagName === 'BODY') break;
     const people = new Set([...parent.querySelectorAll('a[href*="/in/"]')].map(slug).filter(Boolean));
     if (people.size > 1) break;
+    if (((parent.innerText || '').match(SENTENCES) || []).length > 1) break;
     block = parent; hops++;
   }
   if (seen.has(block)) continue;
@@ -3077,20 +3082,22 @@ return cards;
 """
 
 
-def _carried_mention_cards(driver) -> list:
+def _carried_mention_cards(driver, own_url: str = "") -> list:
     """`_mention_cards`' answer without the image.
 
     The shipped locator chain first, the carried climb after it, and a read that blows up is an
-    EMPTY read rather than a crashed probe.
+    EMPTY read rather than a crashed probe. `own_url` is the account's own profile, which the climb
+    must not count as a second person on a card (#2426).
     """
-    from cqc_lem.app.engagement.outreach import _MENTION_CARD_LOCATORS
+    from cqc_lem.app.engagement.outreach import _MENTION_CARD_LOCATORS, _normalize_profile_url
     from cqc_lem.utilities.selenium_util import find_all_first
 
     cards = find_all_first(driver, _MENTION_CARD_LOCATORS)
     if cards:
         return cards
+    match = re.search(r"/in/[^/?#]+", _normalize_profile_url(own_url or ""))
     try:
-        found = driver.execute_script(FALLBACK_MENTION_CARDS_JS)
+        found = driver.execute_script(FALLBACK_MENTION_CARDS_JS, match.group(0).lower() if match else "")
     except Exception:
         return []
     # `execute_script` answers whatever the page handed back; only a list of elements is a reading.
@@ -3098,10 +3105,16 @@ def _carried_mention_cards(driver) -> list:
 
 
 def mention_cards_read() -> tuple:
-    """(the card read to drive, where it came from)."""
+    """(the card read to drive, where it came from).
+
+    Both take `(driver, own_url=...)`. An image whose read predates #2426 has no `own_url`, so it
+    would count the account's own link as a second person: the carried copy grades this branch.
+    """
     try:
         from cqc_lem.app.engagement.outreach import _mention_cards
     except ImportError:
+        return (_carried_mention_cards, "script")
+    if "own_url" not in inspect.signature(_mention_cards).parameters:
         return (_carried_mention_cards, "script")
     return (_mention_cards, "image")
 
@@ -3256,7 +3269,8 @@ def probe_appreciation_sources(driver, user_id: int, profile_url: str = "",
         driver.get(url)
         sleep(5)
         read, card_source = read_cards
-        cards = read(driver)
+        own_norm = _normalize_profile_url(own or "")
+        cards = read(driver, own_url=own_norm)
         rows, dated = [], 0
         for card in cards:
             text = _card_text(card)
@@ -3266,12 +3280,16 @@ def probe_appreciation_sources(driver, user_id: int, profile_url: str = "",
             if age_days is not None:
                 dated += 1
             person_url, name = _card_person(card, person_locators)
+            # A mention card links the account it mentions (#2426), and production never thanks
+            # the account itself.
+            is_self = bool(own_norm) and person_url == own_norm
             # Same fallback production uses, so a blank `name` here means the DM really would say
             # "Hi there" — not that the probe read the card differently.
             if not name and name_of is not None:
                 name = name_of(text)
             rows.append({"profile_url": person_url, "name": name,
                          "age_days": None if age_days is None else round(age_days, 2),
+                         "is_self": is_self,
                          "age_read_from": mention_stamp(text),
                          "in_window": age_days is not None and age_days <= lookback,
                          # Already thanked = production skips it even when everything else resolves.
@@ -3286,7 +3304,7 @@ def probe_appreciation_sources(driver, user_id: int, profile_url: str = "",
                    "card_source": card_source,
                    "stamp_source": stamp_source,
                    "people": [r for r in rows if r["in_window"] and r["profile_url"]
-                              and not r["already_thanked"]],
+                              and not r["already_thanked"] and not r["is_self"]],
                    "rows": rows[:10]}
         if page_native is not None:
             # Taken on EVERY run, not only a zero one: the count is what makes a green reading

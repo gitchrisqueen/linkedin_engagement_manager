@@ -330,6 +330,19 @@ row. It now re-reads up to `_MENTION_RENDER_ATTEMPTS` (5) times, 2s apart, like
 `_RECOMMENDATION_RENDER_ATTEMPTS`, and grades a zero only off the LAST read, so the walk and its
 cross-check always come from the same paint.
 
+**The user's own link is not a second person (#2426).** The poll did not end it: v0.195.0 still
+logged drift on all 3 runs of 2026-10-14, each after ~10s of the page showing the sentence while
+the walk resolved nothing — a reader mismatch, not a render race. A mention IS a link to the
+mentioned profile, so a card that quotes the comment renders "@<user>" as an
+`/in/<own slug>` anchor. The climb counted it as a second person, stopped below the sentence and
+dropped the card. `_MENTION_CARDS_JS` now takes the user's own slug as `arguments[0]` (from
+`my_profile.profile_url`, else the stored URL — never a navigation) and ignores it, both as a person
+and as a climb start; a parent holding a SECOND mention sentence also ends the climb, so ignoring it
+cannot merge two cards. `_card_person(..., exclude=own_url)` skips that link when naming who to
+thank; the first OTHER link still decides, so a company actor is still skipped rather than replaced
+by somebody named in the quote. The probe's carried copy takes the same argument, and an image
+whose `_mention_cards` has no `own_url` is graded by the carried copy; mention rows report `is_self`.
+
 The probe is piped into a worker running the DEPLOYED image, so — as with the recommendations read
 — it drives `_mention_cards` when the running image has it and an identical carried copy when it
 does not, naming which in `card_source`. Each mention row also reports `age_read_from`, the exact

@@ -1176,6 +1176,23 @@ class TestMentionCardReadCopy:
         assert source == "script"
         assert read is llv._carried_mention_cards
 
+    def test_an_image_whose_read_predates_2426_is_graded_by_the_carried_copy(self, monkeypatch):
+        """Without `own_url` the image would count the account's own link as a second person."""
+        from cqc_lem.app.engagement import outreach as ra
+
+        monkeypatch.setattr(ra, "_mention_cards", lambda driver, user_id=None: [])
+        read, source = llv.mention_cards_read()
+        assert source == "script"
+        assert read is llv._carried_mention_cards
+
+    def test_the_carried_copy_passes_the_accounts_own_slug(self):
+        driver = MagicMock()
+        driver.execute_script.return_value = []
+        with patch("cqc_lem.utilities.selenium_util.find_all_first", return_value=[]):
+            llv._carried_mention_cards(driver, own_url="https://www.linkedin.com/in/Me%2DToo/")
+            llv._carried_mention_cards(driver)
+        assert [c.args[1] for c in driver.execute_script.call_args_list] == ["/in/me-too", ""]
+
     def test_the_carried_copy_tries_the_named_rungs_before_the_climb(self):
         driver = MagicMock()
         card = MagicMock()

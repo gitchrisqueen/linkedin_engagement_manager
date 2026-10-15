@@ -694,14 +694,24 @@ _MENTION_CARD_LOCATORS = [
 # One JS call returns every card at once, so nothing goes stale while the feed re-renders under the
 # walk. `<main>` first with a `<body>` fallback, mirroring `_mentions_page_native_count` — the
 # cross-check this walk is graded against — because that asymmetry alone read as drift in #1985.
+#
+# #2426: a mention IS a link to the mentioned profile, so a card that quotes the comment renders
+# "@<user>" as an `/in/<own slug>` anchor. With the user counted as a second person, the climb
+# stopped below the sentence and every card dropped while the page still said "mentioned you",
+# which graded as drift. `arguments[0]` is the user's own slug: it never counts as a person and
+# never starts a climb. Without it ('') the walk reads as before. A parent holding a SECOND mention
+# sentence also ends the climb, so dropping the user's own slug cannot merge two cards into one.
 _MENTION_CARDS_JS = r"""
 const SENTENCE = /\b(mentioned|tagged)\s+you\b/i;
+const SENTENCES = /\b(mentioned|tagged)\s+you\b/gi;
 const MAX_CLIMB = 15;
+const OWN = String(arguments[0] || '').toLowerCase();
 const root = document.querySelector('main') || document.body;
 if (!root) return [];
 const slug = (a) => {
   const m = ((a.getAttribute('href') || '') || (a.href || '')).match(/\/in\/[^/?#]+/);
-  return m ? decodeURIComponent(m[0]).toLowerCase() : '';
+  const s = m ? decodeURIComponent(m[0]).toLowerCase() : '';
+  return s === OWN ? '' : s;
 };
 const cards = [];
 const seen = new Set();
@@ -713,6 +723,7 @@ for (const anchor of root.querySelectorAll('a[href*="/in/"]')) {
     if (parent === root || parent.tagName === 'BODY') break;
     const people = new Set([...parent.querySelectorAll('a[href*="/in/"]')].map(slug).filter(Boolean));
     if (people.size > 1) break;
+    if (((parent.innerText || '').match(SENTENCES) || []).length > 1) break;
     block = parent; hops++;
   }
   if (seen.has(block)) continue;
@@ -818,19 +829,41 @@ def _mention_stamp(text: str) -> str:
     return match.group(1) if match else ""
 
 
-def _card_person(card: WebElement, locators: list) -> tuple:
-    """(normalized profile_url, display name) for the person a card is about, or ('', '')."""
-    link = _first_in_card(card, locators)
-    if link is None:
-        return "", ""
-    try:
-        href = link.get_attribute("href") or ""
-        raw_name = (getText(link) or "").strip().split("\n")[0]
-    except (StaleElementReferenceException, NoSuchElementException, WebDriverException):
-        return "", ""
-    if "/in/" not in href:
-        return "", ""
-    return _normalize_profile_url(href), clean_person_name(raw_name)
+def _profile_slug(url: str) -> str:
+    """The lowercased, percent-decoded `/in/<slug>` of a profile URL, or '' for a non-profile.
+
+    That is the form `_MENTION_CARDS_JS` keys a person on.
+    """
+    match = re.search(r"/in/[^/?#]+", _normalize_profile_url(url or ""))
+    return match.group(0).lower() if match else ""
+
+
+def _card_person(card: WebElement, locators: list, exclude: str = "") -> tuple:
+    """(normalized profile_url, display name) for the person a card is about, or ('', '').
+
+    `exclude` is the user's own profile URL: a mention card links the user it mentions (#2426), and
+    that link is never the person to thank. Otherwise the FIRST link still decides, so a company
+    actor is still skipped rather than replaced by somebody named in the quoted text.
+    """
+    for find_by, value in locators:
+        try:
+            links = card.find_elements(find_by, value)
+        except (StaleElementReferenceException, NoSuchElementException):
+            continue
+        for link in links:
+            try:
+                href = link.get_attribute("href") or ""
+                raw_name = (getText(link) or "").strip().split("\n")[0]
+            except (StaleElementReferenceException, NoSuchElementException, WebDriverException):
+                return "", ""
+            if exclude and _normalize_profile_url(href) == exclude:
+                continue
+            if "/in/" not in href:
+                return "", ""
+            return _normalize_profile_url(href), clean_person_name(raw_name)
+        if links:
+            return "", ""
+    return "", ""
 
 
 def _mention_actor_name(text: str) -> str:
@@ -881,7 +914,7 @@ def _mentions_page_native_count(driver, user_id: int = None) -> "int | None":
     return len(_MENTION_TEXT_RE.findall(text)) if isinstance(text, str) else None
 
 
-def _mention_cards(driver, user_id: int = None) -> list:
+def _mention_cards(driver, user_id: int = None, own_url: str = "") -> list:
     """Every mention notification card the page renders, as an ordered CHAIN (#2020).
 
     The named rungs of `_MENTION_CARD_LOCATORS` first — LinkedIn keeps several DOM generations alive
@@ -891,13 +924,14 @@ def _mention_cards(driver, user_id: int = None) -> list:
     caller rather than believed.
 
     A read that blows up is an EMPTY read at DEBUG, never a warning: a miss re-queues every ~60s and
-    a repeated warning files a defect for a no-op.
+    a repeated warning files a defect for a no-op. `own_url` is the user's own profile, which the
+    climb must not count as a second person on the card (#2426).
     """
     cards = find_all_first(driver, _MENTION_CARD_LOCATORS)
     if cards:
         return cards
     try:
-        found = driver.execute_script(_MENTION_CARDS_JS)
+        found = driver.execute_script(_MENTION_CARDS_JS, _profile_slug(own_url))
     except WebDriverException as e:
         log_debug(f"Could not walk the mentions page for cards: {e}", user_id=user_id,
                   action_type="scrape")
@@ -998,17 +1032,21 @@ def get_recent_recommendations(driver, wait, user_id: int = None,
     return recommenders
 
 
-def get_recent_collaborators(driver, wait, user_id: int = None) -> dict[str, str]:
+def get_recent_collaborators(driver, wait, user_id: int = None,
+                             profile_url: str = None) -> dict[str, str]:
     """Return {profile_url: name} for people to thank for a recent collaboration.
 
     LinkedIn exposes no "collaboration" event, so the source is the nearest structured one it does
     expose: the mentions notification feed — somebody put this user's name in their own post or
     comment inside the lookback window. A card that does not SAY it was a mention is skipped, as is
-    one with no readable age.
+    one with no readable age. `profile_url` is the user's own profile, so the link a mention card
+    carries to the user is never read as the person to thank (#2426).
     """
     if not appreciation_sources_enabled():
         return {}
 
+    own_url = (_normalize_profile_url(profile_url or "")
+               or _own_profile_url(driver, user_id, resolve_live=False))
     driver.get(_MENTIONS_URL)
     wait_for_ajax(driver)
     time.sleep(random.uniform(2, 4))
@@ -1020,7 +1058,7 @@ def get_recent_collaborators(driver, wait, user_id: int = None) -> dict[str, str
     cards: list = []
     page_native: "int | None" = None
     for attempt in range(_MENTION_RENDER_ATTEMPTS):
-        cards = _mention_cards(driver, user_id)
+        cards = _mention_cards(driver, user_id, own_url)
         if cards:
             break
         page_native = _mentions_page_native_count(driver, user_id)
@@ -1044,7 +1082,7 @@ def get_recent_collaborators(driver, wait, user_id: int = None) -> dict[str, str
         age_days = _parse_relative_age_days(_mention_stamp(text))
         if age_days is None or age_days > lookback:
             continue
-        url, name = _card_person(card, _MENTION_ACTOR_LOCATORS)
+        url, name = _card_person(card, _MENTION_ACTOR_LOCATORS, exclude=own_url)
         if not url:
             continue
         collaborators.setdefault(url, name or _mention_actor_name(text))
@@ -1054,9 +1092,10 @@ def get_recent_collaborators(driver, wait, user_id: int = None) -> dict[str, str
     return collaborators
 
 
-def _own_profile_url(driver, user_id: "int | None") -> str:
+def _own_profile_url(driver, user_id: "int | None", resolve_live: bool = True) -> str:
     """The user's own profile URL: the stored one first, else resolved live by letting LinkedIn's
-    /in/me/ redirect answer it. Empty string when neither works.
+    /in/me/ redirect answer it. Empty string when neither works. `resolve_live=False` stops at the
+    stored URL, for a caller that must not navigate away from the page it is on.
     """
     if user_id is not None:
         try:
@@ -1066,6 +1105,8 @@ def _own_profile_url(driver, user_id: "int | None") -> str:
             stored = None
         if stored:
             return _normalize_profile_url(stored)
+    if not resolve_live:
+        return ""
     try:
         driver.get("https://www.linkedin.com/in/me/")
         wait_for_ajax(driver)
@@ -1843,6 +1884,7 @@ def automate_appreciation_dms_for_user(self, user_id: int, loop_for_duration: in
         # two standing-list sources below can each hand back a month of people at once, so without
         # this the first pass after the flag is flipped is a burst LinkedIn reads as a campaign.
         budget = _appreciation_dm_budget(user_id)
+        own_profile_url = str(getattr(my_profile, "profile_url", "") or "")
 
         # After Accepting a Connection Request:
         invitations_accepted = accept_connection_request(user_id) or {}
@@ -1858,7 +1900,6 @@ def automate_appreciation_dms_for_user(self, user_id: int, loop_for_duration: in
                       user_id=user_id, action_type="dm")
         else:
             # After Receiving a Recommendation — thank the recommender
-            own_profile_url = str(getattr(my_profile, "profile_url", "") or "")
             recommenders = get_recent_recommendations(driver, wait, user_id, own_profile_url) or {}
             found += len(recommenders)
             dispatched = _dispatch_appreciation_dms(user_id, my_profile, "recommendation_received",
@@ -1868,7 +1909,7 @@ def automate_appreciation_dms_for_user(self, user_id: int, loop_for_duration: in
 
         if budget > 0:
             # After a Successful Collaboration — express gratitude and offer to connect further
-            collaborators = get_recent_collaborators(driver, wait, user_id) or {}
+            collaborators = get_recent_collaborators(driver, wait, user_id, own_profile_url) or {}
             found += len(collaborators)
             dispatched = _dispatch_appreciation_dms(user_id, my_profile, "collaboration",
                                                     collaborators, budget)

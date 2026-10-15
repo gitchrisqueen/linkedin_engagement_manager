@@ -578,7 +578,7 @@ class TestMentionCardChainIsExhaustedBeforeZero:
         driver.execute_script.return_value = [card]
         with patch(f"{_OUT}.find_all_first", return_value=[]):
             assert _mention_cards(driver, 1) == [card]
-        driver.execute_script.assert_called_once_with(_MENTION_CARDS_JS)
+        driver.execute_script.assert_called_once_with(_MENTION_CARDS_JS, "")
 
     def test_the_climb_keeps_the_body_fallback_and_the_mention_sentence(self):
         """Both halves of the read are in the JS, so they are asserted there.
@@ -634,6 +634,104 @@ class TestMentionCardChainIsExhaustedBeforeZero:
             got = get_recent_collaborators(driver, MagicMock(), 1)
         assert got == {"https://www.linkedin.com/in/jane": "Jane Doe"}
         grade.assert_not_called()
+
+
+class TestMentionCardLinkingTheUserIsStillACard:
+    """#2426: a mention IS a link to the mentioned profile.
+
+    A card that quotes the comment renders "@<user>" as an `/in/<own slug>` anchor. The climb
+    counted that as a second person, stopped below the "mentioned you" sentence and dropped the
+    card, while the page still said it: three drift warnings on 2026-10-14, all after #2332's
+    render poll shipped. The user's own slug is never a person on the card.
+    """
+
+    _OWN = "https://www.linkedin.com/in/christopher%2Dqueen/"
+
+    def test_the_climb_is_told_the_users_own_slug(self):
+        from cqc_lem.app.engagement.outreach import _MENTION_CARDS_JS, _mention_cards
+        driver = MagicMock()
+        driver.execute_script.return_value = []
+        with patch(f"{_OUT}.find_all_first", return_value=[]):
+            _mention_cards(driver, 1, self._OWN)
+        driver.execute_script.assert_called_once_with(_MENTION_CARDS_JS, "/in/christopher-queen")
+
+    def test_the_climb_drops_the_own_slug_and_stops_at_a_second_sentence(self):
+        from cqc_lem.app.engagement.outreach import _MENTION_CARDS_JS
+        assert "arguments[0]" in _MENTION_CARDS_JS
+        assert "s === OWN ? '' : s" in _MENTION_CARDS_JS
+        assert "match(SENTENCES) || []).length > 1) break;" in _MENTION_CARDS_JS
+
+    def test_profile_slug_matches_the_scripts_key(self):
+        from cqc_lem.app.engagement.outreach import _profile_slug
+        assert _profile_slug("https://www.linkedin.com/in/Jane%2DDoe?trk=x") == "/in/jane-doe"
+        assert _profile_slug("https://www.linkedin.com/company/acme") == ""
+        assert _profile_slug("") == ""
+
+    def _card(self, *links):
+        card = MagicMock()
+        card.text = "Harold Sams mentioned you in a comment.\n@Christopher Queen great point\n9h"
+        elements = []
+        for href, name in links:
+            link = MagicMock()
+            link.get_attribute.return_value = href
+            link.text = name
+            elements.append(link)
+        card.find_elements.return_value = elements
+        return card
+
+    def _run(self, cards, profile_url=None, stored=None):
+        from cqc_lem.app.engagement.outreach import get_recent_collaborators
+        driver = MagicMock()
+        with patch(f"{_OUT}.find_all_first", return_value=cards), \
+             patch(f"{_OUT}.wait_for_ajax"), \
+             patch(f"{_OUT}.get_linkedin_profile_url_by_user_id", return_value=stored), \
+             patch(f"{_OUT}.getText", side_effect=lambda el: el.text):
+            got = get_recent_collaborators(driver, MagicMock(), 1, profile_url)
+        return got, driver
+
+    def test_the_users_own_link_is_never_the_person_thanked(self):
+        card = self._card((self._OWN, "Christopher Queen"),
+                          ("https://www.linkedin.com/in/harold-sams", "Harold Sams"))
+        got, _ = self._run([card], profile_url=self._OWN)
+        assert got == {"https://www.linkedin.com/in/harold-sams": "Harold Sams"}
+
+    def test_the_stored_url_stands_in_without_leaving_the_page(self):
+        card = self._card((self._OWN, "Christopher Queen"),
+                          ("https://www.linkedin.com/in/harold-sams", "Harold Sams"))
+        got, driver = self._run([card], stored=self._OWN)
+        assert got == {"https://www.linkedin.com/in/harold-sams": "Harold Sams"}
+        assert [c.args[0] for c in driver.get.call_args_list] == [
+            "https://www.linkedin.com/notifications/?filter=mentions"]
+
+    def test_a_card_linking_only_the_user_thanks_nobody(self):
+        got, _ = self._run([self._card((self._OWN, "Christopher Queen"))], profile_url=self._OWN)
+        assert got == {}
+
+    def test_a_company_actor_is_still_skipped_not_replaced_by_a_quoted_person(self):
+        card = self._card(("https://www.linkedin.com/company/acme", "Acme"),
+                          ("https://www.linkedin.com/in/someone-quoted", "Someone"))
+        got, _ = self._run([card], profile_url=self._OWN)
+        assert got == {}
+
+    def test_an_unreadable_link_is_no_person(self):
+        from selenium.common.exceptions import StaleElementReferenceException
+
+        from cqc_lem.app.engagement.outreach import _MENTION_ACTOR_LOCATORS, _card_person
+        card = MagicMock()
+        link = MagicMock()
+        link.get_attribute.side_effect = StaleElementReferenceException("gone")
+        card.find_elements.return_value = [link]
+        assert _card_person(card, _MENTION_ACTOR_LOCATORS, exclude=self._OWN) == ("", "")
+        card.find_elements.side_effect = StaleElementReferenceException("gone")
+        assert _card_person(card, _MENTION_ACTOR_LOCATORS) == ("", "")
+
+    def test_the_task_hands_the_profile_url_to_the_mentions_read(self):
+        """`own_profile_url` used to be set only on the recommendations branch."""
+        import inspect
+
+        from cqc_lem.app.engagement import outreach
+        src = inspect.getsource(outreach.automate_appreciation_dms_for_user)
+        assert "get_recent_collaborators(driver, wait, user_id, own_profile_url)" in src
 
 
 class TestDispatchDedup:
