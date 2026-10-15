@@ -1178,8 +1178,10 @@ class TestTargetScopedControls:
 
 
 class TestTracedWalk:
-    """Issue #2325: a traced walk reports, per route, what each scan saw, what it chose, and what the
-    click rendered — enough to tell the #1851 no-prior-thread compose screen apart from drift.
+    """Issue #2325: a traced walk reports what each route saw, chose, and rendered.
+
+    Per route: what each scan saw, what it chose, and what the click rendered — enough to tell the
+    #1851 no-prior-thread compose screen apart from drift.
     """
 
     FIRST_DEGREE_SOURCE = "<main><span>1st</span></main>"

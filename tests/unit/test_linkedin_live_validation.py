@@ -677,8 +677,10 @@ class TestMessageThreadProbe:
         assert report["routes_tried"] == ["anchor", "button"]
 
     def test_probe_reports_degree_route_trace_and_window_counts(self, monkeypatch):
-        """#2325: the traced walk's per-route evidence, the degree badge and the tab count all
-        reach the report; the probe asks the ladder for the trace."""
+        """#2325: the traced walk's evidence, degree badge and tab count all reach the report.
+
+        The probe asks the ladder for the trace.
+        """
         from cqc_lem.utilities.linkedin.message_thread import ThreadOpen
         trace = [{"route": "anchor", "candidates": [{"aria_label_present": False, "shown": True,
                                                      "belongs_to_target": True}],
