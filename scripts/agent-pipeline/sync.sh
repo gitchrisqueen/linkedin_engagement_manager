@@ -50,10 +50,11 @@ fi
 
 [ -d "$SRC/.git" ] || { log "FATAL: no git checkout at $SRC"; exit 1; }
 
-# Bring the mirror up to main BEFORE judging it. The timer unit does this in ExecStartPre, but the
-# timer is not enabled (#1397), so every sync is a hand run, and a hand run used to install whatever
-# the mirror last held: it sat at a5d6a1e6 from 2026-10-08 to 2026-10-16 while seven merged pipeline
-# changes waited, and every check below passed, because a stale HEAD is still an ancestor of main.
+# Bring the mirror up to main BEFORE judging it. Nothing else advances the mirror (the unit only runs
+# this script), and the timer is not enabled (#1397), so every sync is a hand run. A hand run used to
+# install whatever the mirror last held: it sat at a5d6a1e6 from 2026-10-08 to 2026-10-16 while
+# seven merged pipeline changes waited, and every check below passed, because a stale HEAD is still
+# an ancestor of main.
 # Fast-forward only: a mirror that has diverged or carries local edits is a mistake to look at,
 # never something to reset away. The re-exec below sets LEM_SYNC_FETCHED=1 so it runs once.
 if [ "${LEM_SYNC_FETCHED:-0}" != "1" ]; then
