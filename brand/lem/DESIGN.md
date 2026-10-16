@@ -59,6 +59,6 @@ targets: { min_px: 44 }
 | dark | text #E8EDF2 on surface #1F2C37 | 12.10 |
 | dark | muted #A3AEB8 on surface #1F2C37 | 6.31 |
 | dark | primary/link #7FB0FF on background #111A22 | 8.00 |
-| dark | primary/link #7FB0FF on surface #1F2C37 | 6.49 |
+| dark | primary/link #7FB0FF on surface #1F2C37 | 6.48 |
 | dark | field-border #7B8894 on background #111A22 | 4.85 (control boundary) |
 | dark | field-border #7B8894 on surface #1F2C37 | 3.93 (control boundary) |
