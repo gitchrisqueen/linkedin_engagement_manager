@@ -86,9 +86,11 @@ JUDGE_FLOOR = 0.80
 PAIRWISE_FLOOR = 0.50
 CALIBRATION_FLOOR = 0.85
 #: No run spends more than this, whatever cap it is given: the scheduled workflow passes 15 and a
-#: dispatch can pass anything, so the limit lives here rather than in a default (the $1.00 eval cap,
-#: #2257). A run that needs more is split by --prompt-ids, or this line changes in a reviewed PR.
-MAX_SPEND_CEILING_USD = 1.0
+#: dispatch can pass anything, so the limit lives here rather than in a default. It was $1.00 (the
+#: eval cap on #2257) until #2435 raised it to $3.00 PER RUN, sized so one prompt whose plan is
+#: between $1 and $3 can be measured in a single dispatch. A run that needs more is split by
+#: --prompt-ids, or this line changes in a reviewed PR.
+MAX_SPEND_CEILING_USD = 3.0
 
 DEFAULT_SAMPLES = 2            # every new/changed prompt@version is generated twice
 DEFAULT_JUDGE_SAMPLE = 5       # judged cases per prompt × model
