@@ -18,7 +18,11 @@ Environment=PYTHONUNBUFFERED=1
 # Root-owned 0600; deliberately NOT the pipeline's secrets.env, which carries the App private key.
 EnvironmentFile=/etc/lem/agent-webhook.env
 
-ExecStart=/usr/bin/python3 -m lemd.receiver
+# Explicit binds, matching the installed unit: the tunnel origin is the lem_default bridge gateway
+# (cloudflared runs on that network), and loopback is what the watchdog probes for /healthz. The
+# receiver's own default resolves to the same pair, but the unit says it so the bind is visible
+# where it is installed. Re-check the bridge address (`ip -4 -o addr show`) if the stack is recreated.
+ExecStart=/usr/bin/python3 -m lemd.receiver --bind 172.18.0.1:8420 --bind 127.0.0.1:8420
 
 Restart=always
 RestartSec=3
@@ -27,7 +31,10 @@ RestartSec=3
 # footprint that still lets it write the queue database.
 NoNewPrivileges=yes
 PrivateTmp=yes
-ProtectSystem=strict
+# `full` (/usr, /boot, /etc read-only), not `strict`: the installed unit says `full` and has not been rewritten
+# since 2026-08-10 01:57Z (its mtime); why it differs from `strict` was not recorded. `strict` is
+# untested on the box, so tightening it is a separate, root-run change with a /healthz check after.
+ProtectSystem=full
 ProtectKernelTunables=yes
 ProtectControlGroups=yes
 RestrictSUIDSGID=yes
