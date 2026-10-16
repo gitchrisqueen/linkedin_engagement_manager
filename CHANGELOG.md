@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.195.2](https://github.com/christopherqueenconsulting/linkedin_engagement_manager/compare/v0.195.1...v0.195.2) (2026-10-16)
+
+
+### Bug Fixes
+
+* **benchmarks:** treat a reply with no choices as a failed case, not a crash ([#2432](https://github.com/christopherqueenconsulting/linkedin_engagement_manager/issues/2432)) ([beb2a38](https://github.com/christopherqueenconsulting/linkedin_engagement_manager/commit/beb2a38d5c28f43159cb2a916c9aa4043968d56e))
+* **perf:** write null, not 0, for engagement counts the snapshot could not read ([#2430](https://github.com/christopherqueenconsulting/linkedin_engagement_manager/issues/2430)) ([466017a](https://github.com/christopherqueenconsulting/linkedin_engagement_manager/commit/466017a4d4f4c1c260a359f1fef29b4d6e44c775))
+
 ## [0.195.1](https://github.com/christopherqueenconsulting/linkedin_engagement_manager/compare/v0.195.0...v0.195.1) (2026-10-15)
 
 
