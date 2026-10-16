@@ -5,6 +5,9 @@ One row per prompt@version × model per run; written by `scripts/benchmark_promp
 <!-- LEADERBOARD:BEGIN -->
 | Date | Run | Tier | Model | Role | Contract | First draft | Judge | p50 | Verdict |
 |---|---|---|---|---|---|---|---|---|---|
+| 2026-10-16 | `pe-20261016-eba194` | classify.lead_intent@3 | `openai/gpt-oss:20b` | champion | 0.975 | 0.975 | — | — | pass |
+| 2026-10-16 | `pe-20261016-eba194` | classify.lead_intent@3 | `openai/gpt-4o-mini` | fallback | 1.0 | 1.0 | — | — | pass |
+| 2026-10-16 | `pe-20261016-eba194` | classify.lead_intent@3 | `openai/gpt-5.4-mini` | candidate | 1.0 | 1.0 | — | — | pass |
 | 2026-10-12 | `pe-20261012-b68015` | classify.dm_reply_intent@2 | `openai/gpt-oss:20b` | champion | 1.0 | 1.0 | — | — | pass |
 | 2026-10-12 | `pe-20261012-b68015` | classify.dm_reply_intent@2 | `openai/gpt-4o-mini` | fallback | 1.0 | 1.0 | — | — | pass |
 | 2026-10-12 | `pe-20261012-b68015` | classify.dm_reply_intent@2 | `openai/gpt-5.4-mini` | candidate | 1.0 | 1.0 | — | — | pass |

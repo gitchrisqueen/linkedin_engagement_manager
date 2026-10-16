@@ -61,7 +61,7 @@
 | `image.render` | `cqc_lem.utilities.ai.image_gen` | `_render_via_gpt_image` | — | exempt:image render — graded by scripts/benchmark_media.py | — | — | — |
 | `vision.staged_inspect_blind` | `cqc_lem.utilities.ai.image_gen` | `_staged_inspect` | — | exempt:vision — graded by scripts/benchmark_media.py | — | — | — |
 | `vision.staged_inspect_targeted` | `cqc_lem.utilities.ai.image_gen` | `_staged_inspect` | — | exempt:vision — graded by scripts/benchmark_media.py | — | — | — |
-| `classify.lead_intent` | `cqc_lem.utilities.ai.lead_intent` | `_llm_says_lead` | classifier | evaluated | 3 | rendered text | not yet measured |
+| `classify.lead_intent` | `cqc_lem.utilities.ai.lead_intent` | `_llm_says_lead` | classifier | evaluated | 3 | rendered text | openai/gpt-4o-mini: pass, openai/gpt-5.4-mini: pass, openai/gpt-oss:20b: pass |
 | `post.pick_quote` | `cqc_lem.utilities.ai.post_treatment` | `pick_quote` | json_planner | planned | 1 | source | not yet measured |
 | `tools.chat_about_news` | `cqc_lem.utilities.ai.tools` | `chat_about_news` | — | exempt:untiered legacy tool, hardcoded gpt-4o-mini | — | — | — |
 | `tools.chat_with_tools` | `cqc_lem.utilities.ai.tools` | `chat_with_tools` | — | exempt:untiered legacy tool, hardcoded gpt-4o-mini | — | — | — |
