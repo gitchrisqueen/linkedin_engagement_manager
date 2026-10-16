@@ -27,7 +27,10 @@ def test_the_unit_binds_the_tunnel_origin_and_loopback():
 
 
 def test_both_binds_share_one_port():
-    """serve() only covers several addresses with one socket when they share a port."""
+    """A shared port is what makes serve() open ONE socket on 0.0.0.0 covering both addresses.
+
+    So the listener is every interface, and the host firewall is the access control, not these binds.
+    """
     line = _exec_start()
     ports = {tok.rsplit(":", 1)[1] for tok in line.split() if tok.count(".") == 3 and ":" in tok}
     assert ports == {"8420"}, line
@@ -36,6 +39,9 @@ def test_both_binds_share_one_port():
 def test_the_unit_keeps_its_hardening():
     """Matching the box must not drop the sandbox around the internet-adjacent process."""
     body = UNIT.read_text()
-    for setting in ("NoNewPrivileges=yes", "ProtectSystem=full", "MemoryMax=256M",
+    for setting in ("NoNewPrivileges=yes", "MemoryMax=256M",
                     "EnvironmentFile=/etc/lem/agent-webhook.env"):
         assert setting in body, setting
+    # A ratchet, not a pin: tightening to `strict` must pass; dropping it or `yes`/`no` must not.
+    values = [ln.split("=", 1)[1] for ln in body.splitlines() if ln.startswith("ProtectSystem=")]
+    assert values in (["full"], ["strict"]), values
