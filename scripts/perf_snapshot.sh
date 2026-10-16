@@ -35,8 +35,17 @@ PWF=$(mktemp)                       # mktemp creates 0600
 trap 'rm -f "$PWF"' EXIT
 printf 'MYSQL_PWD=%s\n' "$DBP" > "$PWF"
 q(){ sudo -n docker exec --env-file "$PWF" mysql_db mysql -u"$DBU" -N -B -e "$1" 2>/dev/null | grep -vi "using a password" | head -1; }
+# A count that could not be read is null, never 0 ("unscored is never zero"). From 2026-10-08 an
+# unreadable .env left every count empty and the old `:-0` defaults wrote all-zero rows that looked
+# like real measurements. num() passes a bare integer through and turns anything else into null.
+num(){ [[ "${1:-}" =~ ^[0-9]+$ ]] && printf '%s' "$1" || printf 'null'; }
+note(){ echo "[$(date -u +%FT%TZ)] $1" >> "$DIR/snapshot.log"; }
 
 U=1
+c1d=; r1d=; d1d=; e1d=; p1d=; ps=; eng=; fu=; cp=
+if [ -z "$DBU" ] || [ -z "$DBP" ] || [ -z "$DBN" ]; then
+  note "engagement counts unavailable: DB credentials not readable from $ENVF; counts written as null"
+else
 DAY="SELECT COUNT(*) FROM $DBN.logs WHERE user_id=$U AND result='success' AND created_at>=NOW()-INTERVAL 1 DAY AND action_type="
 c1d=$(q "${DAY}'comment';"); r1d=$(q "${DAY}'reply';"); d1d=$(q "${DAY}'dm';"); e1d=$(q "${DAY}'engaged';"); p1d=$(q "${DAY}'post';")
 # LATEST stat row per post only. post_stats is append-only — the nightly scrape writes a fresh
@@ -47,7 +56,14 @@ ps=$(q "SELECT CONCAT_WS(',',COUNT(DISTINCT post_id),COALESCE(SUM(reactions),0),
 eng=$(q "SELECT COUNT(*) FROM $DBN.post_engagers WHERE user_id=$U;")
 fu=$(q "SELECT COUNT(*) FROM $DBN.comment_followups WHERE user_id=$U;")
 cp=$(q "SELECT COUNT(*) FROM $DBN.commented_posts WHERE user_id=$U;")
-IFS=',' read -r pt reac comm impr <<< "${ps:-0,0,0,0}"
+fi
+IFS=',' read -r pt reac comm impr <<< "${ps:-,,,}"
+c1d=$(num "$c1d"); r1d=$(num "$r1d"); d1d=$(num "$d1d"); e1d=$(num "$e1d"); p1d=$(num "$p1d")
+pt=$(num "$pt"); reac=$(num "$reac"); comm=$(num "$comm"); impr=$(num "$impr")
+eng=$(num "$eng"); fu=$(num "$fu"); cp=$(num "$cp")
+if [ -n "$DBU" ] && [ -n "$DBP" ] && [ -n "$DBN" ] && [ "$pt" = null ]; then
+  note "engagement counts unavailable: queries against mysql_db returned nothing; counts written as null"
+fi
 
 # Cost/margin block. Never fatal: an unreachable container or a broken block leaves the engagement
 # line intact (with "margin": null) rather than losing the whole day's snapshot.
@@ -62,12 +78,13 @@ fi
 
 MARGIN_JSON="$margin" python3 - <<PY >> "$LOG"
 import json, os, datetime
+null = None
 print(json.dumps({
   "date": datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%d"),
   "ts": datetime.datetime.now(datetime.timezone.utc).isoformat()+"Z",
-  "d1": {"comments": ${c1d:-0}, "replies": ${r1d:-0}, "dms": ${d1d:-0}, "reactions": ${e1d:-0}, "posts": ${p1d:-0}},
-  "cumulative": {"posts_tracked": ${pt:-0}, "own_reactions": ${reac:-0}, "own_comments": ${comm:-0},
-                 "own_impressions": ${impr:-0}, "engagers": ${eng:-0}, "commented_posts": ${cp:-0}, "followups": ${fu:-0}},
+  "d1": {"comments": ${c1d}, "replies": ${r1d}, "dms": ${d1d}, "reactions": ${e1d}, "posts": ${p1d}},
+  "cumulative": {"posts_tracked": ${pt}, "own_reactions": ${reac}, "own_comments": ${comm},
+                 "own_impressions": ${impr}, "engagers": ${eng}, "commented_posts": ${cp}, "followups": ${fu}},
   "margin": json.loads(os.environ["MARGIN_JSON"]),
 }))
 PY
