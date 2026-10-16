@@ -324,9 +324,11 @@ def serve(
     """Start the receiver.
 
     Args:
-        binds: Address/port pairs to listen on. The deployment binds the docker bridge gateway
-            (reachable from the cloudflared container) and loopback (for `healthz`) — never a
-            public interface; the tunnel is the only path in.
+        binds: Address/port pairs to listen on. The deployment passes the docker bridge gateway
+            (the tunnel origin cloudflared dials) and loopback (for `healthz`). They share a port,
+            so this opens ONE socket on 0.0.0.0 and listens on every interface, the public one
+            included: the host firewall plus HMAC on every request keep the internet out, not
+            these addresses.
         db_path: Queue database. Created if absent so first boot needs no ordering with the daemon.
         secret: Webhook secret; defaults to `$LEM_WEBHOOK_SECRET`.
 
