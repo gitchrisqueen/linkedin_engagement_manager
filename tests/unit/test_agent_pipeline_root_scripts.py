@@ -236,6 +236,8 @@ def sync_box(tmp_path: Path):
     dest = tmp_path / "lib-lem"
     run_env = {"PATH": f"{bin_}:/usr/bin:/bin", "BASE": str(base), "HOME": str(base),
                "LEM_SYNC_SRC": str(src), "LEM_SYNC_VERIFY_SECONDS": "1",
+               # The scratch mirror has no remote; the fetch step is covered in test_agent_pipeline_sync.
+               "LEM_SYNC_FETCHED": "1",
                "LEM_ROOT_LIB_DIR": str(dest)}
     return pipeline, dest, run_env
 
