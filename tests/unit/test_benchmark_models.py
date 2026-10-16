@@ -1320,17 +1320,23 @@ class TestProviderClient:
         assert "410" in result["error"]
 
     @pytest.mark.parametrize("choices", [None, []])
-    def test_a_reply_with_no_choices_is_a_result_not_an_exception(self, choices):
+    def test_a_reply_with_no_choices_is_a_result_not_an_exception(
+        self, choices: list | None, capsys: pytest.CaptureFixture[str], monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.setenv("OPENROUTER_API_KEY", "sk-or-test-secret-0123456789")
         response = MagicMock()
         response.choices = choices
-        response.error = {"code": 502, "message": "upstream error"}
+        response.error = {"code": 502, "message": "upstream error sk-or-test-secret-0123456789"}
         provider, _ = self._client(response)
-        result = provider.complete("m", [{"role": "user", "content": "hi"}])
+        result = provider.complete("m-model", [{"role": "user", "content": "hi"}])
         assert result["text"] is None
         assert "upstream error" in result["error"]
         assert result["usage"] == {}
+        err = capsys.readouterr().err
+        assert "m-model returned no choices" in err and "upstream error" in err
+        assert "sk-or-test-secret-0123456789" not in err and "[redacted]" in err
 
-    def test_a_reply_with_no_choices_and_no_error_body_is_still_named(self):
+    def test_a_reply_with_no_choices_and_no_error_body_is_still_named(self) -> None:
         response = MagicMock(spec=["choices"])
         response.choices = None
         provider, _ = self._client(response)

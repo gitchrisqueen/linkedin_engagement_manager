@@ -1918,11 +1918,14 @@ class ProviderClient:
                 return {"text": None, "error": str(exc)[:200], "budget_escalations": escalations,
                         "repeats": repeats, "budget_locked": budget_locked,
                         "latency_ms": (time.time() - started) * 1000.0, "usage": {}}
-            # A 200 whose body carries no choices (OpenRouter's in-band `error` object) is a
-            # provider failure for this case, not a harness crash: one such reply killed a whole
-            # paid eval run on 2026-10-16 (run 38906290915).
+            # A reply whose body carries no choices (a provider can answer with an in-band `error`
+            # object instead) is a provider failure for this case, not a harness crash: one such
+            # reply killed a whole paid eval run on 2026-10-16 (run 38906290915). The detail is
+            # printed, redacted, because an all-errored run is refused before any artifact exists.
             if not getattr(response, "choices", None):
                 detail = getattr(response, "error", None) or "provider returned no choices"
+                print(f"  {model} returned no choices: {routed.redact(detail)[:200]}",
+                      file=sys.stderr)
                 return {"text": None, "error": str(detail)[:200], "budget_escalations": escalations,
                         "repeats": repeats, "budget_locked": budget_locked,
                         "latency_ms": (time.time() - started) * 1000.0, "usage": {}}
