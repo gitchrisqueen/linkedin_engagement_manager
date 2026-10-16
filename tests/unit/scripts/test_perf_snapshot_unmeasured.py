@@ -1,7 +1,7 @@
 """perf_snapshot.sh writes null, never 0, for an engagement count it could not read.
 
-From 2026-10-08 the host cron could no longer read the DB credentials, every query came back empty,
-and the `:-0` defaults wrote all-zero rows that read as real measurements ("unscored is never zero").
+metrics.jsonl has all-zero d1 and cumulative rows from 2026-10-08 through 2026-10-15: the `:-0`
+defaults turned empty reads into rows that read as real measurements ("unscored is never zero").
 """
 
 import json
@@ -66,7 +66,7 @@ class TestUnreadableCountsAreNull:
 
         assert row["cumulative"]["posts_tracked"] is None
         assert row["d1"]["comments"] is None
-        assert "queries against mysql_db returned nothing" in log
+        assert "null fields: d1.comments,d1.replies,d1.dms,d1.reactions,d1.posts,cumulative.posts_tracked" in log
 
     def test_real_counts_pass_through_as_integers(self, tmp_path):
         body = (
@@ -82,3 +82,32 @@ class TestUnreadableCountsAreNull:
         assert row["cumulative"]["commented_posts"] == 7
         assert row["d1"]["comments"] == 7
         assert "unavailable" not in log.replace("margin block unavailable", "")
+
+    def test_a_partial_failure_names_only_the_null_fields(self, tmp_path):
+        # post_stats answers; every plain COUNT(*) query returns nothing.
+        body = (
+            'if [ "$2" = grep ]; then case "$4" in '
+            '*USER*) echo MYSQL_USER=u;; *PASSWORD*) echo MYSQL_PASSWORD=p;; *DATABASE*) echo MYSQL_DATABASE=d;; '
+            "esac; exit 0; fi\n"
+            'case "$*" in *CONCAT_WS*) echo 61,10,4,900;; *) exit 1;; esac'
+        )
+        row, log = _run(tmp_path, body)
+
+        assert row["cumulative"]["posts_tracked"] == 61
+        assert row["d1"]["comments"] is None
+        assert (
+            "null fields: d1.comments,d1.replies,d1.dms,d1.reactions,d1.posts,"
+            "cumulative.engagers,cumulative.commented_posts,cumulative.followups"
+        ) in log
+        assert "posts_tracked" not in log
+
+    def test_a_password_containing_equals_is_kept_whole(self, tmp_path):
+        body = (
+            'if [ "$2" = grep ]; then case "$4" in '
+            '*USER*) echo MYSQL_USER=u;; *PASSWORD*) echo MYSQL_PASSWORD=a=b;; *DATABASE*) echo MYSQL_DATABASE=d;; '
+            "esac; exit 0; fi\n"
+            'case "$*" in *--env-file*) f="${5}"; grep -qx "MYSQL_PWD=a=b" "$f" && echo 7 || exit 1;; *) exit 1;; esac'
+        )
+        row, _ = _run(tmp_path, body)
+
+        assert row["cumulative"]["engagers"] == 7

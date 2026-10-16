@@ -26,18 +26,19 @@ mkdir -p "$DIR"
 
 . "$(dirname "${BASH_SOURCE[0]}")/lib/app_container.sh"
 MARGIN_CONTAINER="${MARGIN_CONTAINER:-$(active_api_container)}"
-DBU=$(sudo -n grep -E "^MYSQL_USER=" "$ENVF"|cut -d= -f2)
-DBP=$(sudo -n grep -E "^MYSQL_PASSWORD=" "$ENVF"|cut -d= -f2)
-DBN=$(sudo -n grep -E "^MYSQL_DATABASE=" "$ENVF"|cut -d= -f2)
+DBU=$(sudo -n grep -E "^MYSQL_USER=" "$ENVF"|cut -d= -f2-)
+DBP=$(sudo -n grep -E "^MYSQL_PASSWORD=" "$ENVF"|cut -d= -f2-)
+DBN=$(sudo -n grep -E "^MYSQL_DATABASE=" "$ENVF"|cut -d= -f2-)
 # The password reaches the mysql client as MYSQL_PWD from a 0600 env-file, never as a `-p` CLI arg:
 # an argv password is readable in the container's process list (and by anything scraping it).
 PWF=$(mktemp)                       # mktemp creates 0600
 trap 'rm -f "$PWF"' EXIT
 printf 'MYSQL_PWD=%s\n' "$DBP" > "$PWF"
 q(){ sudo -n docker exec --env-file "$PWF" mysql_db mysql -u"$DBU" -N -B -e "$1" 2>/dev/null | grep -vi "using a password" | head -1; }
-# A count that could not be read is null, never 0 ("unscored is never zero"). From 2026-10-08 an
-# unreadable .env left every count empty and the old `:-0` defaults wrote all-zero rows that looked
-# like real measurements. num() passes a bare integer through and turns anything else into null.
+# A count that could not be read is null, never 0 ("unscored is never zero"). metrics.jsonl has
+# all-zero d1 and cumulative rows from 2026-10-08 through 2026-10-15 (posts_tracked was 61 on
+# 10-07): the old `:-0` defaults turned empty reads into rows that looked like real measurements.
+# num() passes a bare integer through and turns anything else into null.
 num(){ [[ "${1:-}" =~ ^[0-9]+$ ]] && printf '%s' "$1" || printf 'null'; }
 note(){ echo "[$(date -u +%FT%TZ)] $1" >> "$DIR/snapshot.log"; }
 
@@ -61,8 +62,15 @@ IFS=',' read -r pt reac comm impr <<< "${ps:-,,,}"
 c1d=$(num "$c1d"); r1d=$(num "$r1d"); d1d=$(num "$d1d"); e1d=$(num "$e1d"); p1d=$(num "$p1d")
 pt=$(num "$pt"); reac=$(num "$reac"); comm=$(num "$comm"); impr=$(num "$impr")
 eng=$(num "$eng"); fu=$(num "$fu"); cp=$(num "$cp")
-if [ -n "$DBU" ] && [ -n "$DBP" ] && [ -n "$DBN" ] && [ "$pt" = null ]; then
-  note "engagement counts unavailable: queries against mysql_db returned nothing; counts written as null"
+if [ -n "$DBU" ] && [ -n "$DBP" ] && [ -n "$DBN" ]; then
+  nulls=""
+  for f in d1.comments:$c1d d1.replies:$r1d d1.dms:$d1d d1.reactions:$e1d d1.posts:$p1d \
+           cumulative.posts_tracked:$pt cumulative.own_reactions:$reac cumulative.own_comments:$comm \
+           cumulative.own_impressions:$impr cumulative.engagers:$eng cumulative.commented_posts:$cp \
+           cumulative.followups:$fu; do
+    [ "${f#*:}" = null ] && nulls="${nulls:+$nulls,}${f%%:*}"
+  done
+  [ -n "$nulls" ] && note "engagement counts unavailable: query returned no number for null fields: $nulls"
 fi
 
 # Cost/margin block. Never fatal: an unreachable container or a broken block leaves the engagement
