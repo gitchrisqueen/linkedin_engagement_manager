@@ -20,7 +20,7 @@
 | `post.group` | `cqc_lem.utilities.ai.ai_helper` | `generate_group_post._draft` | post_longform | planned | 1 | source | not yet measured |
 | `dm.lead_response` | `cqc_lem.utilities.ai.ai_helper` | `generate_lead_response._draft` | dm | planned | 1 | source | not yet measured |
 | `newsletter.edition` | `cqc_lem.utilities.ai.ai_helper` | `generate_newsletter_edition._edition` | post_longform | planned | 1 | source | not yet measured |
-| `dm.nurture` | `cqc_lem.utilities.ai.ai_helper` | `generate_nurture_dm._draft` | dm | evaluated | 1 | rendered text | openai/gemma4:31b: pass, openai/gpt-4o-mini: fail, openai/gpt-5.4-mini: fail, openai/gpt-oss:120b: fail |
+| `dm.nurture` | `cqc_lem.utilities.ai.ai_helper` | `generate_nurture_dm._draft` | dm | evaluated | 2 | rendered text | not yet measured |
 | `app.onboarding_nudge` | `cqc_lem.utilities.ai.ai_helper` | `generate_onboarding_nudge_copy` | dm | planned | 1 | source | not yet measured |
 | `comment.second_wave` | `cqc_lem.utilities.ai.ai_helper` | `generate_second_wave_comment._draft` | comment | planned | 1 | source | not yet measured |
 | `comment.seed` | `cqc_lem.utilities.ai.ai_helper` | `generate_seed_comment._draft` | own_comment | evaluated | 1 | rendered text | openai/gemma4:31b: pass, openai/gpt-4o-mini: pass, openai/gpt-5.4-mini: pass, openai/gpt-oss:120b: pass |
@@ -44,7 +44,7 @@
 | `rewrite.humanize` | `cqc_lem.utilities.ai.content_alignment` | `humanize_text` | rewrite | planned | 1 | source | not yet measured |
 | `rewrite.humanize_title` | `cqc_lem.utilities.ai.content_alignment` | `humanize_title` | rewrite | planned | 1 | source | not yet measured |
 | `rewrite.mechanical_edit` | `cqc_lem.utilities.ai.content_alignment` | `mechanical_edit_text` | rewrite | planned | 1 | source | not yet measured |
-| `judge.authenticity` | `cqc_lem.utilities.ai.content_alignment` | `score_authenticity` | judge | evaluated | 1 | rendered text | openai/gemma4:31b: pass, openai/gpt-4o-mini: pass, openai/gpt-5.4-mini: pass, openai/gpt-oss:120b: fail |
+| `judge.authenticity` | `cqc_lem.utilities.ai.content_alignment` | `score_authenticity` | judge | evaluated | 2 | rendered text | not yet measured |
 | `research.web` | `cqc_lem.utilities.ai.content_research` | `_research_via_litellm` | — | exempt:live web research — output depends on the live web, not reproducible | — | — | — |
 | `transport.curated_complete` | `cqc_lem.utilities.ai.curated_commentary` | `_complete` | — | exempt:wrapper — prompts are registered at each caller | — | — | — |
 | `curated.chart_facts` | `cqc_lem.utilities.ai.curated_commentary` | `extract_chart_facts` | json_planner | planned | 2 | source | not yet measured |
@@ -61,7 +61,7 @@
 | `image.render` | `cqc_lem.utilities.ai.image_gen` | `_render_via_gpt_image` | — | exempt:image render — graded by scripts/benchmark_media.py | — | — | — |
 | `vision.staged_inspect_blind` | `cqc_lem.utilities.ai.image_gen` | `_staged_inspect` | — | exempt:vision — graded by scripts/benchmark_media.py | — | — | — |
 | `vision.staged_inspect_targeted` | `cqc_lem.utilities.ai.image_gen` | `_staged_inspect` | — | exempt:vision — graded by scripts/benchmark_media.py | — | — | — |
-| `classify.lead_intent` | `cqc_lem.utilities.ai.lead_intent` | `_llm_says_lead` | classifier | evaluated | 2 | rendered text | openai/gpt-4o-mini: pass, openai/gpt-5.4-mini: pass, openai/gpt-oss:20b: fail |
+| `classify.lead_intent` | `cqc_lem.utilities.ai.lead_intent` | `_llm_says_lead` | classifier | evaluated | 3 | rendered text | not yet measured |
 | `post.pick_quote` | `cqc_lem.utilities.ai.post_treatment` | `pick_quote` | json_planner | planned | 1 | source | not yet measured |
 | `tools.chat_about_news` | `cqc_lem.utilities.ai.tools` | `chat_about_news` | — | exempt:untiered legacy tool, hardcoded gpt-4o-mini | — | — | — |
 | `tools.chat_with_tools` | `cqc_lem.utilities.ai.tools` | `chat_with_tools` | — | exempt:untiered legacy tool, hardcoded gpt-4o-mini | — | — | — |

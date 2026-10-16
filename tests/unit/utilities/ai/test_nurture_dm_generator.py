@@ -51,6 +51,19 @@ class TestGenerateNurtureDm:
         assert nurture_guidance("objection") in system
         assert "invent prices" in system
 
+    def test_system_prompt_forbids_a_filler_opener(self):
+        # The eval's `no_preamble` contract check failed on "Sure," / "Absolutely" / "Thanks for"
+        # openers in prompt-eval pe-20261008-0250fe (#2302); the message is pasted into LinkedIn as is.
+        from cqc_lem.utilities.ai import ai_helper
+        with patch(f"{_AI}._call_llm", return_value=_resp("hi")) as call, \
+             patch(f"{_AI}._humanize_text", side_effect=lambda c, **kw: c):
+            ai_helper.generate_nurture_dm("Sure, send details", "interested", _profile())
+        system = " ".join(call.call_args.kwargs["messages"][0]["content"].split())
+        assert "never with a filler opener" in system
+        for opener in ('"Sure"', '"Absolutely"', '"Of course"', '"Certainly"', '"Thanks for"'):
+            assert opener in system
+        assert "under 300 characters — a hard limit" in system
+
     def test_their_reply_name_and_template_hint_reach_the_user_prompt(self):
         from cqc_lem.utilities.ai import ai_helper
         with patch(f"{_AI}._call_llm", return_value=_resp("hi")) as call, \
