@@ -10,15 +10,11 @@ User=lem
 Group=lem
 Environment=BASE=/home/lem/agent-pipeline
 Environment=LEM_SYNC_SRC=/home/lem/agent-pipeline-src
-# The two ExecStartPre lines below have already brought the mirror to main.
-Environment=LEM_SYNC_FETCHED=1
 WorkingDirectory=/home/lem/agent-pipeline-src
 
-# The fetch happens HERE, before sync.sh is exec'd, so the script is never rewritten underneath the
-# bash process that is reading it. `reset --hard` because this is a machine mirror with no local
-# work to preserve — anything it has is either from main or a mistake.
-ExecStartPre=/usr/bin/git -C /home/lem/agent-pipeline-src fetch --quiet origin main
-ExecStartPre=/usr/bin/git -C /home/lem/agent-pipeline-src reset --quiet --hard origin/main
+# sync.sh fetches and fast-forwards the mirror itself, refusing a dirty or diverged one, then
+# re-execs the fetched copy. The unit used to force the mirror onto origin/main here, which
+# discarded whatever was on the mirror (evidence included) and bypassed those refusals.
 ExecStart=/home/lem/agent-pipeline-src/scripts/agent-pipeline/sync.sh
 
 # A failed sync must not take the box with it: sync.sh already rolled itself back by the time it

@@ -755,13 +755,34 @@ rather than CI-push because a push needs a standing credential that executes as 
 stops it; `--force` is never used, because `--sync`'s refusal on a box-edited file means someone is
 mid-debug on that machine.
 
-**A hand run of `sync.sh` brings the mirror to `main` itself.** It fetches `origin main` into
-`/home/lem/agent-pipeline-src`, fast-forwards, and then re-runs as the mirror's own copy of
-`sync.sh`. It refuses, installing nothing, when the fetch fails, when the mirror has uncommitted
-changes, or when HEAD cannot fast-forward (a local commit on the mirror is looked at, never reset
-away). Before this, nothing advanced the mirror while the timer was off, so a hand run installed a
-stale HEAD and every check passed: the mirror sat at `a5d6a1e6` from 2026-10-08 to 2026-10-16. The
-timer unit fetches in `ExecStartPre` and sets `LEM_SYNC_FETCHED=1` to skip the second fetch.
+**A hand run of `sync.sh` brings the mirror to `main` itself.** Run it as the `lem` user (as
+another uid, git refuses the lem-owned mirror as "dubious ownership", which surfaces as
+`cannot fetch origin main`):
+
+```bash
+/home/lem/agent-pipeline/sync.sh          # as lem; log: /home/lem/agent-pipeline/logs/sync.log
+```
+
+It fetches `origin main` into `/home/lem/agent-pipeline-src`, fast-forwards, and re-runs as the
+mirror's own copy of `sync.sh`. It refuses, installing nothing, when the fetch fails, when the mirror
+has uncommitted changes (untracked files under `scripts/agent-pipeline/` included, because
+`install.sh` ships by glob), when HEAD cannot fast-forward, or when HEAD is ahead of `origin/main`. A
+local commit on the mirror is looked at, never reset away. The timer unit only runs `sync.sh`; it
+no longer forces the mirror onto `main` first. Before this, nothing advanced the mirror while the
+timer was off, so a hand run installed a stale HEAD and every check passed: the mirror sat at
+`a5d6a1e6` from 2026-10-08 to 2026-10-16.
+
+*First run after this change ships:* the installed `sync.sh` and the mirror's copy both predate it,
+so neither fetches. Fast-forward the mirror by hand once, then run the command above:
+
+```bash
+git -C /home/lem/agent-pipeline-src fetch origin main
+git -C /home/lem/agent-pipeline-src merge --ff-only origin/main
+```
+
+Success: `sync.log` ends with `sync OK — daemon is alive and the heartbeat advanced.`, and
+`git -C /home/lem/agent-pipeline-src rev-parse HEAD origin/main` prints the same SHA twice. From then
+on a hand run logs `mirror fast-forwarded <old> -> <new>` whenever `main` has moved.
 
 ⚠️ **The timer is deliberately not enabled.** Auto-deploy closes a loop: agents merge their own PRs
 (`required_approving_review_count` is 0), so a merged pipeline change would reach the box unattended.

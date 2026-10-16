@@ -55,13 +55,16 @@ fi
 # the mirror last held: it sat at a5d6a1e6 from 2026-10-08 to 2026-10-16 while seven merged pipeline
 # changes waited, and every check below passed, because a stale HEAD is still an ancestor of main.
 # Fast-forward only: a mirror that has diverged or carries local edits is a mistake to look at,
-# never something to reset away. LEM_SYNC_FETCHED=1 skips this (the unit has already fetched).
+# never something to reset away. The re-exec below sets LEM_SYNC_FETCHED=1 so it runs once.
 if [ "${LEM_SYNC_FETCHED:-0}" != "1" ]; then
   if ! git -C "$SRC" fetch --quiet origin main 2>>"$LOG"; then
     log "REFUSING: cannot fetch origin main into $SRC, so the mirror may be stale. Nothing installed."
     exit 1
   fi
-  if [ -n "$(git -C "$SRC" status --porcelain --untracked-files=no 2>/dev/null)" ]; then
+  # Untracked files count: install.sh ships by glob from the working tree, not from git, so a file
+  # dropped into the mirror would be installed without ever being on main.
+  if [ -n "$(git -C "$SRC" status --porcelain -- scripts/agent-pipeline 2>/dev/null)" ] ||
+     [ -n "$(git -C "$SRC" status --porcelain --untracked-files=no 2>/dev/null)" ]; then
     log "REFUSING: $SRC has uncommitted changes. It is a machine mirror; read them, then clean it."
     exit 1
   fi
@@ -71,6 +74,12 @@ if [ "${LEM_SYNC_FETCHED:-0}" != "1" ]; then
     exit 1
   fi
   AFTER_FF="$(git -C "$SRC" rev-parse HEAD 2>/dev/null)"
+  # `--ff-only` also succeeds when HEAD is AHEAD of origin/main (a local commit, origin unchanged),
+  # and the copy re-exec'd below would then be that unreviewed commit. Only main itself runs.
+  if [ "$AFTER_FF" != "$(git -C "$SRC" rev-parse origin/main 2>/dev/null)" ]; then
+    log "REFUSING: $SRC HEAD ${AFTER_FF:0:8} is ahead of or differs from origin/main. Nothing installed."
+    exit 1
+  fi
   [ "$BEFORE_FF" = "$AFTER_FF" ] || log "mirror fast-forwarded ${BEFORE_FF:0:8} -> ${AFTER_FF:0:8}"
   # Re-exec the mirror's copy so this run uses the sync.sh it is about to install, not the one bash
   # already has open (which the fast-forward may just have replaced on disk).

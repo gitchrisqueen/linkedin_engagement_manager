@@ -237,11 +237,16 @@ def test_the_updater_ships_itself():
     assert 'for f in "$SRC"/systemd/*' in installer, "top-level systemd/ still is not shipped"
 
 
-def test_the_units_exist_and_pull_before_they_exec():
-    """The fetch must happen BEFORE sync.sh is exec'd, or the script is rewritten while bash reads it."""
+def test_the_units_exist_and_leave_the_mirror_to_sync_sh():
+    """The unit must not force the mirror onto main: that discards a local commit and skips refusals.
+
+    sync.sh fetches, refuses a dirty or diverged mirror, fast-forwards and re-execs the fetched copy,
+    so the unit only runs it.
+    """
     unit = (_PIPELINE / "systemd" / "lem-pipeline-sync.service").read_text()
-    assert "ExecStartPre=/usr/bin/git" in unit
-    assert unit.index("ExecStartPre") < unit.index("ExecStart=")
+    assert "reset" not in unit and "--hard" not in unit
+    assert "LEM_SYNC_FETCHED" not in unit, "the unit must not skip sync.sh's own fetch and refusals"
+    assert "ExecStart=/home/lem/agent-pipeline-src/scripts/agent-pipeline/sync.sh" in unit
     assert "User=lem" in unit
     timer = (_PIPELINE / "systemd" / "lem-pipeline-sync.timer").read_text()
     assert "OnUnitActiveSec=" in timer
@@ -328,7 +333,27 @@ def test_an_unreachable_origin_refuses_rather_than_installing_a_stale_mirror(box
     assert not calls.exists()
 
 
-def test_the_timer_unit_skips_the_second_fetch():
-    """The unit already fetched and reset in ExecStartPre; the flag stops sync.sh doing it twice."""
-    unit = (_PIPELINE / "systemd" / "lem-pipeline-sync.service").read_text()
-    assert "Environment=LEM_SYNC_FETCHED=1" in unit
+def test_a_mirror_ahead_of_main_never_runs_its_own_updater(box, remote):
+    """`--ff-only` succeeds when HEAD is ahead of main, so it alone would re-exec an unreviewed copy."""
+    _, src, _, calls, env = box
+    updater = src / "scripts" / "agent-pipeline" / "sync.sh"
+    updater.write_text("#!/usr/bin/env bash\necho LOCAL-COPY-RAN\n")
+    _git(src, env, "add", "-A")
+    _git(src, env, "commit", "-qm", "local updater")
+    got = _run(box, LEM_SYNC_FETCHED="0")
+    assert got.returncode == 1
+    assert "ahead of or differs from origin/main" in got.stdout
+    assert "LOCAL-COPY-RAN" not in got.stdout
+    assert not calls.exists()
+
+
+def test_an_untracked_pipeline_file_in_the_mirror_is_refused(box, remote):
+    """install.sh ships by glob, so an untracked file would be installed without being on main."""
+    _, src, _, calls, _ = box
+    lib = src / "scripts" / "agent-pipeline" / "lib"
+    lib.mkdir(parents=True, exist_ok=True)
+    (lib / "x.sh").write_text("echo planted\n")
+    got = _run(box, LEM_SYNC_FETCHED="0")
+    assert got.returncode == 1
+    assert "uncommitted changes" in got.stdout
+    assert not calls.exists()
