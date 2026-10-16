@@ -10,6 +10,8 @@ User=lem
 Group=lem
 Environment=BASE=/home/lem/agent-pipeline
 Environment=LEM_SYNC_SRC=/home/lem/agent-pipeline-src
+# The two ExecStartPre lines below have already brought the mirror to main.
+Environment=LEM_SYNC_FETCHED=1
 WorkingDirectory=/home/lem/agent-pipeline-src
 
 # The fetch happens HERE, before sync.sh is exec'd, so the script is never rewritten underneath the

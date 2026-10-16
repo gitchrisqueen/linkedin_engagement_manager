@@ -62,7 +62,10 @@ def _run(box, **extra):
     base, src, bin_, _, _ = box
     env = {
         "PATH": f"{bin_}:/usr/bin:/bin", "BASE": str(base), "HOME": str(base),
-        "LEM_SYNC_SRC": str(src), "LEM_SYNC_VERIFY_SECONDS": "6", **extra,
+        "LEM_SYNC_SRC": str(src), "LEM_SYNC_VERIFY_SECONDS": "6",
+        # Most tests exercise what happens AFTER the mirror is current; the fetch step has its own
+        # tests below, against a real remote.
+        "LEM_SYNC_FETCHED": "1", **extra,
     }
     return subprocess.run(["bash", str(SYNC)], capture_output=True, text=True, timeout=90, env=env)
 
@@ -70,6 +73,38 @@ def _run(box, **extra):
 def _beat(base: Path, value: int) -> None:
     """Set the heartbeat the verify loop watches."""
     (base / "state" / "lemd.heartbeat").write_text(str(value))
+
+
+def _git(cwd: Path, env: dict, *args: str) -> str:
+    """Run git in `cwd` and return stdout."""
+    return subprocess.run(["git", *args], cwd=cwd, env=env, check=True, capture_output=True,
+                          text=True).stdout.strip()
+
+
+@pytest.fixture
+def remote(box, tmp_path: Path):
+    """A bare `origin` for the mirror, plus a clone that can push new commits to its main."""
+    _, src, _, _, env = box
+    bare = tmp_path / "origin.git"
+    subprocess.run(["git", "clone", "-q", "--bare", str(src), str(bare)], env=env, check=True,
+                   capture_output=True)
+    _git(src, env, "remote", "add", "origin", str(bare))
+    _git(src, env, "fetch", "-q", "origin", "main")
+    upstream = tmp_path / "upstream"
+    subprocess.run(["git", "clone", "-q", str(bare), str(upstream)], env=env, check=True,
+                   capture_output=True)
+    return bare, upstream
+
+
+def _push_change(upstream: Path, env: dict, name: str, body: str) -> str:
+    """Commit one pipeline file on the remote's main and return the new SHA."""
+    f = upstream / "scripts" / "agent-pipeline" / name
+    f.write_text(body)
+    f.chmod(0o755)
+    _git(upstream, env, "add", "-A")
+    _git(upstream, env, "commit", "-qm", f"add {name}")
+    _git(upstream, env, "push", "-q", "origin", "HEAD:main")
+    return _git(upstream, env, "rev-parse", "HEAD")
 
 
 # ---------------------------------------------------------------- refusals
@@ -227,3 +262,73 @@ def test_the_mirror_is_not_the_human_workspace():
     body = SYNC.read_text()
     assert "/home/lem/agent-pipeline-src" in body
     assert "linkedin_engagement_manager" not in body.split("LEM_SYNC_SRC")[1][:200]
+
+
+# ---------------------------------------------------------------- bringing the mirror to main
+
+
+def test_a_stale_mirror_is_fast_forwarded_before_anything_is_judged(box, remote):
+    """A hand run used to install whatever the mirror last held (stuck 2026-10-08 to 10-16).
+
+    A stale HEAD is still an ancestor of main, so every other check passed. The run must fetch and
+    fast-forward first.
+    """
+    base, src, _, _, env = box
+    _, upstream = remote
+    new_sha = _push_change(upstream, env, "new.sh", "echo new\n")
+    _beat(base, 1)
+    got = _run(box, LEM_SYNC_FETCHED="0", LEM_SYNC_VERIFY_SECONDS="1")
+    assert "mirror fast-forwarded" in got.stdout, got.stdout + got.stderr
+    assert _git(src, env, "rev-parse", "HEAD") == new_sha
+
+
+def test_the_run_continues_in_the_mirrors_own_copy_of_the_updater(box, remote):
+    """After a fast-forward the updater that runs is the one just fetched, not the stale one."""
+    _, src, _, _, env = box
+    _, upstream = remote
+    _push_change(upstream, env, "sync.sh", "#!/usr/bin/env bash\necho FETCHED-COPY-RAN\n")
+    got = _run(box, LEM_SYNC_FETCHED="0")
+    assert got.returncode == 0
+    assert "FETCHED-COPY-RAN" in got.stdout
+
+
+def test_a_diverged_mirror_is_refused_not_reset(box, remote):
+    """A local commit on the machine mirror is a mistake to look at, never something to discard."""
+    base, src, _, calls, env = box
+    _, upstream = remote
+    _push_change(upstream, env, "upstream.sh", "echo up\n")
+    (src / "scripts" / "agent-pipeline" / "local.sh").write_text("echo local\n")
+    _git(src, env, "add", "-A")
+    _git(src, env, "commit", "-qm", "local")
+    local_sha = _git(src, env, "rev-parse", "HEAD")
+    got = _run(box, LEM_SYNC_FETCHED="0")
+    assert got.returncode == 1
+    assert "cannot fast-forward" in got.stdout
+    assert _git(src, env, "rev-parse", "HEAD") == local_sha, "the local commit was discarded"
+    assert not calls.exists(), "nothing may be restarted after a refusal"
+
+
+def test_uncommitted_changes_in_the_mirror_are_refused(box, remote):
+    """A dirty mirror means someone edited it by hand; installing over that hides it."""
+    _, src, _, calls, _ = box
+    (src / "scripts" / "agent-pipeline" / "install.sh").write_text("#!/usr/bin/env bash\nexit 0\n# edit\n")
+    got = _run(box, LEM_SYNC_FETCHED="0")
+    assert got.returncode == 1
+    assert "uncommitted changes" in got.stdout
+    assert not calls.exists()
+
+
+def test_an_unreachable_origin_refuses_rather_than_installing_a_stale_mirror(box, remote):
+    """Without a fetch the mirror cannot be shown current, so nothing is installed."""
+    _, src, _, calls, env = box
+    _git(src, env, "remote", "set-url", "origin", str(src.parent / "missing.git"))
+    got = _run(box, LEM_SYNC_FETCHED="0")
+    assert got.returncode == 1
+    assert "cannot fetch origin main" in got.stdout
+    assert not calls.exists()
+
+
+def test_the_timer_unit_skips_the_second_fetch():
+    """The unit already fetched and reset in ExecStartPre; the flag stops sync.sh doing it twice."""
+    unit = (_PIPELINE / "systemd" / "lem-pipeline-sync.service").read_text()
+    assert "Environment=LEM_SYNC_FETCHED=1" in unit

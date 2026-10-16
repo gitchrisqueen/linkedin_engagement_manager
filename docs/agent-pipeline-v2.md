@@ -755,6 +755,14 @@ rather than CI-push because a push needs a standing credential that executes as 
 stops it; `--force` is never used, because `--sync`'s refusal on a box-edited file means someone is
 mid-debug on that machine.
 
+**A hand run of `sync.sh` brings the mirror to `main` itself.** It fetches `origin main` into
+`/home/lem/agent-pipeline-src`, fast-forwards, and then re-runs as the mirror's own copy of
+`sync.sh`. It refuses, installing nothing, when the fetch fails, when the mirror has uncommitted
+changes, or when HEAD cannot fast-forward (a local commit on the mirror is looked at, never reset
+away). Before this, nothing advanced the mirror while the timer was off, so a hand run installed a
+stale HEAD and every check passed: the mirror sat at `a5d6a1e6` from 2026-10-08 to 2026-10-16. The
+timer unit fetches in `ExecStartPre` and sets `LEM_SYNC_FETCHED=1` to skip the second fetch.
+
 ⚠️ **The timer is deliberately not enabled.** Auto-deploy closes a loop: agents merge their own PRs
 (`required_approving_review_count` is 0), so a merged pipeline change would reach the box unattended.
 `scripts/pipeline_selfmod_gate.py` is the control, and it only works once the workflow calling it is

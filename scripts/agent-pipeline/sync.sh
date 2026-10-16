@@ -50,6 +50,34 @@ fi
 
 [ -d "$SRC/.git" ] || { log "FATAL: no git checkout at $SRC"; exit 1; }
 
+# Bring the mirror up to main BEFORE judging it. The timer unit does this in ExecStartPre, but the
+# timer is not enabled (#1397), so every sync is a hand run, and a hand run used to install whatever
+# the mirror last held: it sat at a5d6a1e6 from 2026-10-08 to 2026-10-16 while seven merged pipeline
+# changes waited, and every check below passed, because a stale HEAD is still an ancestor of main.
+# Fast-forward only: a mirror that has diverged or carries local edits is a mistake to look at,
+# never something to reset away. LEM_SYNC_FETCHED=1 skips this (the unit has already fetched).
+if [ "${LEM_SYNC_FETCHED:-0}" != "1" ]; then
+  if ! git -C "$SRC" fetch --quiet origin main 2>>"$LOG"; then
+    log "REFUSING: cannot fetch origin main into $SRC, so the mirror may be stale. Nothing installed."
+    exit 1
+  fi
+  if [ -n "$(git -C "$SRC" status --porcelain --untracked-files=no 2>/dev/null)" ]; then
+    log "REFUSING: $SRC has uncommitted changes. It is a machine mirror; read them, then clean it."
+    exit 1
+  fi
+  BEFORE_FF="$(git -C "$SRC" rev-parse HEAD 2>/dev/null)"
+  if ! git -C "$SRC" merge --quiet --ff-only origin/main >>"$LOG" 2>&1; then
+    log "REFUSING: $SRC HEAD ${BEFORE_FF:0:8} cannot fast-forward to origin/main. Nothing installed."
+    exit 1
+  fi
+  AFTER_FF="$(git -C "$SRC" rev-parse HEAD 2>/dev/null)"
+  [ "$BEFORE_FF" = "$AFTER_FF" ] || log "mirror fast-forwarded ${BEFORE_FF:0:8} -> ${AFTER_FF:0:8}"
+  # Re-exec the mirror's copy so this run uses the sync.sh it is about to install, not the one bash
+  # already has open (which the fast-forward may just have replaced on disk).
+  export LEM_SYNC_FETCHED=1
+  [ -f "$SRC/scripts/agent-pipeline/sync.sh" ] && exec bash "$SRC/scripts/agent-pipeline/sync.sh" "$@"
+fi
+
 # The mirror is a MACHINE checkout, deliberately not the human workspace at
 # /home/lem/linkedin_engagement_manager: shipping whatever a half-finished rebase left there is a
 # live hazard, and the person doing the rebase would have no idea they had deployed it.
