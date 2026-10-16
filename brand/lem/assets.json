@@ -1,4 +1,5 @@
 [
   {"path": "logo/01 Main Brand/*", "kind": "image", "licence": "owned", "source": "LEM logo package (approved baselines, logo/05 Brand Guidelines/QA_Review.txt)"},
-  {"path": "fonts: Inter, Inter Tight", "kind": "font", "licence": "OFL-1.1", "source": "https://github.com/rsms/inter", "note": "proposed; self-host the woff2"}
+  {"path": "fonts: Inter", "kind": "font", "licence": "OFL-1.1", "source": "https://github.com/rsms/inter", "note": "proposed; self-host the woff2"},
+  {"path": "fonts: Inter Tight", "kind": "font", "licence": "OFL-1.1", "source": "https://github.com/rsms/inter-gf-tight", "note": "proposed; self-host the woff2"}
 ]

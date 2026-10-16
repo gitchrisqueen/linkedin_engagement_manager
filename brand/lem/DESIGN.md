@@ -11,6 +11,7 @@ colors:
     primary: "#054DB1"      # official primary blue: buttons and links
     on-primary: "#FFFFFF"
     hairline: "#D7DCE1"     # proposed: decorative dividers only
+    field-border: "#7A8590" # proposed: input and control boundaries
   dark:
     background: "#111A22"   # proposed: deepened charcoal
     surface: "#1F2C37"      # official charcoal as raised surface
@@ -19,10 +20,11 @@ colors:
     primary: "#7FB0FF"      # proposed: lifted blue, dark text on it
     on-primary: "#111A22"
     hairline: "#33414D"
+    field-border: "#7B8894"
 typography:
   display: { family: "PROPOSED: Inter Tight", weights: [600], licence: "OFL-1.1", note: "brand owner to confirm; the app uses system-ui today" }
   body: { family: "Inter", weights: [400, 600], licence: "OFL-1.1" }
-  scale: [14, 16, 20, 25, 31, 39, 49]   # px; ratio 1.25
+  scale: [13, 16, 20, 25, 31, 39, 49]   # px; ratio 1.25 from a 16 px body
   body_px: { desktop: 17, phone: 16 }
   measure_chars: [45, 75]
 spacing: [4, 8, 16, 24, 32, 48, 64, 96]
@@ -50,3 +52,13 @@ targets: { min_px: 44 }
 | dark | text #E8EDF2 on background #111A22 | 14.92 |
 | dark | muted #A3AEB8 on background | 7.79 |
 | dark | on-primary #111A22 on primary #7FB0FF | 8.00 |
+| light | text #1F2C37 on surface #FFFFFF | 14.25 |
+| light | muted #5B6670 on surface #FFFFFF | 5.87 |
+| light | field-border #7A8590 on background #F9F9F9 | 3.57 (control boundary, 3:1 needed) |
+| light | field-border #7A8590 on surface #FFFFFF | 3.76 (control boundary) |
+| dark | text #E8EDF2 on surface #1F2C37 | 12.10 |
+| dark | muted #A3AEB8 on surface #1F2C37 | 6.31 |
+| dark | primary/link #7FB0FF on background #111A22 | 8.00 |
+| dark | primary/link #7FB0FF on surface #1F2C37 | 6.49 |
+| dark | field-border #7B8894 on background #111A22 | 4.85 (control boundary) |
+| dark | field-border #7B8894 on surface #1F2C37 | 3.93 (control boundary) |
