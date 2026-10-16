@@ -1,5 +1,20 @@
 # Changelog
 
+## [0.196.0](https://github.com/christopherqueenconsulting/linkedin_engagement_manager/compare/v0.195.2...v0.196.0) (2026-10-16)
+
+
+### Features
+
+* **evals:** raise the per-run prompt-eval spend ceiling to $3.00 ([#2435](https://github.com/christopherqueenconsulting/linkedin_engagement_manager/issues/2435)) ([f5821c0](https://github.com/christopherqueenconsulting/linkedin_engagement_manager/commit/f5821c02c9d74b2547108d9f641b827405d2974e))
+
+
+### Bug Fixes
+
+* **pipeline:** a hand-run sync.sh fast-forwards the mirror before installing ([#2437](https://github.com/christopherqueenconsulting/linkedin_engagement_manager/issues/2437)) ([f104098](https://github.com/christopherqueenconsulting/linkedin_engagement_manager/commit/f104098af6a9c99a6f116b0d17fa60b795af4f81))
+* **pipeline:** make the repo webhook unit match the installed one ([#2438](https://github.com/christopherqueenconsulting/linkedin_engagement_manager/issues/2438)) ([2344555](https://github.com/christopherqueenconsulting/linkedin_engagement_manager/commit/234455508cc401c60a26d8a261c1db7274828631))
+* **prompts:** reword three prompts that missed the eval contract floor ([#2397](https://github.com/christopherqueenconsulting/linkedin_engagement_manager/issues/2397), [#2302](https://github.com/christopherqueenconsulting/linkedin_engagement_manager/issues/2302), [#2303](https://github.com/christopherqueenconsulting/linkedin_engagement_manager/issues/2303)) ([#2413](https://github.com/christopherqueenconsulting/linkedin_engagement_manager/issues/2413)) ([527594b](https://github.com/christopherqueenconsulting/linkedin_engagement_manager/commit/527594bbc236f589c92ace755f22522209582e89))
+* **prompts:** tighten lead_intent, dm.nurture and authenticity judge contracts ([527594b](https://github.com/christopherqueenconsulting/linkedin_engagement_manager/commit/527594bbc236f589c92ace755f22522209582e89)), closes [#2397](https://github.com/christopherqueenconsulting/linkedin_engagement_manager/issues/2397) [#2302](https://github.com/christopherqueenconsulting/linkedin_engagement_manager/issues/2302) [#2303](https://github.com/christopherqueenconsulting/linkedin_engagement_manager/issues/2303)
+
 ## [0.195.2](https://github.com/christopherqueenconsulting/linkedin_engagement_manager/compare/v0.195.1...v0.195.2) (2026-10-16)
 
 
