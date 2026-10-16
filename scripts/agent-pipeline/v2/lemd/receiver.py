@@ -328,10 +328,12 @@ def serve(
             (the tunnel origin cloudflared dials) and loopback (for `healthz`). When every bind
             shares one port, as here, this opens ONE socket on 0.0.0.0 and listens on every IPv4
             interface, the public one included; otherwise it binds binds[0] alone and warns.
-            These addresses are not the access control. The host firewall keeps the internet out
-            (the rule is root-owned on the host, not in this repo; docs/stack-watchdog.md,
-            "Tunnel origin reachability", records it and the outage it caused). HMAC gates every
-            POST; GET serves only an unauthenticated `/healthz` (one kv write) and 404s the rest.
+            These addresses are not the access control. The host firewall keeps the internet out.
+            The rule in force is root-owned on the host and is NOT recorded in this repo; read it
+            as root with `ufw status numbered`. docs/stack-watchdog.md ("Tunnel origin
+            reachability") records only the OLD source-pinned rule and the outage it caused, so
+            never restore the rule quoted there. HMAC gates every POST; GET serves only an
+            unauthenticated `/healthz` (one kv write) and 404s the rest.
         db_path: Queue database. Created if absent so first boot needs no ordering with the daemon.
         secret: Webhook secret; defaults to `$LEM_WEBHOOK_SECRET`.
 
