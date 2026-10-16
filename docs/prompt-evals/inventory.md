@@ -44,7 +44,7 @@
 | `rewrite.humanize` | `cqc_lem.utilities.ai.content_alignment` | `humanize_text` | rewrite | planned | 1 | source | not yet measured |
 | `rewrite.humanize_title` | `cqc_lem.utilities.ai.content_alignment` | `humanize_title` | rewrite | planned | 1 | source | not yet measured |
 | `rewrite.mechanical_edit` | `cqc_lem.utilities.ai.content_alignment` | `mechanical_edit_text` | rewrite | planned | 1 | source | not yet measured |
-| `judge.authenticity` | `cqc_lem.utilities.ai.content_alignment` | `score_authenticity` | judge | evaluated | 2 | rendered text | not yet measured |
+| `judge.authenticity` | `cqc_lem.utilities.ai.content_alignment` | `score_authenticity` | judge | evaluated | 2 | rendered text | openai/gemma4:31b: pass, openai/gpt-4o-mini: pass, openai/gpt-5.4-mini: pass, openai/gpt-oss:120b: pass |
 | `research.web` | `cqc_lem.utilities.ai.content_research` | `_research_via_litellm` | — | exempt:live web research — output depends on the live web, not reproducible | — | — | — |
 | `transport.curated_complete` | `cqc_lem.utilities.ai.curated_commentary` | `_complete` | — | exempt:wrapper — prompts are registered at each caller | — | — | — |
 | `curated.chart_facts` | `cqc_lem.utilities.ai.curated_commentary` | `extract_chart_facts` | json_planner | planned | 2 | source | not yet measured |
