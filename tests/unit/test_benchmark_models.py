@@ -1319,6 +1319,24 @@ class TestProviderClient:
         assert result["text"] is None
         assert "410" in result["error"]
 
+    @pytest.mark.parametrize("choices", [None, []])
+    def test_a_reply_with_no_choices_is_a_result_not_an_exception(self, choices):
+        response = MagicMock()
+        response.choices = choices
+        response.error = {"code": 502, "message": "upstream error"}
+        provider, _ = self._client(response)
+        result = provider.complete("m", [{"role": "user", "content": "hi"}])
+        assert result["text"] is None
+        assert "upstream error" in result["error"]
+        assert result["usage"] == {}
+
+    def test_a_reply_with_no_choices_and_no_error_body_is_still_named(self):
+        response = MagicMock(spec=["choices"])
+        response.choices = None
+        provider, _ = self._client(response)
+        result = provider.complete("m", [{"role": "user", "content": "hi"}])
+        assert result["error"] == "provider returned no choices"
+
     @staticmethod
     def _reply(content, finish_reason="stop"):
         response = MagicMock()
