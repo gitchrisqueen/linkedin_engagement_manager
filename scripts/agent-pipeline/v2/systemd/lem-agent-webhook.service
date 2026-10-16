@@ -21,7 +21,7 @@ EnvironmentFile=/etc/lem/agent-webhook.env
 # These binds match the installed unit, but they are NOT the access control. Two binds on one port
 # make lemd.receiver.serve() open a single socket on 0.0.0.0:8420 (receiver.py, serve()), so the
 # receiver listens on every interface, the public one included. What keeps the internet out is the
-# host firewall plus HMAC on every request.
+# host firewall; HMAC gates every POST, and GET serves only an unauthenticated /healthz.
 # 172.18.0.1 is the lem_default bridge gateway, which is the tunnel ORIGIN cloudflared dials, and
 # loopback is what the watchdog probes for /healthz. Re-check the gateway (`ip -4 -o addr show`)
 # if the stack is recreated. The flags override LEM_WEBHOOK_BIND in config.env for this unit.

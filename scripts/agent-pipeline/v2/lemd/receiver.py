@@ -325,10 +325,13 @@ def serve(
 
     Args:
         binds: Address/port pairs to listen on. The deployment passes the docker bridge gateway
-            (the tunnel origin cloudflared dials) and loopback (for `healthz`). They share a port,
-            so this opens ONE socket on 0.0.0.0 and listens on every interface, the public one
-            included: the host firewall plus HMAC on every request keep the internet out, not
-            these addresses.
+            (the tunnel origin cloudflared dials) and loopback (for `healthz`). When every bind
+            shares one port, as here, this opens ONE socket on 0.0.0.0 and listens on every IPv4
+            interface, the public one included; otherwise it binds binds[0] alone and warns.
+            These addresses are not the access control. The host firewall keeps the internet out
+            (the rule is root-owned on the host, not in this repo; docs/stack-watchdog.md,
+            "Tunnel origin reachability", records it and the outage it caused). HMAC gates every
+            POST; GET serves only an unauthenticated `/healthz` (one kv write) and 404s the rest.
         db_path: Queue database. Created if absent so first boot needs no ordering with the daemon.
         secret: Webhook secret; defaults to `$LEM_WEBHOOK_SECRET`.
 
@@ -351,8 +354,8 @@ def serve(
     # used binds[0], so `--bind 172.18.0.1:8420 --bind 127.0.0.1:8420` silently listened on only
     # the first — and loopback is what the watchdog probes for /healthz, so the self-heal ladder
     # would have reported the receiver dead while it was serving the tunnel perfectly.
-    # Binding all interfaces is safe here BECAUSE ingress is firewalled to the cloudflared
-    # container alone and every request is HMAC-verified; the alternative (a thread per address)
+    # Binding all interfaces relies on the host firewall (see the serve() docstring) and on every
+    # POST being HMAC-verified; GET serves only /healthz. The alternative (a thread per address)
     # buys nothing this deployment needs.
     ports = {p for _, p in binds}
     if len(binds) > 1 and len(ports) == 1:
