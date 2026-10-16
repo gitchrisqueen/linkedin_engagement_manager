@@ -116,6 +116,8 @@ index and the `CLAUDE.md` row that points at it, or the pointer becomes a dead e
 - [Prompt eval run — `pe-20261008-0250fe`](prompt-evals/2026-10-08-pe-20261008-0250fe.md) — archived run report
 - [Prompt eval run — `pe-20261012-b68015`](prompt-evals/2026-10-12-pe-20261012-b68015.md) — archived run report
 - [Prompt eval run — `pe-20261016-eba194`](prompt-evals/2026-10-16-pe-20261016-eba194.md) — archived run report
+- [Prompt eval run — `pe-20261016-f9bfc4`](prompt-evals/2026-10-16-pe-20261016-f9bfc4.md) — archived run report
+- [Prompt eval run — `pe-20261016-655c78`](prompt-evals/2026-10-16-pe-20261016-655c78.md) — archived run report
 - ★ [Stack watchdog & deep health](stack-watchdog.md) — the host watchdog and the `/health/deep` monitor contract
 - ★ [Production log files](production-logs.md) — `/opt/lem/logs/`, one dated file per UTC day; INFO not DEBUG; grep beats `docker logs`
 
