@@ -16,7 +16,7 @@ export default function MarketingFooter() {
         <div className="flex flex-col gap-8 md:flex-row md:items-start md:justify-between">
           <div className="max-w-sm">
             <img
-              src="/brand/lem-wordmark-on-dark.png"
+              src="/brand/lem-wordmark-on-dark-v2.png"
               alt="LinkedIn Engagement Manager"
               width={1340}
               height={300}
