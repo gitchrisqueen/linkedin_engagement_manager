@@ -56,9 +56,10 @@ straight to the cached profile.
 
 Where a lane has a finished draft and no browser read is needed to produce it, a suggest account
 gets the draft stored in `engagement_suggestions` instead of sent. The SPA lists the newest 50 on
-the Settings page ("Suggested", `EngagementSuggestionsCard`) with a copy button; a target URL is a
+the Settings page ("Engagement suggestions", `EngagementSuggestionsCard`) with a copy button; a target URL is a
 link only when it starts with `https://`, and plain text otherwise. A failed read is 503, never an
-empty list. `dedup_key` (unique per user) makes a re-dispatched task a no-op, and the seed and
+empty list. The account-readiness checklist marks the LinkedIn session and display name optional
+for a suggest account, since only browser lanes use them. `dedup_key` (unique per user) makes a re-dispatched task a no-op, and the seed and
 second-wave lanes check it before their LLM call. Every key is fixed-length — the comment and DM
 keys hash the URL as well as the message — so the column's 255-character limit can never truncate
 two drafts into one key.

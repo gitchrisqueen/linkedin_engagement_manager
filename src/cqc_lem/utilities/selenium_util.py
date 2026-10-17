@@ -319,6 +319,7 @@ def get_docker_driver(headless: bool = True, session_name: str = "ChromeTests", 
 
     Raises:
         DemoModeError: `DEMO_MODE` is on and the caller did not pass `demo_safe=True`.
+        SuggestOnlyEngagement: `user_id` belongs to a suggest-only account (issue #2367).
     """
     if not demo_safe:
         guard_linkedin("selenium.get_docker_driver")

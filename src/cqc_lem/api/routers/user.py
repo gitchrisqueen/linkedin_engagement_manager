@@ -218,7 +218,7 @@ from cqc_lem.utilities.db import (
     verify_pin_for_email,
 )
 from cqc_lem.utilities.email import generate_pin, hash_pin, send_pin_email
-from cqc_lem.utilities.engagement_mode import resolve_engagement_mode
+from cqc_lem.utilities.engagement_mode import browser_automation_allowed, resolve_engagement_mode
 from cqc_lem.utilities.geocoding import GeocodeError, geocode_city
 from cqc_lem.utilities.group_post_slot import group_skip_undo_open, skip_undo_deadline
 from cqc_lem.utilities.linkedin.helper import load_profile_for_user
@@ -3764,18 +3764,26 @@ def account_readiness_endpoint(session_token: str) -> ResponseModel[dict[str, An
     # without it every DM follow-up is skipped as unreadable — a silently dead sequencer.
     has_display_name = bool(get_user_linkedin_display_name(user_id))
 
+    # A suggest-only account (issue #2367) runs no browser lane, so the session login and display
+    # name only the browser uses are optional for it: listing them as required would tell a trial
+    # user to finish setup for automation their account does not run.
+    browser_needed = browser_automation_allowed(user_id)
+    browser_only_hint = "Only used by browser automation, which this account does not run."
+
     items = [
         {"key": "email", "label": "Verified email", "ok": True, "required": True,
          "hint": None},
         {"key": "linkedin_oauth", "label": "LinkedIn connected (posting)", "ok": has_oauth,
          "required": True, "hint": "Connect LinkedIn in your account."},
         {"key": "linkedin_session", "label": "LinkedIn session (engagement)",
-         "ok": has_engagement_login, "required": True,
-         "hint": "Connect your LinkedIn session (cookie) — the one-click extension is easiest."},
+         "ok": has_engagement_login, "required": browser_needed,
+         "hint": ("Connect your LinkedIn session (cookie) — the one-click extension is easiest."
+                  if browser_needed else browser_only_hint)},
         {"key": "linkedin_display_name", "label": "Your LinkedIn display name",
-         "ok": has_display_name, "required": True,
-         "hint": "Enter your name exactly as it appears on your LinkedIn profile — LEM needs it to "
-                 "tell your own messages apart from replies."},
+         "ok": has_display_name, "required": browser_needed,
+         "hint": ("Enter your name exactly as it appears on your LinkedIn profile — LEM needs it to "
+                  "tell your own messages apart from replies."
+                  if browser_needed else browser_only_hint)},
         {"key": "subscription", "label": "Active plan", "ok": sub_active, "required": True,
          "hint": "Start a plan or trial under Subscription."},
         {"key": "location", "label": "Login location set", "ok": has_location,

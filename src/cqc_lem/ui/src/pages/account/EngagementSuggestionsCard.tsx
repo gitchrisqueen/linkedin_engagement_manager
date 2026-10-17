@@ -21,6 +21,13 @@ const KIND_LABEL: Record<Suggestion['kind'], string> = {
   dm: 'Direct message',
 }
 
+// Where the link goes, by kind: a comment or reply targets a post, a DM targets a profile.
+const LINK_LABEL: Record<Suggestion['kind'], string> = {
+  comment: 'Open the post on LinkedIn',
+  reply: 'Open the post on LinkedIn',
+  dm: 'Open the profile on LinkedIn',
+}
+
 function when(iso: string | null): string | null {
   if (!iso) return null
   const d = new Date(iso)
@@ -34,28 +41,33 @@ function SuggestionRow({ item }: { item: Suggestion }) {
     try {
       await navigator.clipboard.writeText(item.body)
       setCopied('ok')
-      setTimeout(() => setCopied(null), 2500)
     } catch {
       // A browser that refuses clipboard access (insecure origin, denied permission) — say so,
       // so the user selects the text by hand instead of pasting whatever was there before.
       setCopied('failed')
     }
+    setTimeout(() => setCopied(null), 4000)
   }
 
   const created = when(item.created_at)
+  const kind = KIND_LABEL[item.kind] ?? item.kind
+  // A screen reader lists every Copy button and link on the page; name each after its draft so
+  // the list is not "Copy, Copy, Copy".
+  const preview = item.body.length > 40 ? `${item.body.slice(0, 40)}…` : item.body
 
   return (
     <li data-testid="engagement-suggestion" className="border border-gray-200 rounded-lg p-4 space-y-2">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div className="flex items-center gap-2 text-xs text-gray-500">
           <span className="px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 font-medium">
-            {KIND_LABEL[item.kind] ?? item.kind}
+            {kind}
           </span>
           {created && <span>{created}</span>}
         </div>
         <button
           type="button"
           onClick={copy}
+          aria-label={`${copied === 'ok' ? 'Copied' : 'Copy'} ${kind}: ${preview}`}
           className="px-3 py-1 text-xs font-medium rounded-md border border-gray-300 text-gray-700 hover:bg-gray-50"
         >
           {copied === 'ok' ? 'Copied' : 'Copy'}
@@ -74,12 +86,15 @@ function SuggestionRow({ item }: { item: Suggestion }) {
           rel="noopener noreferrer"
           className="text-xs text-blue-600 hover:underline break-all"
         >
-          Open on LinkedIn
+          {LINK_LABEL[item.kind] ?? 'Open on LinkedIn'}{' '}
+          <span className="sr-only">(opens in a new tab)</span>
         </a>
       )}
-      {copied === 'failed' && (
-        <p className="text-xs text-red-600">Could not copy — select the text and copy it by hand.</p>
-      )}
+      {/* Always mounted, so a screen reader announces the result of every Copy press. */}
+      <p role="status" className={copied === 'failed' ? 'text-xs text-red-600' : 'sr-only'}>
+        {copied === 'ok' && 'Copied to clipboard.'}
+        {copied === 'failed' && 'Could not copy. Select the text and copy it by hand.'}
+      </p>
     </li>
   )
 }
@@ -100,8 +115,8 @@ export default function EngagementSuggestionsCard() {
   if (isError) {
     return (
       <div data-testid="engagement-suggestions" className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-        <h2 className="text-base font-semibold text-gray-700">Suggested</h2>
-        <p className="text-sm text-gray-500 mt-2">Suggestions are temporarily unavailable.</p>
+        <h2 className="text-base font-semibold text-gray-700">Engagement suggestions</h2>
+        <p role="status" className="text-sm text-gray-500 mt-2">Suggestions are temporarily unavailable.</p>
       </div>
     )
   }
@@ -113,19 +128,30 @@ export default function EngagementSuggestionsCard() {
   return (
     <div data-testid="engagement-suggestions" className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 space-y-4">
       <div>
-        <h2 className="text-base font-semibold text-gray-700">Suggested</h2>
+        <h2 className="text-base font-semibold text-gray-700">Engagement suggestions</h2>
         {suggestOnly && (
           <p className="text-xs text-gray-500 mt-1">
-            Your account gets engagement as suggestions: LEM never signs in to LinkedIn or posts
-            comments and messages for you. Copy a draft and post it yourself.
+            Your account is in suggestion mode, which every trial account uses. LEM writes comments
+            and messages for you to copy and post yourself, and never signs in to LinkedIn for you.
           </p>
         )}
       </div>
       {data.suggestions.length === 0 ? (
-        <p className="text-sm text-gray-500">
-          No suggestions yet. Drafts appear here as LEM writes them — for example, a first comment
-          for each post you publish.
-        </p>
+        <div className="text-sm text-gray-500 space-y-2">
+          <p>
+            No suggestions yet. For each post LEM publishes for you, it writes a first comment and a
+            follow-up comment a few hours later, and they appear here.
+          </p>
+          {suggestOnly && (
+            <p>
+              Feed commenting, replies, outreach and invites read LinkedIn in a browser, so they do
+              not run in suggestion mode.{' '}
+              <a href="/content" className="text-blue-600 hover:underline">
+                Write a post in Content Studio
+              </a>
+            </p>
+          )}
+        </div>
       ) : (
         <ul className="space-y-3">
           {data.suggestions.map((item) => (

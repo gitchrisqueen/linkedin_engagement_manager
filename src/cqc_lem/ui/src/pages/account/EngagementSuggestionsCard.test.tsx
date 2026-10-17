@@ -55,8 +55,11 @@ describe('EngagementSuggestionsCard (issue #2367)', () => {
     expect(screen.getByText(DM.body)).toBeTruthy()
     expect(screen.getByText('Comment')).toBeTruthy()
     expect(screen.getByText('Direct message')).toBeTruthy()
-    const links = screen.getAllByRole('link', { name: /Open on LinkedIn/i })
+    const links = screen.getAllByRole('link', { name: /on LinkedIn \(opens in a new tab\)/i })
     expect(links.map((a) => a.getAttribute('href'))).toEqual([SEED.target_url, DM.target_url])
+    // Kind-specific names: two rows are distinguishable from the links list alone.
+    expect(screen.getByRole('link', { name: /Open the post on LinkedIn/ })).toBeTruthy()
+    expect(screen.getByRole('link', { name: /Open the profile on LinkedIn/ })).toBeTruthy()
     expect(get).toHaveBeenCalledWith('/user/engagement-suggestions?session_token=tok')
   })
 
@@ -75,21 +78,23 @@ describe('EngagementSuggestionsCard (issue #2367)', () => {
     writeText.mockResolvedValue(undefined)
     get.mockResolvedValue(payload({ suggestions: [SEED, DM] }))
     harness(<EngagementSuggestionsCard />)
-    await waitFor(() => expect(screen.getAllByRole('button', { name: 'Copy' })).toHaveLength(2))
-    fireEvent.click(screen.getAllByRole('button', { name: 'Copy' })[1])
+    await waitFor(() => expect(screen.getAllByRole('button', { name: /^Copy / })).toHaveLength(2))
+    expect(screen.getByRole('button', { name: /^Copy Comment: What would you add/ })).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: /^Copy Direct message:/ }))
     await waitFor(() => expect(writeText).toHaveBeenCalledWith(DM.body))
     expect(writeText).toHaveBeenCalledTimes(1)
-    await waitFor(() => expect(screen.getByRole('button', { name: 'Copied' })).toBeTruthy())
+    await waitFor(() => expect(screen.getByRole('button', { name: /^Copied Direct message:/ })).toBeTruthy())
+    expect(screen.getAllByRole('status').some((el) => el.textContent === 'Copied to clipboard.')).toBe(true)
   })
 
   it('says so when the browser refuses the clipboard, instead of claiming a copy', async () => {
     writeText.mockRejectedValue(new Error('denied'))
     get.mockResolvedValue(payload({ suggestions: [SEED] }))
     harness(<EngagementSuggestionsCard />)
-    await waitFor(() => expect(screen.getByRole('button', { name: 'Copy' })).toBeTruthy())
-    fireEvent.click(screen.getByRole('button', { name: 'Copy' }))
-    await waitFor(() => expect(screen.getByText(/Could not copy/i)).toBeTruthy())
-    expect(screen.queryByRole('button', { name: 'Copied' })).toBeNull()
+    await waitFor(() => expect(screen.getByRole('button', { name: /^Copy / })).toBeTruthy())
+    fireEvent.click(screen.getByRole('button', { name: /^Copy / }))
+    await waitFor(() => expect(screen.getByRole('status').textContent).toMatch(/Could not copy/i))
+    expect(screen.queryByRole('button', { name: /^Copied / })).toBeNull()
   })
 
   it('explains suggest mode and shows an empty state for a trial with no drafts yet', async () => {
@@ -97,6 +102,9 @@ describe('EngagementSuggestionsCard (issue #2367)', () => {
     harness(<EngagementSuggestionsCard />)
     await waitFor(() => expect(screen.getByText(/No suggestions yet/i)).toBeTruthy())
     expect(screen.getByText(/never signs in to LinkedIn/i)).toBeTruthy()
+    expect(screen.getByText(/every trial account uses/i)).toBeTruthy()
+    expect(screen.getByText(/do\s+not run in suggestion mode/i)).toBeTruthy()
+    expect(screen.getByRole('link', { name: /Write a post in Content Studio/ }).getAttribute('href')).toBe('/content')
   })
 
   it('stays out of the way for an automate account with nothing stored', async () => {
