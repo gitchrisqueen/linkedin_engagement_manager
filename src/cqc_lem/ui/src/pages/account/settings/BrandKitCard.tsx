@@ -27,18 +27,18 @@ export default function BrandKitCard() {
             const swatch = valid ? `#${value.trim().replace(/^#/, '').toLowerCase()}` : '#ffffff'
             return (
               <div key={key} data-testid={`brand-color-${key}`}>
-                <span className="block text-xs font-medium text-gray-600 mb-1">{label}</span>
+                <span className="block text-xs font-medium text-fg-muted mb-1">{label}</span>
                 <div className="flex items-center gap-2">
                   <input type="color" value={swatch} aria-label={`${label} colour picker`}
                     onChange={(e) => update({ [key]: e.target.value } as Partial<BrandKit>)}
-                    className="h-9 w-10 shrink-0 cursor-pointer rounded border border-gray-300 bg-white p-0.5" />
+                    className="h-9 w-10 shrink-0 cursor-pointer rounded-control border border-field bg-raised p-0.5" />
                   <input type="text" value={value} maxLength={7} placeholder="#rrggbb"
                     aria-label={`${label} hex`}
                     onChange={(e) => update({ [key]: e.target.value.trim() } as Partial<BrandKit>)}
-                    className={`${inputClass} font-mono ${value && !valid ? 'border-red-400' : ''}`} />
+                    className={`${inputClass} font-mono ${value && !valid ? 'border-danger/50' : ''}`} />
                 </div>
                 {value && !valid && (
-                  <p className="text-xs text-red-600 mt-1">Not a #rrggbb colour — it will not be saved.</p>
+                  <p className="text-xs text-danger mt-1">Not a #rrggbb colour — it will not be saved.</p>
                 )}
               </div>
             )
@@ -69,8 +69,8 @@ export default function BrandKitCard() {
             aria-label="Share of post images with a typeset card"
             value={Math.round((kit.card_share ?? DEFAULT_CARD_SHARE) * 100)}
             onChange={(e) => update({ card_share: shareFromPercent(Number(e.target.value)) })}
-            className="w-48 accent-gray-700" />
-          <span className="text-sm text-gray-700 tabular-nums">
+            className="w-48 accent-accent" />
+          <span className="text-sm text-fg tabular-nums">
             {Math.round((kit.card_share ?? DEFAULT_CARD_SHARE) * 100)}% typeset cards
           </span>
         </div>

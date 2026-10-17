@@ -676,6 +676,70 @@ class TestMessageThreadProbe:
         assert report["last_sender"] == ""
         assert report["routes_tried"] == ["anchor", "button"]
 
+    def test_probe_reports_degree_route_trace_and_window_counts(self, monkeypatch):
+        """#2325: the traced walk's evidence, degree badge and tab count all reach the report.
+
+        The probe asks the ladder for the trace.
+        """
+        from cqc_lem.utilities.linkedin.message_thread import ThreadOpen
+        trace = [{"route": "anchor", "candidates": [{"aria_label_present": False, "shown": True,
+                                                     "belongs_to_target": True}],
+                  "clicks": [{"chosen": {"aria_label_present": False}, "clicked": True,
+                              "surface": {"url_path": "/messaging/compose/", "events": 0,
+                                          "composer": True, "surface": "page",
+                                          "open_thread": False,
+                                          "reason": "compose_screen_without_messages"}}]}]
+        captured = {}
+
+        def _fake_open(driver, wait, profile_url, **kwargs):
+            captured.update(kwargs)
+            return ThreadOpen(tried=["anchor", "direct_url"], skipped=["messaging_search"],
+                              degree="1st", route_trace=trace)
+
+        monkeypatch.setattr("cqc_lem.utilities.linkedin.message_thread.open_message_thread",
+                            _fake_open)
+        monkeypatch.setattr("cqc_lem.utilities.linkedin.message_thread.profile_urn_from_page",
+                            lambda *_a: None)
+        driver = MagicMock()
+        driver.window_handles = ["only-tab"]
+        report = llv.probe_message_thread(driver, "https://x/in/jane", sleep=lambda s: None)
+        assert captured.get("trace") is True
+        assert report["degree"] == "1st"
+        assert report["route_trace"] == trace
+        assert report["windows"] == {"before": 1, "after": 1}
+        # Every click landed on the no-prior-thread compose screen: named, not read as plain drift.
+        assert llv.compose_screen_only(report)
+        assert "NO prior thread" in report["verdict"]
+
+    def test_probe_reports_an_unreadable_degree_and_window_count_as_unknown(self, monkeypatch):
+        from cqc_lem.utilities.linkedin.message_thread import ThreadOpen
+        monkeypatch.setattr("cqc_lem.utilities.linkedin.message_thread.open_message_thread",
+                            lambda *a, **k: ThreadOpen(tried=["anchor"]))
+        monkeypatch.setattr("cqc_lem.utilities.linkedin.message_thread.profile_urn_from_page",
+                            lambda *_a: None)
+
+        class _Blind:
+            @property
+            def window_handles(self):
+                raise RuntimeError("session gone")
+
+        report = llv.probe_message_thread(_Blind(), "https://x/in/jane", sleep=lambda s: None)
+        assert report["degree"] == "unknown"
+        assert report["windows"] == {"before": None, "after": None}
+        assert report["route_trace"] == []
+        assert report["verdict"] == "no route opened a thread"
+
+    def test_compose_screen_only_needs_every_click_to_be_that_screen(self):
+        compose = {"clicked": True, "surface": {"reason": "compose_screen_without_messages"}}
+        nothing = {"clicked": True, "surface": {"reason": "nothing_rendered"}}
+        assert llv.compose_screen_only({"route_trace": [{"clicks": [compose]},
+                                                        {"clicks": [compose]}]})
+        assert not llv.compose_screen_only({"route_trace": [{"clicks": [compose]},
+                                                            {"clicks": [nothing]}]})
+        # Nothing clicked proves nothing about the compose screen.
+        assert not llv.compose_screen_only({"route_trace": [{"clicks": []}]})
+        assert not llv.compose_screen_only(None)
+
 
 @pytest.mark.unit
 class TestFeedSortProbe:
@@ -1176,6 +1240,23 @@ class TestMentionCardReadCopy:
         assert source == "script"
         assert read is llv._carried_mention_cards
 
+    def test_an_image_whose_read_predates_2426_is_graded_by_the_carried_copy(self, monkeypatch):
+        """Without `own_url` the image would count the account's own link as a second person."""
+        from cqc_lem.app.engagement import outreach as ra
+
+        monkeypatch.setattr(ra, "_mention_cards", lambda driver, user_id=None: [])
+        read, source = llv.mention_cards_read()
+        assert source == "script"
+        assert read is llv._carried_mention_cards
+
+    def test_the_carried_copy_passes_the_accounts_own_slug(self):
+        driver = MagicMock()
+        driver.execute_script.return_value = []
+        with patch("cqc_lem.utilities.selenium_util.find_all_first", return_value=[]):
+            llv._carried_mention_cards(driver, own_url="https://www.linkedin.com/in/Me%2DToo/")
+            llv._carried_mention_cards(driver)
+        assert [c.args[1] for c in driver.execute_script.call_args_list] == ["/in/me-too", ""]
+
     def test_the_carried_copy_tries_the_named_rungs_before_the_climb(self):
         driver = MagicMock()
         card = MagicMock()
@@ -1538,6 +1619,40 @@ class TestAppreciationSourcesProbe:
         assert mentions["crosscheck_source"] in ("image", "script")
         # Worst-wins: a rotated mentions chain is the whole report's state.
         assert report["state"] == llv.STATE_DRIFT
+
+    def test_a_mention_card_linking_the_account_reports_the_actor_production_thanks(self):
+        """#2426: production skips the account's own link and thanks the next; the probe agrees."""
+        from unittest.mock import patch
+
+        own_link, actor = MagicMock(), MagicMock()
+        own_link.get_attribute.return_value = "https://www.linkedin.com/in/Me/"
+        own_link.text = "Me"
+        actor.get_attribute.return_value = "https://www.linkedin.com/in/jane"
+        actor.text = "Jane Doe"
+        card = MagicMock()
+        card.text = "Jane Doe mentioned you in a comment\n@Me great point\n2h"
+        card.find_elements.return_value = [own_link, actor]
+        driver = _fake_driver(current_url="https://www.linkedin.com/notifications/")
+        driver.execute_script.return_value = {"rows": [], "anchors": 0, "page_dated": False}
+
+        def _cards(locators):
+            from cqc_lem.app.engagement.outreach import _MENTION_CARD_LOCATORS
+            return [card] if locators is _MENTION_CARD_LOCATORS else []
+
+        with patch("cqc_lem.utilities.selenium_util.find_all_first",
+                   side_effect=lambda d, locators, *a, **k: _cards(locators)), \
+             patch("cqc_lem.app.engagement.outreach.find_all_first",
+                   side_effect=lambda d, locators, *a, **k: _cards(locators)), \
+             patch("cqc_lem.utilities.db.has_appreciation_touch", return_value=False), \
+             patch("cqc_lem.app.engagement.outreach.getText", side_effect=lambda el: el.text):
+            report = llv.probe_appreciation_sources(driver, 1, "https://www.linkedin.com/in/me/",
+                                                    sleep=lambda s: None)
+
+        rows = report["mentions"]["rows"]
+        assert [(r["profile_url"], r["is_self"]) for r in rows] == [
+            ("https://www.linkedin.com/in/jane", False)]
+        assert [p["profile_url"] for p in report["mentions"]["people"]] == [
+            "https://www.linkedin.com/in/jane"]
 
     def test_probe_reads_both_surfaces_and_never_claims_a_ledger_row(self, monkeypatch):
         """It grounds the PRODUCTION card reads + parsers (the scrapers themselves are gated
@@ -3916,16 +4031,19 @@ class TestPermalinkCommentProbe:
 
     def test_verdict_names_a_resolved_composer(self):
         verdict = llv.permalink_comment_verdict(
-            {"cards_found": 2, "permalink_urn": self._URN, "card_matched_urn": True,
+            {"cards_found": 2, "permalink_urn": self._URN, "card_resolved": True,
+             "card_matched_urn": True,
              "comment_action": {"text": "Comment"}, "composer": {"role": "textbox"}})
         assert "composer resolved" in verdict
+        assert "falls back" not in verdict
 
     def test_no_card_is_the_drift_verdict(self):
         assert "posts nothing" in llv.permalink_comment_verdict({"cards_found": 0})
 
     def test_a_composer_that_never_mounts_names_the_regression(self):
         verdict = llv.permalink_comment_verdict(
-            {"cards_found": 1, "permalink_urn": self._URN, "card_matched_urn": True,
+            {"cards_found": 1, "permalink_urn": self._URN, "card_resolved": True,
+             "card_matched_urn": True,
              "comment_action": {"text": "Comment"}, "composer": None})
         assert "#966" in verdict
 
@@ -3934,6 +4052,61 @@ class TestPermalinkCommentProbe:
             {"cards_found": 3, "permalink_urn": self._URN, "card_matched_urn": False,
              "top_card_urn": "urn:li:activity:7000000000000000002"})
         assert "DIFFERENT post" in verdict
+
+    def test_top_card_fallback_still_reports_the_composer_it_reached(self):
+        """The 2026-10-12 sweep (#2400).
+
+        The top card's URN was unreadable, production fell back to it, and the composer resolved —
+        the verdict stopped at the fallback and never said so.
+        """
+        verdict = llv.permalink_comment_verdict(
+            {"cards_found": 3, "permalink_urn": self._URN, "top_card_urn": None,
+             "card_resolved": True, "card_matched_urn": False,
+             "comment_action": {"text": "Comment"}, "composer": {"role": "textbox"}})
+        assert "falls back to the top card" in verdict
+        assert "composer resolved" in verdict
+
+    @pytest.mark.parametrize("reading, state", [
+        # What every sweep since #1770 actually read — a composer resolved, graded `unknown` (#2400).
+        ({"cards_found": 3, "card_resolved": True, "card_matched_urn": True,
+          "comment_action": {"text": "Comment"}, "composer": {"role": "textbox"}}, "ok"),
+        ({"cards_found": 3, "card_resolved": True, "card_matched_urn": False,
+          "comment_action": {"text": "Comment"}, "composer": {"role": "textbox"}}, "ok"),
+        ({"cards_found": 1, "card_resolved": True,
+          "comment_action": {"text": "Comment"}, "composer": None}, "drift"),
+        ({"cards_found": 1, "card_resolved": True, "comment_action": None}, "drift"),
+        ({"cards_found": 0, "visible_controls": ["Comment", "Repost"]}, "drift"),
+        ({"cards_found": 0, "visible_controls": ["Comment on Jane's post"]}, "drift"),
+        ({"cards_found": 0, "visible_controls": ["5 comments", "Comments", "Me"]}, "unknown"),
+        ({"cards_found": 0}, "unknown"),
+        ({}, "unknown"),
+        (None, "unknown"),
+    ])
+    def test_state_grades_what_production_would_reach(self, reading, state):
+        assert llv.permalink_comment_state(reading) == state
+
+    def test_a_card_from_another_post_on_the_permalink_is_drift(self):
+        reading = {"cards_found": 3, "card_resolved": False, "permalink_urn": self._URN,
+                   "url": self._URL, "top_card_urn": "urn:li:activity:7000000000000000002"}
+        assert llv.permalink_comment_state(reading) == "drift"
+
+    def test_a_redirect_away_from_the_permalink_grounds_nothing(self):
+        reading = {"cards_found": 3, "card_resolved": False, "permalink_urn": self._URN,
+                   "url": "https://www.linkedin.com/feed/",
+                   "top_card_urn": "urn:li:activity:7000000000000000002"}
+        assert llv.permalink_comment_state(reading) == "unknown"
+
+    def test_a_resolved_composer_is_no_longer_summarised_as_unknown(self):
+        """The #2400 blind spot, end to end.
+
+        The sweep summary reads `state`, and the probe never set one — so three weeks of resolved
+        composers were filed as unmeasured.
+        """
+        reading = {"cards_found": 3, "card_resolved": True, "card_matched_urn": True,
+                   "comment_action": {"text": "Comment"}, "composer": {"role": "textbox"}}
+        reading["state"] = llv.permalink_comment_state(reading)
+        summary = llv.sweep_summary({"permalink_comment": reading})
+        assert summary["ok"] == ["permalink_comment"] and summary["unknown"] == []
 
     def test_probe_reports_the_card_the_action_and_the_composer(self, monkeypatch):
         driver = MagicMock()
@@ -3956,6 +4129,7 @@ class TestPermalinkCommentProbe:
         assert reading["card_resolved"] is True and reading["card_matched_urn"] is True
         assert reading["composer"] is not None
         assert "composer resolved" in reading["verdict"]
+        assert reading["state"] == "ok"
 
     def test_probe_says_so_when_no_card_carries_a_comment_action(self, monkeypatch):
         driver = MagicMock()
@@ -3969,6 +4143,7 @@ class TestPermalinkCommentProbe:
         assert reading["cards_found"] == 0 and reading["card_resolved"] is False
         assert reading["composer"] is None
         assert "posts nothing" in reading["verdict"]
+        assert reading["state"] == "unknown"
 
     def test_permalink_comment_alone_is_enough_to_probe(self, monkeypatch):
         monkeypatch.setattr("cqc_lem.utilities.linkedin.session.get_current_profile",
@@ -5076,6 +5251,86 @@ class TestCardUrnEvidence:
         assert llv._PROBE_CAPABILITY_SYMBOLS["group_feed_composer.urn_evidence"] == \
             "card_urn_evidence"
         assert "group_feed_composer.urn_evidence" in llv.probe_script_reading()["capabilities"]
+
+
+@pytest.mark.unit
+class TestRosterCardUrnEvidence:
+    """#2422: the roster activity page reports the same per-card URN evidence as the group walk."""
+
+    @staticmethod
+    def _box(text: str = "a post body long enough to be examined"):
+        box = MagicMock()
+        box.text = text
+        return box
+
+    def test_reads_evidence_for_the_first_cards_only(self, monkeypatch):
+        boxes = [self._box() for _ in range(5)]
+        driver = MagicMock()
+        driver.find_elements.return_value = boxes
+        monkeypatch.setattr("cqc_lem.utilities.linkedin.cards._card_for_textbox",
+                            lambda d, box: None if box is boxes[0] else box)
+        seen = []
+        monkeypatch.setattr(llv, "card_urn_evidence",
+                            lambda d, card: seen.append(card) or {"key_source": "hash"})
+        readings = llv.roster_card_urn_evidence(driver, max_cards=2)
+        assert readings == [{"key_source": "hash"}, {"key_source": "hash"}]
+        assert seen == boxes[1:3]
+
+    def test_short_boxes_are_skipped_like_the_roster_pass(self, monkeypatch):
+        short, long_ = self._box("Like"), self._box()
+        driver = MagicMock()
+        driver.find_elements.return_value = [short, long_]
+        monkeypatch.setattr("cqc_lem.utilities.linkedin.cards._card_for_textbox", lambda d, box: box)
+        seen = []
+        monkeypatch.setattr(llv, "card_urn_evidence",
+                            lambda d, card: seen.append(card) or {"key_source": "hash"})
+        llv.roster_card_urn_evidence(driver)
+        assert seen == [long_]
+
+    def test_one_card_reached_from_two_boxes_is_read_once(self, monkeypatch):
+        boxes = [self._box() for _ in range(3)]
+        shared, other = MagicMock(), MagicMock()
+        driver = MagicMock()
+        driver.find_elements.return_value = boxes
+        monkeypatch.setattr("cqc_lem.utilities.linkedin.cards._card_for_textbox",
+                            lambda d, box: other if box is boxes[2] else shared)
+        seen = []
+        monkeypatch.setattr(llv, "card_urn_evidence",
+                            lambda d, card: seen.append(card) or {"key_source": "hash"})
+        assert len(llv.roster_card_urn_evidence(driver)) == 2
+        assert seen == [shared, other]
+
+    def test_a_card_walk_that_raises_skips_that_card(self, monkeypatch):
+        driver = MagicMock()
+        driver.find_elements.return_value = [self._box()]
+
+        def _boom(*_a):
+            raise RuntimeError("stale")
+        monkeypatch.setattr("cqc_lem.utilities.linkedin.cards._card_for_textbox", _boom)
+        assert llv.roster_card_urn_evidence(driver) == []
+
+    def test_an_enumeration_failure_is_reported_not_raised(self):
+        driver = MagicMock()
+        driver.find_elements.side_effect = RuntimeError("session gone")
+        readings = llv.roster_card_urn_evidence(driver)
+        assert readings[0]["error"].startswith("card enumeration failed: RuntimeError")
+
+    def test_probe_roster_follow_carries_it(self, monkeypatch):
+        monkeypatch.setattr("cqc_lem.app.engagement.feed._resolve_follow_control",
+                            lambda d, u: ("following", None))
+        monkeypatch.setattr("cqc_lem.app.engagement.feed._activity_page_owner_name", lambda d: "Ann")
+        monkeypatch.setattr(llv, "visible_button_labels", lambda d: [])
+        monkeypatch.setattr(llv, "roster_card_urn_evidence", lambda d: [{"key_source": "card"}])
+        driver = MagicMock()
+        driver.find_elements.return_value = []
+        reading = llv.probe_roster_follow(driver, "https://www.linkedin.com/in/ann/",
+                                          sleep=lambda _s: None)
+        assert reading["urn_evidence"] == [{"key_source": "card"}]
+
+    def test_the_capture_is_declared_so_a_stale_pipe_is_detectable(self):
+        assert llv._PROBE_CAPABILITY_SYMBOLS["roster_follow.urn_evidence"] == \
+            "roster_card_urn_evidence"
+        assert "roster_follow.urn_evidence" in llv.probe_script_reading()["capabilities"]
 
 
 @pytest.mark.unit

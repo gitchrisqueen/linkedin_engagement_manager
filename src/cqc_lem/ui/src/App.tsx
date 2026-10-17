@@ -69,7 +69,7 @@ function RouteFallback() {
  * refresh.
  */
 function SessionBoot() {
-  return <div className="min-h-screen bg-white" aria-busy="true" />
+  return <div className="min-h-screen bg-raised" aria-busy="true" />
 }
 
 function AppRoutes() {

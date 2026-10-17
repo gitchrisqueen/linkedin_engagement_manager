@@ -138,6 +138,7 @@ from cqc_lem.utilities.linkedin.rate_limit import (
 from cqc_lem.utilities.logger import log_debug, log_info, log_warning
 from cqc_lem.utilities.notifications import notify_linkedin_session
 from cqc_lem.utilities.observability import FEATURE_CONTENT, FEATURE_NEWSLETTER, attribute_llm_cost, llm_attribution
+from cqc_lem.utilities.trial_access import trial_lapsed
 
 # How close to its slot a post's missing media stops being a self-healing state and becomes a
 # defect. Keep this at ONE beat interval (`backfill-missing-assets` runs every 3 hours) plus a
@@ -245,6 +246,14 @@ def auto_check_scheduled_posts(self):
 
         if scheduled_time.tzinfo is None:
             scheduled_time = scheduled_time.replace(tzinfo=timezone.utc)
+
+        # A free trial that ended with no paid plan publishes nothing (issue #2380). The post stays
+        # APPROVED, so it goes out on a later scan if the user upgrades. DEBUG: this user is skipped
+        # on every scan until then, which is the designed answer, not a degraded one.
+        if trial_lapsed(user_id):
+            log_debug("Post not dispatched: the free trial has ended", post_id=post_id,
+                      user_id=user_id, task_name="auto_check_scheduled_posts")
+            continue
 
         log_info("Post ready to schedule", post_id=post_id, user_id=user_id, task_name="auto_check_scheduled_posts")
 
@@ -1183,6 +1192,13 @@ def _topup_newsletter_drafts_for_user(user_id: int, now: datetime,
     from cqc_lem.utilities.newsletter import should_generate_now, upcoming_publish_slots
     from cqc_lem.utilities.notifications import notify_newsletter_draft_ready
 
+    # A free trial that ended with no paid plan generates nothing (issue #2380). The beat walks every
+    # newsletter-enabled user, not only active ones, so the gate lives here. DEBUG: it recurs daily.
+    if trial_lapsed(user_id):
+        log_debug("Newsletter drafts not generated: the free trial has ended", user_id=user_id,
+                  task_name="auto_generate_newsletter_drafts")
+        return 0
+
     settings = get_newsletter_settings(user_id)
     cap = settings.get("max_queued_drafts", 1)
     lead = settings.get("generate_lead_days", 3)
@@ -1589,6 +1605,12 @@ def _publish_next_due_edition_for_user(user_id: int, now: datetime, dispatch) ->
     user. An overdue draft for an opted-out user is an expected, recurring no-op, so it is DEBUG.
     """
     from cqc_lem.utilities.db import get_newsletter_settings, get_pending_newsletter_editions
+    # A free trial that ended with no paid plan publishes nothing (issue #2380); the edition keeps
+    # its status and slot. DEBUG: this hourly beat meets the same user every run until they upgrade.
+    if trial_lapsed(user_id):
+        log_debug("Newsletter edition not published: the free trial has ended", user_id=user_id,
+                  task_name="auto_publish_scheduled_editions")
+        return 0
     pending = get_pending_newsletter_editions(user_id)  # ordered by scheduled_for ASC
     due = [e for e in pending
            if e.get("scheduled_for") is not None and e["scheduled_for"] <= now]
@@ -2133,15 +2155,17 @@ def auto_sync_brand_account():
 
 @shared_task.task
 def auto_notify_missing_linkedin_session():
-    """Email active users who have no validated LinkedIn session cookie, prompting them
-    to connect — automation can't run without one. Throttled per-user inside
+    """Email active users who have not connected LinkedIn, prompting them to connect. That
+    means no session cookie, or for a trial no usable OAuth token. Throttled per-user inside
     notify_linkedin_session, so this can run daily without spamming.
     """
+    from cqc_lem.utilities.onboarding import linkedin_connected
     users = get_active_user_ids()
     notified = 0
     for user_id in users:
         try:
-            if not has_linkedin_session(user_id):
+            # A trial connects by OAuth only, so for a trial a usable token counts (issue #2375).
+            if not linkedin_connected(user_id):
                 if notify_linkedin_session(user_id, revalidation=False):
                     notified += 1
         except Exception as e:

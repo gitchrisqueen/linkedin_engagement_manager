@@ -56,7 +56,7 @@ class LinkedInPosition(BaseModel):
     place for a wrong one to be invented.
     """
 
-    title: str = None
+    title: Optional[str] = None
     start_date: Optional[str] = None
     end_date: Optional[str] = None
     details: List[str] = Field(default_factory=list)

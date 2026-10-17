@@ -5,7 +5,10 @@ import { getAttribution } from '../utils/attribution'
 import { recordSignup } from '../utils/analytics'
 import { getPasskeyAssertion, isPasskeySupported } from '../utils/webauthn'
 
-type Step = 'email' | 'pin' | 'second-factor'
+// 'waitlist' is the join-the-list form (issue #2377): while the trial cohort is full the server
+// answers a signup with `{ waitlist: true }` instead of an account, and this form takes the email
+// address and nothing else.
+type Step = 'email' | 'pin' | 'second-factor' | 'waitlist'
 
 // The factors the server will accept to finish a bootstrapped login. `passkey` is not in this list:
 // a passkey sign-in is standalone (it proves possession AND identity in one ceremony), so the SPA
@@ -25,6 +28,7 @@ export default function LoginModal() {
   const [methods, setMethods] = useState<string[]>([])
   const [factorMethod, setFactorMethod] = useState<SecondFactorMethod>('totp')
   const [factorCode, setFactorCode] = useState('')
+  const [waitlistJoined, setWaitlistJoined] = useState(false)
 
   function errorText(err: unknown, fallback: string): string {
     const detail = (err as { response?: { data?: { detail?: unknown } } })?.response?.data?.detail
@@ -50,6 +54,10 @@ export default function LoginModal() {
       })
       const detail = r.data.detail
 
+      if (detail.waitlist) {
+        setStep('waitlist')
+        return
+      }
       if (detail.second_factor_required) {
         enterSecondFactor(detail)
         return
@@ -77,6 +85,12 @@ export default function LoginModal() {
     try {
       const r = await api.post('/auth/email/verify', { email, pin, attribution: getAttribution() })
       const detail = r.data.detail
+      // The cohort filled between the code being sent and being entered — no account was made.
+      if (detail.waitlist) {
+        setPin('')
+        setStep('waitlist')
+        return
+      }
       // The emailed code is a bootstrap once a strong factor exists — it proved the mailbox, and
       // that is all it proves now.
       if (detail.second_factor_required) {
@@ -121,6 +135,20 @@ export default function LoginModal() {
     }
   }
 
+  async function handleWaitlistSubmit(e: React.FormEvent) {
+    e.preventDefault()
+    setError(null)
+    setLoading(true)
+    try {
+      await api.post('/auth/waitlist', { email: email.trim().toLowerCase() })
+      setWaitlistJoined(true)
+    } catch (err: unknown) {
+      setError(errorText(err, 'Could not save your email. Please try again.'))
+    } finally {
+      setLoading(false)
+    }
+  }
+
   /** Passkey sign-in: the only path here that a phishing proxy cannot relay, so it is offered
    * first and needs no email at all. */
   async function handlePasskey() {
@@ -146,15 +174,15 @@ export default function LoginModal() {
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-fg/50 px-4"
       onClick={(e) => { if (e.target === e.currentTarget) closeLoginModal() }}
     >
       {/* Height-capped and scrollable: a landscape phone is ~375px tall, and an uncapped panel put
           the code field and the submit button below the fold with no way to reach them (#894). */}
-      <div className="bg-white rounded-xl shadow-xl w-full max-w-md p-6 sm:p-8 relative max-h-viewport overflow-y-auto">
+      <div className="bg-raised rounded-panel shadow-xl w-full max-w-md p-6 sm:p-8 relative max-h-viewport overflow-y-auto">
         <button
           onClick={closeLoginModal}
-          className="absolute top-4 right-4 text-gray-400 hover:text-gray-600 text-2xl leading-none"
+          className="absolute top-4 right-4 text-fg-muted hover:text-fg-muted text-2xl leading-none"
           aria-label="Close"
         >
           ×
@@ -166,7 +194,7 @@ export default function LoginModal() {
         {sessionEndedReason && (
           <div
             role="status"
-            className="mb-4 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900"
+            className="mb-4 rounded-panel border border-warning/50 bg-warning/5 px-3 py-2 text-sm text-warning"
           >
             {sessionEndedReason}
           </div>
@@ -174,8 +202,8 @@ export default function LoginModal() {
 
         {step === 'email' && (
           <>
-            <h2 className="text-xl font-bold text-gray-800 mb-1">Sign in / Sign up</h2>
-            <p className="text-sm text-gray-500 mb-6">
+            <h2 className="text-xl font-semibold text-fg mb-1">Sign in / Sign up</h2>
+            <p className="text-sm text-fg-muted mb-6">
               Enter your email and we'll send you a 6-digit code to continue.
             </p>
             {isPasskeySupported() && (
@@ -184,11 +212,11 @@ export default function LoginModal() {
                   type="button"
                   onClick={handlePasskey}
                   disabled={loading}
-                  className="w-full border border-gray-300 text-gray-700 py-2.5 rounded-lg text-sm font-semibold hover:bg-gray-50 disabled:opacity-50 mb-4"
+                  className="w-full border border-field text-fg py-2.5 rounded-panel text-sm font-semibold hover:bg-page disabled:opacity-50 mb-4"
                 >
                   Sign in with a passkey
                 </button>
-                <p className="text-[11px] uppercase tracking-wide text-gray-400 text-center mb-4">or</p>
+                <p className="text-xs text-fg-muted text-center mb-4">or</p>
               </>
             )}
             <form onSubmit={handleEmailSubmit} className="space-y-4">
@@ -199,13 +227,13 @@ export default function LoginModal() {
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="your@email.com"
-                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full border border-field rounded-control px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent"
               />
-              {error && <p className="text-xs text-red-600">{error}</p>}
+              {error && <p className="text-xs text-danger">{error}</p>}
               <button
                 type="submit"
                 disabled={loading || !email.trim()}
-                className="w-full bg-blue-600 text-white py-2.5 rounded-lg text-sm font-semibold hover:bg-blue-700 disabled:opacity-50 transition-colors"
+                className="w-full bg-accent text-white py-2.5 rounded-panel text-sm font-semibold hover:bg-accent/90 disabled:opacity-50 transition-colors"
               >
                 {loading ? 'Sending code…' : 'Continue'}
               </button>
@@ -215,10 +243,10 @@ export default function LoginModal() {
 
         {step === 'pin' && (
           <>
-            <h2 className="text-xl font-bold text-gray-800 mb-1">
+            <h2 className="text-xl font-semibold text-fg mb-1">
               {isNewUser ? 'Verify your email' : 'Enter your code'}
             </h2>
-            <p className="text-sm text-gray-500 mb-6">
+            <p className="text-sm text-fg-muted mb-6">
               We sent a 6-digit code to <strong>{email}</strong>.
               {isNewUser && ' Confirming will create your account.'}
             </p>
@@ -233,20 +261,20 @@ export default function LoginModal() {
                 value={pin}
                 onChange={(e) => setPin(e.target.value.replace(/\D/g, ''))}
                 placeholder="123456"
-                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm text-center tracking-widest font-mono text-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full border border-field rounded-control px-3 py-2 text-sm text-center font-mono text-lg focus:outline-none focus:ring-2 focus:ring-accent"
               />
-              {error && <p className="text-xs text-red-600">{error}</p>}
+              {error && <p className="text-xs text-danger">{error}</p>}
               <button
                 type="submit"
                 disabled={loading || pin.length !== 6}
-                className="w-full bg-blue-600 text-white py-2.5 rounded-lg text-sm font-semibold hover:bg-blue-700 disabled:opacity-50 transition-colors"
+                className="w-full bg-accent text-white py-2.5 rounded-panel text-sm font-semibold hover:bg-accent/90 disabled:opacity-50 transition-colors"
               >
                 {loading ? 'Verifying…' : isNewUser ? 'Create Account' : 'Sign In'}
               </button>
               <button
                 type="button"
                 onClick={() => { setStep('email'); setPin(''); setError(null) }}
-                className="w-full text-xs text-gray-500 hover:text-gray-700"
+                className="w-full text-xs text-fg-muted hover:text-fg"
               >
                 ← Use a different email
               </button>
@@ -256,8 +284,8 @@ export default function LoginModal() {
 
         {step === 'second-factor' && (
           <>
-            <h2 className="text-xl font-bold text-gray-800 mb-1">One more step</h2>
-            <p className="text-sm text-gray-500 mb-6">
+            <h2 className="text-xl font-semibold text-fg mb-1">One more step</h2>
+            <p className="text-sm text-fg-muted mb-6">
               Your account has two-factor sign-in turned on, so an emailed code isn't enough on its
               own.
             </p>
@@ -267,11 +295,11 @@ export default function LoginModal() {
                   type="button"
                   onClick={handlePasskey}
                   disabled={loading}
-                  className="w-full bg-blue-600 text-white py-2.5 rounded-lg text-sm font-semibold hover:bg-blue-700 disabled:opacity-50 mb-4"
+                  className="w-full bg-accent text-white py-2.5 rounded-panel text-sm font-semibold hover:bg-accent/90 disabled:opacity-50 mb-4"
                 >
                   Use your passkey
                 </button>
-                <p className="text-[11px] uppercase tracking-wide text-gray-400 text-center mb-4">or</p>
+                <p className="text-xs text-fg-muted text-center mb-4">or</p>
               </>
             )}
             <form onSubmit={handleSecondFactorSubmit} className="space-y-4">
@@ -283,13 +311,13 @@ export default function LoginModal() {
                 value={factorCode}
                 onChange={(e) => setFactorCode(e.target.value)}
                 placeholder={factorMethod === 'totp' ? '123456' : 'ABCD234XYZ'}
-                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm text-center tracking-widest font-mono text-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full border border-field rounded-control px-3 py-2 text-sm text-center font-mono text-lg focus:outline-none focus:ring-2 focus:ring-accent"
               />
-              {error && <p className="text-xs text-red-600">{error}</p>}
+              {error && <p className="text-xs text-danger">{error}</p>}
               <button
                 type="submit"
                 disabled={loading || !factorCode.trim()}
-                className="w-full bg-gray-800 text-white py-2.5 rounded-lg text-sm font-semibold hover:bg-gray-900 disabled:opacity-50"
+                className="w-full bg-fg text-white py-2.5 rounded-panel text-sm font-semibold hover:bg-fg disabled:opacity-50"
               >
                 {loading ? 'Verifying…' : 'Sign In'}
               </button>
@@ -304,7 +332,7 @@ export default function LoginModal() {
                     setFactorCode('')
                     setError(null)
                   }}
-                  className="w-full text-xs text-gray-500 hover:text-gray-700"
+                  className="w-full text-xs text-fg-muted hover:text-fg"
                 >
                   {factorMethod === 'totp'
                     ? 'Lost your device? Use a recovery code'
@@ -313,6 +341,44 @@ export default function LoginModal() {
               )}
             </form>
           </>
+        )}
+
+        {step === 'waitlist' && !waitlistJoined && (
+          <>
+            <h2 className="text-xl font-semibold text-fg mb-1">Trial spots are full</h2>
+            <p className="text-sm text-fg-muted mb-6">
+              All trial spots are currently taken. Add your email to join the list.
+            </p>
+            <form onSubmit={handleWaitlistSubmit} className="space-y-4">
+              <input
+                type="email"
+                required
+                autoFocus
+                aria-label="Email address"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="your@email.com"
+                className="w-full border border-field rounded-control px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent"
+              />
+              {error && <p className="text-xs text-danger">{error}</p>}
+              <button
+                type="submit"
+                disabled={loading || !email.trim()}
+                className="w-full bg-accent text-white py-2.5 rounded-panel text-sm font-semibold hover:bg-accent/90 disabled:opacity-50 transition-colors"
+              >
+                {loading ? 'Saving…' : 'Join the list'}
+              </button>
+            </form>
+          </>
+        )}
+
+        {step === 'waitlist' && waitlistJoined && (
+          <div role="status">
+            <h2 className="text-xl font-semibold text-fg mb-1">You're on the list</h2>
+            <p className="text-sm text-fg-muted">
+              <strong>{email.trim().toLowerCase()}</strong> has been added to the list.
+            </p>
+          </div>
         )}
       </div>
     </div>

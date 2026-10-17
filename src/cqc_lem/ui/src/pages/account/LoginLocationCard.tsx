@@ -72,15 +72,15 @@ export default function LoginLocationCard() {
       title="Login Location"
       subtitle={'The automation logs into LinkedIn from our servers. Setting your location makes the browser appear to come from where you normally log in, which reduces LinkedIn "new location" security challenges.'}
     >
-      <div className="text-sm text-gray-700">
-        <span className="font-medium text-gray-600">Current: </span>
+      <div className="text-sm text-fg">
+        <span className="font-medium text-fg-muted">Current: </span>
         {locationData?.latitude != null
           ? `${[locationData.city, locationData.country].filter(Boolean).join(', ') || 'Set'} (${locationData.latitude.toFixed(3)}, ${locationData.longitude?.toFixed(3)})`
           : 'Not set'}
       </div>
 
       {locationMsg && (
-        <p className={`text-sm font-medium ${locationMsg.ok ? 'text-green-600' : 'text-red-600'}`}>
+        <p className={`text-sm font-medium ${locationMsg.ok ? 'text-success' : 'text-danger'}`}>
           {locationMsg.text}
         </p>
       )}
@@ -92,14 +92,14 @@ export default function LoginLocationCard() {
           value={locCity}
           onChange={(e) => setLocCity(e.target.value)}
           placeholder="City"
-          className="border border-gray-300 rounded-lg px-3 py-2 text-sm sm:col-span-1"
+          className="border border-field rounded-control px-3 py-2 text-sm sm:col-span-1"
         />
         <input
           type="text"
           value={locState}
           onChange={(e) => setLocState(e.target.value)}
           placeholder="State / region"
-          className="border border-gray-300 rounded-lg px-3 py-2 text-sm sm:col-span-1"
+          className="border border-field rounded-control px-3 py-2 text-sm sm:col-span-1"
         />
         <input
           type="text"
@@ -107,22 +107,22 @@ export default function LoginLocationCard() {
           onChange={(e) => setLocCountry(e.target.value)}
           placeholder="Country (ISO-2)"
           maxLength={2}
-          className="border border-gray-300 rounded-lg px-3 py-2 text-sm uppercase sm:col-span-1"
+          className="border border-field rounded-control px-3 py-2 text-sm sm:col-span-1"
         />
       </div>
       <button
         type="button"
         onClick={() => setLocationByCityMutation.mutate()}
         disabled={setLocationByCityMutation.isPending || !locCity.trim()}
-        className="w-full bg-blue-600 text-white py-2 rounded-lg text-sm font-semibold hover:bg-blue-700 disabled:opacity-50 transition-colors"
+        className="w-full bg-accent text-white py-2 rounded-panel text-sm font-semibold hover:bg-accent/90 disabled:opacity-50 transition-colors"
       >
         {setLocationByCityMutation.isPending ? 'Setting…' : 'Set location'}
       </button>
 
       <div className="relative py-1">
-        <div className="border-t border-gray-200" />
-        <span className="absolute inset-0 -top-2 flex justify-center text-xs text-gray-400">
-          <span className="bg-white px-2">or</span>
+        <div className="border-t border-hairline" />
+        <span className="absolute inset-0 -top-2 flex justify-center text-xs text-fg-muted">
+          <span className="bg-raised px-2">or</span>
         </span>
       </div>
 
@@ -130,7 +130,7 @@ export default function LoginLocationCard() {
         type="button"
         onClick={() => autocaptureLocationMutation.mutate()}
         disabled={autocaptureLocationMutation.isPending}
-        className="w-full bg-gray-100 text-gray-700 py-2 rounded-lg text-sm font-semibold hover:bg-gray-200 disabled:opacity-50 transition-colors"
+        className="w-full bg-page text-fg py-2 rounded-panel text-sm font-semibold hover:bg-hairline disabled:opacity-50 transition-colors"
       >
         {autocaptureLocationMutation.isPending ? 'Detecting…' : 'Use my current location (auto-detect)'}
       </button>

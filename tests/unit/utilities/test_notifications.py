@@ -27,11 +27,13 @@ def test_sends_connect_when_due(monkeypatch):
     monkeypatch.setenv("LINKEDIN_SESSION_EMAIL_THROTTLE_DAYS", "7")
     with patch(f"{_MOD}.get_linkedin_session_email_sent_at", return_value=None), \
          patch(f"{_MOD}.get_user_email", return_value="u@e.com"), \
+         patch(f"{_MOD}.get_user_subscription_info",
+               return_value={"subscription_status": "active"}), \
          patch(f"{_MOD}.send_connect_linkedin_email", return_value=True) as sc, \
          patch(f"{_MOD}.send_session_revalidation_email") as sr, \
          patch(f"{_MOD}.set_linkedin_session_email_sent_at") as stamp:
         assert notify_linkedin_session(7, revalidation=False) is True
-        sc.assert_called_once_with("u@e.com")
+        sc.assert_called_once_with("u@e.com", trial=False)
         sr.assert_not_called()
         stamp.assert_called_once_with(7)
 

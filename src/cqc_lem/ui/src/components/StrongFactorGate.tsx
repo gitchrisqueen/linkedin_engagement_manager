@@ -43,9 +43,9 @@ export default function StrongFactorGate() {
 
   return (
     <div data-testid="strong-factor-gate" className="max-w-2xl mx-auto space-y-4">
-      <div className="border border-blue-200 bg-blue-50 rounded-lg px-4 py-3">
-        <h2 className="text-base font-bold text-blue-900">Set up two-factor sign-in to continue</h2>
-        <p className="text-sm text-blue-900 mt-1">
+      <div className="border border-accent/25 bg-accent/5 rounded-panel px-4 py-3">
+        <h2 className="text-base font-semibold text-accent">Set up two-factor sign-in to continue</h2>
+        <p className="text-sm text-accent mt-1">
           An emailed code on its own no longer protects a LinkedIn account well enough. Add a
           passkey or an authenticator app — it takes a minute, and you only do it once. You are
           signed in; the rest of LEM unlocks as soon as a factor is saved.
@@ -57,7 +57,7 @@ export default function StrongFactorGate() {
       <button
         type="button"
         onClick={() => logout()}
-        className="text-xs text-gray-500 hover:text-gray-700 font-medium"
+        className="text-xs text-fg-muted hover:text-fg font-medium"
       >
         Sign out instead
       </button>

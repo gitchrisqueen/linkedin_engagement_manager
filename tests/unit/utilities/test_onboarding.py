@@ -149,8 +149,7 @@ class TestStoryBankNudge:
                             started_at=NOW - timedelta(days=5), story_bank_count=0, now=NOW) is None
 
 
-def _eval_patches(*, session=True, prefs=None, configured=True, approved=True, posted=True,
-                  engaged=True):
+def _eval_patches(*, session=True, prefs=None, configured=True, approved=True, posted=True):
     base_prefs = {"tone": "friendly", "comment_style": None, "focus_topics": [],
                   "include_topics": [], "max_comments_per_day": 20, "max_dms_per_day": 20}
     base_prefs.update(prefs or {})
@@ -164,7 +163,6 @@ def _eval_patches(*, session=True, prefs=None, configured=True, approved=True, p
         patch(f"{_ON}.get_engagement_preferences", return_value=base_prefs),
         patch(f"{_ON}.has_engagement_preferences", return_value=configured),
         patch(f"{_ON}.has_post_with_status", side_effect=_has_post),
-        patch(f"{_ON}.has_automated_engagement", return_value=engaged),
     ]
 
 
@@ -203,10 +201,59 @@ class TestEvaluateSteps:
         steps = _evaluate(prefs={"max_comments_per_day": 0, "max_dms_per_day": 0})
         assert steps[OnboardingStep.CAPS_ENABLED] is False
 
-    def test_activation_needs_both_a_published_post_and_engagement(self):
+    def test_activation_is_the_first_published_post(self):
+        """#2373: a published (approved) post activates on its own.
+
+        An approved-but-unpublished one does not.
+        """
         from cqc_lem.utilities.db import OnboardingStep
-        assert _evaluate(engaged=False)[OnboardingStep.ACTIVATED] is False
+        assert _evaluate(posted=True)[OnboardingStep.ACTIVATED] is True
         assert _evaluate(posted=False)[OnboardingStep.ACTIVATED] is False
+
+    def test_activation_never_reads_engagement(self):
+        """#2373: a comment or DM is not evidence of activation.
+
+        Under the trial scope engagement is suggestions only, so the evaluator must not consult it.
+        """
+        from cqc_lem.utilities.db import OnboardingStep
+        with patch("cqc_lem.utilities.db.has_automated_engagement", return_value=True) as engaged:
+            steps = _evaluate(posted=False)
+        assert steps[OnboardingStep.ACTIVATED] is False
+        engaged.assert_not_called()
+
+
+class TestActivatedEvent:
+    """#2373 acceptance: `activated` fires on the first approved post published.
+
+    And not on a comment or DM alone. Real `evaluate_steps`, evidence stubbed.
+    """
+
+    def _sync(self, *, posted):
+        state = {"started_at": NOW - timedelta(hours=5)}
+        ctxs = _eval_patches(posted=posted) + [
+            patch(f"{_ON}.ensure_onboarding_state", return_value=True),
+            patch(f"{_ON}.get_onboarding_state", return_value=state),
+            patch(f"{_ON}.mark_onboarding_step", return_value=True),
+            patch(f"{_ON}._convert_referral"),
+            # A user whose automation HAS commented and DM'd — must not matter.
+            patch("cqc_lem.utilities.db.has_automated_engagement", return_value=True),
+            patch("cqc_lem.utilities.observability.track_onboarding_step"),
+            patch("cqc_lem.utilities.observability.track_funnel_event"),
+        ]
+        mocks = [c.start() for c in ctxs]
+        try:
+            from cqc_lem.utilities.onboarding import sync_onboarding_state
+            sync_onboarding_state(7)
+            return [c.args[0] for c in mocks[-1].call_args_list]
+        finally:
+            for c in ctxs:
+                c.stop()
+
+    def test_fires_on_first_approved_post_published(self):
+        assert "activated" in self._sync(posted=True)
+
+    def test_does_not_fire_on_comment_or_dm_alone(self):
+        assert "activated" not in self._sync(posted=False)
 
 
 class TestSyncOnboardingState:

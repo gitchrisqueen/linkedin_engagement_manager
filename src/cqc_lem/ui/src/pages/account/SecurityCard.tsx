@@ -184,34 +184,34 @@ export default function SecurityCard() {
     >
       {stepUpModal}
       <div>
-        <h4 className="text-sm font-semibold text-gray-800 mb-2">Signed-in devices</h4>
+        <h4 className="text-sm font-semibold text-fg mb-2">Signed-in devices</h4>
         {sessions.length === 0 ? (
-          <p className="text-xs text-gray-500">No active sessions to show.</p>
+          <p className="text-xs text-fg-muted">No active sessions to show.</p>
         ) : (
-          <ul className="divide-y divide-gray-100 border border-gray-200 rounded-lg">
+          <ul className="divide-y divide-hairline border border-hairline rounded-panel">
             {sessions.map((s) => (
               <li key={s.id} className="flex items-center justify-between gap-3 px-3 py-2">
                 <div className="min-w-0">
-                  <p className="text-sm font-medium text-gray-800 truncate">
+                  <p className="text-sm font-medium text-fg truncate">
                     {s.label}
                     {s.is_current && (
-                      <span className="ml-2 text-[11px] font-semibold text-green-700 bg-green-50 px-2 py-0.5 rounded">
+                      <span className="ml-2 text-xs font-semibold text-success bg-success/5 px-2 py-0.5 rounded-control">
                         This device
                       </span>
                     )}
                     {s.scope === 'agent' && (
-                      <span className="ml-2 text-[11px] font-semibold text-purple-700 bg-purple-50 px-2 py-0.5 rounded">
+                      <span className="ml-2 text-xs font-semibold text-accent bg-accent/5 px-2 py-0.5 rounded-control">
                         Agent
                       </span>
                     )}
                   </p>
-                  <p className="text-xs text-gray-500">Last used {when(s.last_seen_at ?? s.created_at)}</p>
+                  <p className="text-xs text-fg-muted">Last used {when(s.last_seen_at ?? s.created_at)}</p>
                 </div>
                 <button
                   type="button"
                   onClick={() => revoke.mutate({ session_id: s.id })}
                   disabled={revoke.isPending}
-                  className="text-xs font-semibold text-red-600 hover:underline disabled:opacity-50 whitespace-nowrap"
+                  className="text-xs font-semibold text-danger hover:underline disabled:opacity-50 whitespace-nowrap"
                 >
                   Sign out
                 </button>
@@ -224,7 +224,7 @@ export default function SecurityCard() {
             type="button"
             onClick={() => revoke.mutate({ all_others: true })}
             disabled={revoke.isPending}
-            className="mt-2 text-xs font-semibold text-blue-600 hover:underline disabled:opacity-50"
+            className="mt-2 text-xs font-semibold text-accent hover:underline disabled:opacity-50"
           >
             Sign out all other devices ({otherSessions})
           </button>
@@ -232,8 +232,8 @@ export default function SecurityCard() {
       </div>
 
       <div>
-        <h4 className="text-sm font-semibold text-gray-800 mb-2">Agent tokens</h4>
-        <p className="text-xs text-gray-500 mb-2">
+        <h4 className="text-sm font-semibold text-fg mb-2">Agent tokens</h4>
+        <p className="text-xs text-fg-muted mb-2">
           A queue-only credential for a headless automation — it can read the review queues and
           create pending items, and can never approve anything or touch credentials.
         </p>
@@ -245,7 +245,7 @@ export default function SecurityCard() {
             onChange={(e) => setAgentLabel(e.target.value)}
             maxLength={120}
             placeholder="Headless agent"
-            className="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="flex-1 border border-field rounded-control px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent"
           />
           <input
             type="number"
@@ -254,29 +254,29 @@ export default function SecurityCard() {
             onChange={(e) => setAgentTtlDays(Number(e.target.value))}
             min={1}
             max={365}
-            className="w-full sm:w-28 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="w-full sm:w-28 border border-field rounded-control px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent"
           />
           <button
             type="button"
             onClick={() => mintAgentToken.mutate()}
             disabled={mintAgentToken.isPending}
-            className="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-blue-700 disabled:opacity-50 whitespace-nowrap"
+            className="bg-accent text-white px-4 py-2 rounded-control text-sm font-semibold hover:bg-accent/90 disabled:opacity-50 whitespace-nowrap"
           >
             {mintAgentToken.isPending ? 'Creating…' : 'Create agent token'}
           </button>
         </div>
-        {mintError && <p className="text-xs text-red-600 mt-2">{mintError}</p>}
+        {mintError && <p className="text-xs text-danger mt-2">{mintError}</p>}
         {mintedToken && (
-          <div className="mt-3 rounded-lg border border-amber-300 bg-amber-50 p-3 space-y-2">
-            <p className="text-xs font-semibold text-amber-900">
+          <div className="mt-3 rounded-panel border border-warning/50 bg-warning/5 p-3 space-y-2">
+            <p className="text-xs font-semibold text-warning">
               Shown once — copy it now. It will not be shown again.
             </p>
-            <code className="block text-xs break-all text-amber-900">{mintedToken.token}</code>
-            <p className="text-xs text-amber-900/80">Expires in {mintedToken.expiresInDays} days.</p>
+            <code className="block text-xs break-all text-warning">{mintedToken.token}</code>
+            <p className="text-xs text-warning">Expires in {mintedToken.expiresInDays} days.</p>
             <button
               type="button"
               onClick={copyMintedToken}
-              className="bg-white border border-amber-400 text-amber-800 px-3 py-1.5 rounded-lg text-xs font-semibold hover:bg-amber-100"
+              className="bg-raised border border-warning/50 text-warning px-3 py-1.5 rounded-panel text-xs font-semibold hover:bg-warning/10"
             >
               {mintedTokenCopied ? '✓ Copied' : 'Copy token'}
             </button>
@@ -285,8 +285,8 @@ export default function SecurityCard() {
       </div>
 
       <div>
-        <h4 className="text-sm font-semibold text-gray-800 mb-2">Email address</h4>
-        <p className="text-xs text-gray-500 mb-2">
+        <h4 className="text-sm font-semibold text-fg mb-2">Email address</h4>
+        <p className="text-xs text-fg-muted mb-2">
           Your account is identified internally, not by this address — changing it keeps everything
           you've created. We send a code to the new address first, and signing in there is what
           completes the move. Every other device is signed out when it does.
@@ -298,13 +298,13 @@ export default function SecurityCard() {
             value={newEmail}
             onChange={(e) => setNewEmail(e.target.value)}
             placeholder={data?.email || 'you@example.com'}
-            className="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="flex-1 border border-field rounded-control px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent"
           />
           <button
             type="button"
             onClick={() => changeInit.mutate()}
             disabled={changeInit.isPending || !newEmail.trim()}
-            className="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-blue-700 disabled:opacity-50"
+            className="bg-accent text-white px-4 py-2 rounded-control text-sm font-semibold hover:bg-accent/90 disabled:opacity-50"
           >
             {changeInit.isPending ? 'Sending…' : 'Send code'}
           </button>
@@ -318,13 +318,13 @@ export default function SecurityCard() {
               value={pin}
               onChange={(e) => setPin(e.target.value)}
               placeholder="6-digit code"
-              className="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="flex-1 border border-field rounded-control px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent"
             />
             <button
               type="button"
               onClick={() => changeVerify.mutate()}
               disabled={changeVerify.isPending || !pin.trim()}
-              className="bg-gray-800 text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-gray-900 disabled:opacity-50"
+              className="bg-fg text-white px-4 py-2 rounded-panel text-sm font-semibold hover:bg-fg disabled:opacity-50"
             >
               {changeVerify.isPending ? 'Confirming…' : 'Confirm change'}
             </button>
@@ -334,14 +334,14 @@ export default function SecurityCard() {
 
       {(data?.recent_events?.length ?? 0) > 0 && (
         <div>
-          <h4 className="text-sm font-semibold text-gray-800 mb-2">Recent activity</h4>
+          <h4 className="text-sm font-semibold text-fg mb-2">Recent activity</h4>
           <ul className="space-y-1">
             {data!.recent_events.slice(0, 8).map((e, i) => (
-              <li key={i} className="text-xs text-gray-600 flex justify-between gap-3">
-                <span className={e.success ? '' : 'text-red-600 font-medium'}>
+              <li key={i} className="text-xs text-fg-muted flex justify-between gap-3">
+                <span className={e.success ? '' : 'text-danger font-medium'}>
                   {EVENT_LABELS[e.event] ?? e.event}
                 </span>
-                <span className="text-gray-400 whitespace-nowrap">{when(e.created_at)}</span>
+                <span className="text-fg-muted whitespace-nowrap">{when(e.created_at)}</span>
               </li>
             ))}
           </ul>
@@ -349,7 +349,7 @@ export default function SecurityCard() {
       )}
 
       {msg && (
-        <p className={`text-sm font-medium ${msg.ok ? 'text-green-600' : 'text-red-600'}`}>{msg.text}</p>
+        <p className={`text-sm font-medium ${msg.ok ? 'text-success' : 'text-danger'}`}>{msg.text}</p>
       )}
     </SettingsCard>
   )

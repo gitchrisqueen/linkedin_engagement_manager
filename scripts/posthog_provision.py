@@ -19,6 +19,9 @@ the UI:
     source/campaign and first-touch channel, the brand-post → visit → signup funnel, referral
     arrivals and tagged landing visits. Plus the two web-analytics **conversion goals** (signup,
     activation), which PostHog reads from actions — so they are defined here, not clicked together.
+  • **LEM Trial test** (issue #2374) — the free-trial go-to-market readout over the SAME funnel
+    events: signups by `utm_source`, activation within 7 days, week-2 retention and trial → paid,
+    each per trial-start cohort week.
   • **A weekly email subscription** of LEM Growth — this is what replaces the hand-run 2-week
     perf-report cron.
 
@@ -77,6 +80,7 @@ DEFAULT_APP_HOST = "https://us.posthog.com"
 DASH_HEALTH = "LEM Health"
 DASH_GROWTH = "LEM Growth"
 DASH_CHANNELS = "LEM Channels"
+DASH_TRIAL = "LEM Trial test"
 
 TAGS = ["lem", "kpi", "health", "growth"]
 
@@ -101,6 +105,15 @@ GROWTH_WINDOW = "INTERVAL 90 DAY"
 # further than the window it reports on — otherwise a post first measured before the window opens
 # would be counted as published on day one of it.
 PUBLISH_LOOKBACK = "INTERVAL 120 DAY"
+# The trial-test cohort windows. Each tile only counts trials old enough for their window to have
+# CLOSED — a trial started yesterday has not failed to activate yet, and counting it as a miss would
+# drag the newest cohort down every time it is read.
+ACTIVATION_WINDOW = "INTERVAL 7 DAY"
+RETENTION_WEEK2_START = "INTERVAL 7 DAY"
+RETENTION_WEEK2_END = "INTERVAL 14 DAY"
+# Mirrors env_constants.FREE_TRIAL_DAYS' default (14). Not imported: that module loads the app's
+# env, and this script is run by hand from a checkout with only the operator key exported.
+TRIAL_LENGTH = "INTERVAL 14 DAY"
 
 # Every event these dashboards read. Server-side ones come from utilities/observability.py, the SPA
 # ones from ui/src/utils/analytics.ts (PH1), and `$ai_generation` from the LiteLLM callback (PH2).
@@ -719,6 +732,108 @@ ORDER BY week ASC, visits DESC
     ]
 
 
+# ── LEM Trial test (issue #2374) ─────────────────────────────────────────────────────
+# The free-trial go-to-market readout. No new events: every tile reads the launch funnel
+# (`signup_completed`, `trial_started`, `activated`, `subscription_started`) plus the SPA's own
+# activity, all keyed on `str(user_id)` — so a person joins across tiles by `distinct_id` alone.
+# Every property a tile groups on is read through `toString()` (docs/kpi-dashboards.md: PostHog
+# matches on the ingested type, so a non-string reading silently falls out of a string match).
+
+def _trial_cohort(min_age: str) -> str:
+    """One row per trial: its first `trial_started`, kept only once `min_age` has elapsed since."""
+    return f"""SELECT distinct_id, min(timestamp) AS started
+      FROM events
+      WHERE event = 'trial_started' AND timestamp >= now() - {GROWTH_WINDOW}
+      GROUP BY distinct_id
+      HAVING started <= now() - {min_age}"""
+
+
+def trial_tiles() -> list:
+    """Does a free trial turn into an active, retained, paying user — and from which source?"""
+    return [
+        _tile(
+            "Trial — Signups by utm_source (90d)",
+            "Completed signups grouped by the `utm_source` they arrived with. An untagged arrival "
+            "reads (none). The channel/campaign split lives on LEM Channels; this is the one "
+            "number the trial test steers by.",
+            _hogql(f"""
+SELECT coalesce(nullIf(toString(properties.utm_source), ''), '(none)') AS source,
+       uniqExact(distinct_id) AS signups
+FROM events
+WHERE event = 'signup_completed' AND timestamp >= now() - {GROWTH_WINDOW}
+GROUP BY source
+ORDER BY signups DESC
+LIMIT 50
+""", "ActionsBar", _line("source", ["signups"])),
+        ),
+        _tile(
+            "Trial — Activation within 7 days, by trial cohort",
+            "Share of each week's trials that reached `activated` (first approved post published) "
+            "within 7 days of `trial_started`. Only trials at least 7 days old are counted, so an "
+            "open window never reads as a miss.",
+            _hogql(f"""
+SELECT toStartOfWeek(t.started) AS cohort_week,
+       count() AS trials,
+       countIf(a.activated_at >= t.started
+               AND a.activated_at <= t.started + {ACTIVATION_WINDOW}) AS activated_7d,
+       round(100 * countIf(a.activated_at >= t.started
+                           AND a.activated_at <= t.started + {ACTIVATION_WINDOW})
+             / nullIf(count(), 0), 2) AS activated_7d_pct
+FROM ({_trial_cohort(ACTIVATION_WINDOW)}) AS t
+LEFT JOIN (SELECT distinct_id, min(timestamp) AS activated_at
+           FROM events
+           WHERE event = 'activated' AND timestamp >= now() - {GROWTH_WINDOW}
+           GROUP BY distinct_id) AS a ON a.distinct_id = t.distinct_id
+GROUP BY cohort_week
+ORDER BY cohort_week ASC
+""", "ActionsLineGraph", _line("cohort_week", ["activated_7d_pct"])),
+        ),
+        _tile(
+            "Trial — Week-2 retention, by trial cohort",
+            "Share of each week's trials that came back to the app in days 7-13 after "
+            "`trial_started` — any SPA pageview or post approval. Server `api_call` rows carry no "
+            "user, so they cannot say who returned. Only trials at least 14 days old are counted.",
+            _hogql(f"""
+SELECT toStartOfWeek(r.started) AS cohort_week,
+       count() AS trials,
+       countIf(r.week2_events > 0) AS retained_week2,
+       round(100 * countIf(r.week2_events > 0) / nullIf(count(), 0), 2) AS week2_retention_pct
+FROM (SELECT t.distinct_id AS distinct_id, t.started AS started,
+             countIf(e.timestamp >= t.started + {RETENTION_WEEK2_START}
+                     AND e.timestamp < t.started + {RETENTION_WEEK2_END}) AS week2_events
+      FROM ({_trial_cohort(RETENTION_WEEK2_END)}) AS t
+      LEFT JOIN (SELECT distinct_id, timestamp
+                 FROM events
+                 WHERE event IN ('post_approved', '$pageview')
+                       AND timestamp >= now() - {GROWTH_WINDOW}) AS e
+             ON e.distinct_id = t.distinct_id
+      GROUP BY t.distinct_id, t.started) AS r
+GROUP BY cohort_week
+ORDER BY cohort_week ASC
+""", "ActionsLineGraph", _line("cohort_week", ["week2_retention_pct"])),
+        ),
+        _tile(
+            "Trial — Trial to paid, by trial cohort",
+            "Share of each week's trials with a `subscription_started` after `trial_started`. Only "
+            "trials whose 14-day trial has ended are counted; a later conversion still lands in "
+            "its original cohort, so older weeks can keep rising.",
+            _hogql(f"""
+SELECT toStartOfWeek(t.started) AS cohort_week,
+       count() AS trials,
+       countIf(p.paid_at >= t.started) AS paid,
+       round(100 * countIf(p.paid_at >= t.started) / nullIf(count(), 0), 2) AS trial_to_paid_pct
+FROM ({_trial_cohort(TRIAL_LENGTH)}) AS t
+LEFT JOIN (SELECT distinct_id, min(timestamp) AS paid_at
+           FROM events
+           WHERE event = 'subscription_started' AND timestamp >= now() - {GROWTH_WINDOW}
+           GROUP BY distinct_id) AS p ON p.distinct_id = t.distinct_id
+GROUP BY cohort_week
+ORDER BY cohort_week ASC
+""", "ActionsLineGraph", _line("cohort_week", ["trial_to_paid_pct"])),
+        ),
+    ]
+
+
 # ── web-analytics conversion goals (issue #658) ──────────────────────────────────────
 # PostHog's web analytics picks its conversion goal from an ACTION, so the two goals are defined
 # here rather than clicked together in the UI — same reason as every other tile in this file.
@@ -766,6 +881,12 @@ def build_specs() -> list:
                         "source/campaign and first-touch channel, the brand-post → visit → signup "
                         "funnel, referral arrivals and tagged landing visits.",
          "tiles": channel_tiles()},
+        {"name": DASH_TRIAL,
+         "description": "The free-trial test (issue #2374), per trial-start cohort week: signups by "
+                        "utm_source, activation within 7 days, week-2 retention and trial to paid. "
+                        "Read off the existing funnel events; a cohort is counted only once its "
+                        "window has closed.",
+         "tiles": trial_tiles()},
     ]
 
 

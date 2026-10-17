@@ -301,10 +301,13 @@ def send_login_pin_request_email(to_email: str, reply_to: str) -> bool:
 
 
 def send_reply_forward_confirmation_email(to_email: str, verify_url: Optional[str],
-                                          code: Optional[str]) -> bool:
+                                          code: Optional[str], trial: bool = False) -> bool:
     """Forward Gmail's forwarding-confirmation to the user so they can finish it from their OWN
     signed-in browser (the most reliable way — a server-side click may not complete Gmail's flow).
     The confirmation was delivered to our reply+<token> address, so the user never saw it.
+
+    A trial account does not get automated replies, so its wording says only what forwarding
+    does — deliver LinkedIn's notification emails to LEM — and promises no auto-reply (#2375).
     """
     if not verify_url and not code:
         return False
@@ -316,19 +319,27 @@ def send_reply_forward_confirmation_email(to_email: str, verify_url: Optional[st
                  f'pending address): <strong style="font-size:16px">{code}</strong></p>') if code else ""
     link_line = (f'<p style="color:#666;font-size:12px;word-break:break-all">Button not working? '
                  f'Copy this link: {verify_url}</p>') if verify_url else ""
+    if trial:
+        headline = "Confirm LinkedIn notification forwarding"
+        purpose = ("You added our address as a Gmail forwarding destination so LEM receives your "
+                   "LinkedIn notification emails.")
+        subject = "Confirm your LinkedIn notification forwarding"
+    else:
+        headline = "Confirm comment-reply forwarding"
+        purpose = ("You added our address as a Gmail forwarding destination so we can auto-reply to "
+                   "comments on your LinkedIn posts.")
+        subject = "Confirm your LinkedIn comment-reply forwarding"
     html = (
         "<html><body style=\"font-family:Arial,Helvetica,sans-serif;color:#222;\">"
-        "<h2>Confirm comment-reply forwarding</h2>"
-        "<p>You added our address as a Gmail forwarding destination so we can auto-reply to comments "
-        "on your LinkedIn posts. Gmail sent a confirmation to that address (which you can't see), so "
+        f"<h2>{headline}</h2>"
+        f"<p>{purpose} Gmail sent a confirmation to that address (which you can't see), so "
         "we're passing it to you.</p>"
         f"{button}{code_line}{link_line}"
         "<p style='color:#666;font-size:12px'>If your forwarding already shows as confirmed in Gmail, "
         "you can ignore this email.</p>"
         "</body></html>"
     )
-    return _dispatch_email(to_email, "Confirm your LinkedIn comment-reply forwarding", html,
-                           high_priority=True)
+    return _dispatch_email(to_email, subject, html, high_priority=True)
 
 
 def _account_url() -> str:
@@ -337,24 +348,36 @@ def _account_url() -> str:
     return f"{base}/account"
 
 
-def send_connect_linkedin_email(to_email: str, account_url: Optional[str] = None) -> bool:
-    """Email a user who has no validated LinkedIn session, prompting them to connect."""
+def send_connect_linkedin_email(to_email: str, account_url: Optional[str] = None,
+                                trial: bool = False) -> bool:
+    """Email a user who has no validated LinkedIn session, prompting them to connect.
+
+    A trial account covers posting through approval only, so it gets wording that says what
+    connecting unlocks for it, not commenting and engaging on its behalf (issue #2375).
+    """
     url = account_url or _account_url()
+    if trial:
+        headline = "Connect your LinkedIn so your approved posts can publish"
+        purpose = ("LinkedIn Engagement Manager needs your LinkedIn connected to publish the posts\n"
+                   "    you approve. Your account isn't connected yet, so nothing can publish.")
+        subject = "Action needed: connect your LinkedIn so your approved posts can publish"
+    else:
+        headline = "Connect your LinkedIn to keep automation running"
+        purpose = ("LinkedIn Engagement Manager needs an authorized LinkedIn session to post,\n"
+                   "    comment, and engage on your behalf. Your account doesn't have one yet, so "
+                   "automation\n    can't run.")
+        subject = "⚠️ Action needed: connect your LinkedIn to keep automation running"
     html = f"""
     <html><body style="font-family:Arial,Helvetica,sans-serif;color:#222;">
-    <h2>Connect your LinkedIn to keep automation running</h2>
-    <p>LinkedIn Engagement Manager needs an authorized LinkedIn session to post,
-    comment, and engage on your behalf. Your account doesn't have one yet, so automation
-    can't run.</p>
+    <h2>{headline}</h2>
+    <p>{purpose}</p>
     <p>It takes about a minute — open your account and click <strong>Connect LinkedIn</strong>:</p>
     <p><a href="{url}" style="background:#0a66c2;color:#fff;padding:10px 16px;border-radius:6px;
     text-decoration:none;">Connect LinkedIn</a></p>
     <p style="color:#888;font-size:12px;">If you've already connected, you can ignore this email.</p>
     </body></html>
     """
-    return _dispatch_email(
-        to_email, "⚠️ Action needed: connect your LinkedIn to keep automation running", html,
-        high_priority=True)
+    return _dispatch_email(to_email, subject, html, high_priority=True)
 
 
 def send_session_revalidation_email(to_email: str, account_url: Optional[str] = None) -> bool:
@@ -393,11 +416,13 @@ def _human_date(value: Optional[str]) -> Optional[str]:
 
 def send_linkedin_token_expiring_email(to_email: str, days_remaining: Optional[int] = None,
                                        expires_on: Optional[str] = None,
-                                       account_url: Optional[str] = None) -> bool:
+                                       account_url: Optional[str] = None,
+                                       trial: bool = False) -> bool:
     """Tell a user their LinkedIn authorization is running out and we could NOT renew it for them
     (issue #600). Only sent after the daily renewal pass has already tried — LinkedIn caps the
     authorization at 60 days and only hands refresh tokens to approved apps, so for some accounts a
-    manual reconnect is the only option and this email IS the notice.
+    manual reconnect is the only option and this email IS the notice. A trial account is told
+    posting stopped, not commenting and messaging, which its trial never did (issue #2375).
     """
     url = account_url or _account_url()
     expires_on = _human_date(expires_on)
@@ -406,7 +431,8 @@ def send_linkedin_token_expiring_email(to_email: str, days_remaining: Optional[i
         when = "It expires soon, and we could not renew it automatically."
     elif days_remaining <= 0:
         headline = "Your LinkedIn authorization has expired"
-        when = ("It has already expired, so posting, commenting and messaging on your behalf have "
+        when = ("It has already expired, so posting on your behalf has stopped." if trial else
+                "It has already expired, so posting, commenting and messaging on your behalf have "
                 "stopped.")
     else:
         day_word = "day" if days_remaining == 1 else "days"

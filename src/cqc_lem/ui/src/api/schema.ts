@@ -255,6 +255,41 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/auth/waitlist": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Auth Waitlist Join
+         * @description Put an address on the trial list shown when the P0 cohort is full (issue #2377).
+         *
+         *     Unauthenticated by definition — the caller has no account. Nothing is sent to the address, and
+         *     a repeat submission answers exactly like the first, so the form reveals nothing about who is
+         *     already on the list. A database fault is 503, never a silent success.
+         *
+         *     Args:
+         *         request: The address to add.
+         *         http_request: The raw request, read for the client IP the rate limit is keyed on.
+         *
+         *     Returns:
+         *         `{"joined": true}` once the address is on the list.
+         *
+         *     Raises:
+         *         HTTPException: 400 for an address that is not an email, 429 when rate limited, 503 when
+         *             the list could not be written.
+         */
+        post: operations["auth_waitlist_join_api_auth_waitlist_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/automate_reply_commenting": {
         parameters: {
             query?: never;
@@ -6328,6 +6363,16 @@ export interface components {
             /** Success Url */
             success_url: string;
         };
+        /**
+         * WaitlistJoinRequest
+         * @description Body of `POST /auth/waitlist` — the join-the-list form (issue #2377).
+         *
+         *     The address is the only field: the form collects nothing it does not need.
+         */
+        WaitlistJoinRequest: {
+            /** Email */
+            email: string;
+        };
     };
     responses: never;
     parameters: never;
@@ -6666,6 +6711,39 @@ export interface operations {
             cookie?: never;
         };
         requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ResponseModel_dict_str__Any__"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    auth_waitlist_join_api_auth_waitlist_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["WaitlistJoinRequest"];
+            };
+        };
         responses: {
             /** @description Successful Response */
             200: {

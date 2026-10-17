@@ -13,7 +13,7 @@ export default function DemoBadge() {
     <div
       data-testid={DEMO_BADGE_TEST_ID}
       role="status"
-      className="fixed bottom-3 left-3 z-[60] pointer-events-none select-none rounded-md bg-amber-500/90 px-2 py-1 text-[11px] font-semibold uppercase tracking-wide text-white shadow"
+      className="fixed bottom-3 left-3 z-[60] pointer-events-none select-none rounded-control bg-warning px-2 py-1 text-[11px] font-semibold uppercase tracking-wide text-white shadow"
     >
       Demo data
     </div>

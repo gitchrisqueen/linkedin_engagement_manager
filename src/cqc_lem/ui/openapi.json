@@ -6923,6 +6923,20 @@
         ],
         "title": "VideoCreditCheckoutRequest",
         "type": "object"
+      },
+      "WaitlistJoinRequest": {
+        "description": "Body of `POST /auth/waitlist` \u2014 the join-the-list form (issue #2377).\n\nThe address is the only field: the form collects nothing it does not need.",
+        "properties": {
+          "email": {
+            "title": "Email",
+            "type": "string"
+          }
+        },
+        "required": [
+          "email"
+        ],
+        "title": "WaitlistJoinRequest",
+        "type": "object"
       }
     }
   },
@@ -7386,6 +7400,45 @@
           }
         },
         "summary": "Auth Check Session"
+      }
+    },
+    "/api/auth/waitlist": {
+      "post": {
+        "description": "Put an address on the trial list shown when the P0 cohort is full (issue #2377).\n\nUnauthenticated by definition \u2014 the caller has no account. Nothing is sent to the address, and\na repeat submission answers exactly like the first, so the form reveals nothing about who is\nalready on the list. A database fault is 503, never a silent success.\n\nArgs:\n    request: The address to add.\n    http_request: The raw request, read for the client IP the rate limit is keyed on.\n\nReturns:\n    `{\"joined\": true}` once the address is on the list.\n\nRaises:\n    HTTPException: 400 for an address that is not an email, 429 when rate limited, 503 when\n        the list could not be written.",
+        "operationId": "auth_waitlist_join_api_auth_waitlist_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/WaitlistJoinRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResponseModel_dict_str__Any__"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Auth Waitlist Join"
       }
     },
     "/api/automate_reply_commenting": {

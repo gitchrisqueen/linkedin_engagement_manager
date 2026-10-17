@@ -126,3 +126,60 @@ export function contrastRatio(a: string, b: string): number {
 export function pairRatio(pair: Pick<ApprovedPair, 'fg' | 'bg'>): number {
   return contrastRatio(TOKENS[pair.fg], TOKENS[pair.bg])
 }
+
+/** The brand pack's semantic tokens (brand/lem/DESIGN.md), as `.lem-marketing` declares them. */
+export const PACK_THEMES = {
+  light: {
+    bg: '#F9F9F9',
+    surface: '#FFFFFF',
+    text: '#1F2C37',
+    muted: '#5B6670',
+    primary: '#054DB1',
+    'on-primary': '#FFFFFF',
+    hairline: '#D7DCE1',
+    'field-border': '#7A8590',
+  },
+  dark: {
+    bg: '#111A22',
+    surface: '#1F2C37',
+    text: '#E8EDF2',
+    muted: '#A3AEB8',
+    primary: '#7FB0FF',
+    'on-primary': '#111A22',
+    hairline: '#33414D',
+    'field-border': '#7B8894',
+  },
+} as const
+
+export type PackToken = keyof (typeof PACK_THEMES)['light']
+
+/**
+ * Status colours for errors, confirmations and warnings in the app (light theme; the app has no
+ * dark mode yet). PROPOSED for brand/lem/DESIGN.md and pending the brand owner's approval; until
+ * then this is the one place they are defined, mirrored by `:root` in index.css. Each is used as
+ * text on the page ground, on a surface, on its own 10% tint, and as a fill under white text.
+ */
+export const STATUS_TOKENS = {
+  danger: '#B42318',
+  success: '#16794A',
+  warning: '#8A5A00',
+} as const
+
+/** A status colour laid over white at `alpha`, as `bg-<status>/10` renders it on a surface. */
+export function tint(hex: string, alpha: number): string {
+  const channel = (i: number) => Math.round(alpha * parseInt(hex.slice(i, i + 2), 16) + (1 - alpha) * 255)
+  return `#${[1, 3, 5].map((i) => channel(i).toString(16).padStart(2, '0')).join('')}`
+}
+
+/** Every pair the marketing tree draws with the pack tokens. Each must hold in BOTH themes. */
+export const PACK_PAIRS: { fg: PackToken; bg: PackToken; role: ContrastRole; usage: string }[] = [
+  { fg: 'text', bg: 'bg', role: 'body', usage: 'headings and body on the page ground' },
+  { fg: 'text', bg: 'surface', role: 'body', usage: 'headings and body on a raised band or panel' },
+  { fg: 'muted', bg: 'bg', role: 'body', usage: 'secondary copy and microcopy on the ground' },
+  { fg: 'muted', bg: 'surface', role: 'body', usage: 'secondary copy on a raised band or panel' },
+  { fg: 'primary', bg: 'bg', role: 'body', usage: 'links and the focus ring on the ground' },
+  { fg: 'primary', bg: 'surface', role: 'body', usage: 'links and the focus ring on a raised band' },
+  { fg: 'on-primary', bg: 'primary', role: 'body', usage: 'primary button label' },
+  { fg: 'field-border', bg: 'bg', role: 'large', usage: 'control boundary on the ground' },
+  { fg: 'field-border', bg: 'surface', role: 'large', usage: 'control boundary on a raised band' },
+]

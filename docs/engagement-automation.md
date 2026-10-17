@@ -385,6 +385,14 @@ URN-shaped attribute to read at all. So the hash-keyed share on the `Engagement 
 likely comes from the home feed, and possibly the roster pages (this probe did not read those). It
 does not come from group-feed post cards. Read the ≥ 80% target from group runs only.
 
+The roster pages went the same way (#2422). Every `Engagement scan:` line through 2026-10-06 keyed
+roster posts on `card`; from 2026-10-07, the week the activity page was rebuilt (#2399), not one
+did, and only an occasional `/feed/update/` anchor (`permalink`) saved a card from the hash. Three
+scans in a row with no URN at all is what fires `No activity URN on ANY feed post examined this
+scan`. `--roster-follow <url>` now reports `urn_evidence` for the page's first three post cards,
+the same capture as the group walk, so the next rung is grounded from a live reading rather than
+guessed.
+
 ## Replies on our own posts, and the seed comment (`sweep_reply_comments`, `auto_seed_comment_on_post`)
 
 Two different jobs on the user's own post: **seed** the thread, then **answer** it.
@@ -789,6 +797,14 @@ The ONE way LEM opens (and reads) a 1:1 thread.
   first/last — message-group label is the full display name as ONE string.
 - Winning route logged (`action_type='followup'`); `--dm-thread-url` reports the `reply_state`
   live.
+- `--dm-thread-url` walks the ladder TRACED (`open_message_thread(trace=True)`, issue #2325), so
+  its report carries, per route (`route_trace`): every candidate each scan saw (`aria_label_present`,
+  `shown`, `belongs_to_target`), each element it chose, and the post-click surface (`url_path`,
+  `composer`, `events`, `open_thread` and its `reason` from `open_thread_reason`). It also reports
+  the top card's `degree` (`unknown` when no badge reads — never guessed) and the tab count
+  `windows.before`/`after`. A walk whose every click reads `compose_screen_without_messages` is the
+  no-prior-thread compose screen the ladder rejects by design (#1851) — the verdict names it rather
+  than reading it as drift. Production walks leave `trace` off.
 
 ### Reading a thread and SENDING into one are different questions (issue #1030)
 

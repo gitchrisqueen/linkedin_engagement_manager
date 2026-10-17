@@ -66,8 +66,8 @@ export default function AdminAuditLogPage() {
   return (
     <div className="max-w-5xl space-y-6">
       <div>
-        <h1 className="text-2xl font-bold text-gray-800">Audit log</h1>
-        <p className="text-sm text-gray-500">
+        <h1 className="text-section lg:text-section-lg font-semibold text-fg">Audit log</h1>
+        <p className="text-sm text-fg-muted">
           Every admin role, disable/enable and subscription-grant change — who did it, and to whom.
         </p>
       </div>
@@ -79,25 +79,25 @@ export default function AdminAuditLogPage() {
           placeholder="Filter by user id…"
           value={userIdFilter}
           onChange={(e) => { setUserIdFilter(e.target.value); setPage(0) }}
-          className="text-sm border border-gray-300 rounded-lg px-3 py-1.5 w-48"
+          className="text-sm border border-field rounded-control px-3 py-1.5 w-48"
         />
         <button
           onClick={() => void refetch()}
           disabled={isLoading}
-          className="text-sm text-blue-600 hover:text-blue-800 font-medium disabled:opacity-50"
+          className="text-sm text-accent hover:text-accent font-medium disabled:opacity-50"
         >
           Refresh
         </button>
       </div>
 
       {error && (
-        <p className="text-sm text-red-600">Could not load the audit log: {errorText(error)}</p>
+        <p className="text-sm text-danger">Could not load the audit log: {errorText(error)}</p>
       )}
 
-      <div className="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
+      <div className="bg-raised border border-hairline rounded-panel shadow-panel overflow-hidden">
         <TableScroll label="Audit log" minWidth={800} testId="audit-log-table">
           <table className="w-full text-sm text-left">
-            <thead className="bg-gray-50 text-gray-600 font-medium">
+            <thead className="bg-page text-fg-muted font-medium">
               <tr>
                 <th className="px-4 py-3">When</th>
                 <th className="px-4 py-3">Event</th>
@@ -105,24 +105,24 @@ export default function AdminAuditLogPage() {
                 <th className="px-4 py-3">Result</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-100">
+            <tbody className="divide-y divide-hairline">
               {items.map((item) => (
-                <tr key={item.id} className="hover:bg-gray-50">
-                  <td className="px-4 py-3 text-gray-500">{when(item.created_at)}</td>
+                <tr key={item.id} className="hover:bg-accent/5">
+                  <td className="px-4 py-3 text-fg-muted">{when(item.created_at)}</td>
                   <td className="px-4 py-3">{EVENT_LABELS[item.event] ?? item.event}</td>
                   <td className="px-4 py-3">
                     {item.email ?? (item.user_id !== null ? `user #${item.user_id}` : '—')}
                   </td>
                   <td className="px-4 py-3">
                     {item.success
-                      ? <span className="text-gray-600">OK</span>
-                      : <span className="text-amber-700">Refused</span>}
+                      ? <span className="text-fg-muted">OK</span>
+                      : <span className="text-warning">Refused</span>}
                   </td>
                 </tr>
               ))}
               {items.length === 0 && !isLoading && (
                 <tr>
-                  <td colSpan={4} className="px-4 py-8 text-center text-gray-500">
+                  <td colSpan={4} className="px-4 py-8 text-center text-fg-muted">
                     No audit rows match the current filter.
                   </td>
                 </tr>
@@ -136,11 +136,11 @@ export default function AdminAuditLogPage() {
         <button
           onClick={() => setPage((p) => Math.max(0, p - 1))}
           disabled={page === 0 || isLoading}
-          className="text-blue-600 hover:text-blue-800 disabled:opacity-50"
+          className="text-accent hover:text-accent disabled:opacity-50"
         >
           Previous
         </button>
-        <span className="text-gray-600">
+        <span className="text-fg-muted">
           {total > 0
             ? `${page * PAGE_SIZE + 1}–${Math.min((page + 1) * PAGE_SIZE, total)} of ${total}`
             : 'No rows'}
@@ -148,7 +148,7 @@ export default function AdminAuditLogPage() {
         <button
           onClick={() => setPage((p) => p + 1)}
           disabled={isLoading || (page + 1) * PAGE_SIZE >= total}
-          className="text-blue-600 hover:text-blue-800 disabled:opacity-50"
+          className="text-accent hover:text-accent disabled:opacity-50"
         >
           Next
         </button>

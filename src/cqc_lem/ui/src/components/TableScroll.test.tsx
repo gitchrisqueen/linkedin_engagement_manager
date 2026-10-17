@@ -20,6 +20,13 @@ describe('TableScroll (issue #894)', () => {
     expect(screen.getByTestId('wrap').className).toContain('overflow-x-auto')
   })
 
+  it('is the containing block for absolutely positioned cell content', () => {
+    // An sr-only label in a cell is position: absolute; without this it escapes the clip and
+    // widens the page (front page at 390px measured scrollWidth 611).
+    harness()
+    expect(screen.getByTestId('wrap').className).toMatch(/(^| )relative( |$)/)
+  })
+
   it('holds a readable floor width for the table it wraps', () => {
     harness({ minWidth: 900 })
     const inner = screen.getByTestId('wrap').firstElementChild as HTMLElement

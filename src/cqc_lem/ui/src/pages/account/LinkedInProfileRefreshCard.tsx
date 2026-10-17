@@ -84,7 +84,7 @@ export default function LinkedInProfileRefreshCard() {
       subtitle="LEM writes in your voice from a cached copy of your profile. Edited your headline, skills or experience? Refresh so the next post and comment use the new version instead of waiting up to a week."
     >
       {msg && (
-        <p className={`text-sm font-medium ${msg.ok ? 'text-green-600' : 'text-amber-700'}`}>{msg.text}</p>
+        <p className={`text-sm font-medium ${msg.ok ? 'text-success' : 'text-warning'}`}>{msg.text}</p>
       )}
 
       <button
@@ -92,7 +92,7 @@ export default function LinkedInProfileRefreshCard() {
         data-testid="refresh-profile-data"
         onClick={() => mutation.mutate()}
         disabled={mutation.isPending || spent}
-        className="w-full bg-blue-600 text-white py-2 rounded-lg text-sm font-semibold hover:bg-blue-700 disabled:opacity-50 transition-colors"
+        className="w-full bg-accent text-white py-2 rounded-panel text-sm font-semibold hover:bg-accent/90 disabled:opacity-50 transition-colors"
       >
         {mutation.isPending
           ? 'Starting…'
@@ -101,7 +101,7 @@ export default function LinkedInProfileRefreshCard() {
             : 'Refresh my profile data'}
       </button>
 
-      <p className="text-xs text-gray-500">
+      <p className="text-xs text-fg-muted">
         One refresh a day. It opens a browser session against LinkedIn, so it is deliberately not
         something to press repeatedly.
       </p>

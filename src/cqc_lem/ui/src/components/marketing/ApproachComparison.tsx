@@ -9,6 +9,8 @@ import Section, { SectionHeading } from './Section'
 //
 // The `<table>` is wrapped in TableScroll because a data table has no way to say "I need more room
 // than this phone" (issue #894), and `mobileViewport.test.ts` greps this file for that import.
+// Below `sm` the same rows render as one block per capability instead: four columns at 390px only
+// fit by scrolling sideways, and the header row was cut mid-word with no cue that more existed.
 
 type Cell = boolean | string
 
@@ -18,16 +20,14 @@ const ROWS: { capability: string; cells: [Cell, Cell, Cell] }[] = [
   { capability: 'Writes in your own voice', cells: [true, 'Generic unless you prompt it every time', true] },
   { capability: 'Plans a month across a buyer journey', cells: [false, false, true] },
   { capability: 'Publishes at your golden hours', cells: ['If you are free at the time', false, true] },
-  { capability: 'Comments and replies for you daily', cells: ['An hour a day', false, true] },
-  { capability: 'Follows up on DMs on a schedule', cells: ['If you remember', false, true] },
-  { capability: 'Per-day caps and human pacing', cells: ['Whatever you feel like', false, true] },
-  { capability: 'Stops on a rate limit automatically', cells: [false, false, true] },
-  { capability: 'Approval before anything is published', cells: [true, true, true] },
-  { capability: 'Measures what each comment earned', cells: [false, false, true] },
+  { capability: 'Suggests comments and replies you send yourself', cells: ['You write each one', 'Only for posts you paste in', true] },
+  { capability: 'Suggests DM follow-ups', cells: ['If you remember', false, true] },
+  { capability: 'Approval before a post is published', cells: [true, true, true] },
+  { capability: 'Shows how each published post performed', cells: [false, false, true] },
 ]
 
 function CellValue({ value }: { value: Cell }) {
-  if (typeof value === 'string') return <span className="text-sm text-ink-600">{value}</span>
+  if (typeof value === 'string') return <span className="text-sm text-fg-muted">{value}</span>
   return <IncludedMark included={value} />
 }
 
@@ -39,19 +39,39 @@ export default function ApproachComparison() {
         title="LEM, doing it yourself, or a general AI writer"
         lede="Doing it by hand works — it just costs an hour a day. A general writer solves the smaller half of the problem."
       />
-      <TableScroll label="How LEM compares with doing it by hand and with a general AI writer">
-        <table className="w-full border-collapse bg-white text-left">
+      <ul className="border-t border-hairline sm:hidden">
+        {ROWS.map((row) => (
+          <li key={row.capability} className="border-b border-hairline py-4">
+            <p className="font-semibold text-fg">{row.capability}</p>
+            <dl className="mt-2 space-y-2">
+              {row.cells.map((cell, index) => (
+                <div key={COLUMNS[index]} className="flex items-start justify-between gap-4">
+                  <dt className="text-fg-muted">{COLUMNS[index]}</dt>
+                  <dd className="text-right">
+                    <CellValue value={cell} />
+                  </dd>
+                </div>
+              ))}
+            </dl>
+          </li>
+        ))}
+      </ul>
+      <TableScroll
+        label="How LEM compares with doing it by hand and with a general AI writer"
+        className="hidden sm:block"
+      >
+        <table className="w-full border-collapse bg-raised text-left">
           <caption className="sr-only">
             Capabilities compared across three approaches: doing it by hand, a general AI writer, and
             LEM.
           </caption>
           <thead>
-            <tr className="border-b border-line-300">
-              <th scope="col" className="p-4 text-sm font-semibold text-ink-900">
+            <tr className="border-b border-hairline">
+              <th scope="col" className="p-4 text-sm font-semibold text-fg">
                 Capability
               </th>
               {COLUMNS.map((column) => (
-                <th key={column} scope="col" className="p-4 text-sm font-semibold text-ink-900">
+                <th key={column} scope="col" className="p-4 text-sm font-semibold text-fg">
                   {column}
                 </th>
               ))}
@@ -59,8 +79,8 @@ export default function ApproachComparison() {
           </thead>
           <tbody>
             {ROWS.map((row) => (
-              <tr key={row.capability} className="border-b border-line-200">
-                <th scope="row" className="p-4 text-sm font-medium text-ink-900">
+              <tr key={row.capability} className="border-b border-hairline">
+                <th scope="row" className="p-4 text-sm font-medium text-fg">
                   {row.capability}
                 </th>
                 {row.cells.map((cell, index) => (

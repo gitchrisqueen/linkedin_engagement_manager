@@ -85,9 +85,9 @@ export default function DmTemplatesCard() {
   if (!seeded) return null
 
   return (
-    <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 space-y-4">
-      <h2 className="text-base font-semibold text-gray-700">DM Templates</h2>
-      <p className="text-xs text-gray-500">
+    <div className="bg-raised rounded-panel shadow-panel border border-hairline p-6 space-y-4">
+      <h2 className="text-base font-semibold text-fg">DM Templates</h2>
+      <p className="text-xs text-fg-muted">
         Blank uses the built-in default. Add follow-up steps to message again after a delay — the
         sequence stops automatically if they reply. Click a placeholder to insert it at your cursor:
       </p>
@@ -100,43 +100,43 @@ export default function DmTemplatesCard() {
       {DM_EVENTS.map((ev) => {
         const steps = dmTemplates.filter((t) => t.event_type === ev.key).sort((a, b) => a.step - b.step)
         return (
-          <div key={ev.key} className="border-t border-gray-100 pt-4">
-            <p className="text-sm font-semibold text-gray-700">{ev.label}</p>
+          <div key={ev.key} className="border-t border-hairline pt-4">
+            <p className="text-sm font-semibold text-fg">{ev.label}</p>
             {steps.map((t) => (
               <div key={t.step} className="mt-2 space-y-1">
-                <div className="flex items-center gap-2 text-xs text-gray-500">
+                <div className="flex items-center gap-2 text-xs text-fg-muted">
                   <span>{t.step === 0 ? 'Initial message' : `Follow-up ${t.step}`}</span>
                   {t.step > 0 && (
                     <label className="flex items-center">
                       after
                       <input type="number" min={1} value={t.delay_hours}
                         onChange={(e) => updateTemplate(ev.key, t.step, { delay_hours: Number(e.target.value) })}
-                        className="mx-1 w-16 border border-gray-300 rounded px-1 py-0.5" />
+                        className="mx-1 w-16 border border-field rounded-control px-1 py-0.5" />
                       h
                     </label>
                   )}
                   {t.step > 0 && (
                     <button type="button" onClick={() => removeStep(ev.key, t.step)}
-                      className="ml-auto text-red-500 hover:text-red-600">Remove</button>
+                      className="ml-auto text-danger hover:text-danger">Remove</button>
                   )}
                 </div>
                 <textarea value={t.template_text} rows={2} maxLength={FIELD_LIMITS.dm_template}
                   onChange={(e) => updateTemplate(ev.key, t.step, { template_text: e.target.value })}
                   placeholder="Leave blank for the default message"
-                  {...maskProps('w-full border border-gray-300 rounded-lg px-3 py-2 text-sm')} />
+                  {...maskProps('w-full border border-field rounded-panel px-3 py-2 text-sm')} />
               </div>
             ))}
             <button type="button" onClick={() => addFollowupStep(ev.key)}
-              className="mt-2 text-xs text-blue-600 font-medium hover:text-blue-700">+ Add follow-up</button>
+              className="mt-2 text-xs text-accent font-medium hover:text-accent">+ Add follow-up</button>
           </div>
         )
       })}
       {dmMsg && (
-        <p className={`text-sm font-medium ${dmMsg.ok ? 'text-green-600' : 'text-red-600'}`}>{dmMsg.text}</p>
+        <p className={`text-sm font-medium ${dmMsg.ok ? 'text-success' : 'text-danger'}`}>{dmMsg.text}</p>
       )}
       <button type="button" onClick={() => dmMutation.mutate(undefined, sectionSaveCallbacks('dm-templates'))}
         disabled={dmMutation.isPending}
-        className="w-full bg-blue-600 text-white py-2 rounded-lg text-sm font-semibold hover:bg-blue-700 disabled:opacity-50 transition-colors">
+        className="w-full bg-accent text-white py-2 rounded-panel text-sm font-semibold hover:bg-accent/90 disabled:opacity-50 transition-colors">
         {dmMutation.isPending ? 'Saving…' : 'Save DM Templates'}
       </button>
     </div>

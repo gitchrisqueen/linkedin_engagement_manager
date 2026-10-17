@@ -266,6 +266,7 @@ from cqc_lem.utilities.selenium_util import (
     is_grid_relay_error,
     is_session_lost,
     is_tab_crashed,
+    note_tab_crash,
     quit_gracefully,
     wait_for_ajax,
 )
@@ -496,6 +497,33 @@ while (el && el.parentElement && d < 6) {
 }
 return scope;
 """
+
+# Which post a mounted composer belongs to, read off the PAGE rather than off the box's label
+# (#2398). The live group feed labels the post's own comment box "Text editor for creating content"
+# — no "creating comment" in it — and on a post whose comment section renders below the
+# marker-bounded scope the page-wide fallback then had no way to claim it. The box's nearest
+# ancestor carrying a post URN is the post it belongs to (the feed-update container holds it as
+# `data-urn`), unless a comment's own container (`data-id="urn:li:comment:…"`) comes first: that
+# box is a reply under someone else's comment. A box inside an `aside` or a dialog (the messaging
+# overlay, the share modal) is never an inline post composer.
+_COMPOSER_OWNER_JS = r"""
+const POST = /urn:li:(?:activity|ugcPost|share):\d+/i;
+const box = arguments[0];
+if (!box) return null;
+if (box.closest && box.closest("aside, [role='dialog']")) return 'outside';
+let el = box.parentElement, d = 0;
+while (el && d < 25) {
+  const ident = (el.getAttribute('data-id') || '') + ' ' + (el.getAttribute('data-urn') || '');
+  if (/urn:li:comment:/i.test(ident)) return 'reply';
+  for (const a of (el.attributes || [])) {
+    const m = POST.exec(a.value || '');
+    if (m) return 'post|' + m[0];
+  }
+  el = el.parentElement; d++;
+}
+return 'unowned';
+"""
+_COMPOSER_UNOWNED = "unowned"
 
 
 def _post_author_from_card(card) -> str:
@@ -860,15 +888,58 @@ def _composer_in_post_scope(driver: WebDriver, card: WebElement, anchor: dict) -
     labelled = [c for c in candidates if _is_post_comment_box(c[0])]
     if page_wide and not labelled:
         # Unlike the scope-bounded widening above (proven to contain at most one post), the
-        # page-wide search has NO ownership bound at all — an unlabelled candidate here can be a
+        # page-wide search has NO positional ownership bound — an unlabelled candidate here can be a
         # reply box under a stranger's comment on any post already loaded on the page, not just
-        # this one. `_reply_composer_for_comment` (#883) covers that same gap with an ownership
-        # check (`_comment_container`); a post has no equivalent container to check against, so the
-        # only safe answer page-wide is: require the "creating comment" label, or skip.
-        return None
+        # this one. So an unlabelled box needs PROOF it is ours: it sits under this post's own URN
+        # container and under no comment (#2398 — the live label no longer says "comment" at all).
+        # No proof, no box: skip the post.
+        labelled = _owned_by_post(driver, card, candidates)
+        if not labelled:
+            return None
     bottom = anchor["y"] + anchor["height"]
     best = min(labelled or candidates, key=lambda br: abs(br[1]["y"] - bottom), default=None)
     return None if best is None else best[0]
+
+
+def _composer_owner(driver: WebDriver, box: WebElement) -> str | None:
+    """'reply', 'outside', 'unowned', or the lowercased post URN a mounted composer sits under.
+
+    None means the page could not be asked — never the same answer as 'unowned'.
+    """
+    try:
+        found = driver.execute_script(_COMPOSER_OWNER_JS, box)
+    except Exception:
+        return None
+    if found in ("reply", "outside", _COMPOSER_UNOWNED):
+        return found
+    m = _URN_RE.search(found) if isinstance(found, str) else None
+    return m.group(0).lower() if m else None
+
+
+def _owned_by_post(driver: WebDriver, card: WebElement, candidates: list) -> list:
+    """The candidates provably mounted under THIS post's own URN container, and no comment's."""
+    post_urn = _feed_post_container_urn(card, driver=driver)
+    if not post_urn:
+        return []
+    return [c for c in candidates if _composer_owner(driver, c[0]) == post_urn]
+
+
+def _unowned_composer_count(driver: WebDriver, anchor: dict) -> int | None:
+    """How many rendered composers at or below this post the page holds that NO post owns.
+
+    The page-native cross-check behind a composer miss (#2398, #1013): a box that mounted after our
+    Comment click and that the ownership walk cannot attribute to any post — or to a comment, or to
+    an overlay — is the resolver going blind, not a post without a composer. None when unreadable.
+    """
+    count = 0
+    for box, rect in _visible_composers(driver):
+        if rect["y"] < anchor["y"] - _COMPOSER_ABOVE_SLACK_PX:
+            continue
+        owner = _composer_owner(driver, box)
+        if owner is None:
+            return None
+        count += owner == _COMPOSER_UNOWNED
+    return count
 
 
 def _post_composer_for_card(driver: WebDriver, card: WebElement,
@@ -882,10 +953,12 @@ def _post_composer_for_card(driver: WebDriver, card: WebElement,
     — 408 in 18h, every one on a group feed. Widening is bounded by `_single_post_scope`, so the
     search area provably contains one post, which is the invariant #876 actually needs.
 
-    A miss is an expected no-op: the box never opened, so the caller skips the post and releases its
-    claim. It is logged DEBUG here, once, the way `_reply_composer_for_comment` logs its own — the
-    per-card `log_warning` it replaces escalated into a filed defect for a skip we already handle.
+    A miss is an expected no-op only when the page agrees: the box never opened, so the caller skips
+    the post and releases its claim, logged DEBUG once, the way `_reply_composer_for_comment` logs
+    its own. When the page still holds a composer below this post that no post owns, the zero is
+    the resolver's blindness, not the post's — that is graded as drift (#2398), which warns.
     """
+    anchor = None
     for _ in range(_COMPOSER_MOUNT_POLLS):
         anchor = _visible_rect(card)
         if anchor is None:
@@ -896,7 +969,13 @@ def _post_composer_for_card(driver: WebDriver, card: WebElement,
         if composer is not None:
             return composer
         time.sleep(_COMPOSER_MOUNT_POLL_SECONDS)
-    log_debug("No comment composer opened on this post card", action_type="comment", user_id=user_id)
+    unowned = _unowned_composer_count(driver, anchor)
+    if unowned:
+        _zw.grade_zero_walk(unowned, "Post comment composer resolver", action_type="comment",
+                            user_id=user_id)
+    else:
+        log_debug("No comment composer opened on this post card", action_type="comment",
+                  user_id=user_id)
     return None
 
 
@@ -1529,7 +1608,9 @@ def _roster_activity_url(profile_url: str) -> str:
 # connection and folds the toggle elsewhere, leaving only the shortened "Message <first>" action or a
 # 1st-degree badge, the same page-native signal `_CONNECT_STATE_JS` already trusts. Route C only ever
 # READS that signal — no control names the target there either, so nothing is clicked — and answers
-# 'following'. A miss on all three routes returns 'unknown' and NOTHING is clicked — fail closed,
+# 'following'. Route D (#2399), tried between B and C, reads the owner's own post-card author
+# header ("<Name> Verified Profile Following") once the 2026-10 <aside> top card dropped every
+# follow signal. A miss on every route returns 'unknown' and NOTHING is clicked — fail closed,
 # exactly like the comment affordance above.
 _FOLLOW_CONTROL_JS = r"""
 const SLUG = (arguments[0] || '').toLowerCase(), NAME = (arguments[1] || '')
@@ -1544,9 +1625,16 @@ const named = (text, verb) => {
   const rest = text.slice(verb.length + 1).trim();
   return rest === NAME || rest.startsWith(NAME + ' ');
 };
+// Since 2026-10 a top-card toggle can also read "Following, click to unfollow <Name>" (#2399): the
+// verb that names the owner is the one AFTER "click to", so that tail is matched as well.
+const clickTail = (text) => {
+  const i = text.lastIndexOf('click to ');
+  return i >= 0 ? text.slice(i + 'click to '.length) : '';
+};
 const readState = (text) => {
-  if (named(text, 'following') || named(text, 'unfollow')) return 'following';
-  if (named(text, 'follow')) return 'not_following';
+  if (named(text, 'following') || named(text, 'unfollow')
+      || named(clickTail(text), 'unfollow')) return 'following';
+  if (named(text, 'follow') || named(clickTail(text), 'follow')) return 'not_following';
   return null;
 };
 const shown = (el) => { const r = el.getBoundingClientRect(); return !!(r.width && r.height); };
@@ -1586,6 +1674,24 @@ if (SLUG) {
 
 const hit = controls(document);
 if (hit) return hit;  // Route B — any owner-named control on the page.
+
+// Route D (#2399) — since 2026-10 the activity page's top card is an <aside> carrying only a bare
+// "Message" link: no Follow toggle, no 1st badge, no shortened "Message <first>". The follow state
+// survives on the owner's OWN post cards, whose author header is labelled
+// "<Name> Verified Profile Following" (visible text "<Name> • Following") — the same slot a
+// not-followed author fills with "<Name> … Profile 3rd+" plus a "Follow <Name>" button, which
+// Routes A/B already take. Read only: it names a state, never a control, so nothing is clicked. The
+// label must START with the owner's name and END on "profile following" (live: "Verified Profile",
+// "Executive Top Voice Profile"), so a header naming anyone else, or prose that merely mentions the
+// owner, never answers.
+for (const el of document.querySelectorAll('[aria-label]')) {
+  if (!shown(el)) continue;
+  const text = norm(el.getAttribute('aria-label'));
+  if (!text.startsWith(NAME + ' ')) continue;
+  const rest = text.slice(NAME.length + 1).split(' ');
+  if (rest.length >= 2 && rest.length <= 8 && rest[rest.length - 1] === 'following'
+      && rest[rest.length - 2] === 'profile') return ['following', null];
+}
 
 // Route C (#1979) — since 2026-09 a 1st-degree connection's activity page top card renders no
 // Follow/Unfollow toggle AT ALL: a shortened "Message <first>" replaces it, exactly the
@@ -1708,11 +1814,12 @@ def _follow_control_crosscheck_sel(owner: str) -> str:
     exists for. It is a PARTLY independent read, and the limit is worth stating, because
     `zero_walk` warns that grading a chain against its own selector proves nothing: this is a CSS
     prefix match on the raw attribute, so it is independent of the chain's element filter
-    (`button, [role='button']`), its `shown()` visibility test, its normalisation and all three
-    route walks — but it shares the chain's one remaining assumption, that the label READS
-    `"<verb> <owner>"`. So a rotated ROUTE still escalates in-lane, while a rotated LABEL SHAPE
-    answers zero to both questions and stays quiet here. That residual is covered on purpose, not
-    by accident: the Monday sweep's `roster_follow` probe
+    (`button, [role='button']`), its `shown()` visibility test, its normalisation and every
+    route walk — but it shares the chain's one remaining assumption, that the label READS
+    `"<verb> <owner>"`, `"… click to <verb> <owner>"` or Route D's `"<owner> … Following"`. So a
+    rotated ROUTE still escalates in-lane, while a rotated LABEL SHAPE answers zero to both
+    questions and stays quiet here. That residual is covered on purpose, not by accident: the
+    Monday sweep's `roster_follow` probe
     (`scripts/linkedin_live_validation.py::roster_follow_state`) still grades this surface against
     the page's POST CARDS, and `sdui_drift_issues.py` files its own issue — the false positives
     that anchor produces are read by a human against the probe's `visible_controls`, which is the
@@ -1720,8 +1827,12 @@ def _follow_control_crosscheck_sel(owner: str) -> str:
     Do not "align" that probe with this selector without replacing the detection it carries.
     """
     escaped = " ".join(str(owner).split()).replace("\\", "\\\\").replace('"', '\\"')
-    return ", ".join(f'[aria-label^="{verb} {escaped}" i]'
-                     for verb in ("Follow", "Following", "Unfollow"))
+    # #2399: the "click to (un)follow" toggle shape, then Route D's post-card author header.
+    return ", ".join([*(f'[aria-label^="{verb} {escaped}" i]'
+                        for verb in ("Follow", "Following", "Unfollow")),
+                      f'[aria-label$="click to unfollow {escaped}" i]',
+                      f'[aria-label$="click to follow {escaped}" i]',
+                      f'[aria-label^="{escaped} " i][aria-label$=" Following" i]'])
 
 
 def _resolve_follow_control(driver: WebDriver, profile_url: str,
@@ -2644,6 +2755,19 @@ def comment_on_roster_posts(ctx: FeedRunContext, max_posts: int) -> dict:
                          "roster walk", user_id=user_id, action_type="comment",
                          task_name="comment_on_roster_posts")
                 break
+            if is_tab_crashed(e):
+                # A dead renderer fails every later target the same way, warning once each until
+                # it escalates (#2402). End the walk AND the run: the feed walk after it would hit
+                # the same dead tab, so the task-level catch reports it once. The blocked visits
+                # already observed are still recorded first — they are facts from pages that did
+                # load — and a failure doing so never replaces the crash being re-raised.
+                try:
+                    _record_blocked_visits(user_id, blocked_visits, stats["targets_visited"])
+                except Exception as record_error:
+                    log_warning("Could not record roster blocked visits before ending on a "
+                                "crashed tab", exc=record_error, user_id=user_id,
+                                action_type="comment", task_name="comment_on_roster_posts")
+                raise e
             log_warning("Could not open roster target's activity page", exc=e, user_id=user_id,
                         action_type="comment", task_name="comment_on_roster_posts")
             continue
@@ -4739,8 +4863,12 @@ def automate_commenting(self, user_id: int, loop_for_duration: int = None, futur
         release_run_lock(lock_name, lock_token)
         return f"Skipped — rate limited: {e}"
     except Exception as e:
-        log_error("Error while getting profile for auto commenting", exc=e, user_id=user_id,
-                  task_name="automate_commenting")
+        # A tab that crashed on the first login navigation was already warned about by
+        # `get_current_profile`; this wrapper only notes it (#2402).
+        if not note_tab_crash(e, task_name="automate_commenting", crash_logged_upstream=True,
+                              user_id=user_id):
+            log_error("Error while getting profile for auto commenting", exc=e, user_id=user_id,
+                      task_name="automate_commenting")
         release_run_lock(lock_name, lock_token)
         return f"Failed to start auto commenting: {e}"
 
@@ -4790,8 +4918,14 @@ def automate_commenting(self, user_id: int, loop_for_duration: int = None, futur
                 globals()[current_function_name].apply_async(kwargs=kwargs, countdown=future_forward)
 
     except Exception as e:
-        log_error("Error while automating commenting", exc=e, user_id=user_id, task_name="automate_commenting")
-        result = f"Error while automating commenting: {e}"
+        # A crashed tab mid-walk is a warning that escalates on repeat, not an immediate defect
+        # (#2402); the run ends here either way and the self-requeue is skipped with it.
+        if note_tab_crash(e, task_name="automate_commenting", user_id=user_id):
+            result = "Automate Commenting stopped — the browser tab crashed"
+        else:
+            log_error("Error while automating commenting", exc=e, user_id=user_id,
+                      task_name="automate_commenting")
+            result = f"Error while automating commenting: {e}"
     finally:
         quit_gracefully(driver)  # Close the driver
         # Released here (after this run's feed walk); the self-requeue fires 60s later as a fresh

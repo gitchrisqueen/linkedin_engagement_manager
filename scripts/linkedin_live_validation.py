@@ -70,6 +70,7 @@ not render is ``unknown`` and is never filed as a defect.
 """
 
 import argparse
+import inspect
 import json
 import re
 import sys
@@ -518,6 +519,7 @@ _PROBE_CAPABILITY_SYMBOLS = {
     "appreciation_sources.mention_dom": "mention_card_dom_evidence",
     "feed_sort.selector_evidence": "_feed_sort_evidence_scan",
     "group_feed_composer.urn_evidence": "card_urn_evidence",
+    "roster_follow.urn_evidence": "roster_card_urn_evidence",
     "composer.share_box_dom": "share_box_dom_evidence",
     "composer.share_box_activation": "share_box_activation_ladder",
     "composer.drift_verdict": "composer_drift_verdict",
@@ -2006,6 +2008,10 @@ def message_thread_verdict(reading: Optional[dict]) -> str:
     """
     reading = dict(reading or {})
     if not reading.get("opened"):
+        if compose_screen_only(reading):
+            return ("every route that clicked landed on the empty full-page compose screen — the "
+                    "shape a person with NO prior thread renders, which the ladder rejects by "
+                    "design (#1851); re-probe a person with a thread before calling this drift")
         if reading.get("routes_skipped"):
             return ("no direct route opened a thread — the profile-side routes are the finding; the "
                     "last-resort messaging-search route was skipped (it types a name into a box)")
@@ -2017,6 +2023,20 @@ def message_thread_verdict(reading: Optional[dict]) -> str:
         return (f"opened via {route}, but no LinkedIn display name is saved for this user "
                 f"(reply state = unknown — set it under Settings > Setup & Connection)")
     return f"opened via {route}"
+
+
+def compose_screen_only(reading: Optional[dict]) -> bool:
+    """Did every traced click land on the empty full-page compose screen (issue #2325)?
+
+    That is the one reading the ladder rejects by design — a person with no prior thread — so a walk
+    made only of it is named as such instead of being read as selector drift. False when nothing was
+    clicked, or when any click rendered something else.
+    """
+    surfaces = [click.get("surface") or {}
+                for route in (reading or {}).get("route_trace") or []
+                for click in route.get("clicks") or [] if click.get("clicked")]
+    return bool(surfaces) and all(s.get("reason") == "compose_screen_without_messages"
+                                  for s in surfaces)
 
 
 def message_thread_state(reading: Optional[dict]) -> str:
@@ -2634,6 +2654,37 @@ def probe_newsletter_edition(driver, edition_url: str, sleep=time.sleep) -> dict
     return graded(reading, newsletter_edition_state(reading), verdict)
 
 
+# A post's own Comment action, by its visible label — "Comment" or "Comment on <name>'s post", never
+# the "5 comments" count. The page-native half of the no-card cross-check below.
+_COMMENT_CONTROL_LABEL_RE = re.compile(r"^comment(?:$|\s+on\b)", re.I)
+
+
+def permalink_comment_state(reading: Optional[dict]) -> str:
+    """Three-state grade for one permalink reading.
+
+    The probe shipped without one, so every sweep summarised it as `unknown` while it was resolving
+    a composer (#2400). `ok` is exactly what production needs: a card it would pick, a Comment action on it, and a
+    composer that mounts. A card that rendered with a Comment action but no composer is the #966
+    regression, so `drift`. No card at all is `drift` only when the page itself shows a Comment
+    control the card walk missed — otherwise the page never rendered (or comments are off) and it
+    grounds nothing.
+    """
+    reading = dict(reading or {})
+    if not reading.get("cards_found"):
+        shown = any(_COMMENT_CONTROL_LABEL_RE.match(str(label).strip())
+                    for label in reading.get("visible_controls") or [])
+        return STATE_DRIFT if shown else STATE_UNKNOWN
+    if not reading.get("card_resolved"):
+        # Only reachable when the top card provably belongs to another post. On the post's own
+        # permalink that is a URN reader that lost the post — unless LinkedIn redirected elsewhere.
+        wanted = str(reading.get("permalink_urn") or "").lower()
+        landed = str(reading.get("url") or "").lower()
+        return STATE_DRIFT if wanted and wanted in landed else STATE_UNKNOWN
+    if not reading.get("comment_action") or not reading.get("composer"):
+        return STATE_DRIFT
+    return STATE_OK
+
+
 def permalink_comment_verdict(reading: dict) -> str:
     """What one permalink reading proves about the #966 comment path.
 
@@ -2645,18 +2696,19 @@ def permalink_comment_verdict(reading: dict) -> str:
     if not reading.get("cards_found"):
         return ("no card carrying a comment action rendered — production logs a FAILURE and posts "
                 "nothing (comments may be restricted on this post, or the card walk has drifted)")
-    if not reading.get("card_matched_urn") and reading.get("permalink_urn"):
-        if reading.get("top_card_urn"):
-            return ("the top card belongs to a DIFFERENT post than the permalink — production "
-                    "refuses to comment rather than comment on a recommendation")
-        return ("no card claimed the permalink's URN and the top card's URN is unreadable — "
-                "production falls back to the top card")
+    if not reading.get("card_resolved"):
+        return ("the top card belongs to a DIFFERENT post than the permalink — production "
+                "refuses to comment rather than comment on a recommendation")
+    # The top-card fallback is a working path, not a failure — say so, then grade what it reached.
+    fallback = ("no card claimed the permalink's URN and the top card's URN is unreadable, so "
+                "production falls back to the top card; "
+                if reading.get("permalink_urn") and not reading.get("card_matched_urn") else "")
     if not reading.get("comment_action"):
-        return "no Comment action on the resolved card — production cannot open a composer"
+        return fallback + "no Comment action on the resolved card — production cannot open a composer"
     if not reading.get("composer"):
-        return ("Comment action clicked but no composer resolved for this card — production skips "
-                "the post; this is the #966 failure mode returning")
-    return "composer resolved on the permalink card — production would type and submit here"
+        return (fallback + "Comment action clicked but no composer resolved for this card — "
+                "production skips the post; this is the #966 failure mode returning")
+    return fallback + "composer resolved on the permalink card — production would type and submit here"
 
 
 def probe_permalink_comment(driver, post_url: str,
@@ -2731,8 +2783,7 @@ def probe_permalink_comment(driver, post_url: str,
                 # failed Escape must not mask the evidence this probe exists to report.
                 pass
 
-    reading["verdict"] = permalink_comment_verdict(reading)
-    return reading
+    return graded(reading, permalink_comment_state(reading), permalink_comment_verdict(reading))
 
 
 def roster_follow_verdict(reading: dict) -> str:
@@ -2782,6 +2833,10 @@ def probe_roster_follow(driver, profile_url: str,
     STRICTLY read-only — it resolves the control and describes it. Nothing is clicked, so no account
     is followed by running this. That is the point: the clicker must not ship before a live run has
     shown that this resolver finds the right button on the real page.
+
+    Each run also reports `urn_evidence` for the page's first post cards: the roster pass comments
+    off this same page, and since 2026-10-07 every roster comment has keyed on the content hash
+    (#2422), so this is the reading a new key-chain rung is grounded from.
     """
     from cqc_lem.app.engagement.feed import _activity_page_owner_name, _resolve_follow_control, _roster_activity_url
     from cqc_lem.utilities.linkedin.cards import _FEED_POST_TEXT_SEL
@@ -2809,8 +2864,45 @@ def probe_roster_follow(driver, profile_url: str,
                "posts_on_page": posts,
                # The live labels the next locator pass would be written from — a bare "not found"
                # is not re-groundable.
-               "visible_controls": visible_button_labels(driver)}
+               "visible_controls": visible_button_labels(driver),
+               "urn_evidence": roster_card_urn_evidence(driver)}
     return graded(reading, roster_follow_state(reading), roster_follow_verdict(reading))
+
+
+# Enough cards to tell "this page carries no URN" from "one card did not"; each reading is bounded
+# by `_CARD_URN_EVIDENCE_JS`'s own cap.
+_ROSTER_URN_EVIDENCE_CARDS = 3
+
+
+def roster_card_urn_evidence(driver, max_cards: int = _ROSTER_URN_EVIDENCE_CARDS) -> list:
+    """#2422: `card_urn_evidence` for the first post cards on a roster target's activity page.
+
+    Cards are resolved the way `comment_on_roster_posts` resolves them (`_card_for_textbox` over
+    `_FEED_POST_TEXT_SEL`, skipping text boxes under 20 chars), so `key_source` is the key that pass
+    would write. A card reached from a second text box (a reshare renders two) is read once, or one
+    post could fill every slot. Reads attributes only.
+    """
+    from cqc_lem.utilities.linkedin.cards import _FEED_POST_TEXT_SEL, _card_for_textbox
+
+    readings: list = []
+    cards: list = []
+    try:
+        boxes = list(driver.find_elements(By.CSS_SELECTOR, _FEED_POST_TEXT_SEL))
+    except Exception as e:
+        return [{"error": f"card enumeration failed: {type(e).__name__}: {e}"[:200]}]
+    for box in boxes:
+        if len(readings) >= max_cards:
+            break
+        try:
+            if len((box.text or "").strip()) < 20:
+                continue
+            card = _card_for_textbox(driver, box)
+        except Exception:
+            card = None
+        if card is not None and card not in cards:
+            cards.append(card)
+            readings.append(card_urn_evidence(driver, card))
+    return readings
 
 
 # The recommendations read is NEW in #1007, so the DEPLOYED image this probe is piped into has no
@@ -3018,12 +3110,15 @@ def mention_card_dom_evidence(driver) -> dict:
 # it ships is exactly how the ladder it replaces shipped dead (#1007, now #2065).
 FALLBACK_MENTION_CARDS_JS = r"""
 const SENTENCE = /\b(mentioned|tagged)\s+you\b/i;
+const SENTENCES = /\b(mentioned|tagged)\s+you\b/gi;
 const MAX_CLIMB = 15;
+const OWN = String(arguments[0] || '').toLowerCase();
 const root = document.querySelector('main') || document.body;
 if (!root) return [];
 const slug = (a) => {
   const m = ((a.getAttribute('href') || '') || (a.href || '')).match(/\/in\/[^/?#]+/);
-  return m ? decodeURIComponent(m[0]).toLowerCase() : '';
+  const s = m ? decodeURIComponent(m[0]).toLowerCase() : '';
+  return s === OWN ? '' : s;
 };
 const cards = [];
 const seen = new Set();
@@ -3035,6 +3130,7 @@ for (const anchor of root.querySelectorAll('a[href*="/in/"]')) {
     if (parent === root || parent.tagName === 'BODY') break;
     const people = new Set([...parent.querySelectorAll('a[href*="/in/"]')].map(slug).filter(Boolean));
     if (people.size > 1) break;
+    if (((parent.innerText || '').match(SENTENCES) || []).length > 1) break;
     block = parent; hops++;
   }
   if (seen.has(block)) continue;
@@ -3046,20 +3142,22 @@ return cards;
 """
 
 
-def _carried_mention_cards(driver) -> list:
+def _carried_mention_cards(driver, own_url: str = "") -> list:
     """`_mention_cards`' answer without the image.
 
     The shipped locator chain first, the carried climb after it, and a read that blows up is an
-    EMPTY read rather than a crashed probe.
+    EMPTY read rather than a crashed probe. `own_url` is the account's own profile, which the climb
+    must not count as a second person on a card (#2426).
     """
-    from cqc_lem.app.engagement.outreach import _MENTION_CARD_LOCATORS
+    from cqc_lem.app.engagement.outreach import _MENTION_CARD_LOCATORS, _normalize_profile_url
     from cqc_lem.utilities.selenium_util import find_all_first
 
     cards = find_all_first(driver, _MENTION_CARD_LOCATORS)
     if cards:
         return cards
+    match = re.search(r"/in/[^/?#]+", _normalize_profile_url(own_url or ""))
     try:
-        found = driver.execute_script(FALLBACK_MENTION_CARDS_JS)
+        found = driver.execute_script(FALLBACK_MENTION_CARDS_JS, match.group(0).lower() if match else "")
     except Exception:
         return []
     # `execute_script` answers whatever the page handed back; only a list of elements is a reading.
@@ -3067,10 +3165,16 @@ def _carried_mention_cards(driver) -> list:
 
 
 def mention_cards_read() -> tuple:
-    """(the card read to drive, where it came from)."""
+    """(the card read to drive, where it came from).
+
+    Both take `(driver, own_url=...)`. An image whose read predates #2426 has no `own_url`, so it
+    would count the account's own link as a second person: the carried copy grades this branch.
+    """
     try:
         from cqc_lem.app.engagement.outreach import _mention_cards
     except ImportError:
+        return (_carried_mention_cards, "script")
+    if "own_url" not in inspect.signature(_mention_cards).parameters:
         return (_carried_mention_cards, "script")
     return (_mention_cards, "image")
 
@@ -3225,7 +3329,15 @@ def probe_appreciation_sources(driver, user_id: int, profile_url: str = "",
         driver.get(url)
         sleep(5)
         read, card_source = read_cards
-        cards = read(driver)
+        own_norm = _normalize_profile_url(own or "")
+        own_match = re.search(r"/in/[^/?#]+", own_norm)
+        own_slug = own_match.group(0).lower() if own_match else ""
+        # Production skips the account's own link and thanks the next one (#2426). An image whose
+        # `_card_person` predates that would name the account itself, so it is only asked to when
+        # it can.
+        person_kwargs = ({"exclude": own_norm}
+                         if "exclude" in inspect.signature(_card_person).parameters else {})
+        cards = read(driver, own_url=own_norm)
         rows, dated = [], 0
         for card in cards:
             text = _card_text(card)
@@ -3234,13 +3346,19 @@ def probe_appreciation_sources(driver, user_id: int, profile_url: str = "",
             age_days = age_of(text)
             if age_days is not None:
                 dated += 1
-            person_url, name = _card_person(card, person_locators)
+            person_url, name = _card_person(card, person_locators, **person_kwargs)
+            # A mention card links the account it mentions (#2426), and production never thanks
+            # the account itself.
+            person_match = re.search(r"/in/[^/?#]+", person_url or "")
+            is_self = bool(own_slug) and bool(person_match) and \
+                person_match.group(0).lower() == own_slug
             # Same fallback production uses, so a blank `name` here means the DM really would say
             # "Hi there" — not that the probe read the card differently.
             if not name and name_of is not None:
                 name = name_of(text)
             rows.append({"profile_url": person_url, "name": name,
                          "age_days": None if age_days is None else round(age_days, 2),
+                         "is_self": is_self,
                          "age_read_from": mention_stamp(text),
                          "in_window": age_days is not None and age_days <= lookback,
                          # Already thanked = production skips it even when everything else resolves.
@@ -3255,7 +3373,7 @@ def probe_appreciation_sources(driver, user_id: int, profile_url: str = "",
                    "card_source": card_source,
                    "stamp_source": stamp_source,
                    "people": [r for r in rows if r["in_window"] and r["profile_url"]
-                              and not r["already_thanked"]],
+                              and not r["already_thanked"] and not r["is_self"]],
                    "rows": rows[:10]}
         if page_native is not None:
             # Taken on EVERY run, not only a zero one: the count is what makes a green reading
@@ -6781,6 +6899,13 @@ def probe_message_thread(driver, profile_url: str, person_name: str = "", self_n
     """#731: walk the message-thread resolution ladder against a REAL profile and report which route
     resolved, which surface rendered (overlay vs full page), and what the reply reader then sees.
 
+    #2325: the walk is TRACED, so `route_trace` carries, per route, every candidate control each scan
+    saw (aria-label present or absent, shown, belongs-to-target verdict), every element the route
+    chose, and the post-click surface (URL path, composer, event count, and `is_open_thread`'s
+    verdict with its reason). `degree` is the top card's badge, `unknown` when none was readable —
+    never guessed. `windows` is the tab count before and after the walk; the ladder owns its windows
+    (#1796), so anything but one-and-one is a leak.
+
     `self_name` is the saved LinkedIn display name, so the probe also answers the OTHER half of a
     live reply check: does the name the user typed into Settings actually match what LinkedIn writes
     on their own messages? A mismatch reads as UNKNOWN in production and silently stops follow-ups.
@@ -6806,9 +6931,10 @@ def probe_message_thread(driver, profile_url: str, person_name: str = "", self_n
         ROUTE_MESSAGING_SEARCH, open_message_thread, profile_urn_from_page, read_last_sender)
 
     wait = WebDriverWait(driver, 10)
+    windows_before = _window_count(driver)
     try:
         opened = open_message_thread(driver, wait, profile_url, person_name=person_name or None,
-                                     skip_routes=(ROUTE_MESSAGING_SEARCH,))
+                                     skip_routes=(ROUTE_MESSAGING_SEARCH,), trace=True)
     except ReadOnlyViolation as e:
         return graded({"profile_url": profile_url, "opened": False, "route": None,
                        "read_only_blocked": str(e)}, STATE_UNKNOWN,
@@ -6822,12 +6948,23 @@ def probe_message_thread(driver, profile_url: str, person_name: str = "", self_n
                "surface": opened.surface,
                "events": opened.events,
                "composer": opened.composer,
+               "degree": opened.degree or "unknown",
+               "route_trace": list(opened.route_trace),
+               "windows": {"before": windows_before, "after": _window_count(driver)},
                "self_name": self_name or "",
                "profile_urn": profile_urn_from_page(driver, profile_url)}
     sleep(1)
     reading["last_sender"] = read_last_sender(driver) if opened.opened else ""
     reading["reply_state"] = _reply_state(reading)
     return graded(reading, message_thread_state(reading), message_thread_verdict(reading))
+
+
+def _window_count(driver) -> Optional[int]:
+    """How many tabs the driver holds — None when unreadable, never a guessed number."""
+    try:
+        return len(driver.window_handles)
+    except Exception:
+        return None
 
 
 def _reply_state(reading: dict) -> str:

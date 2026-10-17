@@ -36,12 +36,12 @@ const STAGE_HELP: Record<string, string> = {
 }
 
 const STATUS_COLORS: Record<string, string> = {
-  pending: 'bg-yellow-100 text-yellow-700',
-  approved: 'bg-green-100 text-green-700',
-  acted: 'bg-blue-100 text-blue-700',
-  skipped: 'bg-gray-100 text-gray-500',
-  failed: 'bg-red-100 text-red-700',
-  canceled: 'bg-gray-100 text-gray-500',
+  pending: 'bg-warning/10 text-warning',
+  approved: 'bg-success/10 text-success',
+  acted: 'bg-accent/10 text-accent',
+  skipped: 'bg-page text-fg-muted',
+  failed: 'bg-danger/10 text-danger',
+  canceled: 'bg-page text-fg-muted',
 }
 
 const STATUSES = ['ALL', 'pending', 'approved', 'acted', 'skipped', 'failed', 'canceled']
@@ -113,12 +113,12 @@ export default function OutreachFunnel() {
 
   return (
     <div className="space-y-4">
-      {msg && <p className={`text-sm font-medium ${msg.ok ? 'text-green-600' : 'text-red-600'}`}>{msg.text}</p>}
+      {msg && <p className={`text-sm font-medium ${msg.ok ? 'text-success' : 'text-danger'}`}>{msg.text}</p>}
 
       {/* New target */}
-      <div className="bg-white rounded-lg border border-gray-200 shadow-sm p-5 space-y-3">
-        <h3 className="font-semibold text-gray-700">Add a target to the funnel</h3>
-        <p className="text-xs text-gray-500">
+      <div className="bg-raised rounded-panel border border-hairline shadow-panel p-5 space-y-3">
+        <h3 className="font-semibold text-fg">Add a target to the funnel</h3>
+        <p className="text-xs text-fg-muted">
           Each target moves comment → connect → DM, and <span className="font-semibold">every step needs your
           approval</span> before it fires. Approving a step advances the target to the next step for review — nothing
           sends automatically.
@@ -126,24 +126,24 @@ export default function OutreachFunnel() {
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <input type="url" value={url} onChange={(e) => setUrl(e.target.value)} maxLength={512}
             placeholder="Target profile URL (https://www.linkedin.com/in/…)"
-            className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" />
+            className="w-full border border-field rounded-control px-3 py-2 text-sm" />
           <input type="text" value={name} onChange={(e) => setName(e.target.value)} maxLength={255}
             placeholder="Target name (optional)"
-            className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" />
+            className="w-full border border-field rounded-control px-3 py-2 text-sm" />
         </div>
         <input type="url" value={contextUrl} onChange={(e) => setContextUrl(e.target.value)} maxLength={512}
           placeholder="Post URL to comment on (the first step)"
-          className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" />
+          className="w-full border border-field rounded-control px-3 py-2 text-sm" />
         <textarea value={draft} onChange={(e) => setDraft(e.target.value)} rows={3} maxLength={DRAFT_MAX}
           placeholder="Your value-adding comment…"
-          {...maskProps('w-full border border-gray-300 rounded-lg px-3 py-2 text-sm')} />
+          {...maskProps('w-full border border-field rounded-panel px-3 py-2 text-sm')} />
         <div className="flex flex-wrap items-center gap-3">
           <button onClick={() => createMutation.mutate('pending')} disabled={!canSubmit || createMutation.isPending}
-            className="px-4 py-2 border border-gray-300 rounded-lg text-sm text-gray-700 hover:bg-gray-50 disabled:opacity-50">
+            className="px-4 py-2 border border-field rounded-control text-sm text-fg hover:bg-page disabled:opacity-50">
             Save draft
           </button>
           <button onClick={() => createMutation.mutate('approved')} disabled={!canSubmit || createMutation.isPending}
-            className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-semibold hover:bg-blue-700 disabled:opacity-50">
+            className="px-4 py-2 bg-accent text-white rounded-control text-sm font-semibold hover:bg-accent/90 disabled:opacity-50">
             {createMutation.isPending ? 'Adding…' : 'Add & approve comment'}
           </button>
         </div>
@@ -154,16 +154,16 @@ export default function OutreachFunnel() {
         {STATUSES.map((s) => (
           <button key={s} onClick={() => setFilter(s)}
             className={`px-3 py-1.5 rounded-full text-xs font-semibold transition-colors ${
-              filter === s ? 'bg-blue-600 text-white' : 'bg-white text-gray-600 border border-gray-300 hover:border-blue-400'
+              filter === s ? 'bg-accent text-white' : 'bg-raised text-fg-muted border border-field hover:border-accent/50'
             }`}>
             {s.toUpperCase()}
           </button>
         ))}
       </div>
 
-      {isLoading && <p className="text-gray-400 text-sm">Loading funnel…</p>}
+      {isLoading && <p className="text-fg-muted text-sm">Loading funnel…</p>}
       {!isLoading && targets.length === 0 && (
-        <div className="text-center py-10 bg-white rounded-lg border border-gray-200 text-sm text-gray-500">
+        <div className="text-center py-10 bg-raised rounded-panel border border-hairline text-sm text-fg-muted">
           No targets in the funnel yet.
         </div>
       )}
@@ -174,22 +174,22 @@ export default function OutreachFunnel() {
           const draftValue = editing ? edits[t.id] : (t.draft_text ?? '')
           const terminal = ['completed'].includes(t.stage) || ['canceled', 'acted'].includes(t.status)
           return (
-            <div key={t.id} className="bg-white rounded-lg border border-gray-200 p-4 space-y-2">
+            <div key={t.id} className="bg-raised rounded-panel border border-hairline p-4 space-y-2">
               <div className="flex items-center justify-between gap-2">
                 <a href={t.target_profile_url} target="_blank" rel="noopener noreferrer"
-                  className="text-sm font-medium text-blue-700 truncate hover:underline">
+                  className="text-sm font-medium text-accent truncate hover:underline">
                   {t.target_name || t.target_profile_url}
                 </a>
                 <div className="flex items-center gap-2 shrink-0">
-                  <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-indigo-100 text-indigo-700">
+                  <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-accent/10 text-accent">
                     {STAGE_LABELS[t.stage] ?? t.stage}
                   </span>
-                  <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${STATUS_COLORS[t.status] ?? 'bg-gray-100 text-gray-600'}`}>
+                  <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${STATUS_COLORS[t.status] ?? 'bg-page text-fg-muted'}`}>
                     {t.status.toUpperCase()}
                   </span>
                 </div>
               </div>
-              <p className="text-xs text-gray-400">{STAGE_HELP[t.stage] ?? ''}</p>
+              <p className="text-xs text-fg-muted">{STAGE_HELP[t.stage] ?? ''}</p>
 
               {!terminal && (
                 <>
@@ -198,30 +198,30 @@ export default function OutreachFunnel() {
                     onChange={(e) => setEdits((prev) => ({ ...prev, [t.id]: e.target.value }))}
                     rows={3} maxLength={DRAFT_MAX}
                     placeholder={t.stage === 'comment' ? 'Comment text…' : t.stage === 'connect' ? 'Connection note…' : 'DM message…'}
-                    {...maskProps('w-full border border-gray-300 rounded-lg px-3 py-2 text-sm')} />
+                    {...maskProps('w-full border border-field rounded-panel px-3 py-2 text-sm')} />
                   <div className="flex gap-2 flex-wrap">
                     <button onClick={() => saveMutation.mutate({ id: t.id, draft_text: draftValue })}
                       disabled={!editing || saveMutation.isPending}
-                      className="px-3 py-1 border border-gray-300 text-gray-600 rounded text-xs font-semibold hover:bg-gray-50 disabled:opacity-50">
+                      className="px-3 py-1 border border-field text-fg-muted rounded-control text-xs font-semibold hover:bg-page disabled:opacity-50">
                       Save draft
                     </button>
                     {['pending', 'failed', 'skipped'].includes(t.status) && (
                       <button onClick={() => actionMutation.mutate({ id: t.id, action: 'approve' })}
                         disabled={actionMutation.isPending}
-                        className="px-3 py-1 bg-green-600 text-white rounded text-xs font-semibold hover:bg-green-700 disabled:opacity-50">
+                        className="px-3 py-1 bg-accent text-on-accent rounded-control text-xs font-semibold hover:bg-accent/90 disabled:opacity-50">
                         {t.status === 'pending' ? 'Approve' : 'Retry'} {t.stage}
                       </button>
                     )}
                     <button onClick={() => actionMutation.mutate({ id: t.id, action: 'cancel' })}
                       disabled={actionMutation.isPending}
-                      className="px-3 py-1 border border-gray-300 text-gray-600 rounded text-xs font-semibold hover:bg-gray-50 disabled:opacity-50">
+                      className="px-3 py-1 border border-field text-fg-muted rounded-control text-xs font-semibold hover:bg-page disabled:opacity-50">
                       Cancel
                     </button>
                   </div>
                 </>
               )}
               {terminal && t.draft_text && (
-                <p className="text-sm text-gray-700 whitespace-pre-wrap line-clamp-3">{t.draft_text}</p>
+                <p className="text-sm text-fg whitespace-pre-wrap line-clamp-3">{t.draft_text}</p>
               )}
             </div>
           )

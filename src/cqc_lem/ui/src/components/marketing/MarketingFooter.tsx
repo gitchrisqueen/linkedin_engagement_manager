@@ -11,21 +11,21 @@ export default function MarketingFooter() {
   const year = new Date().getFullYear()
 
   return (
-    <footer className="bg-ink-900 text-white">
-      <div className="max-w-6xl mx-auto px-4 py-12">
+    <footer data-theme="dark" className="lem-marketing bg-raised text-fg">
+      <div className="box-content max-w-6xl mx-auto px-4 py-12">
         <div className="flex flex-col gap-8 md:flex-row md:items-start md:justify-between">
           <div className="max-w-sm">
             <img
-              src="/brand/lem-wordmark-on-dark.png"
+              src="/brand/lem-wordmark-on-dark-v2.png"
               alt="LinkedIn Engagement Manager"
               width={1340}
               height={300}
-              className="h-8 w-auto"
+              className="-ml-[5px] h-8 w-auto"
               loading="lazy"
             />
-            <p className="mt-4 text-sm leading-relaxed text-brand-300">
-              Content and engagement for LinkedIn, run inside the caps you set — with you approving
-              what ships.
+            <p className="mt-4 text-sm leading-relaxed text-fg-muted">
+              LinkedIn posts in your voice, published only when you approve them, plus engagement
+              suggestions you send yourself.
             </p>
           </div>
           {/* Deliberately NOT a second <nav> landmark: the page is meant to expose exactly one, and
@@ -36,20 +36,20 @@ export default function MarketingFooter() {
             <ul className="flex flex-col gap-3">
               {NAV_ANCHORS.map(({ href, label }) => (
                 <li key={href}>
-                  <NavAnchor href={href} className="text-white hover:text-brand-300 transition-colors">
+                  <NavAnchor href={href} className="text-fg hover:text-accent transition-colors">
                     {label}
                   </NavAnchor>
                 </li>
               ))}
               <li>
-                <Link to="/privacy-policy" className="text-white hover:text-brand-300 transition-colors">
+                <Link to="/privacy-policy" className="text-fg hover:text-accent transition-colors">
                   Privacy Policy
                 </Link>
               </li>
               <li>
                 <Link
                   to="/terms-and-conditions"
-                  className="text-white hover:text-brand-300 transition-colors"
+                  className="text-fg hover:text-accent transition-colors"
                 >
                   Terms and Conditions
                 </Link>
@@ -57,9 +57,9 @@ export default function MarketingFooter() {
             </ul>
           </div>
         </div>
-        <div className="mt-10 border-t border-ink-700 pt-6 space-y-2 text-brand-300">
-          <LegalDisclaimer />
-          <p className="text-xs">
+        <div className="mt-10 border-t border-hairline pt-6 space-y-2 text-fg-muted">
+          <LegalDisclaimer className="max-w-measure" />
+          <p className="max-w-measure text-xs">
             © {year} Christopher Queen Consulting LLC. All rights reserved.
             {data?.show_version && data.version ? ` · v${data.version}` : ''}
           </p>

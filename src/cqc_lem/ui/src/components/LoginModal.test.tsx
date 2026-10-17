@@ -162,3 +162,54 @@ describe('LoginModal on a short viewport (issue #894)', () => {
     expect(panel.className).toContain('overflow-y-auto')
   })
 })
+
+describe('LoginModal — trial cohort full (issue #2377)', () => {
+  async function submitEmail(response: Record<string, unknown>) {
+    post.mockResolvedValueOnce({ data: { detail: response } })
+    render(<LoginModal />)
+    fireEvent.change(screen.getByPlaceholderText('your@email.com'),
+                     { target: { value: 'New@Example.com' } })
+    fireEvent.click(screen.getByText('Continue'))
+  }
+
+  it('shows the join-the-list form instead of a code step when the cohort is full', async () => {
+    await submitEmail({ waitlist: true, email: 'new@example.com' })
+    await waitFor(() => expect(screen.getByText('Trial spots are full')).toBeTruthy())
+    expect(screen.getByText('All trial spots are currently taken. Add your email to join the list.'))
+      .toBeTruthy()
+    expect(screen.queryByPlaceholderText('123456')).toBeNull()
+    expect(login).not.toHaveBeenCalled()
+  })
+
+  it('sends only the email address and confirms it joined', async () => {
+    await submitEmail({ waitlist: true, email: 'new@example.com' })
+    await waitFor(() => expect(screen.getByText('Join the list')).toBeTruthy())
+
+    post.mockResolvedValueOnce({ data: { detail: { joined: true } } })
+    fireEvent.click(screen.getByText('Join the list'))
+
+    await waitFor(() => expect(screen.getByText("You're on the list")).toBeTruthy())
+    const call = post.mock.calls.find((c) => c[0] === '/auth/waitlist')
+    expect(call?.[1]).toEqual({ email: 'new@example.com' })
+  })
+
+  it('keeps the form and shows the error when the list cannot be saved', async () => {
+    await submitEmail({ waitlist: true, email: 'new@example.com' })
+    await waitFor(() => expect(screen.getByText('Join the list')).toBeTruthy())
+
+    post.mockRejectedValueOnce({
+      response: { status: 503, data: { detail: 'Could not save your email — try again shortly' } },
+    })
+    fireEvent.click(screen.getByText('Join the list'))
+
+    await waitFor(() =>
+      expect(screen.getByText('Could not save your email — try again shortly')).toBeTruthy())
+    expect(screen.queryByText("You're on the list")).toBeNull()
+  })
+
+  it('sends a verified code to the list form when the cohort filled in the meantime', async () => {
+    await submitEmailThenPin({ waitlist: true, email: 'me@example.com' })
+    await waitFor(() => expect(screen.getByText('Trial spots are full')).toBeTruthy())
+    expect(login).not.toHaveBeenCalled()
+  })
+})

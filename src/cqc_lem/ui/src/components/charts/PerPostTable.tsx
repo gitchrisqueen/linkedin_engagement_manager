@@ -28,22 +28,22 @@ export default function PerPostTable({ posts }: { posts: PerPost[] }) {
 
   return (
     <div>
-      <h3 className="text-sm font-semibold text-gray-700">
+      <h3 className="text-sm font-semibold text-fg">
         <button
           type="button"
           onClick={() => setOpen(!open)}
           aria-expanded={open}
-          className="w-full flex items-center justify-between gap-2 text-left hover:text-gray-900"
+          className="w-full flex items-center justify-between gap-2 text-left hover:text-fg"
         >
           <span>
             Per-post performance{' '}
-            <span className="font-normal text-gray-400">
+            <span className="font-normal text-fg-muted">
               ({posts.length} post{posts.length === 1 ? '' : 's'})
             </span>
           </span>
           <span
             aria-hidden="true"
-            className={`text-gray-400 leading-none transition-transform ${open ? 'rotate-180' : ''}`}
+            className={`text-fg-muted leading-none transition-transform ${open ? 'rotate-180' : ''}`}
           >
             ▾
           </span>
@@ -51,7 +51,7 @@ export default function PerPostTable({ posts }: { posts: PerPost[] }) {
       </h3>
       {open &&
         (posts.length === 0 ? (
-          <p className="text-xs text-gray-400 mt-2" data-testid="per-post-empty">
+          <p className="text-xs text-fg-muted mt-2" data-testid="per-post-empty">
             No posts with captured stats in this window.
           </p>
         ) : (
@@ -63,7 +63,7 @@ export default function PerPostTable({ posts }: { posts: PerPost[] }) {
           >
             <table className="w-full text-xs text-left tabular-nums">
               <thead>
-                <tr className="text-gray-500 border-b border-gray-200">
+                <tr className="text-fg-muted border-b border-hairline">
                   <th className="py-1.5 pr-3 font-medium">Date</th>
                   <th className="py-1.5 pr-3 font-medium">Format</th>
                   <th className="py-1.5 pr-3 font-medium">Hook</th>
@@ -77,7 +77,7 @@ export default function PerPostTable({ posts }: { posts: PerPost[] }) {
               </thead>
               <tbody>
                 {posts.map((p) => (
-                  <tr key={p.post_id} className="border-b border-gray-100 last:border-0 text-gray-700">
+                  <tr key={p.post_id} className="border-b border-hairline last:border-0 text-fg">
                     <td className="py-1.5 pr-3 whitespace-nowrap">
                       {p.scheduled_time ? shortDate(p.scheduled_time.slice(0, 10)) : '—'}
                     </td>

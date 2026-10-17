@@ -7,12 +7,13 @@ re-exports every name below, so existing importers and patch targets keep resolv
 
 import json
 import uuid
+from contextlib import contextmanager
 from datetime import (
     datetime,
     timedelta,
     timezone,
 )
-from typing import Optional
+from typing import Iterator, Optional
 
 import mysql.connector
 from mysql.connector import errorcode
@@ -1087,6 +1088,122 @@ def add_user_by_email(email: str) -> Optional[int]:
     finally:
         cursor.close()
         connection.close()
+# --- P0 trial cohort cap (issue #2377) ---------------------------------------------------------
+# A cohort member is a self-serve trial account: `add_user_by_email` stamps `trial_started_at` on
+# insert, which nothing else that creates a `users` row does (the LinkedIn OAuth upsert and the
+# demo seed leave it NULL). Admins are the operators, not the cohort, so they never take a slot.
+_TRIAL_COHORT_COUNT_SQL = "SELECT COUNT(*) FROM users WHERE trial_started_at IS NOT NULL AND is_admin = 0"
+# A MySQL named lock, so count-then-insert is serialised across every API worker and replica that
+# shares this database. GET_LOCK answers 1 (held), 0 (timed out) or NULL (error).
+TRIAL_COHORT_LOCK_NAME = "lem_trial_cohort_signup"
+TRIAL_COHORT_LOCK_TIMEOUT_SECONDS = 5
+
+
+def count_trial_cohort_members() -> Optional[int]:
+    """How many self-serve trial accounts exist, for the P0 cohort cap (issue #2377).
+
+    Unlike most readers here this one does not fail soft to 0: zero would read as "every slot is
+    free" and open signup during an outage. The caller fails CLOSED on None.
+
+    Returns:
+        The member count, or None when the database could not answer.
+    """
+    try:
+        with db_cursor() as cursor:
+            cursor.execute(_TRIAL_COHORT_COUNT_SQL)
+            row = cursor.fetchone()
+            return int(row[0]) if row else None
+    except (mysql.connector.Error, TypeError, ValueError) as err:
+        log_warning("Could not read the trial cohort count", exc=err)
+        return None
+
+
+@contextmanager
+def trial_cohort_slot(cap: int) -> Iterator[bool]:
+    """Hold the cohort lock and say whether a new trial account fits under `cap` (issue #2377).
+
+    The count and the caller's insert run INSIDE one named lock, so two signups racing for the
+    last slot are serialised and the second one counts the first one's row: the cap is hard, not
+    soft. The lock lives on this function's own connection and is released on exit (closing the
+    connection releases it too, so a raising body cannot leave it held).
+
+    Fails CLOSED: a connection fault, a lock that is not granted within
+    `TRIAL_COHORT_LOCK_TIMEOUT_SECONDS`, or an unreadable count all yield False, which the signup
+    path answers with the join-the-list form rather than an account.
+
+    Args:
+        cap: The most cohort members allowed. 0 or less means no slot is ever open.
+
+    Yields:
+        True when the caller may create ONE account while the lock is held, else False.
+    """
+    try:
+        connection = _connection.get_db_connection()
+    except (mysql.connector.Error, TypeError, ValueError) as err:
+        log_warning("Could not open the trial cohort lock connection", exc=err)
+        yield False
+        return
+    cursor = None
+    locked = False
+    try:
+        try:
+            cursor = connection.cursor()
+            cursor.execute("SELECT GET_LOCK(%s, %s)", (TRIAL_COHORT_LOCK_NAME, TRIAL_COHORT_LOCK_TIMEOUT_SECONDS))
+            row = cursor.fetchone()
+            locked = bool(row) and row[0] == 1
+            used: Optional[int] = None
+            if locked:
+                cursor.execute(_TRIAL_COHORT_COUNT_SQL)
+                count_row = cursor.fetchone()
+                used = int(count_row[0]) if count_row else None
+        except (mysql.connector.Error, TypeError, ValueError) as err:
+            # ONE warning for the fault, wherever in the lock-then-count sequence it landed.
+            log_warning("Could not read the trial cohort count", exc=err)
+            used = None
+        else:
+            if not locked:
+                log_warning("Trial cohort lock not granted; signup offered the list instead")
+        has_room = locked and used is not None and used < int(cap)
+        if locked and used is not None and not has_room:
+            log_info("Trial cohort is full; signup offered the join-the-list form")
+        yield has_room
+    finally:
+        try:
+            if locked and cursor is not None:
+                cursor.execute("SELECT RELEASE_LOCK(%s)", (TRIAL_COHORT_LOCK_NAME,))
+                cursor.fetchone()
+        except mysql.connector.Error as err:
+            log_debug(f"Trial cohort lock release failed; the connection close releases it: {err}")
+        finally:
+            if cursor is not None:
+                cursor.close()
+            connection.close()
+
+
+def add_to_trial_waitlist(email: str, launch_phase: str) -> bool:
+    """Record an address on the join-the-list form (issue #2377). Nothing is ever sent to it.
+
+    Idempotent: the UNIQUE email key turns a second submission into a no-op, so the answer to a
+    repeat is the same True and the form cannot be used to learn whether an address already joined.
+
+    Args:
+        email: The normalised (stripped, lower-cased) address.
+        launch_phase: The phase that was live when the address joined.
+
+    Returns:
+        True when the address is on the list, False when the database could not be written.
+    """
+    try:
+        with db_cursor(commit=True) as cursor:
+            cursor.execute(
+                "INSERT INTO trial_waitlist (email, launch_phase) VALUES (%s, %s) "
+                "ON DUPLICATE KEY UPDATE id = id",
+                (email, launch_phase),
+            )
+        return True
+    except mysql.connector.Error as err:
+        log_warning("Could not add an address to the trial waitlist", exc=err)
+        return False
 def get_user_public_uid(user_id: int) -> Optional[str]:
     """The account's public identifier (issue #745, 2b). Lazily minted for a row that predates the
     column and somehow escaped the migration backfill, so callers never have to handle None.

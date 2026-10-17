@@ -32,13 +32,13 @@ const EVENT_LABELS: Record<string, string> = Object.fromEntries(
 )
 
 const STATUS_COLORS: Record<string, string> = {
-  pending: 'bg-yellow-100 text-yellow-700',
-  approved: 'bg-green-100 text-green-700',
-  sending: 'bg-purple-100 text-purple-700',
-  sent: 'bg-blue-100 text-blue-700',
-  skipped: 'bg-gray-100 text-gray-500',
-  failed: 'bg-red-100 text-red-700',
-  canceled: 'bg-gray-100 text-gray-500',
+  pending: 'bg-warning/10 text-warning',
+  approved: 'bg-success/10 text-success',
+  sending: 'bg-accent/10 text-accent',
+  sent: 'bg-accent/10 text-accent',
+  skipped: 'bg-page text-fg-muted',
+  failed: 'bg-danger/10 text-danger',
+  canceled: 'bg-page text-fg-muted',
 }
 
 // ALL first and selected by default, like every other review queue (ConnectionRequests, etc.). A
@@ -141,11 +141,11 @@ export default function CatchupTouches({ userTimezone }: { userTimezone: string 
 
   return (
     <div className="space-y-4">
-      {msg && <p className={`text-sm font-medium ${msg.ok ? 'text-green-600' : 'text-red-600'}`}>{msg.text}</p>}
+      {msg && <p className={`text-sm font-medium ${msg.ok ? 'text-success' : 'text-danger'}`}>{msg.text}</p>}
 
-      <div className="bg-white rounded-lg border border-gray-200 shadow-sm p-5 space-y-1">
-        <h3 className="font-semibold text-gray-700">Catch-up congratulations</h3>
-        <p className="text-xs text-gray-500">
+      <div className="bg-raised rounded-panel border border-hairline shadow-panel p-5 space-y-1">
+        <h3 className="font-semibold text-fg">Catch-up congratulations</h3>
+        <p className="text-xs text-fg-muted">
           LEM scans your LinkedIn Catch-up feed daily for network milestones — new jobs, promotions,
           work anniversaries — scores them against your targeting, and queues LinkedIn's own suggested
           congratulations for each one (switch to an AI-written version in Account → Catch-up message).
@@ -162,7 +162,7 @@ export default function CatchupTouches({ userTimezone }: { userTimezone: string 
         {STATUSES.map((s) => (
           <button key={s} onClick={() => setFilter(s)}
             className={`px-3 py-1.5 rounded-full text-xs font-semibold transition-colors ${
-              filter === s ? 'bg-blue-600 text-white' : 'bg-white text-gray-600 border border-gray-300 hover:border-blue-400'
+              filter === s ? 'bg-accent text-white' : 'bg-raised text-fg-muted border border-field hover:border-accent/50'
             }`}>
             {s.toUpperCase()}
           </button>
@@ -171,13 +171,13 @@ export default function CatchupTouches({ userTimezone }: { userTimezone: string 
 
       {/* Sort + date-range filter (issue #1464) */}
       <div className="flex items-center gap-3 flex-wrap">
-        <label className="flex items-center gap-1.5 text-xs text-gray-600">
+        <label className="flex items-center gap-1.5 text-xs text-fg-muted">
           <span>Sort by</span>
           <select
             value={sortBy}
             onChange={(e) => setSortBy(e.target.value as SortBy)}
             aria-label="Sort catch-up touches by"
-            className="border border-gray-300 rounded-lg px-2 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-blue-500"
+            className="border border-field rounded-control px-2 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-accent"
           >
             {SORT_BY_OPTIONS.map((o) => (
               <option key={o.value} value={o.value}>{o.label}</option>
@@ -186,19 +186,19 @@ export default function CatchupTouches({ userTimezone }: { userTimezone: string 
         </label>
         <button
           onClick={() => setSortOrder((o) => (o === 'asc' ? 'desc' : 'asc'))}
-          className="flex items-center gap-1 text-gray-600 border border-gray-300 rounded-lg px-3 py-1.5 hover:border-blue-400 transition-colors text-xs font-medium"
+          className="flex items-center gap-1 text-fg-muted border border-field rounded-control px-3 py-1.5 hover:border-accent/50 transition-colors text-xs font-medium"
         >
           {sortBy === 'date'
             ? (sortOrder === 'asc' ? '↑ Oldest first' : '↓ Newest first')
             : (sortOrder === 'asc' ? '↑ Lowest score first' : '↓ Highest score first')}
         </button>
-        <label className="flex items-center gap-1.5 text-xs text-gray-600">
+        <label className="flex items-center gap-1.5 text-xs text-fg-muted">
           <span>Date</span>
           <select
             value={dateRange}
             onChange={(e) => setDateRange(e.target.value as DateRangeFilter)}
             aria-label="Date range preset"
-            className="border border-gray-300 rounded-lg px-2 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-blue-500"
+            className="border border-field rounded-control px-2 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-accent"
           >
             {CATCHUP_DATE_RANGES.map((d) => (
               <option key={d.value} value={d.value}>{d.label}</option>
@@ -206,13 +206,13 @@ export default function CatchupTouches({ userTimezone }: { userTimezone: string 
           </select>
         </label>
         {dateRange === 'custom' && (
-          <div className="flex items-center gap-1.5 text-xs text-gray-600">
+          <div className="flex items-center gap-1.5 text-xs text-fg-muted">
             <input
               type="date"
               value={customStartDate}
               onChange={(e) => setCustomStartDate(e.target.value)}
               aria-label="Custom start date"
-              className="border border-gray-300 rounded-lg px-2 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-blue-500"
+              className="border border-field rounded-control px-2 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-accent"
             />
             <span>to</span>
             <input
@@ -220,32 +220,32 @@ export default function CatchupTouches({ userTimezone }: { userTimezone: string 
               value={customEndDate}
               onChange={(e) => setCustomEndDate(e.target.value)}
               aria-label="Custom end date"
-              className="border border-gray-300 rounded-lg px-2 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-blue-500"
+              className="border border-field rounded-control px-2 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-accent"
             />
           </div>
         )}
       </div>
 
       {!isLoading && hiddenByPaging > 0 && (
-        <p className="text-xs text-gray-500">
+        <p className="text-xs text-fg-muted">
           Showing the {touches.length} {sortSummary} of {total} touches — {hiddenByPaging} not
           listed. Pick a status or date range above to narrow the list.
         </p>
       )}
 
-      {isLoading && <p className="text-gray-400 text-sm">Loading catch-up touches…</p>}
+      {isLoading && <p className="text-fg-muted text-sm">Loading catch-up touches…</p>}
       {!isLoading && touches.length === 0 && (
-        <div className="text-center py-10 bg-white rounded-lg border border-gray-200 text-sm text-gray-500 space-y-2">
+        <div className="text-center py-10 bg-raised rounded-panel border border-hairline text-sm text-fg-muted space-y-2">
           <p>{emptyMessage}</p>
           {filter !== 'ALL' && (
             <button onClick={() => setFilter('ALL')}
-              className="px-3 py-1 border border-gray-300 rounded text-xs font-semibold text-gray-600 hover:bg-gray-50">
+              className="px-3 py-1 border border-field rounded-control text-xs font-semibold text-fg-muted hover:bg-page">
               Show all statuses
             </button>
           )}
           {dateRange !== 'ALL' && (
             <button onClick={() => setDateRange('ALL')}
-              className="px-3 py-1 border border-gray-300 rounded text-xs font-semibold text-gray-600 hover:bg-gray-50">
+              className="px-3 py-1 border border-field rounded-control text-xs font-semibold text-fg-muted hover:bg-page">
               Show all dates
             </button>
           )}
@@ -258,35 +258,35 @@ export default function CatchupTouches({ userTimezone }: { userTimezone: string 
           const messageValue = editing ? edits[t.id] : (t.message ?? '')
           const editable = ['pending', 'approved', 'failed'].includes(t.status)
           return (
-            <div key={t.id} className="bg-white rounded-lg border border-gray-200 p-4 space-y-2">
+            <div key={t.id} className="bg-raised rounded-panel border border-hairline p-4 space-y-2">
               <div className="flex items-center justify-between gap-2">
                 <a href={t.profile_url} target="_blank" rel="noopener noreferrer"
-                  className="text-sm font-medium text-blue-700 truncate hover:underline">
+                  className="text-sm font-medium text-accent truncate hover:underline">
                   {t.person_name || t.profile_url}
                 </a>
                 <div className="flex items-center gap-2 shrink-0">
-                  <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-indigo-100 text-indigo-700">
+                  <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-accent/10 text-accent">
                     {EVENT_LABELS[t.event_type] ?? t.event_type}
                   </span>
-                  <span className="text-xs text-gray-400" title="Fit score">{t.score}</span>
-                  <span className="text-xs text-gray-400">{formatInTimezone(t.created_at, userTimezone)}</span>
-                  <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${STATUS_COLORS[t.status] ?? 'bg-gray-100 text-gray-600'}`}>
+                  <span className="text-xs text-fg-muted" title="Fit score">{t.score}</span>
+                  <span className="text-xs text-fg-muted">{formatInTimezone(t.created_at, userTimezone)}</span>
+                  <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${STATUS_COLORS[t.status] ?? 'bg-page text-fg-muted'}`}>
                     {t.status.toUpperCase()}
                   </span>
                 </div>
               </div>
-              {t.event_detail && <p className="text-xs text-gray-400 line-clamp-2">{t.event_detail}</p>}
+              {t.event_detail && <p className="text-xs text-fg-muted line-clamp-2">{t.event_detail}</p>}
 
               {editable ? (
                 <>
                   <textarea value={messageValue} rows={3} maxLength={MESSAGE_MAX}
                     onChange={(e) => setEdits((prev) => ({ ...prev, [t.id]: e.target.value }))}
                     placeholder="Your congratulations message…"
-                    {...maskProps('w-full border border-gray-300 rounded-lg px-3 py-2 text-sm')} />
+                    {...maskProps('w-full border border-field rounded-panel px-3 py-2 text-sm')} />
                   <div className="flex gap-2 flex-wrap">
                     <button onClick={() => saveMutation.mutate({ id: t.id, message: messageValue })}
                       disabled={!editing || saveMutation.isPending}
-                      className="px-3 py-1 border border-gray-300 text-gray-600 rounded text-xs font-semibold hover:bg-gray-50 disabled:opacity-50">
+                      className="px-3 py-1 border border-field text-fg-muted rounded-control text-xs font-semibold hover:bg-page disabled:opacity-50">
                       Save message
                     </button>
                     {['pending', 'failed'].includes(t.status) && (
@@ -294,19 +294,19 @@ export default function CatchupTouches({ userTimezone }: { userTimezone: string 
                         onClick={() => actionMutation.mutate({ id: t.id, action: 'approve', message: messageValue.trim() })}
                         disabled={actionMutation.isPending || !messageValue.trim()}
                         title={!messageValue.trim() ? 'Write a message before approving' : undefined}
-                        className="px-3 py-1 bg-green-600 text-white rounded text-xs font-semibold hover:bg-green-700 disabled:opacity-50">
+                        className="px-3 py-1 bg-accent text-on-accent rounded-control text-xs font-semibold hover:bg-accent/90 disabled:opacity-50">
                         {t.status === 'pending' ? 'Approve & send' : 'Retry'}
                       </button>
                     )}
                     <button onClick={() => actionMutation.mutate({ id: t.id, action: 'cancel' })}
                       disabled={actionMutation.isPending}
-                      className="px-3 py-1 border border-gray-300 text-gray-600 rounded text-xs font-semibold hover:bg-gray-50 disabled:opacity-50">
+                      className="px-3 py-1 border border-field text-fg-muted rounded-control text-xs font-semibold hover:bg-page disabled:opacity-50">
                       Cancel
                     </button>
                   </div>
                 </>
               ) : (
-                t.message && <p className="text-sm text-gray-700 whitespace-pre-wrap line-clamp-3">{t.message}</p>
+                t.message && <p className="text-sm text-fg whitespace-pre-wrap line-clamp-3">{t.message}</p>
               )}
             </div>
           )

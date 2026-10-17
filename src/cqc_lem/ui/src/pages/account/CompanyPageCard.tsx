@@ -61,18 +61,18 @@ export default function CompanyPageCard() {
       subtitle="If you have a LinkedIn company page, add it here. On the 1st of each month LEM invites your connections to follow it (using your monthly invite credits, which reset monthly). Leave blank if you don't have one."
     >
       <div>
-        <label className="block text-sm font-medium text-gray-700 mb-1">Company page URL</label>
+        <label className="block text-sm font-medium text-fg mb-1">Company page URL</label>
         <input
           type="url"
           value={companyPage}
           onChange={(e) => setCompanyPageEdit(e.target.value)}
-          className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+          className="w-full border border-field rounded-control px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent"
           placeholder="https://www.linkedin.com/company/your-company/"
         />
       </div>
 
       {companyPageMsg && (
-        <p className={`text-sm font-medium ${companyPageMsg.ok ? 'text-green-600' : 'text-red-600'}`}>
+        <p className={`text-sm font-medium ${companyPageMsg.ok ? 'text-success' : 'text-danger'}`}>
           {companyPageMsg.text}
         </p>
       )}
@@ -81,7 +81,7 @@ export default function CompanyPageCard() {
         type="button"
         onClick={() => companyPageMutation.mutate()}
         disabled={companyPageMutation.isPending}
-        className="w-full bg-blue-600 text-white py-2 rounded-lg text-sm font-semibold hover:bg-blue-700 disabled:opacity-50 transition-colors"
+        className="w-full bg-accent text-white py-2 rounded-panel text-sm font-semibold hover:bg-accent/90 disabled:opacity-50 transition-colors"
       >
         {companyPageMutation.isPending ? 'Saving…' : 'Save Company Page'}
       </button>

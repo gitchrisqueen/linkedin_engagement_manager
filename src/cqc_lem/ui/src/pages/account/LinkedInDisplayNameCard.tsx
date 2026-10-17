@@ -66,20 +66,20 @@ export default function LinkedInDisplayNameCard() {
       title="Your LinkedIn Name"
       subtitle="Type your name exactly as it appears at the top of your LinkedIn profile — same spelling, accents and capitalisation LinkedIn shows on your messages. One field: your full display name, not separate first and last names."
       headerRight={
-        <span className="text-[11px] font-semibold text-red-600 bg-red-50 px-2 py-0.5 rounded whitespace-nowrap">
+        <span className="text-xs font-semibold text-danger bg-danger/5 px-2 py-0.5 rounded-control whitespace-nowrap">
           Required
         </span>
       }
     >
-      <p className="text-xs text-gray-500">
+      <p className="text-xs text-fg-muted">
         LEM uses this to tell your own messages apart from a reply. If it doesn't match what
         LinkedIn shows, LEM can't read the conversation and pauses that person's follow-ups instead
         of risking a message to someone who already answered.
       </p>
 
       <div>
-        <label htmlFor="linkedin-display-name" className="block text-sm font-medium text-gray-700 mb-1">
-          Full name on LinkedIn <span className="text-red-500">*</span>
+        <label htmlFor="linkedin-display-name" className="block text-sm font-medium text-fg mb-1">
+          Full name on LinkedIn <span className="text-danger">*</span>
         </label>
         <input
           id="linkedin-display-name"
@@ -88,21 +88,21 @@ export default function LinkedInDisplayNameCard() {
           onChange={(e) => setTyped(e.target.value)}
           aria-required="true"
           aria-invalid={loaded && !trimmed}
-          className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+          className="w-full border border-field rounded-control px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent"
           placeholder="e.g. Jordan Alvarez"
         />
         {loaded && !trimmed && (
-          <p className="text-xs text-red-600 mt-1">
+          <p className="text-xs text-danger mt-1">
             Required — DM follow-ups stay paused until this is filled in.
           </p>
         )}
         {scraped && scraped !== trimmed && (
-          <p className="text-xs text-gray-500 mt-1">
+          <p className="text-xs text-fg-muted mt-1">
             Your scraped profile reads “{scraped}”.{' '}
             <button
               type="button"
               onClick={() => setTyped(scraped)}
-              className="text-blue-600 font-medium hover:underline"
+              className="text-accent font-medium hover:underline"
             >
               Use this
             </button>
@@ -111,14 +111,14 @@ export default function LinkedInDisplayNameCard() {
       </div>
 
       {msg && (
-        <p className={`text-sm font-medium ${msg.ok ? 'text-green-600' : 'text-red-600'}`}>{msg.text}</p>
+        <p className={`text-sm font-medium ${msg.ok ? 'text-success' : 'text-danger'}`}>{msg.text}</p>
       )}
 
       <button
         type="button"
         onClick={() => mutation.mutate()}
         disabled={mutation.isPending || !trimmed || trimmed === saved}
-        className="w-full bg-blue-600 text-white py-2 rounded-lg text-sm font-semibold hover:bg-blue-700 disabled:opacity-50 transition-colors"
+        className="w-full bg-accent text-white py-2 rounded-panel text-sm font-semibold hover:bg-accent/90 disabled:opacity-50 transition-colors"
       >
         {mutation.isPending ? 'Saving…' : 'Save Name'}
       </button>

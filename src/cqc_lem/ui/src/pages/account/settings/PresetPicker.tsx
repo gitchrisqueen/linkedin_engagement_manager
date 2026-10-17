@@ -10,16 +10,16 @@ export default function PresetPicker() {
   const active = detectPreset(eng, catchupAllowed)
 
   return (
-    <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 space-y-4">
+    <div className="bg-raised rounded-panel shadow-panel border border-hairline p-6 space-y-4">
       <div>
-        <h2 className="text-base font-semibold text-gray-700">Activity level</h2>
-        <p className="text-xs text-gray-500 mt-0.5">
+        <h2 className="text-base font-semibold text-fg">Activity level</h2>
+        <p className="text-xs text-fg-muted mt-0.5">
           These are the same ramp we run our own account on. Pick one as a starting point, then tune
           anything below — the selector switches to Custom as soon as you do.
         </p>
       </div>
       {presetApplied && (
-        <p className="text-xs text-blue-700 bg-blue-50 border border-blue-100 rounded-lg px-3 py-2" data-testid="preset-applied">
+        <p className="text-xs text-accent bg-accent/5 border border-accent/25 rounded-panel px-3 py-2" data-testid="preset-applied">
           New account — we've started you on <span className="font-semibold">Balanced</span>. Nothing
           is stored until you save, so change anything you like first.
         </p>
@@ -35,16 +35,16 @@ export default function PresetPicker() {
               data-testid={`preset-${p.key}`}
               aria-pressed={selected}
               onClick={() => setEng(values)}
-              className={`text-left rounded-xl border p-4 transition-colors ${
-                selected ? 'border-blue-500 bg-blue-50' : 'border-gray-200 hover:border-gray-300'
+              className={`text-left rounded-panel border p-4 transition-colors ${
+                selected ? 'border-accent bg-accent/5' : 'border-hairline hover:border-field'
               }`}
             >
-              <p className="text-sm font-semibold text-gray-800">
+              <p className="text-sm font-semibold text-fg">
                 {p.label}
-                {p.key === 'balanced' && <span className="ml-1 text-xs font-normal text-blue-600">recommended</span>}
+                {p.key === 'balanced' && <span className="ml-1 text-xs font-normal text-accent">recommended</span>}
               </p>
-              <p className="text-xs text-gray-500 mt-1">{p.blurb}</p>
-              <p className="text-xs text-gray-400 mt-2">
+              <p className="text-xs text-fg-muted mt-1">{p.blurb}</p>
+              <p className="text-xs text-fg-muted mt-2">
                 {values.max_comments_per_day} comments · {values.max_dms_per_day} DMs ·{' '}
                 {values.max_invites_per_day} invites / day
               </p>
@@ -52,7 +52,7 @@ export default function PresetPicker() {
           )
         })}
       </div>
-      <p className="text-xs text-gray-500" data-testid="preset-state">
+      <p className="text-xs text-fg-muted" data-testid="preset-state">
         Current: <span className="font-semibold">{active ? PRESETS.find((p) => p.key === active)!.label : 'Custom'}</span>
       </p>
     </div>

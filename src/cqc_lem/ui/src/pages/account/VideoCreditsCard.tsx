@@ -40,10 +40,10 @@ export default function VideoCreditsCard() {
     <SettingsCard
       title="Premium Video Credits"
       headerRight={
-        <span className="text-2xl font-bold text-blue-900" data-testid="video-credit-balance">{videoCredits}</span>
+        <span className="text-section font-semibold tabular-nums text-accent" data-testid="video-credit-balance">{videoCredits}</span>
       }
     >
-      <p className="text-sm text-gray-500">
+      <p className="text-sm text-fg-muted">
         Premium videos use Google Veo (realistic motion + native audio): 1 credit per premium video,
         3 for top realism. Standard videos are always free with your plan.
       </p>
@@ -51,16 +51,16 @@ export default function VideoCreditsCard() {
         {VIDEO_PACKAGES.map((pkg) => (
           <div
             key={pkg.key}
-            className={`relative border rounded-xl p-4 flex flex-col items-center gap-1 ${
-              pkg.key === 'medium' ? 'border-blue-400 bg-blue-50' : 'border-gray-200 bg-white'
+            className={`relative border rounded-panel p-4 flex flex-col items-center gap-1 ${
+              pkg.key === 'medium' ? 'border-accent/50 bg-accent/5' : 'border-hairline bg-raised'
             }`}
           >
-            <span className="text-xl font-bold text-gray-900">{pkg.price}</span>
-            <span className="text-xs font-medium text-gray-600 text-center">{pkg.label}</span>
+            <span className="text-xl font-bold text-fg">{pkg.price}</span>
+            <span className="text-xs font-medium text-fg-muted text-center">{pkg.label}</span>
             <button
               onClick={() => buyVideoCreditsMutation.mutate(pkg.key)}
               disabled={buyVideoCreditsMutation.isPending}
-              className="mt-2 w-full py-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium disabled:opacity-50 transition-colors"
+              className="mt-2 w-full py-1.5 rounded-panel bg-accent hover:bg-accent/90 text-white text-sm font-medium disabled:opacity-50 transition-colors"
             >
               {buyVideoCreditsMutation.isPending ? '…' : 'Buy'}
             </button>

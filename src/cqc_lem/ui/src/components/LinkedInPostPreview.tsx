@@ -1,4 +1,6 @@
 import { useState } from 'react'
+import Icon from './marketing/Icon'
+import type { IconName } from './marketing/Icon'
 
 interface LinkedInPostPreviewProps {
   content: string
@@ -40,7 +42,7 @@ function CarouselPreview({ slides }: { slides: string[] }) {
   const go = (delta: number) => setIndex((i) => (i + delta + total) % total)
 
   return (
-    <div className="relative bg-gray-900 select-none">
+    <div className="relative bg-fg select-none">
       {/* LinkedIn renders document/carousel posts as a square page viewer */}
       <div className="aspect-square w-full flex items-center justify-center overflow-hidden">
         {isUrl(current) ? (
@@ -50,7 +52,7 @@ function CarouselPreview({ slides }: { slides: string[] }) {
             className="w-full h-full object-contain"
           />
         ) : (
-          <div className="w-full h-full flex items-center justify-center p-8 text-center bg-gradient-to-br from-blue-700 to-blue-900">
+          <div className="w-full h-full flex items-center justify-center p-8 text-center bg-accent">
             <p className="text-white text-lg font-semibold leading-snug whitespace-pre-wrap">{current}</p>
           </div>
         )}
@@ -62,7 +64,7 @@ function CarouselPreview({ slides }: { slides: string[] }) {
             type="button"
             onClick={(e) => { e.stopPropagation(); go(-1) }}
             aria-label="Previous slide"
-            className="absolute left-2 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-white/90 text-gray-800 shadow flex items-center justify-center hover:bg-white"
+            className="absolute left-2 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-raised/90 text-fg shadow-panel flex items-center justify-center hover:bg-raised"
           >
             ‹
           </button>
@@ -70,7 +72,7 @@ function CarouselPreview({ slides }: { slides: string[] }) {
             type="button"
             onClick={(e) => { e.stopPropagation(); go(1) }}
             aria-label="Next slide"
-            className="absolute right-2 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-white/90 text-gray-800 shadow flex items-center justify-center hover:bg-white"
+            className="absolute right-2 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-raised/90 text-fg shadow-panel flex items-center justify-center hover:bg-raised"
           >
             ›
           </button>
@@ -78,7 +80,7 @@ function CarouselPreview({ slides }: { slides: string[] }) {
       )}
 
       {/* Page counter badge, like LinkedIn document posts */}
-      <div className="absolute bottom-2 right-2 bg-black/60 text-white text-xs font-medium px-2 py-0.5 rounded">
+      <div className="absolute bottom-2 right-2 bg-fg/60 text-white text-xs font-medium px-2 py-0.5 rounded-control">
         {index + 1} / {total}
       </div>
 
@@ -91,7 +93,7 @@ function CarouselPreview({ slides }: { slides: string[] }) {
               type="button"
               onClick={(e) => { e.stopPropagation(); setIndex(i) }}
               aria-label={`Go to slide ${i + 1}`}
-              className={`w-1.5 h-1.5 rounded-full transition-colors ${i === index ? 'bg-white' : 'bg-white/40'}`}
+              className={`w-1.5 h-1.5 rounded-full transition-colors ${i === index ? 'bg-raised' : 'bg-raised/40'}`}
             />
           ))}
         </div>
@@ -120,19 +122,19 @@ export default function LinkedInPostPreview({
   const showImage = !showVideo && !showCarousel && !!mediaUrl
 
   return (
-    <div className="bg-white rounded-lg border border-gray-200 shadow-sm max-w-lg font-sans">
+    <div className="bg-raised rounded-panel border border-hairline shadow-panel max-w-lg">
       {/* Header */}
       <div className="flex items-center gap-3 p-4">
-        <div className="w-12 h-12 rounded-full bg-blue-600 flex items-center justify-center text-white font-bold text-lg flex-shrink-0">
+        <div className="w-12 h-12 rounded-full bg-accent flex items-center justify-center text-white font-bold text-lg flex-shrink-0">
           {author.charAt(0).toUpperCase()}
         </div>
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-1">
-            <span className="font-semibold text-gray-900 text-sm truncate">{author}</span>
-            <span className="text-gray-400 text-xs">• 1st</span>
+            <span className="font-semibold text-fg text-sm truncate">{author}</span>
+            <span className="text-fg-muted text-xs">• 1st</span>
           </div>
-          <p className="text-xs text-gray-500 truncate">{headline}</p>
-          <div className="flex items-center gap-1 text-xs text-gray-400 mt-0.5">
+          <p className="text-xs text-fg-muted truncate">{headline}</p>
+          <div className="flex items-center gap-1 text-xs text-fg-muted mt-0.5">
             <span>Just now</span>
             <span>·</span>
             <svg className="w-3 h-3" viewBox="0 0 16 16" fill="currentColor">
@@ -140,57 +142,58 @@ export default function LinkedInPostPreview({
             </svg>
           </div>
         </div>
-        <button className="text-blue-600 border border-blue-600 rounded-full px-3 py-1 text-xs font-semibold hover:bg-blue-50">
+        <button className="text-accent border border-accent rounded-full px-3 py-1 text-xs font-semibold hover:bg-accent/5">
           + Follow
         </button>
       </div>
 
       {/* Content */}
       <div className="px-4 pb-3">
-        <p className="text-sm text-gray-800 whitespace-pre-wrap leading-relaxed">
+        <p className="text-sm text-fg whitespace-pre-wrap leading-relaxed">
           {hasMore ? preview : content}
           {hasMore && (
-            <span className="text-gray-500 cursor-pointer"> …<span className="text-blue-600"> see more</span></span>
+            <span className="text-fg-muted cursor-pointer"> …<span className="text-accent"> see more</span></span>
           )}
         </p>
       </div>
 
       {/* Media */}
       {showVideo && (
-        <div className="bg-black">
+        <div className="bg-fg">
           <video
             key={videoUrl ?? undefined}
             src={safeMediaUrl(videoUrl)}
             controls
             playsInline
             preload="metadata"
-            className="w-full max-h-[32rem] object-contain bg-black"
+            className="w-full max-h-[32rem] object-contain bg-fg"
           />
         </div>
       )}
       {showCarousel && <CarouselPreview slides={slides!} />}
       {showImage && (
-        <div className="bg-gray-100 aspect-video overflow-hidden">
+        <div className="bg-page aspect-video overflow-hidden">
           <img src={safeMediaUrl(mediaUrl)} alt="Post media" className="w-full h-full object-cover" />
         </div>
       )}
 
       {/* Stats bar */}
-      <div className="px-4 py-2 flex items-center justify-between text-xs text-gray-500 border-t border-gray-100">
+      <div className="px-4 py-2 flex items-center justify-between text-xs text-fg-muted border-t border-hairline">
         <div className="flex items-center gap-1">
-          <span className="text-blue-600">👍</span>
+          <Icon name="thumbsUp" className="h-4 w-4 text-accent" />
           <span>Be the first to react</span>
         </div>
         <span>0 comments</span>
       </div>
 
       {/* Action buttons */}
-      <div className="flex items-center border-t border-gray-100">
-        {['👍 Like', '💬 Comment', '🔁 Repost', '📤 Send'].map((action) => (
+      <div className="flex items-center border-t border-hairline">
+        {([['thumbsUp', 'Like'], ['chat', 'Comment'], ['repost', 'Repost'], ['send', 'Send']] as [IconName, string][]).map(([icon, action]) => (
           <button
             key={action}
-            className="flex-1 py-3 text-xs font-semibold text-gray-500 hover:bg-gray-50 flex items-center justify-center gap-1"
+            className="flex-1 py-3 text-xs font-semibold text-fg-muted hover:bg-page flex items-center justify-center gap-1"
           >
+            <Icon name={icon} className="h-4 w-4" />
             {action}
           </button>
         ))}

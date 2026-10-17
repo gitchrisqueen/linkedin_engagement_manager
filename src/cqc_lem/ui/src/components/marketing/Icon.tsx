@@ -26,6 +26,18 @@ const PATHS = {
   slash: 'M12 2v20M4.9 4.9l14.2 14.2',
   clock: 'M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20ZM12 6v6l4 2',
   users: 'M17 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2M9.5 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8ZM22 21v-2a4 4 0 0 0-3-3.87M16.5 3.13a4 4 0 0 1 0 7.75',
+  // App (activity feed and list controls)
+  search: 'M11 19a8 8 0 1 0 0-16 8 8 0 0 0 0 16ZM21 21l-4.35-4.35',
+  trash: 'M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6M10 11v6M14 11v6',
+  reply: 'M9 17 4 12l5-5M20 18v-2a4 4 0 0 0-4-4H4',
+  mail: 'M4 4h16a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2ZM22 6l-10 7L2 6',
+  thumbsUp: 'M7 10v12M15 5.88 14 10h5.83a2 2 0 0 1 1.92 2.56l-2.33 8A2 2 0 0 1 17.5 22H4a2 2 0 0 1-2-2v-8a2 2 0 0 1 2-2h2.76a2 2 0 0 0 1.79-1.11L12 2a3.13 3.13 0 0 1 3 3.88Z',
+  userPlus: 'M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8ZM19 8v6M22 11h-6',
+  plus: 'M12 5v14M5 12h14',
+  bell: 'M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9M10.3 21a1.94 1.94 0 0 0 3.4 0',
+  repost: 'M17 1l4 4-4 4M3 11V9a4 4 0 0 1 4-4h14M7 23l-4-4 4-4M21 13v2a4 4 0 0 1-4 4H3',
+  send: 'M22 2 11 13M22 2l-7 20-4-9-9-4Z',
+  pause: 'M6 4h4v16H6zM14 4h4v16h-4z',
 } as const
 
 export type IconName = keyof typeof PATHS
@@ -68,14 +80,9 @@ export default function Icon({
  * all, and a red/green pair is invisible to the most common colour deficiency. The word rides along
  * in `sr-only` text so the meaning survives both.
  */
-export function IncludedMark({ included, onDark = false }: { included: boolean; onDark?: boolean }) {
-  const tone = included
-    ? onDark
-      ? 'text-success-300'
-      : 'text-success-700'
-    : onDark
-      ? 'text-danger-300'
-      : 'text-danger-700'
+export function IncludedMark({ included }: { included: boolean }) {
+  // Pack tokens only: the word in sr-only text carries the meaning, so the glyph need not be red/green.
+  const tone = included ? 'text-accent' : 'text-fg-muted'
   return (
     <span className={`shrink-0 ${tone}`}>
       <Icon name={included ? 'check' : 'cross'} className="h-5 w-5" />

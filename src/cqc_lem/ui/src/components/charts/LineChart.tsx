@@ -129,17 +129,17 @@ export default function LineChart({ title, subtitle, points, format, valueLabel,
         .lem-viz .viz-line { stroke: ${VIZ.series1}; stroke-width: 2; fill: none; stroke-linejoin: round; stroke-linecap: round; }
         .lem-viz .viz-area { fill: ${VIZ.series1}; opacity: 0.10; }
         .lem-viz .viz-dot { fill: ${VIZ.series1}; stroke: ${VIZ.surface}; stroke-width: 2; }
-        .lem-viz .viz-tick { fill: ${VIZ.muted}; font-size: 11px; font-variant-numeric: tabular-nums; }
-        .lem-viz .viz-endlabel { fill: ${VIZ.textSecondary}; font-size: 12px; font-weight: 600; }
-        .lem-viz text { font-family: system-ui, -apple-system, 'Segoe UI', sans-serif; }
+        .lem-viz .viz-tick { fill: ${VIZ.muted}; font-size: 13px; font-variant-numeric: tabular-nums; }
+        .lem-viz .viz-endlabel { fill: ${VIZ.textSecondary}; font-size: 13px; font-weight: 600; }
+        .lem-viz text { font-family: inherit; }
       `}</style>
       <div className="mb-1">
-        <h3 className="text-sm font-semibold text-gray-700">{title}</h3>
-        {subtitle && <p className="text-xs text-gray-500">{subtitle}</p>}
+        <h3 className="text-sm font-semibold text-fg">{title}</h3>
+        {subtitle && <p className="text-xs text-fg-muted">{subtitle}</p>}
       </div>
 
       {!hasData ? (
-        <p className="text-xs text-gray-400 py-8 text-center">{emptyMessage ?? 'No data yet.'}</p>
+        <p className="text-xs text-fg-muted py-8 text-center">{emptyMessage ?? 'No data yet.'}</p>
       ) : (
         <>
           <svg
@@ -204,7 +204,7 @@ export default function LineChart({ title, subtitle, points, format, valueLabel,
                   const valueText = hoverPos.value == null ? 'No data' : fmt(hoverPos.value)
                   return (
                     <g transform={`translate(${bx}, ${by})`}>
-                      <rect width={boxW} height={40} rx={4} fill={VIZ.surface} stroke="rgba(11,11,11,0.10)" />
+                      <rect width={boxW} height={40} rx={4} fill={VIZ.surface} stroke={VIZ.gridline} />
                       <text x={8} y={17} style={{ fill: VIZ.textPrimary, fontSize: 13, fontWeight: 700 }}>{valueText}</text>
                       <text x={8} y={32} style={{ fill: VIZ.textSecondary, fontSize: 11 }}>{`${valueLabel} · ${hoverPos.label}`}</text>
                     </g>
@@ -216,18 +216,18 @@ export default function LineChart({ title, subtitle, points, format, valueLabel,
 
           {/* Table view — every value reachable without hover (WCAG twin) */}
           <details className="mt-2">
-            <summary className="text-xs text-gray-500 cursor-pointer hover:text-gray-700">Show data table</summary>
+            <summary className="text-xs text-fg-muted cursor-pointer hover:text-fg">Show data table</summary>
             <div className="mt-2 max-h-48 overflow-y-auto">
               <table className="w-full text-xs text-left tabular-nums">
                 <thead>
-                  <tr className="text-gray-500 border-b border-gray-200">
+                  <tr className="text-fg-muted border-b border-hairline">
                     <th className="py-1 pr-3 font-medium">Date</th>
                     <th className="py-1 font-medium text-right">{valueLabel}</th>
                   </tr>
                 </thead>
                 <tbody>
                   {points.map((p, i) => (
-                    <tr key={i} className="border-b border-gray-100 last:border-0 text-gray-700">
+                    <tr key={i} className="border-b border-hairline last:border-0 text-fg">
                       <td className="py-1 pr-3">{p.x}</td>
                       <td className="py-1 text-right">{p.y == null ? '—' : fmt(p.y)}</td>
                     </tr>
