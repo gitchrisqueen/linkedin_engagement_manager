@@ -66,7 +66,7 @@ owner**, and only an approval a human made can publish it.
 
 | Treatment | When | Mechanics |
 |---|---|---|
-| `reshare` | A LinkedIn post whose share/ugcPost URN we hold | `/rest/posts` + `reshareContext.parent`; LinkedIn embeds and credits the original. An `urn:li:activity` is refused before any request (`build_reshare_body`). A 4xx is `ReshareRefused`: the source is blocked, never retried |
+| `reshare` | A LinkedIn post whose share/ugcPost URN we hold | `/rest/posts` + `reshareContext.parent`; per LinkedIn's docs it embeds and credits the original (not yet seen live, see Still owed). An `urn:li:activity` is refused before any request (`build_reshare_body`). A 4xx is `ReshareRefused`: the source is blocked, never retried |
 | `rechart` | Figures that validate against the SOURCE text, under a licence that permits a derivative (`RECHART_LICENCES`) | `image_graphics` stat_card / highlight_chart. `validate_graphic_facts` keeps only figures that are their sentence's own substring; `render_graphic` re-checks before drawing and refuses (`UngroundedFactError`). The card carries `Source: <publisher>, <title>`; the body carries the credit line |
 | `link` | Everything else with a URL (including a LinkedIn post we cannot reshare — `link_only`) | Article card; the thumbnail is the publisher's `og:image`, fetched over https, ≤5 MB, uploaded unmodified. A thumbnail failure costs the image, never the post |
 
@@ -193,9 +193,17 @@ one-shot test below passes. After deploy, as the owner or the main session:
    ```
 3. Pass: a `urn:li:share:` / `urn:li:ugcPost:` comes back AND the permalink
    `https://www.linkedin.com/feed/update/<urn>/` shows the original embedded under the commentary.
-   Then delete the test post from the LinkedIn UI.
+   Record the URN and the permalink on #2260, then delete the test post from the LinkedIn UI.
 4. Fail: `ReshareRefused` (a 4xx). Record the status and response body on #2260; the feature then
    ships reshare-less (re-chart and link only) until resolved.
+5. Anything else: do NOT run it again, because a second run can publish a second public reshare.
+   - `None` printed: open user 1's recent activity on LinkedIn and check whether the reshare went
+     live; delete any duplicate. `None` has three causes in `share_reshare_on_linkedin`:
+     - no credentials. This logs only at DEBUG, so nothing reaches `/opt/lem/logs` in prod.
+     - a read timeout that may have published. Grep `/opt/lem/logs` for `Reshare timed out`.
+     - a 2xx with no id.
+   - `requests.exceptions.HTTPError` (a 5xx): record it on #2260 the same way as a refusal.
+   - `ValueError`: the parent was an `urn:li:activity:` URN, so nothing was sent. Go back to step 1.
 
 Also unverified live: the link-post article card with an uploaded thumbnail, and whether the feed
 container exposes share URNs often enough to make reshares common (most cards expose only the
