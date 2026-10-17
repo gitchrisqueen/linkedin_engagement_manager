@@ -25,12 +25,9 @@ export default function PricingSection() {
       />
 
       {/* `SHOWN_PLANS`, not `PLANS`: during the pricing test (issue #2370) this is the trial plus the
-          recommended plan, so two cards sit centred rather than in half of a four-column row. */}
-      <div
-        className={`grid gap-6 sm:grid-cols-2 ${
-          SHOWN_PLANS.length > 2 ? 'lg:grid-cols-4' : 'mx-auto max-w-3xl'
-        }`}
-      >
+          recommended plan, so two cards split the content width 6/6 rather than sit in half of a
+          four-column row. Not centred: the heading and the "Included" panel hang on the same edges. */}
+      <div className={`grid gap-6 sm:grid-cols-2 ${SHOWN_PLANS.length > 2 ? 'lg:grid-cols-4' : ''}`}>
         {SHOWN_PLANS.map((plan) => (
           <div
             key={plan.tier}
