@@ -149,7 +149,7 @@ export default function ScheduledDMs(
           placeholder="Your message…"
           {...maskProps('w-full border border-field rounded-panel px-3 py-2 text-sm')} />
         <div className="flex flex-wrap items-center gap-3">
-          <label className="flex items-center gap-2 text-xs text-fg-muted">
+          <label className="flex flex-wrap items-center gap-2 text-xs text-fg-muted">
             <input type="datetime-local" value={when} onChange={(e) => setWhen(e.target.value)}
               className="border border-field rounded-control px-3 py-2 text-sm" />
             {timezoneResolved ? userTimezone : 'loading your timezone…'}
@@ -187,12 +187,12 @@ export default function ScheduledDMs(
       <div className="space-y-3">
         {dms.map((dm) => (
           <div key={dm.id} className="bg-raised rounded-panel border border-hairline p-4">
-            <div className="flex items-center justify-between gap-2 mb-1">
+            <div className="flex flex-wrap items-center justify-between gap-x-2 gap-y-1 mb-1">
               <a href={dm.recipient_profile_url} target="_blank" rel="noopener noreferrer"
                 className="text-sm font-medium text-accent truncate hover:underline">
                 {dm.recipient_name || dm.recipient_profile_url}
               </a>
-              <div className="flex items-center gap-2 shrink-0">
+              <div className="flex flex-wrap items-center gap-2">
                 {dm.source && SOURCE_LABELS[dm.source] && (
                   <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-accent/10 text-accent">
                     {SOURCE_LABELS[dm.source]}
