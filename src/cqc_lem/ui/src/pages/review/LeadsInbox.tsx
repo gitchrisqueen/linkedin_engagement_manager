@@ -26,11 +26,11 @@ interface LeadSignal {
 }
 
 const STATUS_COLORS: Record<string, string> = {
-  new: 'bg-orange-100 text-orange-700',
-  approved: 'bg-green-100 text-green-700',
-  sent: 'bg-blue-100 text-blue-700',
-  dismissed: 'bg-gray-100 text-gray-500',
-  failed: 'bg-red-100 text-red-700',
+  new: 'bg-warning/10 text-warning',
+  approved: 'bg-success/10 text-success',
+  sent: 'bg-accent/10 text-accent',
+  dismissed: 'bg-page text-fg-muted',
+  failed: 'bg-danger/10 text-danger',
 }
 
 const SOURCE_LABELS: Record<string, string> = {
@@ -83,13 +83,13 @@ export default function LeadsInbox({ userTimezone }: { userTimezone: string }) {
 
   return (
     <div className="space-y-4">
-      {msg && <p className={`text-sm font-medium ${msg.ok ? 'text-green-600' : 'text-red-600'}`}>{msg.text}</p>}
+      {msg && <p className={`text-sm font-medium ${msg.ok ? 'text-success' : 'text-danger'}`}>{msg.text}</p>}
 
-      <div className="bg-white rounded-lg border border-gray-200 shadow-sm p-5">
-        <h3 className="font-semibold text-gray-700">
+      <div className="bg-raised rounded-lg border border-hairline shadow-sm p-5">
+        <h3 className="font-semibold text-fg">
           Leads inbox{data?.new_count ? ` — ${data.new_count} waiting` : ''}
         </h3>
-        <p className="text-xs text-gray-500 mt-1">
+        <p className="text-xs text-fg-muted mt-1">
           People who asked about pricing, availability, or whether you can help — spotted in comments,
           replies, and DMs. Edit the draft if you want, then approve to send it. Nothing goes out
           until you approve.
@@ -100,57 +100,57 @@ export default function LeadsInbox({ userTimezone }: { userTimezone: string }) {
         {STATUSES.map((s) => (
           <button key={s} onClick={() => setFilter(s)}
             className={`px-3 py-1.5 rounded-full text-xs font-semibold transition-colors ${
-              filter === s ? 'bg-blue-600 text-white' : 'bg-white text-gray-600 border border-gray-300 hover:border-blue-400'
+              filter === s ? 'bg-accent text-white' : 'bg-raised text-fg-muted border border-field hover:border-accent/50'
             }`}>
             {s.toUpperCase()}
           </button>
         ))}
       </div>
 
-      {isLoading && <p className="text-gray-400 text-sm">Loading leads…</p>}
+      {isLoading && <p className="text-fg-muted text-sm">Loading leads…</p>}
       {!isLoading && signals.length === 0 && (
-        <div className="text-center py-10 bg-white rounded-lg border border-gray-200 text-sm text-gray-500">
+        <div className="text-center py-10 bg-raised rounded-lg border border-hairline text-sm text-fg-muted">
           No leads here yet — they show up when someone asks about your work.
         </div>
       )}
 
       <div className="space-y-3">
         {signals.map((s) => (
-          <div key={s.id} className="bg-white rounded-lg border border-gray-200 p-4 space-y-2">
+          <div key={s.id} className="bg-raised rounded-lg border border-hairline p-4 space-y-2">
             <div className="flex items-center justify-between gap-2">
               {s.person_profile_url ? (
                 <a href={s.person_profile_url} target="_blank" rel="noopener noreferrer"
-                  className="text-sm font-medium text-blue-700 truncate hover:underline">
+                  className="text-sm font-medium text-accent truncate hover:underline">
                   {s.person_name || s.person_profile_url}
                 </a>
               ) : (
-                <span className="text-sm font-medium text-gray-700 truncate">{s.person_name || 'Unknown'}</span>
+                <span className="text-sm font-medium text-fg truncate">{s.person_name || 'Unknown'}</span>
               )}
               <div className="flex items-center gap-2 shrink-0">
-                <span className="text-xs text-gray-400">{formatInTimezone(s.created_at, userTimezone)}</span>
-                <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-700">
+                <span className="text-xs text-fg-muted">{formatInTimezone(s.created_at, userTimezone)}</span>
+                <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-warning/10 text-warning">
                   {s.score}
                 </span>
-                <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${STATUS_COLORS[s.status] ?? 'bg-gray-100 text-gray-600'}`}>
+                <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${STATUS_COLORS[s.status] ?? 'bg-page text-fg-muted'}`}>
                   {s.status.toUpperCase()}
                 </span>
               </div>
             </div>
 
-            <div className="flex flex-wrap items-center gap-2 text-xs text-gray-500">
+            <div className="flex flex-wrap items-center gap-2 text-xs text-fg-muted">
               <span>{SOURCE_LABELS[s.source] ?? s.source}</span>
               <span>·</span>
               <span>responds by {s.channel === 'dm' ? 'DM' : 'public reply'}</span>
               {s.matched_signals && (<><span>·</span><span className="italic">{s.matched_signals}</span></>)}
               {s.context_url && (
-                <a href={s.context_url} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">
+                <a href={s.context_url} target="_blank" rel="noopener noreferrer" className="text-accent hover:underline">
                   view thread
                 </a>
               )}
             </div>
 
             {s.snippet && (
-              <blockquote className="border-l-2 border-gray-200 pl-3 text-sm text-gray-700 whitespace-pre-wrap">
+              <blockquote className="border-l-2 border-hairline pl-3 text-sm text-fg whitespace-pre-wrap">
                 {s.snippet}
               </blockquote>
             )}
@@ -160,30 +160,30 @@ export default function LeadsInbox({ userTimezone }: { userTimezone: string }) {
                 <textarea value={draftFor(s)} rows={3} maxLength={DRAFT_MAX}
                   onChange={(e) => setDrafts({ ...drafts, [s.id]: e.target.value })}
                   placeholder="Your response…"
-                  {...maskProps('w-full border border-gray-300 rounded-lg px-3 py-2 text-sm')} />
+                  {...maskProps('w-full border border-field rounded-lg px-3 py-2 text-sm')} />
                 <div className="flex gap-2">
                   <button
                     onClick={() => actionMutation.mutate({ id: s.id, action: 'approve', draft_response: draftFor(s) })}
                     disabled={actionMutation.isPending || !draftFor(s).trim()}
-                    className="px-3 py-1 bg-green-600 text-white rounded text-xs font-semibold hover:bg-green-700 disabled:opacity-50">
+                    className="px-3 py-1 bg-success text-white rounded text-xs font-semibold hover:bg-success/90 disabled:opacity-50">
                     Approve &amp; send
                   </button>
                   <button
                     onClick={() => actionMutation.mutate({ id: s.id, draft_response: draftFor(s) })}
                     disabled={actionMutation.isPending || !draftFor(s).trim()}
-                    className="px-3 py-1 border border-gray-300 text-gray-700 rounded text-xs font-semibold hover:bg-gray-50 disabled:opacity-50">
+                    className="px-3 py-1 border border-field text-fg rounded text-xs font-semibold hover:bg-page disabled:opacity-50">
                     Save draft
                   </button>
                   <button onClick={() => actionMutation.mutate({ id: s.id, action: 'dismiss' })}
                     disabled={actionMutation.isPending}
-                    className="px-3 py-1 border border-gray-300 text-gray-600 rounded text-xs font-semibold hover:bg-gray-50 disabled:opacity-50">
+                    className="px-3 py-1 border border-field text-fg-muted rounded text-xs font-semibold hover:bg-page disabled:opacity-50">
                     Dismiss
                   </button>
                 </div>
               </>
             ) : (
               s.draft_response && (
-                <p className="text-sm text-gray-700 whitespace-pre-wrap line-clamp-3">{s.draft_response}</p>
+                <p className="text-sm text-fg whitespace-pre-wrap line-clamp-3">{s.draft_response}</p>
               )
             )}
           </div>

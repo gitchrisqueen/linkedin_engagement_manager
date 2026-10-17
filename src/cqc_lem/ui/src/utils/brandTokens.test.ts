@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest'
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import {
+  STATUS_TOKENS,
+  tint,
   APPROVED_PAIRS,
   PACK_PAIRS,
   PACK_THEMES,
@@ -150,5 +152,23 @@ describe('brand pack tokens (brand/lem/DESIGN.md)', () => {
       (p) => contrastRatio(t[p.fg], t[p.bg]) < THRESHOLDS[p.role],
     ).map((p) => `${p.fg} on ${p.bg} (${p.usage}) = ${contrastRatio(t[p.fg], t[p.bg]).toFixed(2)}:1`)
     expect(failures).toEqual([])
+  })
+})
+
+describe('status tokens (proposed for brand/lem/DESIGN.md)', () => {
+  const root = indexCss.slice(indexCss.indexOf(':root {'), indexCss.indexOf('}', indexCss.indexOf(':root {')))
+
+  it.each(Object.entries(STATUS_TOKENS))('declares --lem-%s on :root as %s', (name, hex) => {
+    const match = root.match(new RegExp(`--lem-${name}:\\s*(#[0-9A-Fa-f]{6})`))
+    expect(match, `--lem-${name} missing from :root`).not.toBeNull()
+    expect(match![1].toUpperCase()).toBe(hex.toUpperCase())
+  })
+
+  it.each(Object.entries(STATUS_TOKENS))('keeps %s readable everywhere it is drawn', (_name, hex) => {
+    const light = PACK_THEMES.light
+    expect(contrastRatio(hex, light.bg)).toBeGreaterThanOrEqual(THRESHOLDS.body)
+    expect(contrastRatio(hex, light.surface)).toBeGreaterThanOrEqual(THRESHOLDS.body)
+    expect(contrastRatio(hex, tint(hex, 0.1))).toBeGreaterThanOrEqual(THRESHOLDS.body)
+    expect(contrastRatio('#FFFFFF', hex)).toBeGreaterThanOrEqual(THRESHOLDS.body)
   })
 })

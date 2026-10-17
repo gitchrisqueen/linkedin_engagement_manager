@@ -164,7 +164,7 @@ describe('GroupPostQueue — editing', () => {
     expect((screen.getByRole('button', { name: /Save post/i }) as HTMLButtonElement).disabled).toBe(true)
   })
 
-  it('shows red character count when over limit', async () => {
+  it('shows the danger character count when over limit', async () => {
     get.mockResolvedValue({ data: { detail: DRAFT } })
     harness(<GroupPostQueue userTimezone="America/New_York" />)
 
@@ -172,10 +172,10 @@ describe('GroupPostQueue — editing', () => {
     fireEvent.change(screen.getByLabelText('Group post text'), { target: { value: 'x'.repeat(3001) } })
 
     const charCount = screen.getByText(/3001\/3000/i)
-    expect(charCount.className).toContain('text-red-600')
+    expect(charCount.className).toContain('text-danger')
   })
 
-  it('shows green character count when under limit', async () => {
+  it('shows the muted character count when under limit', async () => {
     get.mockResolvedValue({ data: { detail: DRAFT } })
     harness(<GroupPostQueue userTimezone="America/New_York" />)
 
@@ -183,7 +183,7 @@ describe('GroupPostQueue — editing', () => {
     fireEvent.change(screen.getByLabelText('Group post text'), { target: { value: 'Short text' } })
 
     const charCount = screen.getByText(/10\/3000/i)
-    expect(charCount.className).toContain('text-gray-500')
+    expect(charCount.className).toContain('text-fg-muted')
   })
 
   it('shows success message after saving', async () => {

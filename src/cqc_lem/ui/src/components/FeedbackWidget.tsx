@@ -111,7 +111,7 @@ export default function FeedbackWidget() {
           ensureSessionRecorded()
           capture(EVENTS.feedbackOpened, { route: location.pathname })
         }}
-        className="bg-blue-600 text-white text-xs font-semibold px-3.5 py-2 rounded-full shadow-lg hover:bg-blue-700 transition-colors"
+        className="bg-accent text-white text-xs font-semibold px-3.5 py-2 rounded-full shadow-lg hover:bg-accent/90 transition-colors"
         aria-label="Feedback / Report a bug"
       >
         Feedback / Report a bug
@@ -125,10 +125,10 @@ export default function FeedbackWidget() {
     // The width clamp is not the whole story on a phone: this form is ~350px tall and the dock
     // grows it UPWARDS off the top of a landscape screen (worse with the keyboard open, which
     // autoFocus guarantees), so it needs the same height cap the modals wear (issue #894).
-    <div className="relative w-[22rem] max-w-[calc(100vw-2rem)] max-h-viewport overflow-y-auto bg-white border border-gray-200 rounded-xl shadow-xl p-4">
+    <div className="relative w-[22rem] max-w-[calc(100vw-2rem)] max-h-viewport overflow-y-auto bg-raised border border-hairline rounded-xl shadow-xl p-4">
       <button
         onClick={close}
-        className="absolute top-2 right-3 text-gray-400 hover:text-gray-600 text-xl leading-none"
+        className="absolute top-2 right-3 text-fg-muted hover:text-fg-muted text-xl leading-none"
         aria-label="Close feedback"
       >
         ×
@@ -136,25 +136,25 @@ export default function FeedbackWidget() {
 
       {sent ? (
         <div className="pt-2">
-          <h2 className="text-sm font-bold text-gray-800 mb-1">Thanks — got it 🙏</h2>
-          <p className="text-xs text-gray-500 mb-4">
+          <h2 className="text-sm font-bold text-fg mb-1">Thanks — got it 🙏</h2>
+          <p className="text-xs text-fg-muted mb-4">
             Your notes go straight to the team along with the page you were on.
           </p>
           <button
             onClick={close}
-            className="w-full bg-blue-600 text-white py-2 rounded-lg text-xs font-semibold hover:bg-blue-700 transition-colors"
+            className="w-full bg-accent text-white py-2 rounded-lg text-xs font-semibold hover:bg-accent/90 transition-colors"
           >
             Done
           </button>
         </div>
       ) : (
         <form onSubmit={handleSubmit} className="space-y-3 pt-1">
-          <h2 className="text-sm font-bold text-gray-800">Feedback / Report a bug</h2>
+          <h2 className="text-sm font-bold text-fg">Feedback / Report a bug</h2>
           <select
             value={typeHint}
             onChange={(e) => setTypeHint(e.target.value)}
             aria-label="Feedback type"
-            className="w-full border border-gray-300 rounded-lg px-2 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="w-full border border-field rounded-lg px-2 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-accent"
           >
             {TYPE_HINTS.map((t) => (
               <option key={t.value} value={t.value}>{t.label}</option>
@@ -169,30 +169,30 @@ export default function FeedbackWidget() {
             onChange={(e) => setBody(e.target.value)}
             aria-label="What happened?"
             placeholder="What happened, or what would you change?"
-            className="w-full border border-gray-300 rounded-lg px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="w-full border border-field rounded-lg px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-accent"
           />
-          <label className="block text-[11px] text-gray-500">
+          <label className="block text-xs text-fg-muted">
             Screenshot (optional)
             <input
               type="file"
               accept="image/*"
               onChange={handleScreenshot}
-              className="mt-1 block w-full text-[11px] text-gray-500 file:mr-2 file:py-1 file:px-2 file:rounded file:border-0 file:bg-gray-100 file:text-gray-600"
+              className="mt-1 block w-full text-xs text-fg-muted file:mr-2 file:py-1 file:px-2 file:rounded file:border-0 file:bg-page file:text-fg-muted"
             />
           </label>
           {screenshotName && (
-            <p className="text-[11px] text-gray-500">Attached: {screenshotName}</p>
+            <p className="text-xs text-fg-muted">Attached: {screenshotName}</p>
           )}
-          <p className="text-[11px] text-gray-400">
+          <p className="text-xs text-fg-muted">
             We attach the page you're on{appInfo?.version ? ` and app v${appInfo.version}` : ''} automatically.
             {/* Say it plainly — opening this panel starts a recording the report will link to. */}
             {replayEnabled() && ' We also record this session and link it to your report (typed text is masked).'}
           </p>
-          {error && <p className="text-xs text-red-600">{error}</p>}
+          {error && <p className="text-xs text-danger">{error}</p>}
           <button
             type="submit"
             disabled={loading || !body.trim()}
-            className="w-full bg-blue-600 text-white py-2 rounded-lg text-xs font-semibold hover:bg-blue-700 disabled:opacity-50 transition-colors"
+            className="w-full bg-accent text-white py-2 rounded-lg text-xs font-semibold hover:bg-accent/90 disabled:opacity-50 transition-colors"
           >
             {loading ? 'Sending…' : 'Send feedback'}
           </button>

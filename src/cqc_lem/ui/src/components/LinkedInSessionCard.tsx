@@ -76,16 +76,16 @@ export default function LinkedInSessionCard({
   })
 
   return (
-    <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 space-y-4">
+    <div className="bg-raised rounded-lg shadow-sm border border-hairline p-6 space-y-4">
       {stepUpModal}
       <div>
-        <h2 className="text-base font-semibold text-gray-700">
-          LinkedIn Session <span className="text-red-500">*</span>
-          <span className="ml-2 text-[11px] font-semibold text-red-600 bg-red-50 px-2 py-0.5 rounded">
+        <h2 className="text-base font-semibold text-fg">
+          LinkedIn Session <span className="text-danger">*</span>
+          <span className="ml-2 text-xs font-semibold text-danger bg-danger/5 px-2 py-0.5 rounded">
             Required
           </span>
         </h2>
-        <p className="text-xs text-gray-500 mt-1">
+        <p className="text-xs text-fg-muted mt-1">
           Lets LEM resume your existing LinkedIn session instead of logging in with a
           password — which avoids LinkedIn's "Check your app" security challenge. The
           easiest way is the one-click browser extension; or paste your <code>li_at</code>{' '}
@@ -96,22 +96,22 @@ export default function LinkedInSessionCard({
       {migrationNeeded && (
         <div
           data-testid="cookie-migration-notice"
-          className="rounded-lg border border-amber-300 bg-amber-50 p-4 space-y-2"
+          className="rounded-lg border border-warning/50 bg-warning/5 p-4 space-y-2"
         >
-          <p className="text-sm font-semibold text-amber-900">
+          <p className="text-sm font-semibold text-warning">
             Switch to session-only login
           </p>
-          <p className="text-xs text-amber-900/90">
+          <p className="text-xs text-warning">
             Your account still logs in with a saved LinkedIn password. A password has to be stored
             reversibly for automation to type it, so connecting a session cookie instead is safer —
             you can revoke it any time from LinkedIn's “Sign out of all sessions”.
           </p>
-          <label className="flex items-center gap-2 text-xs text-amber-900">
+          <label className="flex items-center gap-2 text-xs text-warning">
             <input
               type="checkbox"
               checked={dropPassword}
               onChange={(e) => setDropPassword(e.target.checked)}
-              className="rounded border-amber-400"
+              className="rounded border-warning/50"
             />
             Delete my saved LinkedIn password once the session is saved
           </label>
@@ -120,17 +120,17 @@ export default function LinkedInSessionCard({
 
       {/* Recommended path: the browser extension grabs the httpOnly li_at cookie the paste
           flow can't reach, and sends it in one click. */}
-      <div className="rounded-lg border border-blue-200 bg-blue-50 p-4 space-y-3">
+      <div className="rounded-lg border border-accent/25 bg-accent/5 p-4 space-y-3">
         <div className="flex items-center justify-between gap-3">
           <div>
-            <p className="text-sm font-semibold text-blue-900">Recommended: one-click extension</p>
-            <p className="text-xs text-blue-800/80">
+            <p className="text-sm font-semibold text-accent">Recommended: one-click extension</p>
+            <p className="text-xs text-accent">
               Grabs your LinkedIn session automatically — no DevTools, no cookie hunting.
             </p>
           </div>
           <a
             href="/api/extension/linkedin-connect.zip"
-            className="shrink-0 bg-blue-600 text-white px-3 py-2 rounded-lg text-xs font-semibold hover:bg-blue-700 transition-colors"
+            className="shrink-0 bg-accent text-white px-3 py-2 rounded-lg text-xs font-semibold hover:bg-accent/90 transition-colors"
           >
             Download extension
           </a>
@@ -141,11 +141,11 @@ export default function LinkedInSessionCard({
             type="button"
             onClick={copyToken}
             disabled={!sessionToken}
-            className="bg-white border border-blue-300 text-blue-700 px-3 py-1.5 rounded-lg text-xs font-semibold hover:bg-blue-100 disabled:opacity-50 transition-colors"
+            className="bg-raised border border-accent/50 text-accent px-3 py-1.5 rounded-lg text-xs font-semibold hover:bg-accent/10 disabled:opacity-50 transition-colors"
           >
             {tokenCopied ? '✓ Token copied' : 'Copy my LEM token'}
           </button>
-          <span className="text-[11px] text-blue-800/70">
+          <span className="text-xs text-accent">
             Paste this into the extension once, then click Connect.
           </span>
         </div>
@@ -153,12 +153,12 @@ export default function LinkedInSessionCard({
         <button
           type="button"
           onClick={() => setShowSteps((s) => !s)}
-          className="text-xs font-medium text-blue-700 hover:underline"
+          className="text-xs font-medium text-accent hover:underline"
         >
           {showSteps ? 'Hide install steps' : 'How to install (30 seconds)'}
         </button>
         {showSteps && (
-          <ol className="list-decimal list-inside text-xs text-blue-900/90 space-y-1">
+          <ol className="list-decimal list-inside text-xs text-accent space-y-1">
             <li>Download the extension above and unzip it.</li>
             <li>Open <code>chrome://extensions</code> (or <code>edge://extensions</code>).</li>
             <li>Turn on <strong>Developer mode</strong> (top-right), then click <strong>Load unpacked</strong> and pick the unzipped folder.</li>
@@ -169,14 +169,14 @@ export default function LinkedInSessionCard({
       </div>
 
       {connected && (
-        <div className="flex items-center gap-2 text-sm text-green-700">
-          <span className="w-2.5 h-2.5 rounded-full bg-green-500" /> A session is saved.
+        <div className="flex items-center gap-2 text-sm text-success">
+          <span className="w-2.5 h-2.5 rounded-full bg-success" /> A session is saved.
           Re-paste only if automation reports it disconnected.
         </div>
       )}
 
       <div>
-        <label htmlFor="li-at-input" className="block text-sm font-medium text-gray-700 mb-1">
+        <label htmlFor="li-at-input" className="block text-sm font-medium text-fg mb-1">
           li_at cookie value
         </label>
         <input
@@ -184,18 +184,18 @@ export default function LinkedInSessionCard({
           type="password"
           value={liAt}
           onChange={(e) => setLiAt(e.target.value)}
-          className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+          className="w-full border border-field rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent"
           placeholder="paste your LinkedIn li_at cookie value"
           autoComplete="off"
         />
-        <p className="text-xs text-gray-400 mt-1">
+        <p className="text-xs text-fg-muted mt-1">
           DevTools (F12) → Application → Cookies → https://www.linkedin.com → copy the value of{' '}
           <code>li_at</code>. This is sensitive — treat it like a password.
         </p>
       </div>
 
       {msg && (
-        <p className={`text-sm font-medium ${msg.ok ? 'text-green-600' : 'text-red-600'}`}>
+        <p className={`text-sm font-medium ${msg.ok ? 'text-success' : 'text-danger'}`}>
           {msg.text}
         </p>
       )}
@@ -204,7 +204,7 @@ export default function LinkedInSessionCard({
         type="button"
         onClick={() => mutation.mutate()}
         disabled={mutation.isPending || liAt.trim().length < 20}
-        className="w-full bg-blue-600 text-white py-2 rounded-lg text-sm font-semibold hover:bg-blue-700 disabled:opacity-50 transition-colors"
+        className="w-full bg-accent text-white py-2 rounded-lg text-sm font-semibold hover:bg-accent/90 disabled:opacity-50 transition-colors"
       >
         {mutation.isPending ? 'Saving…' : 'Save LinkedIn Session'}
       </button>

@@ -25,45 +25,45 @@ export default function PostHogStatsPanel() {
   const topFeatures = llmCost.rows.slice(0, 5)
 
   return (
-    <div className="bg-white rounded-lg shadow-sm p-5">
-      <h3 className="text-sm font-semibold text-gray-700 mb-3">Live stats</h3>
+    <div className="bg-raised rounded-lg shadow-sm p-5">
+      <h3 className="text-sm font-semibold text-fg mb-3">Live stats</h3>
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <div>
-          <p className="text-xs text-gray-500 mb-1">This week — posts</p>
+          <p className="text-xs text-fg-muted mb-1">This week — posts</p>
           {posts.available && latestPosts ? (
             <>
-              <p className="text-2xl font-bold text-gray-800">{numeric(latestPosts.posts_measured) ?? 0}</p>
-              <p className="text-xs text-gray-500">
+              <p className="text-2xl font-bold text-fg">{numeric(latestPosts.posts_measured) ?? 0}</p>
+              <p className="text-xs text-fg-muted">
                 {numeric(latestPosts.median_engagement_rate) != null
                   ? `${formatRate(numeric(latestPosts.median_engagement_rate)!)} median engagement`
                   : 'No engagement data yet'}
               </p>
             </>
           ) : (
-            <p className="text-sm text-gray-400">Not available yet</p>
+            <p className="text-sm text-fg-muted">Not available yet</p>
           )}
         </div>
         <div>
-          <p className="text-xs text-gray-500 mb-1">This week — comments</p>
+          <p className="text-xs text-fg-muted mb-1">This week — comments</p>
           {comments.available && latestComments ? (
             <>
-              <p className="text-2xl font-bold text-gray-800">{numeric(latestComments.comments_measured) ?? 0}</p>
-              <p className="text-xs text-gray-500">
+              <p className="text-2xl font-bold text-fg">{numeric(latestComments.comments_measured) ?? 0}</p>
+              <p className="text-xs text-fg-muted">
                 {numeric(latestComments.author_reply_pct) != null
                   ? `${latestComments.author_reply_pct}% author replies`
                   : 'No replies measured yet'}
               </p>
             </>
           ) : (
-            <p className="text-sm text-gray-400">Not available yet</p>
+            <p className="text-sm text-fg-muted">Not available yet</p>
           )}
         </div>
         <div>
-          <p className="text-xs text-gray-500 mb-1">LLM cost by feature (30d)</p>
+          <p className="text-xs text-fg-muted mb-1">LLM cost by feature (30d)</p>
           {!llmCost.available ? (
-            <p className="text-sm text-gray-400">Not available yet</p>
+            <p className="text-sm text-fg-muted">Not available yet</p>
           ) : topFeatures.length > 0 ? (
-            <ul className="text-xs text-gray-700 space-y-0.5">
+            <ul className="text-xs text-fg space-y-0.5">
               {topFeatures.map((row) => (
                 <li key={String(row.feature)} className="flex justify-between gap-2">
                   <span className="truncate">{String(row.feature)}</span>
@@ -72,7 +72,7 @@ export default function PostHogStatsPanel() {
               ))}
             </ul>
           ) : (
-            <p className="text-sm text-gray-400">No LLM calls in the last 30 days</p>
+            <p className="text-sm text-fg-muted">No LLM calls in the last 30 days</p>
           )}
         </div>
       </div>

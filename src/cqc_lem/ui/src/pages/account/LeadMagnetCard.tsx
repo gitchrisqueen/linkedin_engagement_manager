@@ -45,28 +45,28 @@ export default function LeadMagnetCard() {
   if (!leadMagnet) return null
 
   return (
-    <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 space-y-4">
+    <div className="bg-raised rounded-lg shadow-sm border border-hairline p-6 space-y-4">
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-base font-semibold text-gray-700">Comment → DM Lead Magnet</h2>
-          <p className="text-xs text-gray-500">When someone comments your keyword on your post, auto-DM them a resource. The compliant way to share links (links in posts are penalized).</p>
+          <h2 className="text-base font-semibold text-fg">Comment → DM Lead Magnet</h2>
+          <p className="text-xs text-fg-muted">When someone comments your keyword on your post, auto-DM them a resource. The compliant way to share links (links in posts are penalized).</p>
         </div>
         <Toggle on={leadMagnet.enabled} onClick={() => setLm({ enabled: !leadMagnet.enabled })} />
       </div>
       {leadMagnet.enabled && (
         <>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Trigger keyword</label>
+            <label className="block text-sm font-medium text-fg mb-1">Trigger keyword</label>
             <input type="text" value={leadMagnet.keyword || ''} onChange={(e) => setLm({ keyword: e.target.value })}
               maxLength={FIELD_LIMITS.lm_keyword}
-              placeholder="e.g. GUIDE" className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" />
+              placeholder="e.g. GUIDE" className="w-full border border-field rounded-lg px-3 py-2 text-sm" />
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">DM message (may include your link)</label>
+            <label className="block text-sm font-medium text-fg mb-1">DM message (may include your link)</label>
             <textarea value={leadMagnet.message || ''} onChange={(e) => setLm({ message: e.target.value })} rows={3}
               maxLength={FIELD_LIMITS.lm_message}
               placeholder="Thanks for the interest! Here's the resource: …"
-              {...maskProps('w-full border border-gray-300 rounded-lg px-3 py-2 text-sm')} />
+              {...maskProps('w-full border border-field rounded-lg px-3 py-2 text-sm')} />
             <div className="mt-1.5">
               <PlaceholderChips placeholders={[
                 { token: '{first_name}', desc: "The commenter's first name" },
@@ -75,10 +75,10 @@ export default function LeadMagnetCard() {
           </div>
         </>
       )}
-      {lmMsg && <p className={`text-sm font-medium ${lmMsg.ok ? 'text-green-600' : 'text-red-600'}`}>{lmMsg.text}</p>}
+      {lmMsg && <p className={`text-sm font-medium ${lmMsg.ok ? 'text-success' : 'text-danger'}`}>{lmMsg.text}</p>}
       <button type="button" onClick={() => lmMutation.mutate(undefined, sectionSaveCallbacks('lead-magnet'))}
         disabled={lmMutation.isPending}
-        className="w-full bg-blue-600 text-white py-2 rounded-lg text-sm font-semibold hover:bg-blue-700 disabled:opacity-50 transition-colors">
+        className="w-full bg-accent text-white py-2 rounded-lg text-sm font-semibold hover:bg-accent/90 disabled:opacity-50 transition-colors">
         {lmMutation.isPending ? 'Saving…' : 'Save Lead Magnet'}
       </button>
     </div>

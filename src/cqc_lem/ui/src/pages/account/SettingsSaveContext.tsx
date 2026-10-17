@@ -74,9 +74,9 @@ export function SaveAllBar() {
   const bar = (
     <div className={dock ? 'max-w-xs' : 'fixed bottom-4 right-4 z-40 max-w-xs'}>
       {summary && (
-        <div className="mb-2 bg-white rounded-lg shadow-lg border border-gray-200 p-3 space-y-1">
+        <div className="mb-2 bg-raised rounded-lg shadow-lg border border-hairline p-3 space-y-1">
           {summary.map((r, i) => (
-            <p key={i} className={`text-xs font-medium ${r.ok ? 'text-green-600' : 'text-red-600'}`}>
+            <p key={i} className={`text-xs font-medium ${r.ok ? 'text-success' : 'text-danger'}`}>
               {r.ok ? '✓' : '✕'} {r.label}
             </p>
           ))}
@@ -87,7 +87,7 @@ export function SaveAllBar() {
           type="button"
           onClick={() => saveAll()}
           disabled={savingAll}
-          className="w-full bg-blue-600 text-white px-5 py-3 rounded-full shadow-lg text-sm font-semibold hover:bg-blue-700 disabled:opacity-60 transition-colors"
+          className="w-full bg-accent text-white px-5 py-3 rounded-full shadow-lg text-sm font-semibold hover:bg-accent/90 disabled:opacity-60 transition-colors"
         >
           {savingAll
             ? 'Saving all…'

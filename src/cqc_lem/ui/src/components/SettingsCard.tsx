@@ -16,12 +16,12 @@ export default function SettingsCard({
 }) {
   const hasHeader = !!title || !!subtitle || !!headerRight
   return (
-    <div className={`bg-white rounded-lg shadow-sm border border-gray-200 p-6 space-y-4 ${className}`}>
+    <div className={`bg-raised rounded-lg shadow-sm border border-hairline p-6 space-y-4 ${className}`}>
       {hasHeader && (
         <div className="flex items-center justify-between">
           <div>
-            {title && <h2 className="text-base font-semibold text-gray-700">{title}</h2>}
-            {subtitle && <p className="text-xs text-gray-500 mt-1">{subtitle}</p>}
+            {title && <h2 className="text-base font-semibold text-fg">{title}</h2>}
+            {subtitle && <p className="text-xs text-fg-muted mt-1">{subtitle}</p>}
           </div>
           {headerRight}
         </div>

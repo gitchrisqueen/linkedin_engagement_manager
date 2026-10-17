@@ -52,7 +52,7 @@ export default function TutorialVideos() {
           {videos.map((video) => (
             <div key={video.flow} className="rounded-panel border border-hairline shadow-panel overflow-hidden">
               <video
-                className="w-full bg-black"
+                className="w-full bg-fg"
                 controls
                 preload="none"
                 poster={video.thumbnail_url ?? undefined}

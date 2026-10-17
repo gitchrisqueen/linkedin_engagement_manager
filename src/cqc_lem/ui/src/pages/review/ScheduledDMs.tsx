@@ -31,12 +31,12 @@ const SOURCE_LABELS: Record<string, string> = {
 }
 
 const STATUS_COLORS: Record<string, string> = {
-  pending: 'bg-yellow-100 text-yellow-700',
-  approved: 'bg-green-100 text-green-700',
-  scheduled: 'bg-purple-100 text-purple-700',
-  sent: 'bg-blue-100 text-blue-700',
-  failed: 'bg-red-100 text-red-700',
-  canceled: 'bg-gray-100 text-gray-500',
+  pending: 'bg-warning/10 text-warning',
+  approved: 'bg-success/10 text-success',
+  scheduled: 'bg-accent/10 text-accent',
+  sent: 'bg-accent/10 text-accent',
+  failed: 'bg-danger/10 text-danger',
+  canceled: 'bg-page text-fg-muted',
 }
 
 const STATUSES = ['ALL', 'pending', 'approved', 'scheduled', 'sent', 'failed', 'canceled']
@@ -128,38 +128,38 @@ export default function ScheduledDMs(
 
   return (
     <div className="space-y-4">
-      {msg && <p className={`text-sm font-medium ${msg.ok ? 'text-green-600' : 'text-red-600'}`}>{msg.text}</p>}
+      {msg && <p className={`text-sm font-medium ${msg.ok ? 'text-success' : 'text-danger'}`}>{msg.text}</p>}
 
       {/* New scheduled DM */}
-      <div className="bg-white rounded-lg border border-gray-200 shadow-sm p-5 space-y-3">
-        <h3 className="font-semibold text-gray-700">Schedule a DM</h3>
-        <p className="text-xs text-gray-500">
+      <div className="bg-raised rounded-lg border border-hairline shadow-sm p-5 space-y-3">
+        <h3 className="font-semibold text-fg">Schedule a DM</h3>
+        <p className="text-xs text-fg-muted">
           Draft a 1:1 message to a connection and send it at a chosen time. Must be a 1st-degree
           connection. Sends honor your daily DM cap.
         </p>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <input type="url" value={url} onChange={(e) => setUrl(e.target.value)} maxLength={512}
             placeholder="Recipient profile URL (https://www.linkedin.com/in/…)"
-            className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" />
+            className="w-full border border-field rounded-lg px-3 py-2 text-sm" />
           <input type="text" value={name} onChange={(e) => setName(e.target.value)} maxLength={255}
             placeholder="Recipient name (optional)"
-            className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" />
+            className="w-full border border-field rounded-lg px-3 py-2 text-sm" />
         </div>
         <textarea value={body} onChange={(e) => setBody(e.target.value)} rows={3} maxLength={MSG_MAX}
           placeholder="Your message…"
-          {...maskProps('w-full border border-gray-300 rounded-lg px-3 py-2 text-sm')} />
+          {...maskProps('w-full border border-field rounded-lg px-3 py-2 text-sm')} />
         <div className="flex flex-wrap items-center gap-3">
-          <label className="flex items-center gap-2 text-xs text-gray-500">
+          <label className="flex items-center gap-2 text-xs text-fg-muted">
             <input type="datetime-local" value={when} onChange={(e) => setWhen(e.target.value)}
-              className="border border-gray-300 rounded-lg px-3 py-2 text-sm" />
+              className="border border-field rounded-lg px-3 py-2 text-sm" />
             {timezoneResolved ? userTimezone : 'loading your timezone…'}
           </label>
           <button onClick={() => submit('pending')} disabled={!canSubmit || createMutation.isPending}
-            className="px-4 py-2 border border-gray-300 rounded-lg text-sm text-gray-700 hover:bg-gray-50 disabled:opacity-50">
+            className="px-4 py-2 border border-field rounded-lg text-sm text-fg hover:bg-page disabled:opacity-50">
             Save draft
           </button>
           <button onClick={() => submit('approved')} disabled={!canSubmit || createMutation.isPending}
-            className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-semibold hover:bg-blue-700 disabled:opacity-50">
+            className="px-4 py-2 bg-accent text-white rounded-lg text-sm font-semibold hover:bg-accent/90 disabled:opacity-50">
             {createMutation.isPending ? 'Scheduling…' : 'Approve & schedule'}
           </button>
         </div>
@@ -170,53 +170,53 @@ export default function ScheduledDMs(
         {STATUSES.map((s) => (
           <button key={s} onClick={() => setFilter(s)}
             className={`px-3 py-1.5 rounded-full text-xs font-semibold transition-colors ${
-              filter === s ? 'bg-blue-600 text-white' : 'bg-white text-gray-600 border border-gray-300 hover:border-blue-400'
+              filter === s ? 'bg-accent text-white' : 'bg-raised text-fg-muted border border-field hover:border-accent/50'
             }`}>
             {s.toUpperCase()}
           </button>
         ))}
       </div>
 
-      {isLoading && <p className="text-gray-400 text-sm">Loading scheduled DMs…</p>}
+      {isLoading && <p className="text-fg-muted text-sm">Loading scheduled DMs…</p>}
       {!isLoading && dms.length === 0 && (
-        <div className="text-center py-10 bg-white rounded-lg border border-gray-200 text-sm text-gray-500">
+        <div className="text-center py-10 bg-raised rounded-lg border border-hairline text-sm text-fg-muted">
           No scheduled DMs yet.
         </div>
       )}
 
       <div className="space-y-3">
         {dms.map((dm) => (
-          <div key={dm.id} className="bg-white rounded-lg border border-gray-200 p-4">
+          <div key={dm.id} className="bg-raised rounded-lg border border-hairline p-4">
             <div className="flex items-center justify-between gap-2 mb-1">
               <a href={dm.recipient_profile_url} target="_blank" rel="noopener noreferrer"
-                className="text-sm font-medium text-blue-700 truncate hover:underline">
+                className="text-sm font-medium text-accent truncate hover:underline">
                 {dm.recipient_name || dm.recipient_profile_url}
               </a>
               <div className="flex items-center gap-2 shrink-0">
                 {dm.source && SOURCE_LABELS[dm.source] && (
-                  <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-indigo-100 text-indigo-700">
+                  <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-accent/10 text-accent">
                     {SOURCE_LABELS[dm.source]}
                   </span>
                 )}
-                <span className="text-xs text-gray-400">{formatInTimezone(dm.scheduled_time, userTimezone)}</span>
-                <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${STATUS_COLORS[dm.status] ?? 'bg-gray-100 text-gray-600'}`}>
+                <span className="text-xs text-fg-muted">{formatInTimezone(dm.scheduled_time, userTimezone)}</span>
+                <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${STATUS_COLORS[dm.status] ?? 'bg-page text-fg-muted'}`}>
                   {dm.status.toUpperCase()}
                 </span>
               </div>
             </div>
-            <p className="text-sm text-gray-700 whitespace-pre-wrap line-clamp-3">{dm.message}</p>
+            <p className="text-sm text-fg whitespace-pre-wrap line-clamp-3">{dm.message}</p>
             {['pending', 'approved', 'scheduled'].includes(dm.status) && (
               <div className="flex gap-2 mt-2">
                 {dm.status === 'pending' && (
                   <button onClick={() => actionMutation.mutate({ id: dm.id, action: 'approve' })}
                     disabled={actionMutation.isPending}
-                    className="px-3 py-1 bg-green-600 text-white rounded text-xs font-semibold hover:bg-green-700 disabled:opacity-50">
+                    className="px-3 py-1 bg-success text-white rounded text-xs font-semibold hover:bg-success/90 disabled:opacity-50">
                     Approve
                   </button>
                 )}
                 <button onClick={() => actionMutation.mutate({ id: dm.id, action: 'cancel' })}
                   disabled={actionMutation.isPending}
-                  className="px-3 py-1 border border-gray-300 text-gray-600 rounded text-xs font-semibold hover:bg-gray-50 disabled:opacity-50">
+                  className="px-3 py-1 border border-field text-fg-muted rounded text-xs font-semibold hover:bg-page disabled:opacity-50">
                   Cancel
                 </button>
               </div>

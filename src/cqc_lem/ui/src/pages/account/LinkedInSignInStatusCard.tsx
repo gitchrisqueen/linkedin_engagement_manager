@@ -56,12 +56,12 @@ export default function LinkedInSignInStatusCard() {
 
   const tone =
     data.state === 'signed_in'
-      ? { dot: 'bg-green-500', box: 'border-gray-200' }
+      ? { dot: 'bg-success', box: 'border-hairline' }
       : data.state === 'approval_pending'
-        ? { dot: 'bg-amber-500', box: 'border-amber-300' }
+        ? { dot: 'bg-warning', box: 'border-warning/50' }
         : data.state === 'approval_timed_out' || data.state === 'challenge_unsolvable'
-          ? { dot: 'bg-red-500', box: 'border-red-200' }
-          : { dot: 'bg-gray-300', box: 'border-gray-200' }
+          ? { dot: 'bg-danger', box: 'border-danger/25' }
+          : { dot: 'bg-hairline', box: 'border-hairline' }
 
   const headline =
     data.state === 'signed_in'
@@ -77,17 +77,17 @@ export default function LinkedInSignInStatusCard() {
   return (
     <div
       data-testid="linkedin-signin-status"
-      className={`bg-white rounded-lg shadow-sm border ${tone.box} p-6 space-y-3`}
+      className={`bg-raised rounded-lg shadow-sm border ${tone.box} p-6 space-y-3`}
     >
       <div className="flex items-center gap-3">
         <div className={`w-3 h-3 rounded-full flex-shrink-0 ${tone.dot}`} />
-        <h2 className="text-base font-semibold text-gray-700">LinkedIn Sign-in</h2>
+        <h2 className="text-base font-semibold text-fg">LinkedIn Sign-in</h2>
       </div>
 
-      <p className="text-sm text-gray-700">{headline}</p>
+      <p className="text-sm text-fg">{headline}</p>
 
       {data.state === 'signed_in' && (
-        <p className="text-xs text-gray-500">
+        <p className="text-xs text-fg-muted">
           {data.approval_cleared_at
             ? 'Your device approval came through — LEM signed in with it. '
             : ''}
@@ -98,7 +98,7 @@ export default function LinkedInSignInStatusCard() {
       )}
 
       {data.state === 'approval_pending' && (
-        <div className="text-xs text-amber-900 space-y-1">
+        <div className="text-xs text-warning space-y-1">
           <p>
             LinkedIn asked us to verify this sign-in from your device. Open the{' '}
             <strong>LinkedIn mobile app</strong> and tap <strong>Yes</strong> on the "Did you just
@@ -112,7 +112,7 @@ export default function LinkedInSignInStatusCard() {
       )}
 
       {data.state === 'approval_timed_out' && (
-        <div className="text-xs text-gray-600 space-y-1">
+        <div className="text-xs text-fg-muted space-y-1">
           <p>
             We stopped waiting {askedAt ? `after asking ${askedAt}` : ''} — automation will ask
             again on its next run, and approving from the LinkedIn app is all that is needed.
@@ -122,7 +122,7 @@ export default function LinkedInSignInStatusCard() {
       )}
 
       {data.state === 'challenge_unsolvable' && (
-        <div className="text-xs text-gray-600 space-y-1">
+        <div className="text-xs text-fg-muted space-y-1">
           <p>
             Arkose, the email verification code, and a mobile-app approval all failed to clear
             LinkedIn's challenge — automation is backing off this account for a few hours rather
@@ -134,7 +134,7 @@ export default function LinkedInSignInStatusCard() {
       )}
 
       {data.state === 'unknown' && (
-        <p className="text-xs text-gray-500">
+        <p className="text-xs text-fg-muted">
           This fills in the next time automation signs in to LinkedIn. Nothing is wrong — we simply
           have no recent sign-in on record.
         </p>

@@ -114,12 +114,12 @@ interface RescoreResult {
 type PostsResponse = GetDetail<'/api/posts/'>
 
 const STATUS_COLORS: Record<string, string> = {
-  approved: 'bg-green-100 text-green-700',
-  pending: 'bg-yellow-100 text-yellow-700',
-  posted: 'bg-blue-100 text-blue-700',
-  rejected: 'bg-red-100 text-red-700',
-  scheduled: 'bg-purple-100 text-purple-700',
-  error: 'bg-red-100 text-red-700',
+  approved: 'bg-success/10 text-success',
+  pending: 'bg-warning/10 text-warning',
+  posted: 'bg-accent/10 text-accent',
+  rejected: 'bg-danger/10 text-danger',
+  scheduled: 'bg-accent/10 text-accent',
+  error: 'bg-danger/10 text-danger',
 }
 
 export default function ContentStudio() {
@@ -583,12 +583,12 @@ export default function ContentStudio() {
     <div className="space-y-4">
       {/* Header */}
       <div className="flex items-center justify-between flex-wrap gap-3">
-        <h1 className="text-2xl font-bold text-gray-800">Content Studio</h1>
+        <h1 className="text-2xl font-bold text-fg">Content Studio</h1>
         {view === 'review' && (
           <button
             onClick={() => weeklyMutation.mutate()}
             disabled={generating}
-            className="bg-green-600 text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-green-700 disabled:opacity-50 transition-colors"
+            className="bg-success text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-success/90 disabled:opacity-50 transition-colors"
           >
             {generateLabel}
           </button>
@@ -596,7 +596,7 @@ export default function ContentStudio() {
         {view === 'review' && (
           <button
             onClick={() => setView('posts')}
-            className="border border-blue-600 text-blue-700 px-4 py-2 rounded-lg text-sm font-semibold hover:bg-blue-50 transition-colors"
+            className="border border-accent text-accent px-4 py-2 rounded-lg text-sm font-semibold hover:bg-accent/5 transition-colors"
           >
             + Schedule a post
           </button>
@@ -609,12 +609,12 @@ export default function ContentStudio() {
         <div
           className={`rounded-lg border p-3 text-sm ${
             isGenerationRunning(genStatus)
-              ? 'bg-blue-50 border-blue-200 text-blue-800'
+              ? 'bg-accent/5 border-accent/25 text-accent'
               : genStatus.state === 'failed'
-                ? 'bg-red-50 border-red-200 text-red-800'
+                ? 'bg-danger/5 border-danger/25 text-danger'
                 : emptyRun
-                  ? 'bg-amber-50 border-amber-200 text-amber-900'
-                  : 'bg-green-50 border-green-200 text-green-800'
+                  ? 'bg-warning/5 border-warning/25 text-warning'
+                  : 'bg-success/5 border-success/25 text-success'
           }`}
         >
           <div className="flex items-center justify-between gap-3 flex-wrap">
@@ -646,9 +646,9 @@ export default function ContentStudio() {
             )}
           </div>
           {genStatus.total > 0 && (
-            <div className="mt-2 h-2 w-full rounded-full bg-white/70 overflow-hidden">
+            <div className="mt-2 h-2 w-full rounded-full bg-raised/70 overflow-hidden">
               <div
-                className="h-full bg-blue-600 transition-all"
+                className="h-full bg-accent transition-all"
                 style={{
                   width: `${Math.min(100, Math.round(
                     ((genStatus.completed + genStatus.failed) / genStatus.total) * 100))}%`,
@@ -667,15 +667,15 @@ export default function ContentStudio() {
       )}
 
       {/* Content tabs */}
-      <div className="flex flex-wrap gap-1 border-b border-gray-200">
+      <div className="flex flex-wrap gap-1 border-b border-hairline">
         {VIEWS.map((v) => (
           <button
             key={v.key}
             onClick={() => setView(v.key)}
             className={`px-3 py-2 text-sm font-semibold border-b-2 -mb-px transition-colors ${
               view === v.key
-                ? 'border-blue-600 text-blue-700'
-                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                ? 'border-accent text-accent'
+                : 'border-transparent text-fg-muted hover:text-fg hover:border-field'
             }`}
           >
             {v.label}
@@ -710,7 +710,7 @@ export default function ContentStudio() {
       {view === 'review' && (
       <>
       {regenNotice && (
-        <div className="bg-indigo-50 border border-indigo-200 text-indigo-800 rounded-lg px-4 py-2 text-sm">
+        <div className="bg-accent/5 border border-accent/25 text-accent rounded-lg px-4 py-2 text-sm">
           {regenNotice}
         </div>
       )}
@@ -722,8 +722,8 @@ export default function ContentStudio() {
             onClick={() => resetPage(s.value)}
             className={`px-3 py-1.5 rounded-full text-xs font-semibold transition-colors ${
               filterStatus === s.value
-                ? 'bg-blue-600 text-white'
-                : 'bg-white text-gray-600 border border-gray-300 hover:border-blue-400'
+                ? 'bg-accent text-white'
+                : 'bg-raised text-fg-muted border border-field hover:border-accent/50'
             }`}
           >
             {s.label}
@@ -734,27 +734,27 @@ export default function ContentStudio() {
       {/* Keyword search — boolean operators supported */}
       <div>
         <div className="relative">
-          <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm">🔍</span>
+          <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-fg-muted text-sm">🔍</span>
           <input
             type="search"
             value={searchInput}
             onChange={(e) => setSearchInput(e.target.value)}
             placeholder='Search posts… e.g.  ai AND "case study" NOT hiring'
             aria-label="Search posts by keyword"
-            className="w-full border border-gray-300 rounded-lg pl-9 pr-8 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="w-full border border-field rounded-lg pl-9 pr-8 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent"
           />
           {searchInput && (
             <button
               type="button"
               onClick={() => setSearchInput('')}
               aria-label="Clear search"
-              className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 text-base leading-none px-1"
+              className="absolute right-2 top-1/2 -translate-y-1/2 text-fg-muted hover:text-fg-muted text-base leading-none px-1"
             >
               ×
             </button>
           )}
         </div>
-        <p className="text-xs text-gray-400 mt-1">
+        <p className="text-xs text-fg-muted mt-1">
           Combine keywords with <span className="font-mono font-semibold">AND</span>,{' '}
           <span className="font-mono font-semibold">OR</span>,{' '}
           <span className="font-mono font-semibold">NOT</span> and parentheses; wrap phrases in "quotes".
@@ -763,25 +763,25 @@ export default function ContentStudio() {
 
       {/* Sort + type filter + date range + page-size controls */}
       <div className="flex items-center gap-3 flex-wrap text-sm">
-        <label className="flex items-center gap-1.5 text-xs text-gray-600">
+        <label className="flex items-center gap-1.5 text-xs text-fg-muted">
           <span>Type</span>
           <select
             value={filterPostType}
             onChange={(e) => { setFilterPostType(e.target.value as PostTypeFilter); setPage(1); setSelectedIds(new Set()) }}
-            className="border border-gray-300 rounded-lg px-2 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-blue-500"
+            className="border border-field rounded-lg px-2 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-accent"
           >
             {POST_TYPE_FILTERS.map((t) => (
               <option key={t.value} value={t.value}>{t.label}</option>
             ))}
           </select>
         </label>
-        <label className="flex items-center gap-1.5 text-xs text-gray-600">
+        <label className="flex items-center gap-1.5 text-xs text-fg-muted">
           <span>Date</span>
           <select
             value={dateRange}
             onChange={(e) => { setDateRange(e.target.value as DateRangeFilter); setPage(1); setSelectedIds(new Set()) }}
             aria-label="Date range preset"
-            className="border border-gray-300 rounded-lg px-2 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-blue-500"
+            className="border border-field rounded-lg px-2 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-accent"
           >
             {DATE_RANGE_FILTERS.map((d) => (
               <option key={d.value} value={d.value}>{d.label}</option>
@@ -789,13 +789,13 @@ export default function ContentStudio() {
           </select>
         </label>
         {dateRange === 'custom' && (
-          <div className="flex items-center gap-1.5 text-xs text-gray-600">
+          <div className="flex items-center gap-1.5 text-xs text-fg-muted">
             <input
               type="date"
               value={customStartDate}
               onChange={(e) => { setCustomStartDate(e.target.value); setPage(1); setSelectedIds(new Set()) }}
               aria-label="Custom start date"
-              className="border border-gray-300 rounded-lg px-2 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-blue-500"
+              className="border border-field rounded-lg px-2 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-accent"
             />
             <span>to</span>
             <input
@@ -803,16 +803,16 @@ export default function ContentStudio() {
               value={customEndDate}
               onChange={(e) => { setCustomEndDate(e.target.value); setPage(1); setSelectedIds(new Set()) }}
               aria-label="Custom end date"
-              className="border border-gray-300 rounded-lg px-2 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-blue-500"
+              className="border border-field rounded-lg px-2 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-accent"
             />
           </div>
         )}
-        <label className="flex items-center gap-1.5 text-xs text-gray-600">
+        <label className="flex items-center gap-1.5 text-xs text-fg-muted">
           <span>Sort by</span>
           <select
             value={sortBy}
             onChange={(e) => { setSortBy(e.target.value as SortBy); resetPage() }}
-            className="border border-gray-300 rounded-lg px-2 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-blue-500"
+            className="border border-field rounded-lg px-2 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-accent"
           >
             {SORT_BY_OPTIONS.map((o) => (
               <option key={o.value} value={o.value}>{o.label}</option>
@@ -821,20 +821,20 @@ export default function ContentStudio() {
         </label>
         <button
           onClick={() => { setSortOrder((o) => (o === 'asc' ? 'desc' : 'asc')); resetPage() }}
-          className="flex items-center gap-1 text-gray-600 border border-gray-300 rounded-lg px-3 py-1.5 hover:border-blue-400 transition-colors text-xs font-medium"
+          className="flex items-center gap-1 text-fg-muted border border-field rounded-lg px-3 py-1.5 hover:border-accent/50 transition-colors text-xs font-medium"
         >
           {sortBy === 'scheduled_time'
             ? (sortOrder === 'asc' ? '↑ Oldest first' : '↓ Newest first')
             : (sortOrder === 'asc' ? '↑ Ascending' : '↓ Descending')}
         </button>
-        <div className="flex items-center gap-1.5 text-xs text-gray-600">
+        <div className="flex items-center gap-1.5 text-xs text-fg-muted">
           <span>Show</span>
           {PAGE_SIZE_OPTIONS.map((n) => (
             <button
               key={n}
               onClick={() => { setPageSize(n); resetPage() }}
               className={`px-2 py-1 rounded border transition-colors ${
-                pageSize === n ? 'bg-blue-600 text-white border-blue-600' : 'border-gray-300 hover:border-blue-400'
+                pageSize === n ? 'bg-accent text-white border-accent' : 'border-field hover:border-accent/50'
               }`}
             >
               {n}
@@ -842,19 +842,19 @@ export default function ContentStudio() {
           ))}
           <span>per page</span>
         </div>
-        <span className="text-xs text-gray-400">{total} total posts</span>
+        <span className="text-xs text-fg-muted">{total} total posts</span>
       </div>
 
       {/* Bulk action bar */}
       {selectedIds.size > 0 && (
-        <div className="bg-blue-50 border border-blue-200 rounded-lg px-4 py-3 flex flex-wrap items-center gap-3">
-          <span className="text-sm font-semibold text-blue-800">{selectedIds.size} selected</span>
+        <div className="bg-accent/5 border border-accent/25 rounded-lg px-4 py-3 flex flex-wrap items-center gap-3">
+          <span className="text-sm font-semibold text-accent">{selectedIds.size} selected</span>
 
           <div className="flex items-center gap-2">
             <select
               value={bulkStatus}
               onChange={(e) => setBulkStatus(e.target.value)}
-              className="border border-gray-300 rounded px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-blue-500"
+              className="border border-field rounded px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-accent"
             >
               {['pending', 'approved', 'scheduled', 'posted', 'rejected'].map((s) => (
                 <option key={s} value={s}>{s.toUpperCase()}</option>
@@ -863,7 +863,7 @@ export default function ContentStudio() {
             <button
               onClick={() => bulkUpdateMutation.mutate({ post_ids: Array.from(selectedIds), status: bulkStatus })}
               disabled={bulkUpdateMutation.isPending}
-              className="bg-blue-600 text-white px-3 py-1 rounded text-xs font-semibold hover:bg-blue-700 disabled:opacity-50"
+              className="bg-accent text-white px-3 py-1 rounded text-xs font-semibold hover:bg-accent/90 disabled:opacity-50"
             >
               Apply Status
             </button>
@@ -875,9 +875,9 @@ export default function ContentStudio() {
               value={bulkDate}
               onChange={(e) => setBulkDate(e.target.value)}
               aria-label={`Bulk schedule date and time (${timezoneLabel})`}
-              className="border border-gray-300 rounded px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-blue-500"
+              className="border border-field rounded px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-accent"
             />
-            <span className="text-xs text-gray-400">{timezoneLabel}</span>
+            <span className="text-xs text-fg-muted">{timezoneLabel}</span>
             <button
               onClick={() => {
                 // Never convert a typed wall clock against a guessed zone (issue #774).
@@ -890,7 +890,7 @@ export default function ContentStudio() {
                 })
               }}
               disabled={!bulkDate || !timezoneResolved || bulkUpdateMutation.isPending}
-              className="bg-blue-600 text-white px-3 py-1 rounded text-xs font-semibold hover:bg-blue-700 disabled:opacity-50"
+              className="bg-accent text-white px-3 py-1 rounded text-xs font-semibold hover:bg-accent/90 disabled:opacity-50"
             >
               Apply Date
             </button>
@@ -899,34 +899,34 @@ export default function ContentStudio() {
           <button
             onClick={() => bulkDeleteMutation.mutate(Array.from(selectedIds))}
             disabled={bulkDeleteMutation.isPending}
-            className="ml-auto bg-red-500 text-white px-3 py-1 rounded text-xs font-semibold hover:bg-red-600 disabled:opacity-50"
+            className="ml-auto bg-danger text-white px-3 py-1 rounded text-xs font-semibold hover:bg-danger/90 disabled:opacity-50"
           >
             {bulkDeleteMutation.isPending ? 'Deleting…' : 'Delete Selected'}
           </button>
         </div>
       )}
 
-      {isLoading && <p className="text-gray-400 text-sm">Loading posts…</p>}
+      {isLoading && <p className="text-fg-muted text-sm">Loading posts…</p>}
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         <div className="space-y-3">
           {/* Select-all header */}
           {posts.length > 0 && (
-            <label className="flex items-center gap-2 text-xs text-gray-500 cursor-pointer select-none">
+            <label className="flex items-center gap-2 text-xs text-fg-muted cursor-pointer select-none">
               <input
                 type="checkbox"
                 checked={allOnPageSelected}
                 onChange={toggleSelectAll}
-                className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                className="rounded border-field text-accent focus:ring-accent"
               />
               Select all on this page
             </label>
           )}
 
           {posts.length === 0 && !isLoading && (
-            <div className="flex flex-col items-center text-center py-12 px-4 bg-white rounded-lg border border-gray-200">
+            <div className="flex flex-col items-center text-center py-12 px-4 bg-raised rounded-lg border border-hairline">
               <div className="text-4xl mb-4">📅</div>
-              <p className="text-gray-600 text-sm mb-6 max-w-xs">
+              <p className="text-fg-muted text-sm mb-6 max-w-xs">
                 {hasActiveFilters
                   ? 'No posts match these filters.'
                   : 'Your scheduled posts will appear here. Generate your first week of content to get started.'}
@@ -934,7 +934,7 @@ export default function ContentStudio() {
               {hasActiveFilters ? (
                 <button
                   onClick={clearFilters}
-                  className="border border-gray-300 text-gray-600 px-5 py-2 rounded-lg text-sm font-semibold hover:bg-gray-50 transition-colors"
+                  className="border border-field text-fg-muted px-5 py-2 rounded-lg text-sm font-semibold hover:bg-page transition-colors"
                 >
                   Clear filters
                 </button>
@@ -942,7 +942,7 @@ export default function ContentStudio() {
                 <button
                   onClick={() => weeklyMutation.mutate()}
                   disabled={generating}
-                  className="bg-green-600 text-white px-6 py-2.5 rounded-lg text-sm font-semibold hover:bg-green-700 disabled:opacity-50 transition-colors"
+                  className="bg-success text-white px-6 py-2.5 rounded-lg text-sm font-semibold hover:bg-success/90 disabled:opacity-50 transition-colors"
                 >
                   {generateLabel}
                 </button>
@@ -954,8 +954,8 @@ export default function ContentStudio() {
             <div
               key={post.post_id}
               onClick={() => setEditingPost(post)}
-              className={`bg-white rounded-lg border p-4 cursor-pointer hover:border-blue-400 transition-colors ${
-                editingPost?.post_id === post.post_id ? 'border-blue-500 ring-1 ring-blue-500' : 'border-gray-200'
+              className={`bg-raised rounded-lg border p-4 cursor-pointer hover:border-accent/50 transition-colors ${
+                editingPost?.post_id === post.post_id ? 'border-accent ring-1 ring-accent' : 'border-hairline'
               }`}
             >
               <div className="flex items-start gap-3">
@@ -964,21 +964,21 @@ export default function ContentStudio() {
                   checked={selectedIds.has(post.post_id)}
                   onChange={(e) => { e.stopPropagation(); toggleSelect(post.post_id) }}
                   onClick={(e) => e.stopPropagation()}
-                  className="mt-1 rounded border-gray-300 text-blue-600 focus:ring-blue-500 shrink-0"
+                  className="mt-1 rounded border-field text-accent focus:ring-accent shrink-0"
                 />
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center justify-between mb-1 gap-2">
-                    <span className="text-xs text-gray-400 truncate">
+                    <span className="text-xs text-fg-muted truncate">
                       {formatInTimezone(post.scheduled_time, userTimezone)}
                     </span>
                     <div className="flex items-center gap-1.5 shrink-0">
-                      <span className="text-xs text-gray-400 uppercase">{post.post_type}</span>
+                      <span className="text-xs text-fg-muted uppercase">{post.post_type}</span>
                       {post.manual_publish && post.status !== 'posted' && (
-                        <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-800">
+                        <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-warning/10 text-warning">
                           POST NATIVELY
                         </span>
                       )}
-                      <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${STATUS_COLORS[post.status] ?? 'bg-gray-100 text-gray-600'}`}>
+                      <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${STATUS_COLORS[post.status] ?? 'bg-page text-fg-muted'}`}>
                         {post.status.toUpperCase()}
                       </span>
                       {post.status !== 'posted' && (
@@ -987,33 +987,33 @@ export default function ContentStudio() {
                           title="Delete this post"
                           aria-label={`Delete post ${post.post_id}`}
                           onClick={(e) => { e.stopPropagation(); setConfirmDeletePost(post) }}
-                          className="text-gray-300 hover:text-red-500 transition-colors px-1 leading-none text-base"
+                          className="text-fg-muted hover:text-danger transition-colors px-1 leading-none text-base"
                         >
                           🗑
                         </button>
                       )}
                     </div>
                   </div>
-                  <p className="text-sm text-gray-700 line-clamp-2">{post.content}</p>
+                  <p className="text-sm text-fg line-clamp-2">{post.content}</p>
                   {/* A curated post comments on someone else's content (docs/curated-sources.md). */}
                   {post.curated && (
-                    <p className="text-xs text-indigo-700 mt-1 truncate" title={post.curated.credit}>
+                    <p className="text-xs text-accent mt-1 truncate" title={post.curated.credit}>
                       ↻ Curated · {curatedTreatmentLabel(post.curated.treatment)} · {post.curated.credit}
                     </p>
                   )}
                   {/* One-line "why" for a gate-held draft — the full reason + fix is in the editor. */}
                   {post.status === 'pending' && gateHold(post.gate_reason).length > 0 && (
-                    <p className="text-xs text-amber-700 mt-1 truncate">
+                    <p className="text-xs text-warning mt-1 truncate">
                       ⏸ {gateHold(post.gate_reason).map((f) => f.label).join(' · ')} — click to see why
                     </p>
                   )}
                   {post.status === 'rejected' && post.rejection_reason && (
-                    <p className="text-xs text-red-700 mt-1 truncate">
+                    <p className="text-xs text-danger mt-1 truncate">
                       ✎ {post.rejection_reason}
                     </p>
                   )}
                   {isDeckType(post.post_type) && post.carousel_slides && (
-                    <p className="text-xs text-gray-400 mt-1">{post.carousel_slides.length} slides</p>
+                    <p className="text-xs text-fg-muted mt-1">{post.carousel_slides.length} slides</p>
                   )}
                 </div>
               </div>
@@ -1026,15 +1026,15 @@ export default function ContentStudio() {
               <button
                 onClick={() => setPage((p) => Math.max(1, p - 1))}
                 disabled={page <= 1}
-                className="px-3 py-1.5 border border-gray-300 rounded-lg text-xs text-gray-600 hover:border-blue-400 disabled:opacity-40 transition-colors"
+                className="px-3 py-1.5 border border-field rounded-lg text-xs text-fg-muted hover:border-accent/50 disabled:opacity-40 transition-colors"
               >
                 ← Prev
               </button>
-              <span className="text-xs text-gray-500">Page {page} of {totalPages}</span>
+              <span className="text-xs text-fg-muted">Page {page} of {totalPages}</span>
               <button
                 onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
                 disabled={page >= totalPages}
-                className="px-3 py-1.5 border border-gray-300 rounded-lg text-xs text-gray-600 hover:border-blue-400 disabled:opacity-40 transition-colors"
+                className="px-3 py-1.5 border border-field rounded-lg text-xs text-fg-muted hover:border-accent/50 disabled:opacity-40 transition-colors"
               >
                 Next →
               </button>
@@ -1046,73 +1046,73 @@ export default function ContentStudio() {
           <div className="sticky top-4 self-start space-y-4 max-h-[calc(100vh-2rem)] overflow-y-auto">
             {editingPost.status === 'posted' ? (
               /* Read-only view for published posts */
-              <div className="bg-white rounded-lg border border-gray-200 shadow-sm p-5 space-y-4">
+              <div className="bg-raised rounded-lg border border-hairline shadow-sm p-5 space-y-4">
                 <div className="flex items-center justify-between">
-                  <h3 className="font-semibold text-gray-700">
+                  <h3 className="font-semibold text-fg">
                     Post #{editingPost.post_id}
-                    <span className="ml-2 px-2 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-700">Published</span>
+                    <span className="ml-2 px-2 py-0.5 rounded-full text-xs font-medium bg-accent/10 text-accent">Published</span>
                   </h3>
                 </div>
 
-                <p className="text-sm text-gray-700 whitespace-pre-wrap">{editingPost.content}</p>
+                <p className="text-sm text-fg whitespace-pre-wrap">{editingPost.content}</p>
 
-                <div className="grid grid-cols-2 gap-3 text-xs text-gray-500">
+                <div className="grid grid-cols-2 gap-3 text-xs text-fg-muted">
                   <div>
-                    <span className="font-medium text-gray-600 block mb-0.5">Type</span>
+                    <span className="font-medium text-fg-muted block mb-0.5">Type</span>
                     {editingPost.post_type.toUpperCase()}
                   </div>
                   <div>
-                    <span className="font-medium text-gray-600 block mb-0.5">Posted</span>
+                    <span className="font-medium text-fg-muted block mb-0.5">Posted</span>
                     {formatInTimezone(editingPost.scheduled_time, userTimezone)}
                   </div>
                 </div>
 
                 <div>
                   {postUrlLoading ? (
-                    <span className="text-xs text-gray-400">Loading link…</span>
+                    <span className="text-xs text-fg-muted">Loading link…</span>
                   ) : postUrlData?.detail?.post_url ? (
                     <a
                       href={postUrlData.detail.post_url}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="inline-flex items-center gap-1.5 bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-blue-700 transition-colors"
+                      className="inline-flex items-center gap-1.5 bg-accent text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-accent/90 transition-colors"
                     >
                       View on LinkedIn ↗
                     </a>
                   ) : (
-                    <span className="text-xs text-gray-400">LinkedIn link not available</span>
+                    <span className="text-xs text-fg-muted">LinkedIn link not available</span>
                   )}
                 </div>
 
                 <button
                   onClick={() => setEditingPost(null)}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg text-sm text-gray-600 hover:bg-gray-50"
+                  className="w-full px-4 py-2 border border-field rounded-lg text-sm text-fg-muted hover:bg-page"
                 >
                   Close
                 </button>
               </div>
             ) : (
               /* Editable form for non-posted statuses */
-              <div className="bg-white rounded-lg border border-gray-200 shadow-sm p-5 space-y-4">
-                <h3 className="font-semibold text-gray-700">Edit Post #{editingPost.post_id}</h3>
+              <div className="bg-raised rounded-lg border border-hairline shadow-sm p-5 space-y-4">
+                <h3 className="font-semibold text-fg">Edit Post #{editingPost.post_id}</h3>
 
                 {/* Occasion / milestone draft (issue #1074). LinkedIn's occasion composer has no
                     API, so this post never publishes itself — copy it across, then say it landed. */}
                 {editingPost.manual_publish && (
-                  <div className="border border-amber-300 bg-amber-50 rounded-lg p-4 space-y-3">
-                    <p className="text-sm font-semibold text-amber-900">Post natively on LinkedIn</p>
+                  <div className="border border-warning/50 bg-warning/5 rounded-lg p-4 space-y-3">
+                    <p className="text-sm font-semibold text-warning">Post natively on LinkedIn</p>
                     {/* Since #1088 a native-publish attempt that could not be confirmed lands the
                         draft at 'error' — the post may already be live. The default copy below
                         tells the author to paste it across, and an occasion post published twice is
                         public and un-deletable, so this status has to say "check first" instead. */}
                     {editingPost.status === 'error' ? (
-                      <p className="text-xs text-red-700 font-medium">
+                      <p className="text-xs text-danger font-medium">
                         This one is held. If LEM attempted it for you, it may already be on LinkedIn —
                         check your profile first: if it's there, press "I posted this". Only paste it
                         across if it is not.
                       </p>
                     ) : (
-                      <p className="text-xs text-amber-800">
+                      <p className="text-xs text-warning">
                         LinkedIn's occasion posts can only be created in its own composer, so LEM won't
                         publish this one. On LinkedIn: <span className="font-semibold">Start a post →
                         More → Celebrate an occasion</span>, pick the occasion, then paste the text
@@ -1123,7 +1123,7 @@ export default function ContentStudio() {
                       <button
                         type="button"
                         onClick={() => copyNativeText(editingPost.content)}
-                        className="bg-amber-600 text-white px-3 py-1.5 rounded-lg text-xs font-semibold hover:bg-amber-700 transition-colors"
+                        className="bg-warning text-white px-3 py-1.5 rounded-lg text-xs font-semibold hover:bg-warning/90 transition-colors"
                       >
                         {nativeCopied ? 'Copied ✓' : 'Copy post text'}
                       </button>
@@ -1131,7 +1131,7 @@ export default function ContentStudio() {
                         href="https://www.linkedin.com/feed/"
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="border border-amber-400 text-amber-800 px-3 py-1.5 rounded-lg text-xs font-semibold hover:bg-amber-100 transition-colors"
+                        className="border border-warning/50 text-warning px-3 py-1.5 rounded-lg text-xs font-semibold hover:bg-warning/10 transition-colors"
                       >
                         Open LinkedIn ↗
                       </a>
@@ -1139,38 +1139,38 @@ export default function ContentStudio() {
                         type="button"
                         onClick={() => markPostedMutation.mutate(editingPost.post_id)}
                         disabled={markPostedMutation.isPending}
-                        className="border border-amber-400 text-amber-800 px-3 py-1.5 rounded-lg text-xs font-semibold hover:bg-amber-100 disabled:opacity-50 transition-colors"
+                        className="border border-warning/50 text-warning px-3 py-1.5 rounded-lg text-xs font-semibold hover:bg-warning/10 disabled:opacity-50 transition-colors"
                       >
                         {markPostedMutation.isPending ? 'Saving…' : 'I posted this'}
                       </button>
                     </div>
-                    {nativeError && <p className="text-xs text-red-600 font-medium">{nativeError}</p>}
+                    {nativeError && <p className="text-xs text-danger font-medium">{nativeError}</p>}
                   </div>
                 )}
 
                 {/* The approval card for a curated post: what it comments on, how, and the exact
                     credit it publishes with (docs/curated-sources.md). */}
                 {editingPost.curated && (
-                  <div className="rounded-lg border border-indigo-200 bg-indigo-50 p-3 text-sm space-y-1">
-                    <p className="font-medium text-indigo-900">
+                  <div className="rounded-lg border border-accent/25 bg-accent/5 p-3 text-sm space-y-1">
+                    <p className="font-medium text-accent">
                       Curated post — it publishes only after you approve it
                     </p>
-                    <p className="text-indigo-800">
+                    <p className="text-accent">
                       Treatment: {curatedTreatmentLabel(editingPost.curated.treatment)}
                       {editingPost.curated.link_only ? ' (no reshare ID — linked, not reshared)' : ''}
                     </p>
-                    <p className="text-indigo-800">{editingPost.curated.credit}</p>
+                    <p className="text-accent">{editingPost.curated.credit}</p>
                     {safeHttpUrl(editingPost.curated.url) && (
                       <a
                         href={safeHttpUrl(editingPost.curated.url)}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="text-indigo-700 underline break-all"
+                        className="text-accent underline break-all"
                       >
                         {editingPost.curated.url}
                       </a>
                     )}
-                    <p className="text-xs text-indigo-700">
+                    <p className="text-xs text-accent">
                       The credit line is added back when it publishes, even if you remove it here.
                     </p>
                   </div>
@@ -1189,11 +1189,11 @@ export default function ContentStudio() {
                   rows={6}
                   value={editingPost.content}
                   onChange={(e) => setEditingPost({ ...editingPost, content: e.target.value })}
-                  {...maskProps('w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none')}
+                  {...maskProps('w-full border border-field rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent resize-none')}
                 />
 
                 <div>
-                  <label className="block text-xs font-medium text-gray-600 mb-1">Post Type</label>
+                  <label className="block text-xs font-medium text-fg-muted mb-1">Post Type</label>
                   <select
                     value={editingPost.post_type}
                     onChange={(e) => {
@@ -1205,7 +1205,7 @@ export default function ContentStudio() {
                         carousel_slides: isDeckType(newType) ? editingPost.carousel_slides : null,
                       })
                     }}
-                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="w-full border border-field rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent"
                   >
                     {['text', 'video', 'carousel', 'document'].map((t) => (
                       <option key={t} value={t}>{t.toUpperCase()}</option>
@@ -1215,12 +1215,12 @@ export default function ContentStudio() {
 
                 {editingPost.post_type === 'video' && (
                   <div>
-                    <label className="block text-xs font-medium text-gray-600 mb-1">Video URL</label>
+                    <label className="block text-xs font-medium text-fg-muted mb-1">Video URL</label>
                     <input
                       type="url"
                       value={editingPost.video_url ?? ''}
                       onChange={(e) => setEditingPost({ ...editingPost, video_url: e.target.value || null })}
-                      className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      className="w-full border border-field rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent"
                       placeholder="https://example.com/video.mp4"
                     />
                   </div>
@@ -1230,21 +1230,21 @@ export default function ContentStudio() {
                     draft. Saved on the spot, so it survives Cancel and needs no "Save Changes". */}
                 {editingPost.post_type === 'text' && (
                   <div>
-                    <label className="block text-xs font-medium text-gray-600 mb-1">
-                      Image <span className="font-normal text-gray-400">(optional)</span>
+                    <label className="block text-xs font-medium text-fg-muted mb-1">
+                      Image <span className="font-normal text-fg-muted">(optional)</span>
                     </label>
                     {editingPost.image_url && (
                       <div className="mb-2 flex items-start gap-3">
                         <img
                           src={editingPost.image_url}
                           alt={`Image on post ${editingPost.post_id}`}
-                          className="w-24 h-24 object-cover rounded-lg border border-gray-200"
+                          className="w-24 h-24 object-cover rounded-lg border border-hairline"
                         />
                         <button
                           type="button"
                           onClick={() => removeImageMutation.mutate(editingPost.post_id)}
                           disabled={imageBusy !== null}
-                          className="text-xs text-red-500 hover:text-red-700 font-semibold underline disabled:opacity-50"
+                          className="text-xs text-danger hover:text-danger font-semibold underline disabled:opacity-50"
                         >
                           {imageBusy === 'remove' ? 'Removing…' : 'Remove image'}
                         </button>
@@ -1261,20 +1261,20 @@ export default function ContentStudio() {
                           const file = e.target.files?.[0]
                           if (file) uploadImageMutation.mutate({ post_id: editingPost.post_id, file })
                         }}
-                        className="text-xs text-gray-600 file:mr-2 file:py-1.5 file:px-3 file:rounded-lg file:border file:border-gray-300 file:text-xs file:font-semibold file:bg-white hover:file:border-blue-400"
+                        className="text-xs text-fg-muted file:mr-2 file:py-1.5 file:px-3 file:rounded-lg file:border file:border-hairline file:text-xs file:font-semibold file:bg-raised hover:file:border-accent/50"
                       />
                       <button
                         type="button"
                         onClick={() => generateImageMutation.mutate(editingPost)}
                         disabled={imageBusy !== null}
-                        className="bg-indigo-600 text-white px-3 py-1.5 rounded-lg text-xs font-semibold hover:bg-indigo-700 disabled:opacity-50 transition-colors"
+                        className="bg-accent text-white px-3 py-1.5 rounded-lg text-xs font-semibold hover:bg-accent/90 disabled:opacity-50 transition-colors"
                       >
                         {imageBusy === 'generate' ? 'Generating image…' : 'Generate with AI'}
                       </button>
                     </div>
-                    {imageBusy === 'upload' && <p className="mt-1 text-xs text-gray-500">Uploading…</p>}
-                    {imageError && <p className="mt-1 text-xs text-red-600 font-medium">{imageError}</p>}
-                    <p className="mt-1 text-xs text-gray-400">
+                    {imageBusy === 'upload' && <p className="mt-1 text-xs text-fg-muted">Uploading…</p>}
+                    {imageError && <p className="mt-1 text-xs text-danger font-medium">{imageError}</p>}
+                    <p className="mt-1 text-xs text-fg-muted">
                       PNG or JPG, at least 400×400. AI generation draws the image from the text above.
                     </p>
                   </div>
@@ -1282,13 +1282,13 @@ export default function ContentStudio() {
 
                 {isDeckType(editingPost.post_type) && editingPost.carousel_slides && (
                   <div>
-                    <label className="block text-xs font-medium text-gray-600 mb-1">
+                    <label className="block text-xs font-medium text-fg-muted mb-1">
                       Slides ({editingPost.carousel_slides.length})
                     </label>
                     <ul className="space-y-1">
                       {editingPost.carousel_slides.map((slide, i) => (
-                        <li key={i} className="text-xs text-gray-600 bg-gray-50 rounded px-2 py-1">
-                          <span className="text-gray-400 mr-1">{i + 1}.</span>{slide}
+                        <li key={i} className="text-xs text-fg-muted bg-page rounded px-2 py-1">
+                          <span className="text-fg-muted mr-1">{i + 1}.</span>{slide}
                         </li>
                       ))}
                     </ul>
@@ -1297,11 +1297,11 @@ export default function ContentStudio() {
 
                 <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <label className="block text-xs font-medium text-gray-600 mb-1">Status</label>
+                    <label className="block text-xs font-medium text-fg-muted mb-1">Status</label>
                     <select
                       value={editingPost.status}
                       onChange={(e) => setEditingPost({ ...editingPost, status: e.target.value })}
-                      className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      className="w-full border border-field rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent"
                     >
                       {['pending', 'approved', 'scheduled', 'posted', 'rejected'].map((s) => (
                         <option key={s} value={s}>{s.toUpperCase()}</option>
@@ -1309,8 +1309,8 @@ export default function ContentStudio() {
                     </select>
                   </div>
                   <div>
-                    <label className="block text-xs font-medium text-gray-600 mb-1">
-                      Scheduled Time <span className="font-normal text-gray-400">({timezoneLabel})</span>
+                    <label className="block text-xs font-medium text-fg-muted mb-1">
+                      Scheduled Time <span className="font-normal text-fg-muted">({timezoneLabel})</span>
                     </label>
                     <input
                       type="datetime-local"
@@ -1324,7 +1324,7 @@ export default function ContentStudio() {
                             zonedInputToUtcIso(e.target.value, userTimezone) ?? editingPost.scheduled_time,
                         })
                       }
-                      className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100"
+                      className="w-full border border-field rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent disabled:bg-page"
                     />
                   </div>
                 </div>
@@ -1333,13 +1333,13 @@ export default function ContentStudio() {
                   <button
                     onClick={() => updateMutation.mutate(editingPost)}
                     disabled={updateMutation.isPending}
-                    className="flex-1 bg-blue-600 text-white py-2 rounded-lg text-sm font-semibold hover:bg-blue-700 disabled:opacity-50"
+                    className="flex-1 bg-accent text-white py-2 rounded-lg text-sm font-semibold hover:bg-accent/90 disabled:opacity-50"
                   >
                     {updateMutation.isPending ? 'Saving…' : 'Save Changes'}
                   </button>
                   <button
                     onClick={() => setEditingPost(null)}
-                    className="px-4 py-2 border border-gray-300 rounded-lg text-sm text-gray-600 hover:bg-gray-50"
+                    className="px-4 py-2 border border-field rounded-lg text-sm text-fg-muted hover:bg-page"
                   >
                     Cancel
                   </button>
@@ -1353,16 +1353,16 @@ export default function ContentStudio() {
                     and videos re-render their clip from the new caption); approved posts already
                     have acceptance (issue #778). */}
                 {(editingPost.status === 'pending' || editingPost.status === 'rejected') && (
-                  <div className="border-t border-gray-100 pt-4 space-y-2">
-                    <label className="block text-xs font-medium text-gray-600">
-                      Added Guidance <span className="font-normal text-gray-400">(optional)</span>
+                  <div className="border-t border-hairline pt-4 space-y-2">
+                    <label className="block text-xs font-medium text-fg-muted">
+                      Added Guidance <span className="font-normal text-fg-muted">(optional)</span>
                     </label>
                     <textarea
                       value={regenGuidance}
                       onChange={(e) => setRegenGuidance(e.target.value)}
                       rows={2}
                       placeholder="e.g. lead with a client result, drop the stat, make it a personal story"
-                      className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
+                      className="w-full border border-field rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent resize-none"
                     />
                     <button
                       onClick={() => {
@@ -1370,11 +1370,11 @@ export default function ContentStudio() {
                         regenerateMutation.mutate({ post_id: editingPost.post_id, guidance })
                       }}
                       disabled={regenerateMutation.isPending}
-                      className="w-full bg-indigo-600 text-white py-2 rounded-lg text-sm font-semibold hover:bg-indigo-700 disabled:opacity-50 transition-colors"
+                      className="w-full bg-accent text-white py-2 rounded-lg text-sm font-semibold hover:bg-accent/90 disabled:opacity-50 transition-colors"
                     >
                       {regenerateMutation.isPending ? 'Starting…' : 'Re-generate Post'}
                     </button>
-                    <p className="text-xs text-gray-400">
+                    <p className="text-xs text-fg-muted">
                       Regeneration replaces this post's content
                       {editingPost.post_type === 'carousel' || editingPost.post_type === 'document'
                         ? ' and slides'
@@ -1388,19 +1388,19 @@ export default function ContentStudio() {
 
                 {/* Rejected posts get a one-click "regenerate with the reason" prompt (issue #713). */}
                 {editingPost.status === 'rejected' && editingPost.rejection_reason && (
-                  <div className="border-t border-gray-100 pt-4 space-y-2">
-                    <p className="text-xs text-gray-600">
+                  <div className="border-t border-hairline pt-4 space-y-2">
+                    <p className="text-xs text-fg-muted">
                       This post was rejected because:
-                      <span className="block mt-1 text-red-700 font-medium">{editingPost.rejection_reason}</span>
+                      <span className="block mt-1 text-danger font-medium">{editingPost.rejection_reason}</span>
                     </p>
                     <button
                       onClick={() => regenerateRejectedMutation.mutate(editingPost.post_id)}
                       disabled={regenerateRejectedMutation.isPending}
-                      className="w-full bg-indigo-600 text-white py-2 rounded-lg text-sm font-semibold hover:bg-indigo-700 disabled:opacity-50 transition-colors"
+                      className="w-full bg-accent text-white py-2 rounded-lg text-sm font-semibold hover:bg-accent/90 disabled:opacity-50 transition-colors"
                     >
                       {regenerateRejectedMutation.isPending ? 'Starting…' : 'Regenerate using this feedback'}
                     </button>
-                    <p className="text-xs text-gray-400">
+                    <p className="text-xs text-fg-muted">
                       We'll use the rejection reason as guidance so the new draft avoids the same issue.
                     </p>
                   </div>
@@ -1426,28 +1426,28 @@ export default function ContentStudio() {
       {/* Quick-delete confirmation — backend is a soft delete (status=rejected), so the copy
           promises only what actually happens: gone from the queue/views, not purged. */}
       {confirmDeletePost && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-fg/40 p-4"
              onClick={() => !deleteMutation.isPending && setConfirmDeletePost(null)}>
-          <div className="bg-white rounded-lg shadow-xl max-w-sm w-full p-6 space-y-4 max-h-viewport overflow-y-auto"
+          <div className="bg-raised rounded-lg shadow-xl max-w-sm w-full p-6 space-y-4 max-h-viewport overflow-y-auto"
                onClick={(e) => e.stopPropagation()}>
-            <h3 className="text-base font-semibold text-gray-800">Remove this post?</h3>
-            <p className="text-sm text-gray-600">
+            <h3 className="text-base font-semibold text-fg">Remove this post?</h3>
+            <p className="text-sm text-fg-muted">
               This will remove post #{confirmDeletePost.post_id} from your queue — it won't be published
               and will disappear from all views. You can't undo this from the UI.
             </p>
-            <p className="text-xs text-gray-500 line-clamp-3 bg-gray-50 rounded p-2">{confirmDeletePost.content}</p>
+            <p className="text-xs text-fg-muted line-clamp-3 bg-page rounded p-2">{confirmDeletePost.content}</p>
             <div className="space-y-2">
-              <label className="block text-xs font-medium text-gray-600">
-                Why are you removing this? <span className="font-normal text-gray-400">(optional)</span>
+              <label className="block text-xs font-medium text-fg-muted">
+                Why are you removing this? <span className="font-normal text-fg-muted">(optional)</span>
               </label>
               <textarea
                 value={deleteRejectionReason}
                 onChange={(e) => setDeleteRejectionReason(e.target.value)}
                 rows={2}
                 placeholder="e.g. too salesy, wrong tone, not relevant to my audience"
-                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
+                className="w-full border border-field rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent resize-none"
               />
-              <p className="text-xs text-gray-400">
+              <p className="text-xs text-fg-muted">
                 Your reason will help future drafts avoid the same issue.
               </p>
             </div>
@@ -1455,14 +1455,14 @@ export default function ContentStudio() {
               <button
                 onClick={() => setConfirmDeletePost(null)}
                 disabled={deleteMutation.isPending}
-                className="px-4 py-2 border border-gray-300 rounded-lg text-sm text-gray-600 hover:bg-gray-50 disabled:opacity-50"
+                className="px-4 py-2 border border-field rounded-lg text-sm text-fg-muted hover:bg-page disabled:opacity-50"
               >
                 Cancel
               </button>
               <button
                 onClick={() => deleteMutation.mutate(confirmDeletePost.post_id)}
                 disabled={deleteMutation.isPending}
-                className="px-4 py-2 bg-red-600 text-white rounded-lg text-sm font-semibold hover:bg-red-700 disabled:opacity-50"
+                className="px-4 py-2 bg-danger text-white rounded-lg text-sm font-semibold hover:bg-danger/90 disabled:opacity-50"
               >
                 {deleteMutation.isPending ? 'Removing…' : 'Remove post'}
               </button>

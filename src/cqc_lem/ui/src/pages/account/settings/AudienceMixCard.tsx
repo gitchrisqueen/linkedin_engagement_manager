@@ -38,8 +38,8 @@ export default function AudienceMixCard() {
           <input type="range" min={0} max={100} step={10} data-testid="audience-share"
             aria-label="Share of posts for the second audience" value={percent}
             onChange={(e) => update({ secondary_share: Number(e.target.value) / 100 })}
-            className="w-48 accent-gray-700" />
-          <span className="text-sm text-gray-700 tabular-nums">
+            className="w-48 accent-accent" />
+          <span className="text-sm text-fg tabular-nums">
             {percent}% of posts for the second audience
           </span>
         </div>

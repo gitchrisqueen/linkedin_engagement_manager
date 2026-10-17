@@ -34,24 +34,24 @@ export default function Leaderboard({ title, subtitle, entries, emptyMessage, hu
   return (
     <div>
       <div className="mb-2">
-        <h3 className="text-sm font-semibold text-gray-700">{title}</h3>
-        <p className="text-xs text-gray-500">
+        <h3 className="text-sm font-semibold text-fg">{title}</h3>
+        <p className="text-xs text-fg-muted">
           {subtitle ?? (isRate ? 'Avg engagement rate per impression' : 'Avg engagement per post')}
         </p>
       </div>
       {entries.length === 0 ? (
-        <p className="text-xs text-gray-400 py-4 text-center">{emptyMessage ?? 'Not enough data yet.'}</p>
+        <p className="text-xs text-fg-muted py-4 text-center">{emptyMessage ?? 'Not enough data yet.'}</p>
       ) : (
         <ul className="space-y-2">
           {entries.map((e) => (
             <li key={e.key} className="text-xs">
               <div className="flex items-baseline justify-between mb-0.5">
-                <span className="font-medium text-gray-700 truncate pr-2">{humanize(e.key)}</span>
-                <span className="text-gray-500 tabular-nums whitespace-nowrap">
+                <span className="font-medium text-fg truncate pr-2">{humanize(e.key)}</span>
+                <span className="text-fg-muted tabular-nums whitespace-nowrap">
                   {fmt(e.avg_engagement)} · {e.samples} post{e.samples === 1 ? '' : 's'}
                 </span>
               </div>
-              <div className="h-2 w-full rounded-full" style={{ backgroundColor: '#f0efec' }}>
+              <div className="h-2 w-full rounded-full" style={{ backgroundColor: VIZ.gridline }}>
                 <div
                   className="h-2 rounded-full"
                   style={{

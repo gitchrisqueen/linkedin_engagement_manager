@@ -12,17 +12,17 @@ const PACKAGES = [
 ]
 
 const STATUS_COLORS: Record<string, string> = {
-  starting:   'bg-yellow-100 text-yellow-800',
-  processing: 'bg-blue-100 text-blue-800',
-  succeeded:  'bg-green-100 text-green-800',
-  failed:     'bg-red-100 text-red-800',
-  canceled:   'bg-gray-100 text-gray-600',
+  starting:   'bg-warning/10 text-warning',
+  processing: 'bg-accent/10 text-accent',
+  succeeded:  'bg-success/10 text-success',
+  failed:     'bg-danger/10 text-danger',
+  canceled:   'bg-page text-fg-muted',
 }
 
 const APPROVAL_COLORS: Record<string, string> = {
-  pending:  'bg-amber-100 text-amber-800',
-  approved: 'bg-green-100 text-green-800',
-  rejected: 'bg-red-100 text-red-800',
+  pending:  'bg-warning/10 text-warning',
+  approved: 'bg-success/10 text-success',
+  rejected: 'bg-danger/10 text-danger',
 }
 
 // Mirrors utilities/avatar/attributes.py — the user picks; nothing is ever inferred from photos.
@@ -237,50 +237,50 @@ export default function Avatars() {
 
   return (
     <div className="max-w-4xl mx-auto px-4 py-8 space-y-10">
-      <h1 className="text-2xl font-bold text-gray-900">My Avatars</h1>
+      <h1 className="text-2xl font-bold text-fg">My Avatars</h1>
 
       {/* Credit balance + usage */}
       <div
-        className="flex items-center justify-between bg-blue-50 border border-blue-200 rounded-xl px-6 py-4"
+        className="flex items-center justify-between bg-accent/5 border border-accent/25 rounded-xl px-6 py-4"
         data-testid="avatar-credit-balance"
       >
         <div>
-          <p className="text-sm text-blue-700 font-medium">Avatar Training Credits</p>
-          <p className="text-3xl font-bold text-blue-900">{balance}</p>
-          <p className="text-xs text-blue-700 mt-1" data-testid="avatar-usage-summary">
+          <p className="text-sm text-accent font-medium">Avatar Training Credits</p>
+          <p className="text-3xl font-bold text-accent">{balance}</p>
+          <p className="text-xs text-accent mt-1" data-testid="avatar-usage-summary">
             {trainings.length} training{trainings.length === 1 ? '' : 's'} used ·{' '}
             {trainings.filter((t) => t.approval_status === 'approved').length} approved
           </p>
         </div>
         {hasCredits ? (
-          <span className="text-sm text-blue-700">
+          <span className="text-sm text-accent">
             {balance === 1 ? '1 training available' : `${balance} trainings available`}
           </span>
         ) : (
-          <span className="text-sm text-gray-500">Purchase credits below to train your first avatar</span>
+          <span className="text-sm text-fg-muted">Purchase credits below to train your first avatar</span>
         )}
       </div>
 
       {/* Guardrails */}
       <section data-testid="avatar-guardrails">
-        <h2 className="text-lg font-semibold text-gray-800 mb-1">Where your avatar may be used</h2>
-        <p className="text-sm text-gray-500 mb-4">
+        <h2 className="text-lg font-semibold text-fg mb-1">Where your avatar may be used</h2>
+        <p className="text-sm text-fg-muted mb-4">
           Off by default. Your avatar is only used on the content types you switch on here, and only
           after you have approved its preview images. Posts you compose can override this per post.
         </p>
 
-        <div className="border border-gray-200 rounded-xl divide-y divide-gray-100 bg-white">
+        <div className="border border-hairline rounded-xl divide-y divide-hairline bg-raised">
           <label className="flex items-start gap-3 px-5 py-4 cursor-pointer">
             <input
               type="checkbox"
               checked={avatarOff}
               onChange={(e) => prefsMutation.mutate({ avatar_disabled: e.target.checked })}
               data-testid="avatar-disabled-toggle"
-              className="mt-0.5 h-4 w-4 rounded border-gray-300 text-red-600 focus:ring-red-500"
+              className="mt-0.5 h-4 w-4 rounded border-field text-danger focus:ring-danger"
             />
             <span>
-              <span className="block text-sm font-semibold text-gray-800">Don’t use my avatar</span>
-              <span className="block text-xs text-gray-500">
+              <span className="block text-sm font-semibold text-fg">Don’t use my avatar</span>
+              <span className="block text-xs text-fg-muted">
                 Forces every image and video back to stock or generic AI artwork. Overrides everything below.
               </span>
             </span>
@@ -297,11 +297,11 @@ export default function Avatars() {
                 checked={!!prefs?.[g.key]}
                 onChange={(e) => prefsMutation.mutate({ [g.key]: e.target.checked })}
                 data-testid={`avatar-toggle-${g.key}`}
-                className="mt-0.5 h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                className="mt-0.5 h-4 w-4 rounded border-field text-accent focus:ring-accent"
               />
               <span>
-                <span className="block text-sm font-medium text-gray-800">{g.label}</span>
-                <span className="block text-xs text-gray-500">{g.hint}</span>
+                <span className="block text-sm font-medium text-fg">{g.label}</span>
+                <span className="block text-xs text-fg-muted">{g.hint}</span>
               </span>
             </label>
           ))}
@@ -310,8 +310,8 @@ export default function Avatars() {
 
       {/* Pricing */}
       <section>
-        <h2 className="text-lg font-semibold text-gray-800 mb-4">Buy Training Credits</h2>
-        <p className="text-sm text-gray-500 mb-5">
+        <h2 className="text-lg font-semibold text-fg mb-4">Buy Training Credits</h2>
+        <p className="text-sm text-fg-muted mb-5">
           Each credit lets you train one personalized AI avatar using your photos on Replicate's
           FLUX.1 model. Training takes ~2 minutes.
         </p>
@@ -320,23 +320,23 @@ export default function Avatars() {
             <div
               key={pkg.key}
               className={`relative border rounded-xl p-4 flex flex-col items-center gap-2 shadow-sm hover:shadow-md transition-shadow ${
-                pkg.key === 'value' ? 'border-blue-400 bg-blue-50' : 'border-gray-200 bg-white'
+                pkg.key === 'value' ? 'border-accent/50 bg-accent/5' : 'border-hairline bg-raised'
               }`}
             >
               {pkg.badge && (
-                <span className="absolute -top-3 bg-blue-600 text-white text-xs font-bold px-2 py-0.5 rounded-full">
+                <span className="absolute -top-3 bg-accent text-white text-xs font-bold px-2 py-0.5 rounded-full">
                   {pkg.badge}
                 </span>
               )}
-              <span className="text-2xl font-bold text-gray-900">{pkg.price}</span>
-              <span className="text-sm font-medium text-gray-700">{pkg.label}</span>
+              <span className="text-2xl font-bold text-fg">{pkg.price}</span>
+              <span className="text-sm font-medium text-fg">{pkg.label}</span>
               {pkg.savings && (
-                <span className="text-xs text-green-700 font-semibold">{pkg.savings}</span>
+                <span className="text-xs text-success font-semibold">{pkg.savings}</span>
               )}
               <button
                 onClick={() => buyMutation.mutate(pkg.key)}
                 disabled={buyMutation.isPending}
-                className="mt-2 w-full py-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium disabled:opacity-50 transition-colors"
+                className="mt-2 w-full py-1.5 rounded-lg bg-accent hover:bg-accent/90 text-white text-sm font-medium disabled:opacity-50 transition-colors"
               >
                 {buyMutation.isPending ? 'Loading…' : 'Buy'}
               </button>
@@ -344,7 +344,7 @@ export default function Avatars() {
           ))}
         </div>
         {buyMutation.isError && (
-          <p className="mt-3 text-sm text-red-600">
+          <p className="mt-3 text-sm text-danger">
             Could not start checkout. Please try again.
           </p>
         )}
@@ -352,19 +352,19 @@ export default function Avatars() {
 
       {/* Train new avatar */}
       <section>
-        <h2 className="text-lg font-semibold text-gray-800 mb-1">Train New Avatar</h2>
-        <p className="text-sm text-gray-500 mb-4">
+        <h2 className="text-lg font-semibold text-fg mb-1">Train New Avatar</h2>
+        <p className="text-sm text-fg-muted mb-4">
           Upload 10–20 clear photos of yourself (different angles and lighting). Each training
           costs 1 credit. Credits are refunded automatically if training fails.
         </p>
 
         <div
           className={`border-2 border-dashed rounded-xl p-6 space-y-4 ${
-            hasCredits ? 'border-gray-300 bg-white' : 'border-gray-200 bg-gray-50 opacity-60'
+            hasCredits ? 'border-hairline bg-raised' : 'border-hairline bg-page opacity-60'
           }`}
         >
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+            <label className="block text-sm font-medium text-fg mb-1">
               Photos (JPG / PNG / WebP)
             </label>
             <input
@@ -374,17 +374,17 @@ export default function Avatars() {
               accept="image/jpeg,image/png,image/webp"
               disabled={!hasCredits}
               onChange={handleFileChange}
-              className="block w-full text-sm text-gray-600 file:mr-4 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:bg-blue-50 file:text-blue-700 file:font-medium hover:file:bg-blue-100"
+              className="block w-full text-sm text-fg-muted file:mr-4 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:bg-accent/5 file:text-accent file:font-medium hover:file:bg-accent/10"
             />
             {files && (
-              <p className="mt-1 text-xs text-gray-500">{files.length} file(s) selected</p>
+              <p className="mt-1 text-xs text-fg-muted">{files.length} file(s) selected</p>
             )}
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+            <label className="block text-sm font-medium text-fg mb-1">
               Trigger Word
-              <span className="ml-1 text-xs text-gray-400">(used in image prompts to activate your avatar)</span>
+              <span className="ml-1 text-xs text-fg-muted">(used in image prompts to activate your avatar)</span>
             </label>
             <input
               type="text"
@@ -392,18 +392,18 @@ export default function Avatars() {
               onChange={(e) => setTriggerWord(e.target.value.toUpperCase())}
               disabled={!hasCredits}
               placeholder="e.g. LEMAVTR42"
-              className="block w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-400 focus:outline-none disabled:bg-gray-50"
+              className="block w-full rounded-lg border border-field px-3 py-2 text-sm focus:border-accent/50 focus:outline-none disabled:bg-page"
             />
           </div>
 
           {trainError && (
-            <p className="text-sm text-red-600">{trainError}</p>
+            <p className="text-sm text-danger">{trainError}</p>
           )}
 
           <button
             onClick={() => trainMutation.mutate()}
             disabled={!hasCredits || trainMutation.isPending || inProgress}
-            className="py-2 px-5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold disabled:opacity-50 transition-colors"
+            className="py-2 px-5 rounded-lg bg-accent hover:bg-accent/90 text-white text-sm font-semibold disabled:opacity-50 transition-colors"
           >
             {trainMutation.isPending
               ? 'Starting training…'
@@ -419,30 +419,30 @@ export default function Avatars() {
       {/* Training list */}
       {trainings.length > 0 && (
         <section>
-          <h2 className="text-lg font-semibold text-gray-800 mb-4">My Trained Avatars</h2>
+          <h2 className="text-lg font-semibold text-fg mb-4">My Trained Avatars</h2>
           <div className="space-y-3">
             {trainings.map((t) => (
               <div
                 key={t.id}
                 data-testid={`avatar-card-${t.id}`}
                 className={`border rounded-xl px-5 py-4 space-y-4 ${
-                  t.is_active ? 'border-green-400 bg-green-50' : 'border-gray-200 bg-white'
+                  t.is_active ? 'border-success/50 bg-success/5' : 'border-hairline bg-raised'
                 }`}
               >
                 <div className="flex items-center justify-between gap-4">
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 flex-wrap">
-                      <span className="font-mono text-sm font-semibold text-gray-800">
+                      <span className="font-mono text-sm font-semibold text-fg">
                         {t.trigger_word}
                       </span>
                       {t.is_active && (
-                        <span className="text-xs bg-green-600 text-white px-2 py-0.5 rounded-full font-medium">
+                        <span className="text-xs bg-success text-white px-2 py-0.5 rounded-full font-medium">
                           Active
                         </span>
                       )}
                       <span
                         className={`text-xs px-2 py-0.5 rounded-full font-medium ${
-                          STATUS_COLORS[t.status] ?? 'bg-gray-100 text-gray-600'
+                          STATUS_COLORS[t.status] ?? 'bg-page text-fg-muted'
                         }`}
                       >
                         {t.status}
@@ -451,14 +451,14 @@ export default function Avatars() {
                         <span
                           data-testid={`avatar-approval-${t.id}`}
                           className={`text-xs px-2 py-0.5 rounded-full font-medium ${
-                            APPROVAL_COLORS[t.approval_status] ?? 'bg-gray-100 text-gray-600'
+                            APPROVAL_COLORS[t.approval_status] ?? 'bg-page text-fg-muted'
                           }`}
                         >
                           {t.approval_status}
                         </span>
                       )}
                     </div>
-                    <p className="text-xs text-gray-400 mt-0.5">
+                    <p className="text-xs text-fg-muted mt-0.5">
                       Started {t.created_at ? new Date(t.created_at).toLocaleDateString() : '—'}
                     </p>
                   </div>
@@ -468,7 +468,7 @@ export default function Avatars() {
                       <button
                         onClick={() => syncMutation.mutate(t.id)}
                         disabled={syncMutation.isPending}
-                        className="text-xs px-3 py-1.5 rounded-lg border border-blue-300 text-blue-700 hover:bg-blue-50 disabled:opacity-50"
+                        className="text-xs px-3 py-1.5 rounded-lg border border-accent/50 text-accent hover:bg-accent/5 disabled:opacity-50"
                       >
                         Refresh
                       </button>
@@ -480,7 +480,7 @@ export default function Avatars() {
                         title={t.approval_status !== 'approved'
                           ? 'Approve the preview images first'
                           : undefined}
-                        className="text-xs px-3 py-1.5 rounded-lg bg-green-600 hover:bg-green-700 text-white font-medium disabled:opacity-50"
+                        className="text-xs px-3 py-1.5 rounded-lg bg-success hover:bg-success/90 text-white font-medium disabled:opacity-50"
                       >
                         Set Active
                       </button>
@@ -570,18 +570,18 @@ function AvatarReviewPanel({ training, sessionToken }: { training: Training; ses
   const declinedWithoutAgeBand = storedGender === 'prefer-not-to-say' && !storedAgeBand
 
   return (
-    <div className="border-t border-gray-100 pt-4 space-y-4">
+    <div className="border-t border-hairline pt-4 space-y-4">
       {/* Declared attributes */}
       <div>
-        <p className="text-sm font-medium text-gray-800">How should you be described?</p>
-        <p className="text-xs text-gray-500 mb-2">
+        <p className="text-sm font-medium text-fg">How should you be described?</p>
+        <p className="text-xs text-fg-muted mb-2">
           Written into every image prompt so the generator can’t invent someone else. You choose
           these — we never guess them from your photos, and leaving them blank adds nothing.
         </p>
         {nothingDeclared && (
           <p
             data-testid={`avatar-attributes-undeclared-${training.id}`}
-            className="text-xs text-amber-800 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 mb-2"
+            className="text-xs text-warning bg-warning/5 border border-warning/25 rounded-lg px-3 py-2 mb-2"
           >
             Nothing declared yet, so two things are switched off for this avatar: the likeness check
             on generated video frames has nothing to verify and reports every frame unchecked, and
@@ -592,7 +592,7 @@ function AvatarReviewPanel({ training, sessionToken }: { training: Training; ses
         {declinedWithoutAgeBand && (
           <p
             data-testid={`avatar-attributes-age-only-${training.id}`}
-            className="text-xs text-amber-800 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 mb-2"
+            className="text-xs text-warning bg-warning/5 border border-warning/25 rounded-lg px-3 py-2 mb-2"
           >
             “Prefer not to say” is saved and we won’t ask again. On its own it describes no one,
             though: add an age band and the likeness check on generated video frames has something
@@ -600,26 +600,26 @@ function AvatarReviewPanel({ training, sessionToken }: { training: Training; ses
           </p>
         )}
         <div className="flex flex-wrap items-end gap-3">
-          <label className="text-xs text-gray-600">
+          <label className="text-xs text-fg-muted">
             <span className="block mb-1">Gender presentation</span>
             <select
               value={gender}
               onChange={(e) => setGender(e.target.value)}
               data-testid={`avatar-gender-${training.id}`}
-              className="rounded-lg border border-gray-300 px-2 py-1.5 text-sm"
+              className="rounded-lg border border-field px-2 py-1.5 text-sm"
             >
               {GENDER_OPTIONS.map((o) => (
                 <option key={o.value} value={o.value}>{o.label}</option>
               ))}
             </select>
           </label>
-          <label className="text-xs text-gray-600">
+          <label className="text-xs text-fg-muted">
             <span className="block mb-1">Age band</span>
             <select
               value={ageBand}
               onChange={(e) => setAgeBand(e.target.value)}
               data-testid={`avatar-age-${training.id}`}
-              className="rounded-lg border border-gray-300 px-2 py-1.5 text-sm"
+              className="rounded-lg border border-field px-2 py-1.5 text-sm"
             >
               {AGE_OPTIONS.map((o) => (
                 <option key={o} value={o}>{o || 'Not specified'}</option>
@@ -629,7 +629,7 @@ function AvatarReviewPanel({ training, sessionToken }: { training: Training; ses
           <button
             onClick={() => attributesMutation.mutate()}
             disabled={attributesMutation.isPending}
-            className="text-xs px-3 py-1.5 rounded-lg border border-blue-300 text-blue-700 hover:bg-blue-50 disabled:opacity-50"
+            className="text-xs px-3 py-1.5 rounded-lg border border-accent/50 text-accent hover:bg-accent/5 disabled:opacity-50"
           >
             {attributesMutation.isPending ? 'Saving…' : 'Save'}
           </button>
@@ -638,9 +638,9 @@ function AvatarReviewPanel({ training, sessionToken }: { training: Training; ses
 
       {/* Preview gallery */}
       <div>
-        <p className="text-sm font-medium text-gray-800 mb-2">Preview</p>
+        <p className="text-sm font-medium text-fg mb-2">Preview</p>
         {gallery.length === 0 ? (
-          <p className="text-xs text-gray-500" data-testid={`avatar-samples-empty-${training.id}`}>
+          <p className="text-xs text-fg-muted" data-testid={`avatar-samples-empty-${training.id}`}>
             Preview images are still rendering. This takes a minute or two after training finishes.
           </p>
         ) : (
@@ -651,9 +651,9 @@ function AvatarReviewPanel({ training, sessionToken }: { training: Training; ses
                   src={s.url}
                   alt={`${training.trigger_word} ${s.label} sample`}
                   loading="lazy"
-                  className="w-full aspect-square object-cover rounded-lg border border-gray-200"
+                  className="w-full aspect-square object-cover rounded-lg border border-hairline"
                 />
-                <figcaption className="text-[11px] text-gray-500 text-center">
+                <figcaption className="text-xs text-fg-muted text-center">
                   {s.label.replace('_', ' ')}
                 </figcaption>
               </figure>
@@ -662,14 +662,14 @@ function AvatarReviewPanel({ training, sessionToken }: { training: Training; ses
         )}
       </div>
 
-      {actionError && <p className="text-sm text-red-600">{actionError}</p>}
+      {actionError && <p className="text-sm text-danger">{actionError}</p>}
 
       <div className="flex flex-wrap items-center gap-2">
         <button
           onClick={() => verdictMutation.mutate('approve')}
           disabled={verdictMutation.isPending || gallery.length === 0}
           data-testid={`avatar-approve-${training.id}`}
-          className="text-xs px-3 py-1.5 rounded-lg bg-green-600 hover:bg-green-700 text-white font-medium disabled:opacity-50"
+          className="text-xs px-3 py-1.5 rounded-lg bg-success hover:bg-success/90 text-white font-medium disabled:opacity-50"
         >
           Approve — this looks like me
         </button>
@@ -677,7 +677,7 @@ function AvatarReviewPanel({ training, sessionToken }: { training: Training; ses
           onClick={() => verdictMutation.mutate('reject')}
           disabled={verdictMutation.isPending}
           data-testid={`avatar-reject-${training.id}`}
-          className="text-xs px-3 py-1.5 rounded-lg border border-red-300 text-red-700 hover:bg-red-50 disabled:opacity-50"
+          className="text-xs px-3 py-1.5 rounded-lg border border-danger/50 text-danger hover:bg-danger/5 disabled:opacity-50"
         >
           Reject
         </button>
@@ -685,11 +685,11 @@ function AvatarReviewPanel({ training, sessionToken }: { training: Training; ses
           onClick={() => regenerateMutation.mutate()}
           disabled={regenerateMutation.isPending || regenRemaining <= 0}
           data-testid={`avatar-regenerate-${training.id}`}
-          className="text-xs px-3 py-1.5 rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+          className="text-xs px-3 py-1.5 rounded-lg border border-field text-fg hover:bg-page disabled:opacity-50"
         >
           Regenerate previews
         </button>
-        <span className="text-[11px] text-gray-500">
+        <span className="text-xs text-fg-muted">
           {regenRemaining} regeneration{regenRemaining === 1 ? '' : 's'} left
         </span>
       </div>

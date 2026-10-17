@@ -42,10 +42,10 @@ export default function Account() {
 
   return (
     <div className="max-w-5xl space-y-6">
-      <h1 className="text-2xl font-bold text-gray-800">Settings</h1>
+      <h1 className="text-2xl font-bold text-fg">Settings</h1>
 
       {oauthMsg && (
-        <p className={`text-sm font-medium ${oauthMsg.ok ? 'text-green-600' : 'text-red-600'}`}>
+        <p className={`text-sm font-medium ${oauthMsg.ok ? 'text-success' : 'text-danger'}`}>
           {oauthMsg.text}
         </p>
       )}
@@ -59,20 +59,20 @@ export default function Account() {
 
       {/* Account setup checklist — exactly what automation needs, from the readiness API */}
       {readiness && !readiness.ready && (
-        <div className="bg-amber-50 rounded-lg border border-amber-200 p-4">
-          <p className="text-sm font-semibold text-amber-900 mb-3">Finish account setup</p>
+        <div className="bg-warning/5 rounded-lg border border-warning/25 p-4">
+          <p className="text-sm font-semibold text-warning mb-3">Finish account setup</p>
           <div className="space-y-2">
             {readiness.items.map((it) => (
               <div key={it.key} className="flex items-start gap-3">
-                <span className={`mt-0.5 w-5 h-5 rounded-full flex items-center justify-center text-[11px] font-bold flex-shrink-0 ${it.ok ? 'bg-green-500 text-white' : 'bg-gray-200 text-gray-500'}`}>
+                <span className={`mt-0.5 w-5 h-5 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0 ${it.ok ? 'bg-success text-white' : 'bg-hairline text-fg-muted'}`}>
                   {it.ok ? '✓' : '!'}
                 </span>
                 <div>
-                  <span className={`text-sm ${it.ok ? 'text-gray-400 line-through' : 'text-gray-800 font-medium'}`}>
+                  <span className={`text-sm ${it.ok ? 'text-fg-muted line-through' : 'text-fg font-medium'}`}>
                     {it.label}
-                    {it.required && !it.ok && <span className="text-red-500"> *</span>}
+                    {it.required && !it.ok && <span className="text-danger"> *</span>}
                   </span>
-                  {!it.ok && it.hint && <p className="text-xs text-gray-500">{it.hint}</p>}
+                  {!it.ok && it.hint && <p className="text-xs text-fg-muted">{it.hint}</p>}
                 </div>
               </div>
             ))}

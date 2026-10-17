@@ -1,17 +1,15 @@
-// Data-viz palette tokens (validated reference instance from the `dataviz` skill —
-// light-mode values, since the app renders on white cards). The dark steps are kept behind
-// the inert `[data-theme="dark"]` hook in each chart's <style>, so charts stay light to match
-// the surrounding UI but are correct if a theme toggle is ever added.
+// Data-viz palette: the brand pack's light tokens (brand/lem/DESIGN.md), since the app renders on
+// white cards. The dark steps stay behind the inert `[data-theme="dark"]` hook in each chart's
+// <style>, so charts stay light to match the surrounding UI.
 export const VIZ = {
-  surface: '#fcfcfb',
-  gridline: '#e1e0d9',
-  baseline: '#c3c2b7',
-  textPrimary: '#0b0b0b',
-  textSecondary: '#52514e',
-  muted: '#898781',
-  // Categorical slot 1 (blue) — every chart here is single-series, so one hue is all that's
-  // needed and CVD separation is a non-issue.
-  series1: '#2a78d6',
+  surface: '#FFFFFF', // surface
+  gridline: '#D7DCE1', // hairline
+  baseline: '#7A8590', // field-border
+  textPrimary: '#1F2C37', // text
+  textSecondary: '#5B6670', // muted
+  muted: '#5B6670', // muted: axis labels are text, so they hold AA like any other
+  // Every chart here is single-series, so the brand primary is the only hue needed.
+  series1: '#054DB1', // primary
 } as const
 
 // Compact number formatter for big counts: 1,284 / 12.9K / 4.2M.

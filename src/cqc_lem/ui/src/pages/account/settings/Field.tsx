@@ -4,9 +4,9 @@ import { useConflicts } from './conflictsCtx'
 import type { Finding, Severity } from './conflicts'
 
 const TONE: Record<Severity, string> = {
-  inform: 'bg-gray-50 border-gray-200 text-gray-600',
-  warn: 'bg-amber-50 border-amber-200 text-amber-800',
-  block: 'bg-red-50 border-red-200 text-red-700',
+  inform: 'bg-page border-hairline text-fg-muted',
+  warn: 'bg-warning/5 border-warning/25 text-warning',
+  block: 'bg-danger/5 border-danger/25 text-danger',
 }
 
 const ICON: Record<Severity, string> = { inform: 'ⓘ', warn: '⚠', block: '✕' }
@@ -55,23 +55,23 @@ export function Field({
   return (
     <div className={className} data-testid={`field-${settingKey}`}>
       <div className="flex items-start justify-between gap-2 mb-1">
-        <label className="block text-sm font-medium text-gray-700">{d.label}</label>
+        <label className="block text-sm font-medium text-fg">{d.label}</label>
         <button
           type="button"
           onClick={() => setOpen((v) => !v)}
           aria-expanded={open}
           aria-label={`Why ${d.label} matters`}
-          className="shrink-0 w-5 h-5 rounded-full border border-gray-300 text-[11px] font-bold text-gray-500 hover:bg-gray-100"
+          className="shrink-0 w-5 h-5 rounded-full border border-field text-xs font-bold text-fg-muted hover:bg-page"
         >
           ?
         </button>
       </div>
       {children}
-      <p className="text-xs text-gray-500 mt-1">{d.what}</p>
+      <p className="text-xs text-fg-muted mt-1">{d.what}</p>
       {open && (
-        <div className="mt-1.5 rounded-lg bg-gray-50 border border-gray-100 px-3 py-2 text-xs text-gray-600 space-y-1">
-          <p><span className="font-semibold text-gray-700">Why it matters</span> — {d.why}</p>
-          <p><span className="font-semibold text-gray-700">Recommended</span> — {d.recommended}</p>
+        <div className="mt-1.5 rounded-lg bg-page border border-hairline px-3 py-2 text-xs text-fg-muted space-y-1">
+          <p><span className="font-semibold text-fg">Why it matters</span> — {d.why}</p>
+          <p><span className="font-semibold text-fg">Recommended</span> — {d.recommended}</p>
         </div>
       )}
       <ConflictNotices anchor={settingKey} />
@@ -83,12 +83,12 @@ export function Field({
 export function Advanced({ children, label = 'Advanced' }: { children: ReactNode; label?: string }) {
   const [open, setOpen] = useState(false)
   return (
-    <div className="border-t border-gray-100 pt-4">
+    <div className="border-t border-hairline pt-4">
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
         aria-expanded={open}
-        className="text-sm font-semibold text-gray-600 hover:text-gray-800"
+        className="text-sm font-semibold text-fg-muted hover:text-fg"
       >
         {open ? '▾' : '▸'} {label}
       </button>
@@ -101,14 +101,14 @@ export function SectionCard({
   title, blurb, children,
 }: { title: string; blurb?: string; children: ReactNode }) {
   return (
-    <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 space-y-5">
+    <div className="bg-raised rounded-lg shadow-sm border border-hairline p-6 space-y-5">
       <div>
-        <h2 className="text-base font-semibold text-gray-700">{title}</h2>
-        {blurb && <p className="text-xs text-gray-500 mt-0.5">{blurb}</p>}
+        <h2 className="text-base font-semibold text-fg">{title}</h2>
+        {blurb && <p className="text-xs text-fg-muted mt-0.5">{blurb}</p>}
       </div>
       {children}
     </div>
   )
 }
 
-export const inputClass = 'w-full border border-gray-300 rounded-lg px-3 py-2 text-sm'
+export const inputClass = 'w-full border border-hairline rounded-lg px-3 py-2 text-sm'

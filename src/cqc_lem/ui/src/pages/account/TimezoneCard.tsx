@@ -69,27 +69,27 @@ export default function TimezoneCard() {
   return (
     <form
       onSubmit={(e) => { e.preventDefault(); tzMutation.mutate() }}
-      className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 space-y-4"
+      className="bg-raised rounded-lg shadow-sm border border-hairline p-6 space-y-4"
     >
-      <h2 className="text-base font-semibold text-gray-700">Timezone</h2>
+      <h2 className="text-base font-semibold text-fg">Timezone</h2>
       <div>
-        <label className="block text-sm font-medium text-gray-700 mb-1">Your timezone</label>
+        <label className="block text-sm font-medium text-fg mb-1">Your timezone</label>
         <select
           value={timezone}
           onChange={(e) => setTzEdit(e.target.value)}
-          className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+          className="w-full border border-field rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent"
         >
           {COMMON_TIMEZONES.map((tz) => (
             <option key={tz} value={tz}>{tz}</option>
           ))}
         </select>
-        <p className="text-xs text-gray-400 mt-1">
+        <p className="text-xs text-fg-muted mt-1">
           Scheduled post times will be displayed in this timezone across all pages.
         </p>
       </div>
 
       {tzSavedMsg && (
-        <p className={`text-sm font-medium ${tzMutation.isError ? 'text-red-600' : 'text-green-600'}`}>
+        <p className={`text-sm font-medium ${tzMutation.isError ? 'text-danger' : 'text-success'}`}>
           {tzSavedMsg}
         </p>
       )}
@@ -97,7 +97,7 @@ export default function TimezoneCard() {
       <button
         type="submit"
         disabled={tzMutation.isPending}
-        className="w-full bg-blue-600 text-white py-2 rounded-lg text-sm font-semibold hover:bg-blue-700 disabled:opacity-50 transition-colors"
+        className="w-full bg-accent text-white py-2 rounded-lg text-sm font-semibold hover:bg-accent/90 disabled:opacity-50 transition-colors"
       >
         {tzMutation.isPending ? 'Saving…' : 'Save Timezone'}
       </button>

@@ -47,13 +47,13 @@ export default function ContentSection() {
               <button key={o.value} type="button" onClick={() => toggleDay(o.value)}
                 aria-pressed={postingDays.includes(o.value)}
                 className={`px-3 py-1 rounded-full border text-sm ${postingDays.includes(o.value)
-                  ? 'bg-blue-600 border-blue-600 text-white'
-                  : 'bg-white border-gray-300 text-gray-600'}`}>
+                  ? 'bg-accent border-accent text-white'
+                  : 'bg-raised border-field text-fg-muted'}`}>
                 {o.label}
               </button>
             ))}
           </div>
-          <p className="mt-2 text-xs text-gray-500">Publishes on: {weekdayLabels(resolvedDays)}</p>
+          <p className="mt-2 text-xs text-fg-muted">Publishes on: {weekdayLabels(resolvedDays)}</p>
         </Field>
         <Field settingKey="auto_schedule_posts">
           <Toggle on={!!prefs?.auto_schedule_posts}
@@ -159,16 +159,16 @@ function ProfileSkillsPanel() {
   }
 
   return (
-    <div className="mt-4 rounded-lg border border-blue-100 bg-blue-50 px-4 py-3">
-      <h4 className="text-sm font-semibold text-blue-900">Profile skills</h4>
-      <p className="text-xs text-blue-800 mt-1">
+    <div className="mt-4 rounded-lg border border-accent/25 bg-accent/5 px-4 py-3">
+      <h4 className="text-sm font-semibold text-accent">Profile skills</h4>
+      <p className="text-xs text-accent mt-1">
         Top skills from your LinkedIn profile:
         {' '}
         {data.skills.map((s) => (
           <span
             key={s}
             className={`inline-block mr-1 mb-1 px-2 py-0.5 rounded-full text-xs ${
-              isAdopted(s) ? 'bg-green-100 text-green-800' : 'bg-white text-blue-800 border border-blue-200'
+              isAdopted(s) ? 'bg-success/10 text-success' : 'bg-raised text-accent border border-accent/25'
             }`}
           >
             {s}
@@ -179,13 +179,13 @@ function ProfileSkillsPanel() {
         <button
           type="button"
           onClick={adopt}
-          className="mt-2 text-xs font-semibold text-white bg-blue-600 hover:bg-blue-700 px-3 py-1.5 rounded-md"
+          className="mt-2 text-xs font-semibold text-white bg-accent hover:bg-accent/90 px-3 py-1.5 rounded-md"
         >
           Adopt {unadopted.length} skill{unadopted.length === 1 ? '' : 's'} as focus topics
         </button>
       )}
       {unadopted.length === 0 && (
-        <p className="mt-2 text-xs text-green-700">All top profile skills already match your focus topics.</p>
+        <p className="mt-2 text-xs text-success">All top profile skills already match your focus topics.</p>
       )}
     </div>
   )

@@ -113,8 +113,8 @@ export default function AdminFeedbackPage() {
     <div className="max-w-5xl space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-gray-800">Feedback triage</h1>
-          <p className="text-sm text-gray-500">
+          <h1 className="text-2xl font-bold text-fg">Feedback triage</h1>
+          <p className="text-sm text-fg-muted">
             Approve feedback for the auto-work pipeline or dismiss it. Only feedback from admin users is auto-triaged without review.
           </p>
         </div>
@@ -122,12 +122,12 @@ export default function AdminFeedbackPage() {
 
       <div className="flex flex-wrap gap-3">
         <div className="flex items-center gap-2">
-          <label htmlFor="status-filter" className="text-sm text-gray-600">Status</label>
+          <label htmlFor="status-filter" className="text-sm text-fg-muted">Status</label>
           <select
             id="status-filter"
             value={statusFilter}
             onChange={(e) => { setStatusFilter(e.target.value); setPage(0) }}
-            className="text-sm border border-gray-300 rounded-lg px-2 py-1"
+            className="text-sm border border-field rounded-lg px-2 py-1"
           >
             <option value="">All</option>
             {Object.entries(STATUS_LABELS).map(([value, label]) => (
@@ -136,12 +136,12 @@ export default function AdminFeedbackPage() {
           </select>
         </div>
         <div className="flex items-center gap-2">
-          <label htmlFor="source-filter" className="text-sm text-gray-600">Source</label>
+          <label htmlFor="source-filter" className="text-sm text-fg-muted">Source</label>
           <select
             id="source-filter"
             value={sourceFilter}
             onChange={(e) => { setSourceFilter(e.target.value); setPage(0) }}
-            className="text-sm border border-gray-300 rounded-lg px-2 py-1"
+            className="text-sm border border-field rounded-lg px-2 py-1"
           >
             <option value="">All</option>
             {Object.entries(SOURCE_LABELS).map(([value, label]) => (
@@ -152,34 +152,34 @@ export default function AdminFeedbackPage() {
         <button
           onClick={() => void refetch()}
           disabled={isLoading}
-          className="text-sm text-blue-600 hover:text-blue-800 font-medium disabled:opacity-50"
+          className="text-sm text-accent hover:text-accent font-medium disabled:opacity-50"
         >
           Refresh
         </button>
       </div>
 
       {listError && (
-        <p role="alert" className="text-sm text-red-600">
+        <p role="alert" className="text-sm text-danger">
           Could not load feedback: {listError}
         </p>
       )}
 
       {reviewError && (
-        <p className="text-sm text-red-600">Could not record the review: {reviewError}</p>
+        <p className="text-sm text-danger">Could not record the review: {reviewError}</p>
       )}
 
       {/* Approving does not guarantee an issue: the filer can drop, FAQ, or fail on GitHub and
           leave the row where it was. Show what actually happened, in those words. */}
       {outcome && (
-        <p className={classNames('text-sm', outcomeFailed ? 'text-amber-700' : 'text-gray-600')}>
+        <p className={classNames('text-sm', outcomeFailed ? 'text-warning' : 'text-fg-muted')}>
           Last review: {outcome}
         </p>
       )}
 
-      <div className="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
+      <div className="bg-raised border border-hairline rounded-xl shadow-sm overflow-hidden">
         <TableScroll label="Feedback submissions" minWidth={900} testId="feedback-table">
           <table className="w-full text-sm text-left">
-            <thead className="bg-gray-50 text-gray-600 font-medium">
+            <thead className="bg-page text-fg-muted font-medium">
               <tr>
                 <th className="px-4 py-3">ID</th>
                 <th className="px-4 py-3">Source</th>
@@ -191,29 +191,29 @@ export default function AdminFeedbackPage() {
                 <th className="px-4 py-3 text-right">Actions</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-100">
+            <tbody className="divide-y divide-hairline">
               {items.map((item) => (
-                <tr key={item.id} className="hover:bg-gray-50">
-                  <td className="px-4 py-3 text-gray-500">{item.id}</td>
+                <tr key={item.id} className="hover:bg-page">
+                  <td className="px-4 py-3 text-fg-muted">{item.id}</td>
                   <td className="px-4 py-3">{SOURCE_LABELS[item.source] ?? item.source}</td>
                   <td className="px-4 py-3">
                     {item.email ? (
-                      <span className={classNames('text-gray-800', item.is_admin_reporter && 'font-semibold')}>
+                      <span className={classNames('text-fg', item.is_admin_reporter && 'font-semibold')}>
                         {item.email}
-                        {item.is_admin_reporter && <span className="ml-1 text-xs text-blue-600">(admin)</span>}
+                        {item.is_admin_reporter && <span className="ml-1 text-xs text-accent">(admin)</span>}
                       </span>
                     ) : (
-                      <span className="text-gray-400 italic">Anonymous</span>
+                      <span className="text-fg-muted italic">Anonymous</span>
                     )}
                   </td>
                   <td className="px-4 py-3 max-w-xs truncate" title={item.body}>{item.body}</td>
                   <td className="px-4 py-3">
                     <span className={classNames(
                       'inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium',
-                      item.status === 'new' && 'bg-amber-100 text-amber-800',
-                      item.status === 'dismissed' && 'bg-gray-100 text-gray-600',
-                      item.status === 'issue_created' && 'bg-green-100 text-green-800',
-                      !['new', 'dismissed', 'issue_created'].includes(item.status) && 'bg-blue-100 text-blue-800'
+                      item.status === 'new' && 'bg-warning/10 text-warning',
+                      item.status === 'dismissed' && 'bg-page text-fg-muted',
+                      item.status === 'issue_created' && 'bg-success/10 text-success',
+                      !['new', 'dismissed', 'issue_created'].includes(item.status) && 'bg-accent/10 text-accent'
                     )}>
                       {STATUS_LABELS[item.status] ?? item.status}
                     </span>
@@ -224,15 +224,15 @@ export default function AdminFeedbackPage() {
                         href={`https://github.com/christopherqueenconsulting/linkedin_engagement_manager/issues/${item.github_issue_number}`}
                         target="_blank"
                         rel="noreferrer"
-                        className="text-blue-600 hover:underline"
+                        className="text-accent hover:underline"
                       >
                         #{item.github_issue_number}
                       </a>
                     ) : (
-                      <span className="text-gray-400">—</span>
+                      <span className="text-fg-muted">—</span>
                     )}
                   </td>
-                  <td className="px-4 py-3 text-gray-500">
+                  <td className="px-4 py-3 text-fg-muted">
                     {item.created_at ? new Date(item.created_at).toLocaleString() : '—'}
                   </td>
                   <td className="px-4 py-3 text-right">
@@ -242,14 +242,14 @@ export default function AdminFeedbackPage() {
                           <button
                             onClick={() => handleAction(item.id, 'approve')}
                             disabled={review.isPending}
-                            className="text-xs bg-blue-600 text-white px-2.5 py-1 rounded hover:bg-blue-700 disabled:opacity-50"
+                            className="text-xs bg-accent text-white px-2.5 py-1 rounded hover:bg-accent/90 disabled:opacity-50"
                           >
                             {review.isPending && actedId === item.id ? 'Working…' : 'Approve'}
                           </button>
                           <button
                             onClick={() => handleAction(item.id, 'dismiss')}
                             disabled={review.isPending}
-                            className="text-xs bg-gray-100 text-gray-700 px-2.5 py-1 rounded hover:bg-gray-200 disabled:opacity-50"
+                            className="text-xs bg-page text-fg px-2.5 py-1 rounded hover:bg-hairline disabled:opacity-50"
                           >
                             Dismiss
                           </button>
@@ -257,7 +257,7 @@ export default function AdminFeedbackPage() {
                         {actedId === item.id && !review.isPending && (reviewError || outcome) && (
                           <p className={classNames(
                             'text-xs max-w-xs text-right',
-                            reviewError || outcomeFailed ? 'text-amber-700' : 'text-gray-500'
+                            reviewError || outcomeFailed ? 'text-warning' : 'text-fg-muted'
                           )}>
                             {reviewError || outcome}
                           </p>
@@ -271,7 +271,7 @@ export default function AdminFeedbackPage() {
                 <tr>
                   <td colSpan={8} className={classNames(
                     'px-4 py-8 text-center',
-                    listError ? 'text-red-600' : 'text-gray-500',
+                    listError ? 'text-danger' : 'text-fg-muted',
                   )}>
                     {listError
                       ? 'The feedback list could not be read — this is not an empty list. Try Refresh.'
@@ -288,15 +288,15 @@ export default function AdminFeedbackPage() {
         <button
           onClick={() => setPage((p) => Math.max(0, p - 1))}
           disabled={page === 0 || isLoading}
-          className="text-blue-600 hover:text-blue-800 disabled:opacity-50"
+          className="text-accent hover:text-accent disabled:opacity-50"
         >
           Previous
         </button>
-        <span className="text-gray-600">Page {page + 1}</span>
+        <span className="text-fg-muted">Page {page + 1}</span>
         <button
           onClick={() => setPage((p) => p + 1)}
           disabled={items.length < PAGE_SIZE || isLoading}
-          className="text-blue-600 hover:text-blue-800 disabled:opacity-50"
+          className="text-accent hover:text-accent disabled:opacity-50"
         >
           Next
         </button>

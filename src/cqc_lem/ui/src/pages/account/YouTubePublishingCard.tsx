@@ -52,10 +52,10 @@ export default function YouTubePublishingCard() {
 
   const badge =
     data.status === 'ok'
-      ? { text: 'Connected', className: 'text-green-700 bg-green-50' }
+      ? { text: 'Connected', className: 'text-success bg-success/5' }
       : data.status === 'needs_reauth'
-        ? { text: 'Needs re-auth', className: 'text-red-700 bg-red-50' }
-        : { text: 'Unknown', className: 'text-amber-700 bg-amber-50' }
+        ? { text: 'Needs re-auth', className: 'text-danger bg-danger/5' }
+        : { text: 'Unknown', className: 'text-warning bg-warning/5' }
 
   return (
     <SettingsCard
@@ -64,34 +64,34 @@ export default function YouTubePublishingCard() {
       headerRight={
         <span
           data-testid="youtube-status-badge"
-          className={`text-[11px] font-semibold px-2 py-0.5 rounded whitespace-nowrap ${badge.className}`}
+          className={`text-xs font-semibold px-2 py-0.5 rounded whitespace-nowrap ${badge.className}`}
         >
           {badge.text}
         </span>
       }
     >
-      {data.reason && <p className="text-xs text-gray-600">{data.reason}</p>}
+      {data.reason && <p className="text-xs text-fg-muted">{data.reason}</p>}
 
       {data.status === 'needs_reauth' && (
-        <p className="text-xs text-red-600">
+        <p className="text-xs text-danger">
           Tutorial runs abort before spending on narration or rendering until this is re-minted.
           Re-mint the refresh token (see <code>{data.runbook ?? 'docs/youtube-publishing.md'}</code>)
           and install it with <code>POST /api/admin/youtube-token</code> — no deploy needed.
         </p>
       )}
 
-      <dl className="text-xs text-gray-500 space-y-1">
+      <dl className="text-xs text-fg-muted space-y-1">
         <div className="flex gap-2">
-          <dt className="font-medium text-gray-600">Last checked</dt>
+          <dt className="font-medium text-fg-muted">Last checked</dt>
           <dd>{data.checked_at ?? 'never'}</dd>
         </div>
         <div className="flex gap-2">
-          <dt className="font-medium text-gray-600">Token stored in</dt>
+          <dt className="font-medium text-fg-muted">Token stored in</dt>
           <dd>{data.token_source === 'db' ? 'database (rotatable without a deploy)' : '.env'}</dd>
         </div>
         {data.privacy_status && (
           <div className="flex gap-2">
-            <dt className="font-medium text-gray-600">Uploads are</dt>
+            <dt className="font-medium text-fg-muted">Uploads are</dt>
             <dd>{data.privacy_status}</dd>
           </div>
         )}
@@ -104,7 +104,7 @@ export default function YouTubePublishingCard() {
           refetch()
         }}
         disabled={isFetching}
-        className="w-full bg-blue-600 text-white py-2 rounded-lg text-sm font-semibold hover:bg-blue-700 disabled:opacity-50 transition-colors"
+        className="w-full bg-accent text-white py-2 rounded-lg text-sm font-semibold hover:bg-accent/90 disabled:opacity-50 transition-colors"
       >
         {isFetching ? 'Checking…' : 'Check now'}
       </button>

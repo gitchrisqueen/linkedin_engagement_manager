@@ -50,9 +50,9 @@ function errorText(error: unknown): string | null {
 
 function DetailRow({ label, value }: { label: string; value: React.ReactNode }) {
   return (
-    <div className="flex justify-between gap-4 py-1 border-b border-gray-100 last:border-0">
-      <dt className="text-gray-500">{label}</dt>
-      <dd className="text-gray-800 text-right break-all">{value}</dd>
+    <div className="flex justify-between gap-4 py-1 border-b border-hairline last:border-0">
+      <dt className="text-fg-muted">{label}</dt>
+      <dd className="text-fg text-right break-all">{value}</dd>
     </div>
   )
 }
@@ -64,9 +64,9 @@ function SubscriptionGrantForm({ userId, sessionToken }: { userId: number; sessi
   const valid = Number.isInteger(days_n) && days_n >= 1 && days_n <= 365
 
   return (
-    <div className="flex flex-col gap-1 pt-2 border-t border-gray-100">
+    <div className="flex flex-col gap-1 pt-2 border-t border-hairline">
       <div className="flex items-center gap-2">
-        <label htmlFor={`grant-days-${userId}`} className="text-gray-500">
+        <label htmlFor={`grant-days-${userId}`} className="text-fg-muted">
           Grant subscription days (one-time — not a standing override)
         </label>
         <input
@@ -76,23 +76,23 @@ function SubscriptionGrantForm({ userId, sessionToken }: { userId: number; sessi
           max={365}
           value={days}
           onChange={(e) => setDays(e.target.value)}
-          className="w-20 text-sm border border-gray-300 rounded px-2 py-1"
+          className="w-20 text-sm border border-field rounded px-2 py-1"
         />
         <button
           onClick={() => valid && grant.mutate({ userId, days: days_n, sessionToken })}
           disabled={!valid || grant.isPending}
-          className="text-xs bg-blue-600 text-white px-2.5 py-1 rounded hover:bg-blue-700 disabled:opacity-50"
+          className="text-xs bg-accent text-white px-2.5 py-1 rounded hover:bg-accent/90 disabled:opacity-50"
         >
           {grant.isPending ? 'Working…' : 'Grant'}
         </button>
       </div>
       {grant.isSuccess && (
-        <p className="text-xs text-gray-500">
+        <p className="text-xs text-fg-muted">
           Extended {grant.data.days_granted} day(s) — new period end: {when(grant.data.subscription_current_period_end)}
         </p>
       )}
       {grant.isError && (
-        <p className="text-xs text-amber-700">Could not grant: {errorText(grant.error)}</p>
+        <p className="text-xs text-warning">Could not grant: {errorText(grant.error)}</p>
       )}
     </div>
   )
@@ -100,8 +100,8 @@ function SubscriptionGrantForm({ userId, sessionToken }: { userId: number; sessi
 
 function UserDetail({ userId, sessionToken }: { userId: number; sessionToken: string }) {
   const { data, isLoading, error } = useAdminUserDetail(userId, sessionToken)
-  if (isLoading) return <p className="text-sm text-gray-500">Loading account…</p>
-  if (error) return <p className="text-sm text-red-600">Could not load: {errorText(error)}</p>
+  if (isLoading) return <p className="text-sm text-fg-muted">Loading account…</p>
+  if (error) return <p className="text-sm text-danger">Could not load: {errorText(error)}</p>
   if (!data) return null
   return (
     <div className="space-y-3">
@@ -195,8 +195,8 @@ export default function AdminUsersPage() {
   return (
     <div className="max-w-6xl space-y-6">
       <div>
-        <h1 className="text-2xl font-bold text-gray-800">User management</h1>
-        <p className="text-sm text-gray-500">
+        <h1 className="text-2xl font-bold text-fg">User management</h1>
+        <p className="text-sm text-fg-muted">
           Every account, who can administer LEM, and whether their automation runs. Subscription
           state comes from billing (a grant is a one-time comp, not an override), and preferences
           belong to their owner.
@@ -210,15 +210,15 @@ export default function AdminUsersPage() {
           placeholder="Search email…"
           value={search}
           onChange={(e) => { setSearch(e.target.value); setPage(0) }}
-          className="text-sm border border-gray-300 rounded-lg px-3 py-1.5 w-64"
+          className="text-sm border border-field rounded-lg px-3 py-1.5 w-64"
         />
         <div className="flex items-center gap-2">
-          <label htmlFor="subscription-filter" className="text-sm text-gray-600">Subscription</label>
+          <label htmlFor="subscription-filter" className="text-sm text-fg-muted">Subscription</label>
           <select
             id="subscription-filter"
             value={subscriptionFilter}
             onChange={(e) => { setSubscriptionFilter(e.target.value); setPage(0) }}
-            className="text-sm border border-gray-300 rounded-lg px-2 py-1"
+            className="text-sm border border-field rounded-lg px-2 py-1"
           >
             <option value="">All</option>
             {Object.entries(SUBSCRIPTION_LABELS).map(([value, label]) => (
@@ -227,12 +227,12 @@ export default function AdminUsersPage() {
           </select>
         </div>
         <div className="flex items-center gap-2">
-          <label htmlFor="connection-filter" className="text-sm text-gray-600">LinkedIn</label>
+          <label htmlFor="connection-filter" className="text-sm text-fg-muted">LinkedIn</label>
           <select
             id="connection-filter"
             value={connectionFilter}
             onChange={(e) => { setConnectionFilter(e.target.value); setPage(0) }}
-            className="text-sm border border-gray-300 rounded-lg px-2 py-1"
+            className="text-sm border border-field rounded-lg px-2 py-1"
           >
             <option value="">All</option>
             {Object.entries(CONNECTION_LABELS).map(([value, label]) => (
@@ -240,7 +240,7 @@ export default function AdminUsersPage() {
             ))}
           </select>
         </div>
-        <label className="flex items-center gap-2 text-sm text-gray-600">
+        <label className="flex items-center gap-2 text-sm text-fg-muted">
           <input
             type="checkbox"
             checked={adminOnly}
@@ -251,20 +251,20 @@ export default function AdminUsersPage() {
         <button
           onClick={() => void refetch()}
           disabled={isLoading}
-          className="text-sm text-blue-600 hover:text-blue-800 font-medium disabled:opacity-50"
+          className="text-sm text-accent hover:text-accent font-medium disabled:opacity-50"
         >
           Refresh
         </button>
       </div>
 
       {error && (
-        <p className="text-sm text-red-600">Could not load users: {errorText(error)}</p>
+        <p className="text-sm text-danger">Could not load users: {errorText(error)}</p>
       )}
 
-      <div className="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
+      <div className="bg-raised border border-hairline rounded-xl shadow-sm overflow-hidden">
         <TableScroll label="Users" minWidth={900} testId="users-table">
           <table className="w-full text-sm text-left">
-            <thead className="bg-gray-50 text-gray-600 font-medium">
+            <thead className="bg-page text-fg-muted font-medium">
               <tr>
                 <th className="px-4 py-3">Email</th>
                 <th className="px-4 py-3">Admin</th>
@@ -275,25 +275,25 @@ export default function AdminUsersPage() {
                 <th className="px-4 py-3 text-right">Actions</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-100">
+            <tbody className="divide-y divide-hairline">
               {items.map((item) => (
                 <Fragment key={item.id}>
-                  <tr className="hover:bg-gray-50 align-top">
+                  <tr className="hover:bg-page align-top">
                     <td className="px-4 py-3">
                       <button
                         onClick={() => setOpenId(openId === item.id ? null : item.id)}
-                        className="text-blue-600 hover:underline text-left"
+                        className="text-accent hover:underline text-left"
                         aria-expanded={openId === item.id}
                       >
                         {item.email}
                       </button>
                       {item.id === user?.userId && (
-                        <span className="ml-2 text-xs text-gray-400">(you)</span>
+                        <span className="ml-2 text-xs text-fg-muted">(you)</span>
                       )}
                       {item.disabled && (
                         <span
                           data-testid={`disabled-badge-${item.id}`}
-                          className="ml-2 inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800"
+                          className="ml-2 inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-danger/10 text-danger"
                         >
                           Disabled
                         </span>
@@ -303,39 +303,39 @@ export default function AdminUsersPage() {
                       {item.is_admin ? (
                         <span
                           data-testid={`admin-badge-${item.id}`}
-                          className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800"
+                          className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-accent/10 text-accent"
                         >
                           Admin
                           {item.admin_via_allowlist && !item.admin_via_column && ' (env)'}
                         </span>
                       ) : (
-                        <span className="text-gray-400">—</span>
+                        <span className="text-fg-muted">—</span>
                       )}
                     </td>
                     <td className="px-4 py-3">
                       <span className={classNames(
                         'inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium',
-                        item.subscription_status === 'active' && 'bg-green-100 text-green-800',
-                        item.subscription_status === 'trial' && 'bg-amber-100 text-amber-800',
+                        item.subscription_status === 'active' && 'bg-success/10 text-success',
+                        item.subscription_status === 'trial' && 'bg-warning/10 text-warning',
                         !['active', 'trial'].includes(item.subscription_status ?? '')
-                          && 'bg-gray-100 text-gray-600'
+                          && 'bg-page text-fg-muted'
                       )}>
                         {SUBSCRIPTION_LABELS[item.subscription_status ?? ''] ?? 'Unknown'}
                       </span>
                       {item.subscription_tier && (
-                        <span className="ml-2 text-xs text-gray-500">{item.subscription_tier}</span>
+                        <span className="ml-2 text-xs text-fg-muted">{item.subscription_tier}</span>
                       )}
                     </td>
                     <td className="px-4 py-3">
                       <span className={classNames(
                         item.linkedin_connection_status === 'connected'
-                          ? 'text-gray-800' : 'text-amber-700'
+                          ? 'text-fg' : 'text-warning'
                       )}>
                         {CONNECTION_LABELS[item.linkedin_connection_status ?? ''] ?? 'Unknown'}
                       </span>
                     </td>
-                    <td className="px-4 py-3 text-gray-500">{when(item.last_login)}</td>
-                    <td className="px-4 py-3 text-gray-500">{when(item.signed_up_at)}</td>
+                    <td className="px-4 py-3 text-fg-muted">{when(item.last_login)}</td>
+                    <td className="px-4 py-3 text-fg-muted">{when(item.signed_up_at)}</td>
                     <td className="px-4 py-3 text-right">
                       <div className="flex flex-col items-end gap-1">
                         <button
@@ -344,8 +344,8 @@ export default function AdminUsersPage() {
                           className={classNames(
                             'text-xs px-2.5 py-1 rounded disabled:opacity-50',
                             item.is_admin
-                              ? 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                              : 'bg-blue-600 text-white hover:bg-blue-700'
+                              ? 'bg-page text-fg hover:bg-hairline'
+                              : 'bg-accent text-white hover:bg-accent/90'
                           )}
                         >
                           {role.isPending && actedId === item.id
@@ -353,11 +353,11 @@ export default function AdminUsersPage() {
                             : item.is_admin ? 'Remove admin' : 'Make admin'}
                         </button>
                         {actedId === item.id && lastAction === 'role' && !role.isPending && roleError && (
-                          <p className="text-xs max-w-xs text-right text-amber-700">{roleError}</p>
+                          <p className="text-xs max-w-xs text-right text-warning">{roleError}</p>
                         )}
                         {actedId === item.id && lastAction === 'role' && !role.isPending && !roleError
                           && role.data?.changed === false && (
-                          <p className="text-xs text-gray-500">Already in that state</p>
+                          <p className="text-xs text-fg-muted">Already in that state</p>
                         )}
                         <button
                           onClick={() => handleDisable(item)}
@@ -366,8 +366,8 @@ export default function AdminUsersPage() {
                           className={classNames(
                             'text-xs px-2.5 py-1 rounded disabled:opacity-50',
                             item.disabled
-                              ? 'bg-green-50 text-green-700 hover:bg-green-100'
-                              : 'bg-red-50 text-red-700 hover:bg-red-100'
+                              ? 'bg-success/5 text-success hover:bg-success/10'
+                              : 'bg-danger/5 text-danger hover:bg-danger/10'
                           )}
                         >
                           {disabling.isPending && actedId === item.id
@@ -375,11 +375,11 @@ export default function AdminUsersPage() {
                             : item.disabled ? 'Enable' : 'Disable'}
                         </button>
                         {actedId === item.id && lastAction === 'disabled' && !disabling.isPending && disabledError && (
-                          <p className="text-xs max-w-xs text-right text-amber-700">{disabledError}</p>
+                          <p className="text-xs max-w-xs text-right text-warning">{disabledError}</p>
                         )}
                         {actedId === item.id && lastAction === 'disabled' && !disabling.isPending
                           && !disabledError && disabling.data?.changed === false && (
-                          <p className="text-xs text-gray-500">Already in that state</p>
+                          <p className="text-xs text-fg-muted">Already in that state</p>
                         )}
                       </div>
                     </td>
@@ -388,7 +388,7 @@ export default function AdminUsersPage() {
                       nested in the first column stretches that column to half the table and shifts
                       every other one sideways for as long as the drawer is open. */}
                   {openId === item.id && (
-                    <tr className="bg-gray-50">
+                    <tr className="bg-page">
                       <td colSpan={7} className="px-4 py-3">
                         <UserDetail userId={item.id} sessionToken={token} />
                       </td>
@@ -398,7 +398,7 @@ export default function AdminUsersPage() {
               ))}
               {items.length === 0 && !isLoading && (
                 <tr>
-                  <td colSpan={7} className="px-4 py-8 text-center text-gray-500">
+                  <td colSpan={7} className="px-4 py-8 text-center text-fg-muted">
                     No users match the current filters.
                   </td>
                 </tr>
@@ -412,11 +412,11 @@ export default function AdminUsersPage() {
         <button
           onClick={() => setPage((p) => Math.max(0, p - 1))}
           disabled={page === 0 || isLoading}
-          className="text-blue-600 hover:text-blue-800 disabled:opacity-50"
+          className="text-accent hover:text-accent disabled:opacity-50"
         >
           Previous
         </button>
-        <span className="text-gray-600">
+        <span className="text-fg-muted">
           {total > 0
             ? `${page * PAGE_SIZE + 1}–${Math.min((page + 1) * PAGE_SIZE, total)} of ${total}`
             : 'No users'}
@@ -424,7 +424,7 @@ export default function AdminUsersPage() {
         <button
           onClick={() => setPage((p) => p + 1)}
           disabled={isLoading || (page + 1) * PAGE_SIZE >= total}
-          className="text-blue-600 hover:text-blue-800 disabled:opacity-50"
+          className="text-accent hover:text-accent disabled:opacity-50"
         >
           Next
         </button>

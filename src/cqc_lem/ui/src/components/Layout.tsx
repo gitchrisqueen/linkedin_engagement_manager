@@ -21,6 +21,16 @@ const navLinks = [
   { to: '/content', label: 'Content' },
 ]
 
+// One link style for every nav item: a full-height row with a 2px primary bar under the active
+// page (the marketing nav's hairline chrome, carried into the app).
+function navLinkClass({ isActive }: { isActive: boolean }): string {
+  return `inline-flex h-16 items-center border-b-2 text-sm whitespace-nowrap transition-colors ${
+    isActive
+      ? 'border-accent font-semibold text-fg'
+      : 'border-transparent font-medium text-fg-muted hover:text-fg'
+  }`
+}
+
 const adminNavLinks = [
   { to: '/admin/users', label: 'Users' },
   { to: '/admin/feedback', label: 'Feedback Triage' },
@@ -39,45 +49,34 @@ export default function Layout() {
   }
 
   return (
-    <div className="min-h-screen flex flex-col bg-gray-100">
-      <nav className="bg-white border-b border-gray-200 sticky top-0 z-10">
-        <div className="max-w-5xl mx-auto px-4 flex items-center gap-3 sm:gap-6 h-14">
-          <span className="font-bold text-blue-600 text-lg shrink-0">LEM</span>
+    <div className="lem-app min-h-screen flex flex-col bg-page">
+      <nav className="bg-raised border-b border-hairline sticky top-0 z-10">
+        <div className="box-content max-w-6xl mx-auto px-4 flex items-center gap-4 sm:gap-8 h-16">
+          {/* -ml-[5px]: the artwork has 50 of 1340 px transparent on its left, about 5px here, so
+              the visible mark starts on the page's left edge (same as the marketing nav). */}
+          <NavLink to="/" className="shrink-0" aria-label="LinkedIn Engagement Manager, home">
+            <img
+              src="/brand/lem-wordmark.png"
+              alt=""
+              width={1340}
+              height={300}
+              className="-ml-[5px] h-7 w-auto"
+            />
+          </NavLink>
           {/* On a phone the links no longer push the account controls off the right edge: this row
               is the only thing allowed to shrink, and it scrolls sideways instead (issue #894). */}
           {user && (
             <div
               data-testid="nav-links"
-              className="flex items-center gap-4 sm:gap-6 min-w-0 overflow-x-auto scrollbar-none"
+              className="flex items-center gap-5 sm:gap-7 min-w-0 overflow-x-auto scrollbar-none"
             >
               {navLinks.map(({ to, label, end }) => (
-                <NavLink
-                  key={to}
-                  to={to}
-                  end={end}
-                  className={({ isActive }) =>
-                    `text-sm font-medium transition-colors whitespace-nowrap ${
-                      isActive
-                        ? 'text-blue-600 border-b-2 border-blue-600 pb-0.5'
-                        : 'text-gray-600 hover:text-gray-900'
-                    }`
-                  }
-                >
+                <NavLink key={to} to={to} end={end} className={navLinkClass}>
                   {label}
                 </NavLink>
               ))}
               {isAdmin && adminNavLinks.map(({ to, label }) => (
-                <NavLink
-                  key={to}
-                  to={to}
-                  className={({ isActive }) =>
-                    `text-sm font-medium transition-colors whitespace-nowrap ${
-                      isActive
-                        ? 'text-purple-600 border-b-2 border-purple-600 pb-0.5'
-                        : 'text-gray-600 hover:text-gray-900'
-                    }`
-                  }
-                >
+                <NavLink key={to} to={to} className={navLinkClass}>
                   {label}
                 </NavLink>
               ))}
@@ -86,12 +85,12 @@ export default function Layout() {
           <div className="ml-auto flex items-center gap-3 shrink-0">
             {user ? (
               <>
-                <span className="text-xs text-gray-500 hidden sm:inline">
-                  Logged in as: <span className="font-medium text-gray-700">{user.email}</span>
+                <span className="text-sm text-fg-muted hidden sm:inline">
+                  Logged in as: <span className="font-medium text-fg">{user.email}</span>
                 </span>
                 <button
                   onClick={handleLogout}
-                  className="text-xs text-red-500 hover:text-red-700 font-medium border border-red-200 hover:border-red-400 px-2.5 py-1 rounded transition-colors"
+                  className="min-h-11 px-2 text-sm font-medium text-fg-muted hover:text-fg transition-colors"
                 >
                   Log out
                 </button>
@@ -99,7 +98,7 @@ export default function Layout() {
             ) : (
               <button
                 onClick={openLoginModal}
-                className="text-xs text-blue-600 hover:text-blue-800 font-medium border border-blue-200 hover:border-blue-400 px-2.5 py-1 rounded transition-colors"
+                className="min-h-11 px-2 text-sm font-semibold text-accent hover:underline"
               >
                 Login / Sign Up
               </button>
@@ -107,7 +106,7 @@ export default function Layout() {
           </div>
         </div>
       </nav>
-      <main className="flex-1 w-full max-w-5xl mx-auto px-4 py-6">
+      <main className="flex-1 w-full box-content max-w-6xl mx-auto px-4 py-8 sm:py-10">
         {/* Mandatory strong-factor enrolment (issue #905). The gate REPLACES the page: a held
             session is refused everywhere but the enrolment surface, so rendering the app behind it
             would only produce 403s. The prompt is the pre-deadline half. */}
