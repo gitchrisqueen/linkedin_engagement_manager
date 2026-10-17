@@ -188,7 +188,7 @@
   }
   /* The app's prose keeps the pack measure too (em, for the reason given at the token); a
      centred note stays centred in its box. */
-  .lem-app main :where(p) {
+  .lem-app main :where(p, blockquote) {
     max-width: var(--container-measure);
   }
   .lem-app main :where(p.text-center) {
