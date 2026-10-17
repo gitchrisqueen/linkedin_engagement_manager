@@ -318,3 +318,10 @@ def fake_cursor():
         connection; assert against the cursor.
     """
     return _make_fake_cursor
+
+
+@pytest.fixture(autouse=True)
+def _no_real_parallel_search():
+    """Fail unmocked Parallel research sockets immediately; SDK MockTransport still works."""
+    with hermetic.block_parallel_search():
+        yield

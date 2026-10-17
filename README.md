@@ -9,6 +9,7 @@ LinkedIn Engagement Manager (LEM) is an automated solution for managing engageme
 ### Content generation & scheduling
 - **Buyer-journey content plan**: A balanced 30-day plan across awareness / consideration / decision stages — thought-leadership, industry-news commentary, personal-story, and engagement-prompt posts, carousels (educational / case-study / product-demo / insights), native video, native PDF documents, and blog summaries. The plan balances four post types (`PLANNED_POST_TYPES` in `src/cqc_lem/app/run_content_plan.py`) and never schedules two posts inside 24 hours.
 - **AI-Generated Content**: LiteLLM-proxied models generate text and carousel content with tiered routing (`lem-simple`, `lem-medium`, `lem-complex`, `lem-image`); video is rendered by RunwayML (`src/cqc_lem/utilities/ai/video_models.py`) from a LiteLLM-written prompt and source frame, with Pexels stock as the fallback.
+- **Web research grounding**: Posts and newsletters use free [Parallel Search MCP](https://docs.parallel.ai/integrations/mcp/search-mcp) in Fast mode when no Perplexity key or proxy route is configured. Existing Perplexity settings stay active; `CONTENT_RESEARCH_PROVIDER=parallel` selects Parallel explicitly. [Research controls and source handling](docs/content-core.md#shared-web-research).
 - **Peak-hour scheduling**: Auto-schedules posts around golden/peak hours, with self-healing carousels and media asset backfill.
 - **Quality gates & approval workflow**: Drafts go through a slop lint and an authenticity score, and `src/cqc_lem/utilities/content_quality.py` tracks the trend; preview and approve manually or let it auto-approve. Native `LinkedInPostPreview` component and a date-time picker for editing scheduled posts.
 
@@ -106,7 +107,7 @@ pushes to GHCR instead — see `docs/DEPLOYMENT.md`.
 
 ### AI Proxy (LiteLLM)
 
-App LLM calls go through the LiteLLM proxy at `http://litellm:4000`; the exceptions are the direct Perplexity helper in `src/cqc_lem/utilities/ai/tools.py` (the primary research route; the `lem-research` alias is opt-in via `RESEARCH_VIA_PROXY`), Replicate for avatar images, and RunwayML for video. Model tier
+App LLM calls go through the LiteLLM proxy at `http://litellm:4000`; the exceptions are the direct Perplexity helper in `src/cqc_lem/utilities/ai/tools.py` (when Perplexity research is selected; `lem-research` is opt-in via `RESEARCH_VIA_PROXY`), Replicate for avatar images, and RunwayML for video. Unconfigured research uses Parallel Search MCP excerpts through the shared research layer. Model tier
 aliases are defined in `.litellm/config.yaml`:
 
 | Alias | Use case |

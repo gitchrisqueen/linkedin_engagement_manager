@@ -28,6 +28,8 @@ _TRACK = "cqc_lem.utilities.observability.track_llm_call"
 def _clean_toggles(monkeypatch):
     for name in _RESEARCH_ENVS + ("RESEARCH_VIA_PROXY",):
         monkeypatch.delenv(name, raising=False)
+    # This suite exercises the existing Perplexity routes; default selection has separate coverage.
+    monkeypatch.setenv("CONTENT_RESEARCH_PROVIDER", "perplexity")
     monkeypatch.setattr(cr, "_proxy_skip_until", 0.0)  # the in-process fallback deadline
     monkeypatch.setattr(cr, "_shared_redis", lambda: None)  # no Redis unless a test brings one
 

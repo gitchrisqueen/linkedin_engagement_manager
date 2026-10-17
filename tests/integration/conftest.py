@@ -44,6 +44,7 @@ from celery_once.backends import redis as celery_once_redis
 from openai import OpenAI
 
 from cqc_lem.platform.db import connection as db_connection
+from tests import hermetic
 
 # Redis' default `databases` setting. A wider `-n` than this wraps back onto db 0 and shares a
 # window with gw0 — the same sharing every worker has today, not a new failure mode.
@@ -286,3 +287,10 @@ def _worker_isolated_state() -> Iterator[None]:
         db_connection.reset_connection_pool()
         patcher.undo()
         _drop_database(config, target)
+
+
+@pytest.fixture(autouse=True)
+def _no_live_parallel_search() -> Iterator[None]:
+    """Keep content generation integration tests from issuing live anonymous searches."""
+    with hermetic.block_parallel_search():
+        yield

@@ -1,7 +1,8 @@
 """The two outside-world research fetchers the content pipeline grounds itself on.
 
-`search_with_perplexity` is `content_research`'s PRIMARY research route: the proxy's `lem-research`
-alias sits behind `RESEARCH_VIA_PROXY` until LiteLLM can parse Perplexity's Agent API answer.
+`search_with_perplexity` serves configured Perplexity research; unconfigured research uses Parallel
+Search MCP through `content_research`. The proxy's `lem-research` alias sits behind
+`RESEARCH_VIA_PROXY` until LiteLLM can parse Perplexity's Agent API answer.
 `search_recent_news` is the free GoogleNews path `get_industry_trend_analysis_based_on_user_profile`
 drops to when research is disabled or came back
 empty. Both are SOURCES, never gates — every caller already treats "nothing found" as "write from

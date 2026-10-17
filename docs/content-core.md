@@ -15,10 +15,45 @@ flow, the slop lint, or the deck reference gate.
 | File | Purpose |
 |---|---|
 | `src/cqc_lem/utilities/ai/content_framework.py` | ONE blueprint core (archetype/hook/CTA menus per content type + shared variety engine) |
-| `src/cqc_lem/utilities/ai/content_research.py` | ONE research layer (direct Perplexity Agent API primary, `lem-research` proxy opt-in via `RESEARCH_VIA_PROXY`; per-type cost toggles) |
+| `src/cqc_lem/utilities/ai/content_research.py` | ONE research layer (Parallel for unconfigured installs; configured Perplexity and opt-in proxy routing preserved; per-type toggles) |
 | `src/cqc_lem/utilities/ai/content_alignment.py` | ONE alignment core (voice synthesis + prefs + LEM purpose + promo policy) |
 | `src/cqc_lem/utilities/ai/story_bank.py` | ONE fact layer (the user's own anecdotes/numbers — the only permitted specifics) |
 | `src/cqc_lem/utilities/ai/slop_lint.py` | ONE deterministic AI-slop lint (no LLM) run on every surface |
+
+## Shared web research
+
+Posts and newsletters gather current background material through `research_topic` before the
+existing writer generates content. A fresh installation uses free anonymous
+[Parallel Search MCP](https://docs.parallel.ai/integrations/mcp/search-mcp), powered by Fast mode,
+without an account or API key. Search excerpts carry source names and URLs in the existing
+`findings` / `sources` result; the writer still authors the final text. The MCP dependency installs
+with the application, so no optional group or separate server setup is needed.
+
+| Configuration | Research route |
+|---|---|
+| `CONTENT_RESEARCH_PROVIDER` empty or unset, no Perplexity key, proxy off | Parallel |
+| Provider empty or unset, nonempty `PERPLEXITY_API_KEY`, proxy off | Existing direct Perplexity Agent API (`fast` preset) |
+| Provider empty or unset, `RESEARCH_VIA_PROXY=true` | Existing proxy-first route, then direct Perplexity |
+| `CONTENT_RESEARCH_PROVIDER=parallel` | Parallel, even with Perplexity configured |
+| `CONTENT_RESEARCH_PROVIDER=perplexity` | Existing Perplexity routing, including the proxy toggle |
+
+Automatic selection happens before the request. A failed explicitly selected provider never
+switches to the other research provider. Unknown provider values produce empty research and a
+configuration warning. Parallel provides source excerpts rather than a synthesized research
+answer; Perplexity's answer-producing path remains available explicitly.
+
+`CONTENT_RESEARCH_ENABLED=false` disables this layer before any network request. The existing
+`NEWSLETTER_RESEARCH_ENABLED` and `POST_RESEARCH_ENABLED` switches still default on.
+`COMMENT_RESEARCH_ENABLED` still defaults off and remains subject to the per-user comment
+research feature flag. Turning research off also prevents an explicitly selected provider from
+running. The industry-trend workflow retains its separate GoogleNews fallback when shared
+research returns no findings.
+
+Parallel's anonymous service has rate limits and is intended for light use. Its research request
+has a 25-second overall timeout. Empty results, service failures and timeouts yield empty research,
+so generation can proceed from its existing
+inputs. Sources and search excerpts are third-party material, not evidence of the author's own
+experience; the fact-grounding checks below still apply.
 
 ## Comment research + quality contract
 
