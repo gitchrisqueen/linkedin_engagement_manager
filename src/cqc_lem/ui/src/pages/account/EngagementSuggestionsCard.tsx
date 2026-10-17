@@ -146,7 +146,7 @@ export default function EngagementSuggestionsCard() {
             <p>
               Feed commenting, replies, outreach and invites read LinkedIn in a browser, so they do
               not run in suggestion mode.{' '}
-              <a href="/content" className="text-blue-600 hover:underline">
+              <a href="/content" className="text-blue-600 underline underline-offset-2">
                 Write a post in Content Studio
               </a>
             </p>
