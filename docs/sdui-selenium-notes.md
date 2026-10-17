@@ -330,6 +330,19 @@ row. It now re-reads up to `_MENTION_RENDER_ATTEMPTS` (5) times, 2s apart, like
 `_RECOMMENDATION_RENDER_ATTEMPTS`, and grades a zero only off the LAST read, so the walk and its
 cross-check always come from the same paint.
 
+**The user's own link is not a second person (#2426).** The poll did not end it: v0.195.0 still
+logged drift on all 3 runs of 2026-10-14, each after ~10s of the page showing the sentence while
+the walk resolved nothing — a reader mismatch, not a render race. A mention IS a link to the
+mentioned profile, so a card that quotes the comment renders "@<user>" as an
+`/in/<own slug>` anchor. The climb counted it as a second person, stopped below the sentence and
+dropped the card. `_MENTION_CARDS_JS` now takes the user's own slug as `arguments[0]` (from
+`my_profile.profile_url`, else the stored URL — never a navigation) and ignores it, both as a person
+and as a climb start; a parent holding a SECOND mention sentence also ends the climb, so ignoring it
+cannot merge two cards. `_card_person(..., exclude=own_url)` skips that link when naming who to
+thank; the first OTHER link still decides, so a company actor is still skipped rather than replaced
+by somebody named in the quote. The probe's carried copy takes the same argument, and an image
+whose `_mention_cards` has no `own_url` is graded by the carried copy; mention rows report `is_self`.
+
 The probe is piped into a worker running the DEPLOYED image, so — as with the recommendations read
 — it drives `_mention_cards` when the running image has it and an identical carried copy when it
 does not, naming which in `card_source`. Each mention row also reports `age_read_from`, the exact
@@ -737,6 +750,34 @@ exists at all. A genuine miss on all three routes is now cross-checked against t
 real drift on a page that plainly has content escalates instead of reading identically to an
 ordinary quiet page forever.
 
+## The activity-page top card lost every follow signal; the owner's own post cards carry it (#2399)
+
+Live-grounded 2026-10-12 (user 1, debug node, read-only probe) against four targets after the weekly
+sweep graded `hamelhusain` as `drift` with 21 posts on the page. What the DOM looks like now:
+
+- **The top card is an `<aside aria-label="Sidebar">`** holding name, headline, a `Followers N`
+  count and a bare `<a href="/messaging/compose/?profileUrn=…">Message</a>`. On `hamelhusain` and
+  `arvidkahl` there is no Follow/Following toggle, no `1st` badge and no shortened
+  `Message <first>`, so Routes A, B and C all miss — the shape the drift issue reported.
+- **The owner's own post cards carry the state.** Each card's author header is a `<div>` labelled
+  `"<Name> <badges> Profile <relationship>"` (visible text `"<Name> • <relationship>"`):
+  `Hamel Husain Verified Profile Following`, `Andrew Ng Executive Top Voice Profile Following`,
+  `Satya Nadella Executive Top Voice Profile 3rd+`. A not-followed author's card also renders a
+  `Follow <Name>` button, which Route B already resolves (Satya: `not_following`).
+- **Some top cards DO keep a toggle, in a new label shape:** `andrewyng` renders
+  `<button aria-label="Following, click to unfollow Andrew Ng">Following</button>`. The old
+  `named(text, 'following')` test needs `"following "`, so the comma form was invisible too.
+
+The fix, in `_FOLLOW_CONTROL_JS`: `readState` also matches the verb after `"click to "`, and a new
+read-only **Route D** — tried after A/B (an explicit control still wins) and before C — accepts an
+`[aria-label]` that STARTS with the owner's name and ENDS on `profile following`, answering
+`following` with no element. Another author's header never starts with the owner's name, and a
+label that merely mentions the owner without the `… profile following` tail never answers.
+`_follow_control_crosscheck_sel` gained both shapes, so the zero-walk cross-check sees them too.
+After the fix all four targets grade `ok` (`hamelhusain`/`arvidkahl` following via Route D,
+`andrewyng` following via the toggle, `satyanadella` not following via `Follow Satya Nadella`).
+`TestFollowControlJsAgainstLiveShapes` runs the JS itself under `node` against these four shapes.
+
 ## The feed share-box composer is a non-button clickable (#1107)
 
 Live-grounded 2026-08-08 (`/feed/`, user 1): the share-box trigger renders the text
@@ -969,7 +1010,39 @@ problem (#883): every visible `role=textbox` on the PAGE, never above this post 
 above-filter), nearest to its bottom edge wins. No box of ours (in card, in scope, or on the page,
 all within that bound) = skip the post.
 
-A miss is an expected no-op and is logged DEBUG *inside* the resolver, like the reply one — the
+**Issue #2398 — the page-wide fallback now proves ownership instead of trusting a label.** The
+weekly drift sweep (2026-10, group 115435, user 1, `--group-feed-composer`) read the live group
+feed as follows:
+
+| Reading | Live value |
+|---|---|
+| Comment action | `button[aria-label='Comment']`, `type=submit`, text `Comment` — 1 hit per card; `aria-label^='Comment on'` and `data-testid*='comment-button'` 0 |
+| Post identity | `data-urn="urn:li:activity:<id>"` on an ancestor 2–3 levels above the card, plus `data-view-tracking-scope` carrying the same URN 4–5 levels up |
+| Existing comment | `article[data-id="urn:li:comment:(groupPost:<group>-<id>…)"]` inside the comment section |
+| Post's own comment box | `div[role=textbox]`, `aria-label="Text editor for creating content"` — **no "creating comment" in it** |
+| Resolution | 2 of 3 cards resolved, both from the widened scope; the third mounted a box (page textboxes 1→2) outside `_single_post_scope` — its comment section carries a comment's own text node, a per-post marker, so the scope stopped at the card |
+
+That third card is the #1777 sibling render again, and the page-wide fallback rejected the box only
+because its label no longer says "comment". The share modal uses the same label, so the label proves
+nothing either way. The fallback now accepts an unlabelled box only when the page says it is ours
+(`_COMPOSER_OWNER_JS`): walking up from the box, the nearest post URN on any attribute must equal
+the card's own container URN (`_feed_post_container_urn`), with no `data-id`/`data-urn` naming a
+`urn:li:comment:` on the way (a reply box), and the box not inside an `aside` or a dialog (the
+messaging overlay, the share modal). No card URN means no proof, and the post is skipped.
+
+A miss logs DEBUG *inside* the resolver only when the page agrees. Before treating the zero as
+"nothing to do", `_unowned_composer_count` counts the rendered boxes at or below the post that no
+post, comment or overlay owns. A non-zero count means the resolver has gone blind (the ownership
+walk lost its URN attribute), so it is graded `drift` through `zero_walk.grade_zero_walk` and warns.
+A box owned by a different post or by a comment is an ordinary miss. An unreadable owner grounds
+nothing (DEBUG).
+
+The same reading found a second card on that post: a comment's text node (the same
+`expandable-text-box` marker) walked up to the comment section, whose nearest "Comment" control is
+the composer's own submit button. It keys to the same activity URN, so the at-most-once claim
+stops a second comment, but its "content" is a stranger's comment, not the post.
+
+A miss the page agrees with is an expected no-op, logged DEBUG *inside* the resolver like the reply one — the
 per-card `log_warning` it replaced escalated to ERROR and filed a defect for a post we skip by
 design. It polls `_COMPOSER_MOUNT_POLLS` times rather than burning
 `WAIT_DEFAULT_TIMEOUT x (MAX_WAIT_RETRY + 1)` (~35s) on a card that never opened one.

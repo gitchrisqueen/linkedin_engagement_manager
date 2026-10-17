@@ -804,12 +804,15 @@ class TestSharedInboundRouting:
 class TestGmailConfirmationForwardToUser:
     BASE = "/api/linkedin/comment-notification/inbound"
 
-    def test_forwards_to_user_when_click_fails(self, api_client):
+    @pytest.mark.parametrize("status,trial", [("active", False), ("trial", True), (None, True)])
+    def test_forwards_to_user_when_click_fails(self, api_client, status, trial):
         body = "verify permission https://mail.google.com/mail/vf-x\nConfirmation code: 55667788"
         with patch("cqc_lem.utilities.db.get_user_id_by_reply_token", return_value=7), \
              patch("cqc_lem.api.main.requests.get", side_effect=RuntimeError("net")), \
              patch("cqc_lem.api.main.log_warning"), \
              patch("cqc_lem.utilities.db.get_user_email", return_value="chris@example.com"), \
+             patch("cqc_lem.api.main.get_user_subscription_info",
+                   return_value={"subscription_status": status}), \
              patch("cqc_lem.utilities.email.send_reply_forward_confirmation_email", return_value=True) as fwd:
             resp = api_client.post(self.BASE, data={
                 "to": "reply+tok9@parse.example.com",
@@ -819,6 +822,7 @@ class TestGmailConfirmationForwardToUser:
         fwd.assert_called_once()
         assert fwd.call_args.args[0] == "chris@example.com"
         assert fwd.call_args.args[2] == "55667788"  # code passed through
+        assert fwd.call_args.kwargs == {"trial": trial}  # issue #2375: wording follows the plan
 
 
 @pytest.mark.unit

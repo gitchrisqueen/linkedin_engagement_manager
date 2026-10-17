@@ -49,7 +49,7 @@ probe matches the image it is piped into (it was `origin/main` under #2086; run 
 
 | Schedule (UTC) | Job | Revision |
 |---|---|---|
-| `30 23 * * *` | `scripts/perf_snapshot.sh` → `/home/lem/perf-tracking/metrics.jsonl` | deployed tag |
+| `30 23 * * *` | `scripts/perf_snapshot.sh` → `/home/lem/perf-tracking/metrics.jsonl` (count reads: #2431) | deployed tag |
 | `40 6 * * 1` | `scripts/weekly_sdui_drift_check.sh` (env `SDUI_PROBE_PROFILE_URL=…`) | deployed tag |
 | `0 9 * * 0` | `scripts/weekly_model_check.sh` | deployed tag |
 | `30 9 * * 0` | `scripts/weekly_linkedin_version_check.sh` | deployed tag |
@@ -100,6 +100,13 @@ error-issues-cron}` clones can be removed once a week of runs shows up in the lo
   line. It was null on 48 of 63 lines because the block exec'd into `web_app`, the nginx front door
   with no python; it now targets the active `web_api_<color>` from `/opt/lem/.active_color`, and a
   null line records the container's last stderr line in `snapshot.log`.
+- `tail -7 /home/lem/perf-tracking/metrics.jsonl` — the `d1` and `cumulative` counts are integers.
+  A count may be `null`, and null means **unmeasured, never zero**: every line with a null count has
+  a matching `engagement counts unavailable:` line in `/home/lem/perf-tracking/snapshot.log` naming
+  the cause or the null fields (`grep 'engagement counts unavailable' snapshot.log | tail`).
+  Rows from **2026-10-08 until the release carrying this null handling is deployed** are all-zero
+  read failures, not measurements (posts_tracked was 61 on 2026-10-07): exclude them from any
+  series. Restoring the reads is tracked in #2431.
 - Alert emails (`weekly_sdui_drift_check.sh`, `weekly_model_check.sh`,
   `weekly_linkedin_version_check.sh`, `error_to_issues.sh`, `triage_issues.sh`) had the same defect:
   each `alert()` exec'd python into `web_app` and swallowed the failure, so none ever sent (#2160).

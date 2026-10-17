@@ -51,8 +51,8 @@
     "version": 1
   },
   "classify.lead_intent": {
-    "changed_in": "reasoning-safe max_tokens (prompt-eval baseline pe-20261008-0250fe)",
-    "content_hash": "sha256:3c835011fed19d44e2ff77172dfd599574c853aa2fa201621c8053fab96ffc56",
+    "changed_in": "contract-floor fix for #2397, #2302, #2303",
+    "content_hash": "sha256:0243905f927747d9b8ad7c201adde0935bdc112966efa1709b5f5a342a80b517",
     "dataset_hash": "sha256:ee266c3cbab97bc05896a33372c88b99b2a4e9d30cf78ea63c22077bd9129205",
     "dataset_history": [],
     "dataset_version": 1,
@@ -61,10 +61,15 @@
         "hash": "sha256:8b301f0684a2aa68dc0bebe919c78c79c31340ccf56bf3d36911db7cd72cc74e",
         "retired": "2026-10-08",
         "version": 1
+      },
+      {
+        "hash": "sha256:3c835011fed19d44e2ff77172dfd599574c853aa2fa201621c8053fab96ffc56",
+        "retired": "2026-10-12",
+        "version": 2
       }
     ],
-    "source_hash": "sha256:b9a31ffad9889e08c82e56d662805fe081e49a74ed6cdc89eeed7504c8e61bc6",
-    "version": 2
+    "source_hash": "sha256:f1951d6b7dc5cc5942126d492a1b807e335d4b0bd2a7de5035d96e96d2c682ab",
+    "version": 3
   },
   "classify.post_reaction": {
     "changed_in": "reasoning-safe max_tokens (prompt-eval baseline pe-20261008-0250fe)",
@@ -178,14 +183,20 @@
     "version": 1
   },
   "dm.nurture": {
-    "changed_in": null,
-    "content_hash": "sha256:679d59cc08ed4846c4dbc66d1cebc1f4b9be5c237ebe8fd13fdb5e7a520a9c41",
+    "changed_in": "contract-floor fix for #2397, #2302, #2303",
+    "content_hash": "sha256:b5932e295973598871abe392f889af96be63e266bb632b029eb2b7a4af5eb2f1",
     "dataset_hash": "sha256:9da0e7a58e8bff8f273e5c910e821dc99f9160f3a5e7533fa729d235a084d525",
     "dataset_history": [],
     "dataset_version": 1,
-    "history": [],
-    "source_hash": "sha256:0b53b9e6dedd19fa367c77239b4d6b4898146ca4ef201c450c2c50804286cb56",
-    "version": 1
+    "history": [
+      {
+        "hash": "sha256:679d59cc08ed4846c4dbc66d1cebc1f4b9be5c237ebe8fd13fdb5e7a520a9c41",
+        "retired": "2026-10-12",
+        "version": 1
+      }
+    ],
+    "source_hash": "sha256:607aa16042a0a9145f7a498968f16653eeecf106fb003487164d93bc31e63c4f",
+    "version": 2
   },
   "dm.refine": {
     "changed_in": null,
@@ -255,14 +266,20 @@
     "version": 1
   },
   "judge.authenticity": {
-    "changed_in": null,
-    "content_hash": "sha256:3863b349bf730caaeea3c0da49c8e8c468ae4f038a8da6672cce3a1395ca819e",
+    "changed_in": "contract-floor fix for #2397, #2302, #2303",
+    "content_hash": "sha256:542a984945b83a5f9e58d336013ea5f7c2b5a7553e0f659481aa987f0e2f355c",
     "dataset_hash": "sha256:3d17e4d0e0f1d2eadbeb8d175ba90b8850fa6099ced167731ea8f449cdf24bd9",
     "dataset_history": [],
     "dataset_version": 1,
-    "history": [],
-    "source_hash": "sha256:3b56489b1d34516dd136d0cd68b7ae876e42e2c89c73e80bbb414b98acb37df6",
-    "version": 1
+    "history": [
+      {
+        "hash": "sha256:3863b349bf730caaeea3c0da49c8e8c468ae4f038a8da6672cce3a1395ca819e",
+        "retired": "2026-10-12",
+        "version": 1
+      }
+    ],
+    "source_hash": "sha256:f1ae00ae9abd6c502fce1ada8d90eb60820943af1d8f45eed82f91cac3c25fa2",
+    "version": 2
   },
   "marketing.affiliate_post": {
     "changed_in": null,
@@ -321,11 +338,17 @@
     "version": 1
   },
   "post.carousel": {
-    "changed_in": null,
+    "changed_in": "PR #2385",
     "content_hash": null,
-    "history": [],
-    "source_hash": "sha256:8e3fa8ff74e6143ae195906bf32a307891eae9cdad202662ecf6a2400b12dc6c",
-    "version": 1
+    "history": [
+      {
+        "hash": "sha256:8e3fa8ff74e6143ae195906bf32a307891eae9cdad202662ecf6a2400b12dc6c",
+        "retired": "2026-10-10",
+        "version": 1
+      }
+    ],
+    "source_hash": "sha256:cdfae460131c8646143c9d7216f4bbca6e967e21033dee3f50990cc91ad8ff82",
+    "version": 2
   },
   "post.engagement_prompt": {
     "changed_in": null,

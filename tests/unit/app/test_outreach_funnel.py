@@ -28,6 +28,8 @@ def _prefs():
 
 
 class TestFireFunnelStage:
+    # The connect/DM stage tests use user 2: user 1 is the brand account, whose connect/DM stages
+    # are held by the #2376 ruling (TestBrandAcquisitionHold below).
     def _common(self):
         return {
             "prefs": patch(f"{_OUT}.get_engagement_preferences", return_value=_prefs()),
@@ -81,7 +83,7 @@ class TestFireFunnelStage:
         c = self._common()
         with c["prefs"], c["cc"], c["cd"], c["refine"], c["dm"], c["enq"], \
              c["upd"] as upd, c["ust"], patch(f"{_OUT}.invite_to_connect") as inv:
-            out = _fire_funnel_stage(1, _target(stage="connect", draft_text="my note"))
+            out = _fire_funnel_stage(2, _target(stage="connect", draft_text="my note"))
         inv.apply_async.assert_called_once()
         assert inv.apply_async.call_args.kwargs["kwargs"]["message"] == "my note"
         assert upd.call_args.kwargs["stage"] == OutreachStage.DM
@@ -94,7 +96,7 @@ class TestFireFunnelStage:
         c = self._common()
         with c["prefs"], c["cc"], c["cd"], c["refine"], c["dm"], \
              c["enq"] as enq, c["upd"] as upd, c["ust"], patch(f"{_OUT}.send_private_dm") as spd:
-            out = _fire_funnel_stage(1, _target(stage="dm", draft_text="hi jane"))
+            out = _fire_funnel_stage(2, _target(stage="dm", draft_text="hi jane"))
         spd.apply_async.assert_called_once()
         assert spd.apply_async.call_args.kwargs["kwargs"]["message"] == "hi jane"
         enq.assert_called_once()
@@ -108,7 +110,7 @@ class TestFireFunnelStage:
         c = self._common()
         with c["prefs"], c["cc"], patch(f"{_OUT}.count_dms_sent_today", return_value=99), \
              c["refine"], c["dm"], c["enq"], c["upd"], c["ust"], patch(f"{_OUT}.send_private_dm") as spd:
-            out = _fire_funnel_stage(1, _target(stage="dm", draft_text="hi"))
+            out = _fire_funnel_stage(2, _target(stage="dm", draft_text="hi"))
         spd.apply_async.assert_not_called()
         assert "deferred" in out
 
@@ -122,6 +124,57 @@ class TestFireFunnelStage:
         cop.apply_async.assert_not_called()
         ust.assert_called_once_with(1, OutreachStatus.SKIPPED)
         assert "skipped" in out
+
+
+class TestBrandAcquisitionHold:
+    """Owner ruling 2026-10-10 (#2376, option A): the brand's funnel connect and DM stages are held.
+
+    The draft goes back to 'pending' for the owner to send. Its comment stage and every other
+    user's stages are unaffected.
+    """
+
+    def _run(self, user_id, stage, brand_user_id=""):
+        from cqc_lem.app.engagement.outreach import _fire_funnel_stage
+        c = TestFireFunnelStage()._common()
+        with c["prefs"], c["cc"], c["cd"], c["refine"], c["dm"], c["enq"] as enq, \
+             c["upd"] as upd, c["ust"] as ust, \
+             patch("cqc_lem.utilities.brand_account.BRAND_USER_ID", brand_user_id), \
+             patch(f"{_OUT}.invite_to_connect") as inv, \
+             patch(f"{_OUT}.send_private_dm") as spd, \
+             patch(f"{_OUT}.comment_on_post") as cop:
+            out = _fire_funnel_stage(user_id, _target(stage=stage, draft_text="draft"))
+        return out, {"inv": inv, "spd": spd, "cop": cop, "enq": enq, "upd": upd, "ust": ust}
+
+    @pytest.mark.parametrize("stage", ["connect", "dm"])
+    def test_the_brand_stage_is_held_and_returned_to_pending(self, stage):
+        from cqc_lem.utilities.brand_account import ACQUISITION_HOLD_REASON
+        from cqc_lem.utilities.db import OutreachStatus
+        out, m = self._run(1, stage)
+        m["inv"].apply_async.assert_not_called()
+        m["spd"].apply_async.assert_not_called()
+        m["enq"].assert_not_called()                          # no funnel follow-up either
+        # Back to pending with the reason in `notes`; no `stage=` — the stage is not advanced.
+        m["upd"].assert_called_once_with(1, status=OutreachStatus.PENDING,
+                                         notes=ACQUISITION_HOLD_REASON)
+        m["ust"].assert_not_called()
+        assert "held" in out
+
+    def test_the_hold_follows_an_overridden_brand_user(self):
+        out, m = self._run(7, "connect", brand_user_id="7")
+        m["inv"].apply_async.assert_not_called()
+        assert "held" in out
+
+    @pytest.mark.parametrize("stage,task", [("connect", "inv"), ("dm", "spd")])
+    def test_other_users_still_fire(self, stage, task):
+        out, m = self._run(2, stage)
+        m[task].apply_async.assert_called_once()
+        assert "held" not in out
+
+    def test_the_brand_comment_stage_is_not_held(self):
+        """Comments are the owner's ordinary engagement and keep their caps."""
+        out, m = self._run(1, "comment")
+        m["cop"].apply_async.assert_called_once()
+        assert "held" not in out
 
 
 class TestDraftFunnelStage:

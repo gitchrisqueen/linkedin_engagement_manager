@@ -2,6 +2,9 @@
 per-author weekly cap, the on-topic gate, and the roster-vs-feed funnel diagnostics.
 """
 
+import json
+import shutil
+import subprocess
 from contextlib import ExitStack
 from datetime import datetime, timedelta
 from unittest.mock import MagicMock, patch
@@ -1161,7 +1164,16 @@ class TestFollowControlCrosscheckSelector:
     def test_matching_is_case_insensitive(self):
         # The <title> and the aria-label are written from the same display name but LinkedIn does
         # not guarantee the same casing, and CSS attribute matching is case-sensitive by default.
-        assert self._sel("Arvid Kahl").count(" i]") == 3
+        assert self._sel("Arvid Kahl").count(" i]") == 7
+        assert self._sel("Arvid Kahl").count("[aria-label") == 7
+
+    def test_the_2026_10_label_shapes_are_covered(self):
+        # #2399: the top-card toggle now reads "Following, click to unfollow <Name>", and the owner's
+        # own post-card author header "<Name> Verified Profile Following" is Route D's signal.
+        sel = self._sel("Andrew Ng")
+        assert '[aria-label$="click to unfollow Andrew Ng" i]' in sel
+        assert '[aria-label$="click to follow Andrew Ng" i]' in sel
+        assert '[aria-label^="Andrew Ng " i][aria-label$=" Following" i]' in sel
 
     def test_whitespace_in_the_name_is_collapsed(self):
         assert self._sel("  Arvid   Kahl\n") == self._sel("Arvid Kahl")
@@ -1198,6 +1210,101 @@ class TestFollowControlRouteCShortenedLabel:
     def test_connect_offered_is_detected_page_wide_when_it_names_the_owner(self):
         from cqc_lem.app.engagement.feed import _FOLLOW_CONTROL_JS
         assert "namesOwner(text) || ownerCard(b)" in _FOLLOW_CONTROL_JS
+
+
+_FAKE_DOM_HARNESS = r"""
+const spec = JSON.parse(require('fs').readFileSync(0, 'utf8'));
+const mk = (n, parent) => {
+  const el = {tagName: n.tag, parentElement: parent || null, children: [],
+    getAttribute: (k) => (n.attrs || {})[k] ?? null,
+    getBoundingClientRect: () => (n.hidden ? {width: 0, height: 0} : {width: 10, height: 10})};
+  el.children = (n.children || []).map((c) => mk(c, el));
+  Object.defineProperty(el, 'textContent', {get: () =>
+    (n.text || '') + ' ' + el.children.map((c) => c.textContent).join(' ')});
+  return el;
+};
+const all = (el) => [el, ...el.children.flatMap(all)];
+const matches = (el, sel) => sel.split(',').map((x) => x.trim()).some((x) => {
+  if (x === 'button') return el.tagName === 'BUTTON';
+  if (x === "[role='button']") return el.getAttribute('role') === 'button';
+  if (x === "a[role='link']") return el.tagName === 'A' && el.getAttribute('role') === 'link';
+  if (x === '[aria-label]') return el.getAttribute('aria-label') !== null;
+  if (x === "a[href*='/in/']") return el.tagName === 'A' && (el.getAttribute('href') || '').includes('/in/');
+  throw new Error('unsupported selector ' + x);
+});
+const root = mk({tag: 'BODY', children: spec.dom});
+const withQuery = (el) => { el.querySelectorAll = (sel) => all(el).slice(1).filter((e) => matches(e, sel)); };
+all(root).forEach(withQuery);
+global.document = root;
+const result = new Function(spec.js).apply(null, spec.args);
+process.stdout.write(JSON.stringify([result[0], result[1] ? result[1].getAttribute('aria-label') : null]));
+"""
+
+
+@pytest.mark.skipif(shutil.which("node") is None, reason="needs node to execute the resolver JS")
+class TestFollowControlJsAgainstLiveShapes:
+    """Run `_FOLLOW_CONTROL_JS` itself against minimal DOMs copied from the 2026-10 live pages (#2399).
+
+    The structural tests above can only hold an invariant's SHAPE; these execute the routes, so a
+    route that stops resolving the shapes the probe grounded — or starts reading someone else's
+    header as the owner's — fails here instead of on the Monday sweep.
+    """
+
+    _ASIDE = {"tag": "ASIDE", "attrs": {"aria-label": "Sidebar"}, "children": [
+        {"tag": "A", "attrs": {"href": "/messaging/compose/?profileUrn=x"}, "text": "Message"}]}
+
+    def _run(self, dom: list[dict], name: str, slug: str = "target") -> tuple:
+        from cqc_lem.app.engagement.feed import _FOLLOW_CONTROL_JS
+        spec = {"js": _FOLLOW_CONTROL_JS, "args": [slug, name], "dom": dom}
+        out = subprocess.run(["node", "-e", _FAKE_DOM_HARNESS], input=json.dumps(spec),
+                             capture_output=True, text=True, timeout=30, check=True)
+        return tuple(json.loads(out.stdout))
+
+    def _author_header(self, label: str, follow_button: str | None = None) -> dict:
+        children = [{"tag": "DIV", "attrs": {"aria-label": label}}]
+        if follow_button:
+            children.append({"tag": "BUTTON", "attrs": {"aria-label": follow_button}, "text": "Follow"})
+        return {"tag": "DIV", "children": children}
+
+    def test_a_followed_owners_post_card_header_reads_following(self):
+        # hamelhusain, 2026-10-12: the aside top card offers nothing; the owner's own card says so.
+        dom = [self._ASIDE, self._author_header("Hamel Husain Verified Profile Following")]
+        assert self._run(dom, "Hamel Husain") == ("following", None)
+
+    def test_a_longer_badge_run_still_reads_following(self):
+        # andrewyng, 2026-10-12: "Executive Top Voice" is three badge words, not one.
+        dom = [self._ASIDE, self._author_header("Andrew Ng Executive Top Voice Profile Following")]
+        assert self._run(dom, "Andrew Ng") == ("following", None)
+
+    def test_the_click_to_unfollow_toggle_reads_following(self):
+        dom = [{"tag": "BUTTON", "attrs": {"aria-label": "Following, click to unfollow Andrew Ng"},
+                "text": "Following"}]
+        assert self._run(dom, "Andrew Ng") == ("following", "Following, click to unfollow Andrew Ng")
+
+    def test_an_unfollowed_owner_resolves_their_own_follow_button(self):
+        # satyanadella, 2026-10-12: the header carries the degree, the button names the owner.
+        dom = [self._ASIDE, self._author_header("Satya Nadella Executive Top Voice Profile 3rd+",
+                                                follow_button="Follow Satya Nadella")]
+        assert self._run(dom, "Satya Nadella") == ("not_following", "Follow Satya Nadella")
+
+    def test_someone_elses_following_header_never_answers_for_the_owner(self):
+        # A reshared card's author is followed; the page owner is not shown as followed anywhere.
+        dom = [self._ASIDE, self._author_header("Shaikh Quader Verified Profile Following")]
+        assert self._run(dom, "Hamel Husain") == ("unknown", None)
+
+    def test_a_bare_name_following_label_without_the_profile_slot_is_not_a_header(self):
+        # Only the grounded "<Name> … Profile Following" shape answers; "<Name> Following" is ungrounded.
+        dom = [self._ASIDE, self._author_header("Hamel Husain Following")]
+        assert self._run(dom, "Hamel Husain") == ("unknown", None)
+
+    def test_a_label_that_merely_starts_with_the_owner_and_ends_following_is_not_a_header(self):
+        dom = [self._ASIDE, self._author_header("Hamel Husain and 3 others you are following")]
+        assert self._run(dom, "Hamel Husain") == ("unknown", None)
+
+    def test_a_hidden_header_is_not_read(self):
+        header = self._author_header("Hamel Husain Verified Profile Following")
+        header["children"][0]["hidden"] = True
+        assert self._run([self._ASIDE, header], "Hamel Husain") == ("unknown", None)
 
 
 class TestActivityPageOwnerName:
@@ -1415,6 +1522,19 @@ class TestRosterConnectBudget:
         # Queued-but-unsent requests count as spent: they take tomorrow's cap the moment it opens.
         assert remaining.call_args[0][3] == 3
         assert remaining.call_args[1]["caps"] is not None
+
+    @pytest.mark.parametrize("user_id,excluded", [
+        (1, {"own_post", "adjacent_post", "outreach_funnel"}), (2, set())])
+    def test_held_brand_acquisition_drafts_do_not_starve_the_ladder(self, user_id, excluded):
+        """#2376: the brand's held drafts never send, so only the brand leaves them out."""
+        from cqc_lem.app.engagement import feed as ra
+        with patch("cqc_lem.utilities.brand_account.BRAND_USER_ID", ""), \
+             patch(f"{_FEED}.remaining_actions", return_value=6), \
+             patch(f"{_FEED}.count_invites_sent_today", return_value=0), \
+             patch(f"{_FEED}.count_open_connection_requests", return_value=0) as count:
+            ra.roster_connect_budget(user_id, {"roster_auto_connect": True,
+                                               "max_invites_per_day": 10})
+        assert set(count.call_args.kwargs["exclude_sources"]) == excluded
 
 
 def _queue_env(*, budget=2, hold="", terminal=False, auto_connect=True):

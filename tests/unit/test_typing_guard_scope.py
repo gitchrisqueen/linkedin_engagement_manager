@@ -10,9 +10,9 @@ import os
 import pathlib
 import re
 import subprocess
+import tomllib
 
 import pytest
-import tomllib
 
 pytestmark = pytest.mark.unit
 

@@ -482,3 +482,29 @@ class TestOneColdDmPerPerson:
         from cqc_lem.app.engagement.outreach import PROFILE_VIEWER_DM_INTERVAL_DAYS
 
         assert PROFILE_VIEWER_DM_INTERVAL_DAYS >= 7
+
+
+class TestHeldBrandDraftsDoNotStarveViewerInvites:
+    """#2376: the brand's held acquisition drafts sit at 'pending' and never send.
+
+    The profile-viewer lane still sends for the brand, so it leaves those rows out of the queue
+    depth it subtracts; every other user's count is unchanged.
+    """
+
+    @pytest.mark.parametrize("user_id,excluded,blocked", [
+        (1, {"own_post", "adjacent_post", "outreach_funnel"}, False), (2, set(), True)])
+    def test_only_the_brand_leaves_held_drafts_out(self, user_id, excluded, blocked):
+        from cqc_lem.app.engagement.outreach import _profile_viewer_connect_blocked
+
+        def open_rows(uid, exclude_sources=()):
+            # 5 open rows, all of them held acquisition drafts.
+            return 0 if exclude_sources else 5
+
+        with patch("cqc_lem.utilities.brand_account.BRAND_USER_ID", ""), \
+             patch(f"{_OUT}.count_invites_sent_today", return_value=0), \
+             patch(f"{_OUT}.count_open_connection_requests", side_effect=open_rows) as count, \
+             patch(f"{_OUT}.get_requested_person_keys", return_value=set()):
+            got = _profile_viewer_connect_blocked(user_id, "https://www.linkedin.com/in/jane-doe",
+                                                  "Jane Doe", {"max_invites_per_day": 5})
+        assert set(count.call_args.kwargs["exclude_sources"]) == excluded
+        assert got is blocked

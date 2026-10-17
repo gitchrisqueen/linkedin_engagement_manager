@@ -103,6 +103,11 @@ from cqc_lem.utilities.ai.outbound_qa import (
     SURFACE_DM as OUTBOUND_SURFACE_DM,
     refusal_reason as outbound_refusal_reason,
 )
+from cqc_lem.utilities.brand_account import (
+    ACQUISITION_HOLD_REASON,
+    acquisition_outbound_held,
+    held_connect_sources,
+)
 from cqc_lem.utilities.connection_targeting import (
     SOURCE_ADJACENT_POST,
     SOURCE_OWN_POST,
@@ -182,6 +187,7 @@ from cqc_lem.utilities.db import (
     update_outreach_target,
     update_outreach_target_status,
 )
+from cqc_lem.utilities.demo_mode import DemoModeError
 from cqc_lem.utilities.dm_templates import _draft_connect_note, render_dm_placeholders
 from cqc_lem.utilities.engagement_window import (
     PRE_POST_TASK_VIEWER,
@@ -261,6 +267,7 @@ from cqc_lem.utilities.selenium_util import (
     get_element_wait_retry,
     getText,
     is_tab_crashed,
+    note_tab_crash,
     quit_gracefully,
     wait_for_ajax,
 )
@@ -687,14 +694,24 @@ _MENTION_CARD_LOCATORS = [
 # One JS call returns every card at once, so nothing goes stale while the feed re-renders under the
 # walk. `<main>` first with a `<body>` fallback, mirroring `_mentions_page_native_count` — the
 # cross-check this walk is graded against — because that asymmetry alone read as drift in #1985.
+#
+# #2426: a mention IS a link to the mentioned profile, so a card that quotes the comment renders
+# "@<user>" as an `/in/<own slug>` anchor. With the user counted as a second person, the climb
+# stopped below the sentence and every card dropped while the page still said "mentioned you",
+# which graded as drift. `arguments[0]` is the user's own slug: it never counts as a person and
+# never starts a climb. Without it ('') the walk reads as before. A parent holding a SECOND mention
+# sentence also ends the climb, so dropping the user's own slug cannot merge two cards into one.
 _MENTION_CARDS_JS = r"""
 const SENTENCE = /\b(mentioned|tagged)\s+you\b/i;
+const SENTENCES = /\b(mentioned|tagged)\s+you\b/gi;
 const MAX_CLIMB = 15;
+const OWN = String(arguments[0] || '').toLowerCase();
 const root = document.querySelector('main') || document.body;
 if (!root) return [];
 const slug = (a) => {
   const m = ((a.getAttribute('href') || '') || (a.href || '')).match(/\/in\/[^/?#]+/);
-  return m ? decodeURIComponent(m[0]).toLowerCase() : '';
+  const s = m ? decodeURIComponent(m[0]).toLowerCase() : '';
+  return s === OWN ? '' : s;
 };
 const cards = [];
 const seen = new Set();
@@ -706,6 +723,7 @@ for (const anchor of root.querySelectorAll('a[href*="/in/"]')) {
     if (parent === root || parent.tagName === 'BODY') break;
     const people = new Set([...parent.querySelectorAll('a[href*="/in/"]')].map(slug).filter(Boolean));
     if (people.size > 1) break;
+    if (((parent.innerText || '').match(SENTENCES) || []).length > 1) break;
     block = parent; hops++;
   }
   if (seen.has(block)) continue;
@@ -811,19 +829,43 @@ def _mention_stamp(text: str) -> str:
     return match.group(1) if match else ""
 
 
-def _card_person(card: WebElement, locators: list) -> tuple:
-    """(normalized profile_url, display name) for the person a card is about, or ('', '')."""
-    link = _first_in_card(card, locators)
-    if link is None:
-        return "", ""
-    try:
-        href = link.get_attribute("href") or ""
-        raw_name = (getText(link) or "").strip().split("\n")[0]
-    except (StaleElementReferenceException, NoSuchElementException, WebDriverException):
-        return "", ""
-    if "/in/" not in href:
-        return "", ""
-    return _normalize_profile_url(href), clean_person_name(raw_name)
+def _profile_slug(url: str) -> str:
+    """The lowercased, percent-decoded `/in/<slug>` of a profile URL, or '' for a non-profile.
+
+    That is the form `_MENTION_CARDS_JS` keys a person on.
+    """
+    match = re.search(r"/in/[^/?#]+", _normalize_profile_url(url or ""))
+    return match.group(0).lower() if match else ""
+
+
+def _card_person(card: WebElement, locators: list, exclude: str = "") -> tuple:
+    """(normalized profile_url, display name) for the person a card is about, or ('', '').
+
+    `exclude` is the user's own profile URL: a mention card links the user it mentions (#2426), and
+    that link is never the person to thank. Otherwise the FIRST link still decides, so a company
+    actor is still skipped rather than replaced by somebody named in the quoted text. Matched on the
+    slug, as the climb does: a stored URL can differ from the card's href in case or host.
+    """
+    own_slug = _profile_slug(exclude)
+    for find_by, value in locators:
+        try:
+            links = card.find_elements(find_by, value)
+        except (StaleElementReferenceException, NoSuchElementException):
+            continue
+        for link in links:
+            try:
+                href = link.get_attribute("href") or ""
+                raw_name = (getText(link) or "").strip().split("\n")[0]
+            except (StaleElementReferenceException, NoSuchElementException, WebDriverException):
+                return "", ""
+            if own_slug and _profile_slug(href) == own_slug:
+                continue
+            if "/in/" not in href:
+                return "", ""
+            return _normalize_profile_url(href), clean_person_name(raw_name)
+        if links:
+            return "", ""
+    return "", ""
 
 
 def _mention_actor_name(text: str) -> str:
@@ -874,7 +916,7 @@ def _mentions_page_native_count(driver, user_id: int = None) -> "int | None":
     return len(_MENTION_TEXT_RE.findall(text)) if isinstance(text, str) else None
 
 
-def _mention_cards(driver, user_id: int = None) -> list:
+def _mention_cards(driver, user_id: int = None, own_url: str = "") -> list:
     """Every mention notification card the page renders, as an ordered CHAIN (#2020).
 
     The named rungs of `_MENTION_CARD_LOCATORS` first — LinkedIn keeps several DOM generations alive
@@ -884,13 +926,14 @@ def _mention_cards(driver, user_id: int = None) -> list:
     caller rather than believed.
 
     A read that blows up is an EMPTY read at DEBUG, never a warning: a miss re-queues every ~60s and
-    a repeated warning files a defect for a no-op.
+    a repeated warning files a defect for a no-op. `own_url` is the user's own profile, which the
+    climb must not count as a second person on the card (#2426).
     """
     cards = find_all_first(driver, _MENTION_CARD_LOCATORS)
     if cards:
         return cards
     try:
-        found = driver.execute_script(_MENTION_CARDS_JS)
+        found = driver.execute_script(_MENTION_CARDS_JS, _profile_slug(own_url))
     except WebDriverException as e:
         log_debug(f"Could not walk the mentions page for cards: {e}", user_id=user_id,
                   action_type="scrape")
@@ -991,17 +1034,21 @@ def get_recent_recommendations(driver, wait, user_id: int = None,
     return recommenders
 
 
-def get_recent_collaborators(driver, wait, user_id: int = None) -> dict[str, str]:
+def get_recent_collaborators(driver, wait, user_id: int = None,
+                             profile_url: str = None) -> dict[str, str]:
     """Return {profile_url: name} for people to thank for a recent collaboration.
 
     LinkedIn exposes no "collaboration" event, so the source is the nearest structured one it does
     expose: the mentions notification feed — somebody put this user's name in their own post or
     comment inside the lookback window. A card that does not SAY it was a mention is skipped, as is
-    one with no readable age.
+    one with no readable age. `profile_url` is the user's own profile, so the link a mention card
+    carries to the user is never read as the person to thank (#2426).
     """
     if not appreciation_sources_enabled():
         return {}
 
+    own_url = (_normalize_profile_url(profile_url or "")
+               or _own_profile_url(driver, user_id, resolve_live=False))
     driver.get(_MENTIONS_URL)
     wait_for_ajax(driver)
     time.sleep(random.uniform(2, 4))
@@ -1013,7 +1060,7 @@ def get_recent_collaborators(driver, wait, user_id: int = None) -> dict[str, str
     cards: list = []
     page_native: "int | None" = None
     for attempt in range(_MENTION_RENDER_ATTEMPTS):
-        cards = _mention_cards(driver, user_id)
+        cards = _mention_cards(driver, user_id, own_url)
         if cards:
             break
         page_native = _mentions_page_native_count(driver, user_id)
@@ -1037,7 +1084,7 @@ def get_recent_collaborators(driver, wait, user_id: int = None) -> dict[str, str
         age_days = _parse_relative_age_days(_mention_stamp(text))
         if age_days is None or age_days > lookback:
             continue
-        url, name = _card_person(card, _MENTION_ACTOR_LOCATORS)
+        url, name = _card_person(card, _MENTION_ACTOR_LOCATORS, exclude=own_url)
         if not url:
             continue
         collaborators.setdefault(url, name or _mention_actor_name(text))
@@ -1047,9 +1094,10 @@ def get_recent_collaborators(driver, wait, user_id: int = None) -> dict[str, str
     return collaborators
 
 
-def _own_profile_url(driver, user_id: "int | None") -> str:
+def _own_profile_url(driver, user_id: "int | None", resolve_live: bool = True) -> str:
     """The user's own profile URL: the stored one first, else resolved live by letting LinkedIn's
-    /in/me/ redirect answer it. Empty string when neither works.
+    /in/me/ redirect answer it. Empty string when neither works. `resolve_live=False` stops at the
+    stored URL, for a caller that must not navigate away from the page it is on.
     """
     if user_id is not None:
         try:
@@ -1059,6 +1107,8 @@ def _own_profile_url(driver, user_id: "int | None") -> str:
             stored = None
         if stored:
             return _normalize_profile_url(stored)
+    if not resolve_live:
+        return ""
     try:
         driver.get("https://www.linkedin.com/in/me/")
         wait_for_ajax(driver)
@@ -1282,6 +1332,8 @@ def check_dm_replied(driver, wait, profile_url: str, my_name: str = None,
             return ThreadState.NOT_REPLIED  # we spoke last → no reply yet
         return ThreadState.REPLIED  # someone other than us spoke last → they replied
     except Exception as e:
+        if is_tab_crashed(e):
+            raise  # not this thread's state — the session is over; the run ends (issue #2421)
         log_warning("Reply-detection failed (treating as UNKNOWN)", exc=e, user_id=user_id,
                     action_type="followup")
         return ThreadState.UNKNOWN
@@ -1294,6 +1346,8 @@ def check_dm_replied(driver, wait, profile_url: str, my_name: str = None,
 # anything: the draft is 'pending' until a human approves it in the UI, and delivery then runs
 # through send_scheduled_dm with the existing per-day DM cap.
 NURTURE_EVENT_TYPE = "nurture"  # dm_templates / dm_followups event_type for this sequence
+# dm_followups event_type the outreach funnel's DM stage enqueues (#399) — held for the brand (#2376)
+FUNNEL_FOLLOWUP_EVENT_TYPE = "funnel"
 # Issue #1815: a thread that never becomes readable used to stay due forever, so every */30min
 # `send-due-dm-followups` beat re-opened it — 48 Chrome sessions a day for a read that never
 # succeeds. A few UNKNOWN reads on the ordinary cadence are left alone (a rotated selector usually
@@ -1668,6 +1722,17 @@ def process_user_followups(self, user_id: int, max_per_run: int = 20):
                 # operator's to approve, and nurture NEVER auto-sends a template.
                 mark_followup(f["id"], FollowupStatus.STOPPED)
                 continue
+            if str(f["event_type"]) == FUNNEL_FOLLOWUP_EVENT_TYPE and \
+                    acquisition_outbound_held(user_id, funnel=True):
+                # Owner ruling (#2376): a brand funnel follow-up is acquisition outbound, the owner's
+                # to send. dm_followups has no reason column, so the row is STOPPED (terminal — a
+                # pending row would be re-read every run) and the hold reason goes to the log. A
+                # reply on the thread was already handled above, so nurture drafting still works.
+                mark_followup(f["id"], FollowupStatus.STOPPED)
+                log_debug(f"Funnel follow-up {f['id']} stopped: {ACQUISITION_HOLD_REASON}",
+                          user_id=user_id, action_type=LogActionType.FOLLOWUP,
+                          task_name="process_user_followups")
+                continue
             # Issue #2115: two ladder steps a day apart put two near-identical DMs in the same inbox
             # on consecutive days. Deferred, not stopped — the step still goes out once the window
             # since the last touch has passed.
@@ -1710,6 +1775,16 @@ def process_user_followups(self, user_id: int, max_per_run: int = 20):
             sent += 1
             enqueue_next_followup(user_id, f["profile_url"], f["first_name"], f["event_type"], f["next_step"])
             time.sleep(random.uniform(5, 12))
+    except Exception as e:
+        # A crashed tab ends the run: every later thread read fails on the same dead tab. It is an
+        # expected transient (one escalating WARNING), not a fresh `$exception` (issue #2421). The
+        # rows not reached stay 'pending' for the next run. Anything else still raises unlogged
+        # here, so the Celery failure hook stays its one report.
+        if not note_tab_crash(e, task_name="process_user_followups", user_id=user_id,
+                              action_type=LogActionType.FOLLOWUP):
+            raise
+        return (f"Browser tab crashed — sent {sent} follow-up(s), drafted {nurtured} nurture "
+                f"reply(ies) before it")
     finally:
         quit_gracefully(driver)
     return (f"Sent {sent} follow-up(s); drafted {nurtured} nurture reply(ies); "
@@ -1823,6 +1898,7 @@ def automate_appreciation_dms_for_user(self, user_id: int, loop_for_duration: in
         # two standing-list sources below can each hand back a month of people at once, so without
         # this the first pass after the flag is flipped is a burst LinkedIn reads as a campaign.
         budget = _appreciation_dm_budget(user_id)
+        own_profile_url = str(getattr(my_profile, "profile_url", "") or "")
 
         # After Accepting a Connection Request:
         invitations_accepted = accept_connection_request(user_id) or {}
@@ -1838,7 +1914,6 @@ def automate_appreciation_dms_for_user(self, user_id: int, loop_for_duration: in
                       user_id=user_id, action_type="dm")
         else:
             # After Receiving a Recommendation — thank the recommender
-            own_profile_url = str(getattr(my_profile, "profile_url", "") or "")
             recommenders = get_recent_recommendations(driver, wait, user_id, own_profile_url) or {}
             found += len(recommenders)
             dispatched = _dispatch_appreciation_dms(user_id, my_profile, "recommendation_received",
@@ -1848,7 +1923,7 @@ def automate_appreciation_dms_for_user(self, user_id: int, loop_for_duration: in
 
         if budget > 0:
             # After a Successful Collaboration — express gratitude and offer to connect further
-            collaborators = get_recent_collaborators(driver, wait, user_id) or {}
+            collaborators = get_recent_collaborators(driver, wait, user_id, own_profile_url) or {}
             found += len(collaborators)
             dispatched = _dispatch_appreciation_dms(user_id, my_profile, "collaboration",
                                                     collaborators, budget)
@@ -1901,9 +1976,16 @@ def automate_appreciation_dms_for_user(self, user_id: int, loop_for_duration: in
         result = {"status": "rate_limited", "found": found, "sent": sent,
                   "message": f"Skipped — rate limited: {e}"}
     except Exception as e:
-        log_error("Error while sending appreciation DMs", exc=e, user_id=user_id, task_name="automate_appreciation_dms_for_user", action_type="dm")
-        result = {"status": "error", "found": found, "sent": sent,
-                  "message": f"Error while sending appreciation DMs: {e}"}
+        # This task logs in directly (not via `get_current_profile`), so nothing upstream has
+        # reported a crashed tab yet: it warns here, once, and escalates only on repeat (#2403).
+        if note_tab_crash(e, task_name="automate_appreciation_dms_for_user", user_id=user_id,
+                          action_type="dm"):
+            message = "Appreciation DMs stopped — the browser tab crashed"
+        else:
+            log_error("Error while sending appreciation DMs", exc=e, user_id=user_id,
+                      task_name="automate_appreciation_dms_for_user", action_type="dm")
+            message = f"Error while sending appreciation DMs: {e}"
+        result = {"status": "error", "found": found, "sent": sent, "message": message}
     finally:
         quit_gracefully(driver)
 
@@ -2339,7 +2421,8 @@ def _profile_viewer_connect_blocked(user_id: int, profile_url: str, viewer_name:
         cap = max(0, int(prefs.get("max_invites_per_day") or 0))
     except (TypeError, ValueError):
         cap = 0
-    if cap - count_invites_sent_today(user_id) - count_open_connection_requests(user_id) <= 0:
+    if cap - count_invites_sent_today(user_id) - count_open_connection_requests(
+            user_id, exclude_sources=held_connect_sources(user_id)) <= 0:
         # DEBUG: the queue holding a day's worth of invites is the cap working, not a fault. The
         # viewer is skipped rather than deferred — `has_engaged_url_with_x_days` already ends this
         # visit, and the analytics page lists them again while they keep visiting.
@@ -2777,8 +2860,11 @@ def send_dm_now(user_id: int, profile_url: str, message: str, person_name: str =
 
     except Exception as e:
         # ERROR, not myprint: this lane failed silently for weeks because every send logged its
-        # failure at INFO, which never reaches PostHog and so never escalated (issue #1030).
-        log_error("DM send failed", exc=e, user_id=user_id, action_type="dm")
+        # failure at INFO, which never reaches PostHog and so never escalated (issue #1030). A
+        # crashed tab — which the message-thread reader now re-raises (issue #2421) — is the
+        # expected transient that WARNs once instead.
+        if not note_tab_crash(e, task_name="send_dm_now", user_id=user_id, action_type="dm"):
+            log_error("DM send failed", exc=e, user_id=user_id, action_type="dm")
 
     finally:
         # Update DB logs with DM Sent
@@ -2864,7 +2950,15 @@ def send_scheduled_dm(self, dm_id: int):
         update_scheduled_dm_status(dm_id, ScheduledDmStatus.APPROVED)  # retry on the next scan
         return lane_result(TaskOutcome.NO_OP, f"Scheduled DM {dm_id} deferred (daily DM cap reached)")
 
-    dm_sent = send_dm_now(user_id, dm["recipient_profile_url"], dm["message"])
+    try:
+        dm_sent = send_dm_now(user_id, dm["recipient_profile_url"], dm["message"])
+    except DemoModeError:
+        # DEMO_MODE (#2372) refused before a browser opened. Left 'scheduled', the orphan reaper
+        # would re-queue this DM forever and SEND it the moment demo mode is turned off — to a real
+        # person. 'pending' needs a human to approve it again, so nothing is ever replayed.
+        update_scheduled_dm_status(dm_id, ScheduledDmStatus.PENDING)
+        return lane_result(TaskOutcome.NO_OP,
+                           f"Scheduled DM {dm_id} held at pending (DEMO_MODE)")
     update_scheduled_dm_status(dm_id, ScheduledDmStatus.SENT if dm_sent else ScheduledDmStatus.FAILED)
     if dm_sent and dm.get("source") == SCHEDULED_DM_SOURCE_PROFILE_VIEWER:
         # The direct-dispatch branch starts the 'profile_viewer' ladder the moment it sends, so the
@@ -3195,6 +3289,10 @@ def scan_connection_candidates(self, user_id: int, max_new: int = None):
         return f"No new connection candidates for user {user_id} (all deduped or below ICP floor)"
 
     status = _target_status_for_mode(mode, prefs)
+    if acquisition_outbound_held(user_id, SOURCE_OWN_POST):
+        # Owner ruling (#2376): the brand's sourced targets are drafts for the owner to send, so
+        # `auto_queue` never files them approved. `send_connection_request` holds them as well.
+        status = ConnectionRequestStatus.PENDING
     topic = terms[0] if terms else None
     filed = 0
     for candidate in candidates:
@@ -3279,6 +3377,17 @@ def _fire_funnel_stage(user_id: int, target: dict) -> str:
                     user_id=user_id, action_type="outreach_funnel")
         return f"target {target_id}: skipped {stage} (no draft)"
 
+    if stage in (OutreachStage.CONNECT, OutreachStage.DM) and \
+            acquisition_outbound_held(user_id, funnel=True):
+        # Owner ruling (#2376): the brand's funnel connect/DM is the owner's to send. The draft goes
+        # back to 'pending' — still on screen, never fired — so the beat does not re-pick it. The
+        # reason goes in `notes`, a column nothing else writes, so held targets can be counted.
+        update_outreach_target(target_id, status=OutreachStatus.PENDING,
+                               notes=ACQUISITION_HOLD_REASON)
+        log_debug(f"Funnel {stage} stage held for the brand account: {ACQUISITION_HOLD_REASON}",
+                  user_id=user_id, action_type="outreach_funnel")
+        return f"target {target_id}: {stage} {ACQUISITION_HOLD_REASON}"
+
     if stage == OutreachStage.COMMENT:
         # Same paced budget + account governor the feed walk spends against (issue #626), so the
         # funnel can't quietly push the day past the account envelope.
@@ -3307,7 +3416,7 @@ def _fire_funnel_stage(user_id: int, target: dict) -> str:
             return f"target {target_id}: DM deferred (daily DM cap)"
         send_private_dm.apply_async(kwargs={"user_id": user_id, "profile_url": profile_url,
                                             "message": draft})
-        enqueue_next_followup(user_id, profile_url, first_name, "funnel", 0)
+        enqueue_next_followup(user_id, profile_url, first_name, FUNNEL_FOLLOWUP_EVENT_TYPE, 0)
         update_outreach_target(target_id, stage=OutreachStage.COMPLETED, status=OutreachStatus.ACTED)
         return f"target {target_id}: DM sent -> funnel completed"
     else:
@@ -3631,6 +3740,7 @@ CATCHUP_STATUS_NOT_SENDABLE = "not_sendable"        # row missing or no longer a
 CATCHUP_STATUS_CONTACT_COOLDOWN = "contact_cooldown"  # per-contact interval hasn't elapsed (issue #1078)
 CATCHUP_STATUS_CONTACT_CAP = "contact_cap"            # per-contact window cap reached (issue #1078)
 CATCHUP_STATUS_ALREADY_SENT = "already_sent"          # durable claim row already exists (issue #1078)
+CATCHUP_STATUS_DEMO_HELD = "demo_held"                # DEMO_MODE refused the send; held at pending (#2372)
 
 # Ordered fallback chain for the catch-up cards. Live-grounded 2026-08-03 on a real session: the
 # surface is full SDUI — every card is a div[role='listitem'] (with a componentkey UUID) inside the
@@ -4356,6 +4466,15 @@ def send_catchup_touch(self, touch_id: int):
         update_catchup_touch_status(touch_id, CatchupTouchStatus.APPROVED)
         _report(CATCHUP_STATUS_THROTTLED, user_id)
         return f"Catch-up touch {touch_id} deferred (LinkedIn throttled)"
+    except DemoModeError:
+        # DEMO_MODE (#2372) refused before a browser opened, so nothing was sent: give the claim
+        # back (or a later attempt would mark this touch `sent` having sent nothing) and hold the
+        # row at 'pending'. Left 'sending', the orphan reaper would re-queue it and send it to a
+        # real person once demo mode is turned off.
+        release_catchup_send_attempt(user_id, touch["profile_url"], touch["event_type"], event_period)
+        update_catchup_touch_status(touch_id, CatchupTouchStatus.PENDING)
+        _report(CATCHUP_STATUS_DEMO_HELD, user_id)
+        return f"Catch-up touch {touch_id} held at pending (DEMO_MODE)"
     update_catchup_touch_status(touch_id, CatchupTouchStatus.SENT if sent else CatchupTouchStatus.FAILED)
     _report(CATCHUP_STATUS_SENT if sent else CATCHUP_STATUS_FAILED, user_id)
     if sent:

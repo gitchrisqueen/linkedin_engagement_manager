@@ -44,6 +44,25 @@ class TestCountOpenConnectionRequests:
         assert "status IN ('pending','approved','sending')" in sql
         assert params == (1,)
 
+    def test_excluded_sources_are_left_out_but_null_sources_still_count(self, fake_cursor):
+        """#2376: held brand acquisition drafts never send, so the sending lanes leave them out."""
+        conn, cur = fake_cursor(fetch_one=(1,), lastrowid=7)
+        with patch("cqc_lem.platform.db.connection.get_db_connection", return_value=conn):
+            from cqc_lem.utilities.db import count_open_connection_requests
+            assert count_open_connection_requests(
+                1, exclude_sources=frozenset({"own_post", "adjacent_post"})) == 1
+        sql, params = cur.execute.call_args[0]
+        assert "AND (source IS NULL OR source NOT IN (%s, %s))" in sql
+        assert params == (1, "adjacent_post", "own_post")
+
+    def test_an_empty_exclusion_is_the_plain_count(self, fake_cursor):
+        conn, cur = fake_cursor(fetch_one=(3,), lastrowid=7)
+        with patch("cqc_lem.platform.db.connection.get_db_connection", return_value=conn):
+            from cqc_lem.utilities.db import count_open_connection_requests
+            count_open_connection_requests(1, exclude_sources=frozenset())
+        sql, params = cur.execute.call_args[0]
+        assert "NOT IN" not in sql and params == (1,)
+
     def test_no_rows_is_zero(self, fake_cursor):
         conn, _cur = fake_cursor(fetch_one=None, lastrowid=7)
         with patch("cqc_lem.platform.db.connection.get_db_connection", return_value=conn):

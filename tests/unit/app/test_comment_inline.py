@@ -437,6 +437,123 @@ class TestPostComposerResolution:
         ff.assert_not_called()  # no second, unscoped composer lookup anywhere in the path
 
 
+def _owner_driver(card_urn=None, owners=None, scope=None, page_boxes=()):
+    """A driver that also answers the card's container URN and each box's owning post.
+
+    `_URN_SCAN_JS` reads the card's own URN; `_COMPOSER_OWNER_JS` reads, per box, the post it sits under.
+    """
+    owners = owners or {}
+
+    def script(js, *args):
+        if "MARKERS" in js:
+            return scope
+        if "countCommentActions" in js:
+            return f"container|{card_urn}" if card_urn else None
+        if "'unowned'" in js:
+            return owners.get(id(args[0]), "unowned")
+        return True
+
+    d = MagicMock()
+    d.execute_script.side_effect = script
+    d.find_elements.side_effect = _textbox_source(*page_boxes)
+    return d
+
+
+class TestComposerOwnership:
+    """Issue #2398: an unlabelled page-wide composer is claimed only on page-read ownership.
+
+    The live group feed labels the post's own comment box "Text editor for creating content", so the page-wide fallback's "creating comment" proof rejected the one box that
+    mounted on a post whose comment section renders below the single-post scope. Ownership is now
+    read off the page: the box's nearest post-URN ancestor, unless a comment's container is nearer.
+    """
+
+    _URN = "urn:li:activity:7506723302195859456"
+
+    def _resolve(self, box, owner, card_urn=_URN):
+        from cqc_lem.app.engagement import feed as ra
+        card = _holder(y=100, height=300)                 # nothing inside
+        driver = _owner_driver(card_urn=card_urn, owners={id(box): owner},
+                               scope=_holder(y=100, height=300), page_boxes=(box,))
+        return ra._post_composer_for_card(driver, card, user_id=1)
+
+    def test_an_unlabelled_box_under_this_posts_own_urn_is_claimed(self):
+        mine = _box(430, aria="Text editor for creating content")   # the live 2026-10 label
+        assert self._resolve(mine, f"post|{self._URN}") is mine
+
+    def test_an_unlabelled_box_under_another_post_is_never_borrowed(self):
+        other = _box(430, aria="Text editor for creating content")
+        assert self._resolve(other, "post|urn:li:activity:1") is None
+
+    def test_a_reply_box_under_this_posts_comment_is_never_claimed(self):
+        reply = _box(430, aria="Text editor for creating content")
+        assert self._resolve(reply, "reply") is None
+
+    def test_no_card_urn_means_no_proof(self):
+        box = _box(430)
+        assert self._resolve(box, f"post|{self._URN}", card_urn=None) is None
+
+    def test_the_owner_walk_checks_for_a_comment_before_a_post(self):
+        from cqc_lem.app.engagement import feed as ra
+        js = ra._COMPOSER_OWNER_JS
+        assert js.index("urn:li:comment:") < js.index("'post|'")
+        assert "aside, [role='dialog']" in js
+
+    def test_owner_parsing(self):
+        from cqc_lem.app.engagement import feed as ra
+        for answer, expected in [("reply", "reply"), ("outside", "outside"), ("unowned", "unowned"),
+                                 ("post|urn:li:ugcPost:42", "urn:li:ugcpost:42"), (None, None),
+                                 (True, None), ("post|nothing", None)]:
+            d = MagicMock()
+            d.execute_script.return_value = answer
+            assert ra._composer_owner(d, MagicMock()) == expected
+        d = MagicMock()
+        d.execute_script.side_effect = Exception("stale")
+        assert ra._composer_owner(d, MagicMock()) is None
+
+
+class TestComposerMissIsCrossCheckedAgainstThePage:
+    """Issue #2398 acceptance: a zero is not "nothing to do" until the page agrees.
+
+    A composer mounted below this post that no post owns is the resolver going blind — drift, which warns.
+    """
+
+    def _miss(self, owners, page_boxes):
+        from cqc_lem.app.engagement import feed as ra
+        driver = _owner_driver(card_urn=None, owners=owners, scope=None, page_boxes=page_boxes)
+        with patch(f"{_FEED}.log_debug") as debug, \
+             patch("cqc_lem.utilities.linkedin.zero_walk.log_warning") as warn:
+            assert ra._post_composer_for_card(driver, _holder(y=100), user_id=1) is None
+        return debug, warn
+
+    def test_an_unowned_box_below_the_post_is_drift(self):
+        box = _box(430)
+        debug, warn = self._miss({id(box): "unowned"}, (box,))
+        warn.assert_called_once()
+        assert "Post comment composer resolver" in warn.call_args.args[0]
+        assert "No comment composer opened on this post card" not in \
+            [c.args[0] for c in debug.call_args_list]
+
+    def test_boxes_the_page_attributes_elsewhere_are_an_ordinary_miss(self):
+        reply, other, overlay = _box(430), _box(500), _box(600)
+        debug, warn = self._miss({id(reply): "reply", id(other): "post|urn:li:activity:9",
+                                  id(overlay): "outside"}, (reply, other, overlay))
+        warn.assert_not_called()
+        assert debug.call_args.args[0] == "No comment composer opened on this post card"
+
+    def test_a_box_above_the_post_is_not_counted(self):
+        stale = _box(10)
+        debug, warn = self._miss({id(stale): "unowned"}, (stale,))
+        warn.assert_not_called()
+
+    def test_an_unreadable_owner_grounds_nothing(self):
+        from cqc_lem.app.engagement import feed as ra
+        box = _box(430)
+        d = MagicMock()
+        d.execute_script.side_effect = lambda js, *a: None if "MARKERS" in js else True
+        d.find_elements.side_effect = _textbox_source(box)
+        assert ra._unowned_composer_count(d, {"y": 100, "height": 300}) is None
+
+
 class TestPostCommentInlineStepNaming:
     """One `try` over the whole sequence reported every failure mode as the same warning, so the
     escalated issue never said which step broke — and unrelated faults collapsed into one.

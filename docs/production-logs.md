@@ -63,6 +63,11 @@ INFO on purpose: prod retains INFO, and an INFO line never enters the warning-es
 unbounded body here can never file a defect. Forward-looking only — comments posted before this
 line shipped remain unrecoverable from the logs.
 
+A Selenium lane whose Chrome tab crashed (the renderer died, usually an OOM kill) ends its run on
+ONE WARNING, `Browser tab crashed — ending <task_name>`, from `selenium_util.note_tab_crash`
+(#2393/#2402/#2403), so `grep 'Browser tab crashed — ending' /opt/lem/logs/cqc_lem_*.log` counts
+them per lane. Any other fault keeps the lane's own ERROR line.
+
 ## The prod volume mount, so it doesn't look like dead config
 
 `docker-compose.prod.yml` mounts `./logs:/app/logs` **explicitly** on `web_api_blue`/`_green` and on

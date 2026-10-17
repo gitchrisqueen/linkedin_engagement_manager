@@ -19,7 +19,7 @@
 | **Stripe billing + 14-day trial** | `src/cqc_lem/utilities/stripe_util.py` (`create_checkout_session`, `upgrade_subscription`, `fetch_subscription`), `FREE_TRIAL_DAYS` (default 14) in `src/cqc_lem/utilities/env_constants.py`, trial row created in `src/cqc_lem/utilities/db.py` (`subscription_status='trial'`, `subscription_tier='free_trial'`, `trial_ends_at`) | Extended-trial cohort program grants a longer `trial_ends_at` + Stripe coupon. Tiers: `starter` / `professional` / `enterprise` (`STRIPE_PRICE_ID_*` in `env_constants.py`). |
 | **PostHog analytics** | `src/cqc_lem/utilities/observability.py` (`track_llm_call`, `track_task`, `track_api_call`) | Extended with signup/activation/funnel events → CAC, activation rate, retention, channel ROI. |
 | **Content generation engine** | `src/cqc_lem/app/run_content_plan.py` (`auto_generate_content`, `plan_content_for_user`, `create_content`), unified core `src/cqc_lem/utilities/ai/content_framework.py` / `content_research.py` / `content_alignment.py` | Dogfooding: the LEM company account runs the same 30-day content plan to market LEM. |
-| **Feed engagement + outreach** | `src/cqc_lem/app/engagement/feed.py` — `automate_commenting`, `comment_on_feed_inline`; `src/cqc_lem/app/engagement/outreach.py` — `build_dm_from_template`, `automate_appreciation_dms_for_user`, `process_user_followups`; `src/cqc_lem/app/engagement/invites.py` — `invite_to_connect`, `automate_invites_to_company_page_for_user` | Dogfooding: comment→connect→DM funnel run **as** the LEM brand account to acquire users. |
+| **Feed engagement + outreach** | `src/cqc_lem/app/engagement/feed.py` — `automate_commenting`, `comment_on_feed_inline`; `src/cqc_lem/app/engagement/outreach.py` — `build_dm_from_template`, `automate_appreciation_dms_for_user`, `process_user_followups`; `src/cqc_lem/app/engagement/invites.py` — `invite_to_connect`, `automate_invites_to_company_page_for_user` | ~~Dogfooding: comment→connect→DM funnel run **as** the LEM brand account to acquire users.~~ *Superseded 2026-10-10 by owner ruling (issue #2376): the brand account sends no automated acquisition outbound — agents draft, the owner sends. The owner's ordinary engagement on the same account is unchanged. Exact scope in § C.2.* |
 | **Newsletter engine** | `src/cqc_lem/app/run_scheduler.py` (`auto_generate_newsletter_drafts`, `auto_publish_scheduled_editions`), `newsletter_editions` table | LEM publishes a LinkedIn newsletter about LinkedIn growth → top-of-funnel awareness. |
 | **Lead-gen (in-flight)** | Issues #482–#486 (inbound-intent detection, lead scoring/CRM-lite, catch-up/trigger outreach, smart connection targeting) | These same features power LEM's **self**-lead-gen once shipped — the marketing engine is a first customer of the lead-gen roadmap. |
 | **Celery beat scheduler** | `src/cqc_lem/app/my_celery.py` `beat_schedule` | All marketing/feedback agents are new beat entries (content 01:00, engagement 13:00, newsletter 10:00, etc. already exist as the pattern). |
@@ -36,6 +36,7 @@ re-file work that already exists. Sections A–D remain the plan of record for e
 | Auto-changelog + notify reporter (B.4) | **Shipped** | `utilities/feedback/shipped.py`, `changelog-notify` beat |
 | Onboarding/activation checklist + stalled-user nudges (A.3) | **Shipped** | `OnboardingChecklist.tsx`, `onboarding_state` (`V20260725090900__add_onboarding_state.sql`), `onboarding-nudges` beat |
 | Extended-trial endpoint + cohort slots (A.2) | **Shipped** | `POST /trial/extend`, `extend_trial_for_user`, `early_adopter_slots` / `early_adopter_grants`, `EARLY_ADOPTER_*` + `LAUNCH_PHASE` env |
+| P0 signup cap + join-the-list form (A.1) | **Shipped** | `_create_signup_account` in `api/routers/auth.py`, `trial_cohort_slot` / `count_trial_cohort_members` / `add_to_trial_waitlist`, `POST /api/auth/waitlist`, `trial_waitlist` (`V20261012130436__add_trial_waitlist.sql`), `P0_TRIAL_COHORT_CAP` env (issue #2377) |
 | Funnel instrumentation (C.5) | **Shipped** | `track_funnel_event` in `observability.py` |
 | Brand-account dogfooding (C.2) | **Partial** | `sync-brand-account` beat (`auto_sync_brand_account`); the brand user is **user 1 by convention** (issue #736, no env var required) and runs the existing content/engagement/newsletter tasks |
 | Passive-signal mining (B.1) | **Planned** | — |
@@ -58,7 +59,18 @@ outbound volume ramps only as ToS-safety and satisfaction signals hold).
 | **P2 — GA / official release** | Unlimited public | P1 exit met + GA gate (A.4) | — (continuous improvement continues via the same loop) |
 
 Phase state is a single config key (`LAUNCH_PHASE` env / Redis) read by marketing agents and the signup path so
-guardrails (caps, outbound volume, price display) switch atomically. Advancing a phase is a
+guardrails (caps, outbound volume, price display) switch atomically.
+
+**The P0 cap on the signup path (issue #2377).** While the phase resolves to P0 (an unrecognised value
+falls back to P0), a NEW account is created only while fewer than `P0_TRIAL_COHORT_CAP` (default 25)
+self-serve trial accounts exist — rows with `trial_started_at` set and `is_admin = 0`, so admins, the
+LinkedIn OAuth upsert and demo seeds never take a slot. The count and the insert run under one MySQL
+named lock (`GET_LOCK`), so the cap is hard across API workers. Past the cap the signup answers
+`{"waitlist": true}` and the SPA shows a form that takes an email address and nothing else
+(`trial_waitlist`); nothing is ever sent to it. **Fails closed:** an unreadable count, a connection
+fault or an ungranted lock all give the list form, never an account. `/auth/email/init` checks first
+so no PIN is mailed to an address that cannot get an account; the locked check at account creation is
+the binding one. Existing accounts signing in are never gated, and P1/P2 never read the counter. Advancing a phase is a
 `risk:product-decision` gate — the owner confirms the exit metrics via a Decision Comment.
 
 ### A.2 Extended trial for first adopters
@@ -88,9 +100,11 @@ guardrails (caps, outbound volume, price display) switch atomically. Advancing a
 ### A.3 Fully-automated onboarding & activation (no human)
 
 **"Aha moment" (activation) definition:** a user reaches activation when, within their first 7 days, LEM has
-**published their first AI post AND landed their first automated feed comment/DM under the user's own voice
-settings** — i.e. they have seen LEM *act on LinkedIn for them*. This is the single event the whole funnel
-optimizes toward.
+**published their first approved post** — i.e. they have seen LEM *act on LinkedIn for them*. This is the single
+event the whole funnel optimizes toward. Since #2373 a comment or DM is **not** required and never counts on its
+own: under the free-trial scope (owner rulings 2026-10-10) posting runs through approval and engagement is
+suggestions only, so an engagement-gated activation could never fire for a trial account. The evaluator is
+`evaluate_steps` in `utilities/onboarding.py` — a `posted` post is the whole test.
 
 **Activation checklist** (rendered in the SPA, state persisted server-side, emitted to PostHog as each step
 completes):
@@ -98,8 +112,8 @@ completes):
 1. Connect LinkedIn session (cookie/extension) — reuses the LinkedIn Connect extension + verification-PIN flow.
 2. Set voice/tone + targeting in `Account.tsx` (`engagement_preferences`).
 3. Approve the first AI-generated post from the 30-day plan (`run_content_plan.py`).
-4. Enable feed commenting + DM caps.
-5. **Activated:** first post published + first comment/DM sent.
+4. Enable feed commenting + DM caps (still a checklist step; not part of activation).
+5. **Activated:** first approved post published.
 
 **Automated nudges for stalled users** — a new beat task `auto_onboarding_nudges` (daily, mirrors
 `auto_notify_missing_linkedin_session` throttling) inspects each trial user's checklist state and sends the next
@@ -277,12 +291,69 @@ failed closed, and kept this whole engine dormant in prod because two env vars w
 `BRAND_USER_ID` seats the brand elsewhere; blank or invalid falls back to user 1 rather than switching
 self-marketing off. What the brand does:
 
+> **Owner ruling, 2026-10-10 (issue #2376): the brand account sends no automated outbound sourced for user
+> acquisition — agents draft, the owner sends.** Items 2 and 5 below are superseded; the original text is kept
+> for the record. The hold is `brand_account.acquisition_outbound_held` and applies to the brand account only.
+>
+> **Held at 0 for the brand account:**
+> - connection requests whose `connection_requests.source` is `own_post` or `adjacent_post` (smart connection
+>   targeting, #486) or `outreach_funnel`. `scan_connection_candidates` still drafts them, always as `pending`
+>   even under `auto_queue`, and `send_connection_request` returns any approved one to `pending` without
+>   sending it;
+> - the comment-first outreach funnel's connect and DM stages (`_fire_funnel_stage`, #399/#623). A held stage
+>   goes back to `pending` with its draft kept and `notes` set to the hold reason, and does not advance;
+> - the funnel's DM follow-up ladder: `process_user_followups` marks a brand `funnel` follow-up `stopped` without
+>   sending it (`dm_followups` has no reason column, so the hold is logged at DEBUG). A reply on that thread is
+>   still read first, so an approval-gated nurture draft can still be filed.
+>
+> **How the owner handles a held draft.** Send it by hand on LinkedIn, then close the row in Content Studio:
+> on the **Connections** tab press **Cancel** (`PUT /api/connection_request` with `action=cancel`, or
+> `DELETE /api/connection_request`; both set `canceled`); on the **Outreach** tab press **Cancel**
+> (`PUT /api/outreach/target` with `action=cancel`, or `DELETE /api/outreach/target`; cancels the whole funnel
+> for that person). There is no "mark sent" action. **Approve** on a brand acquisition draft does not send it:
+> the next dispatch or funnel run returns it to `pending`. The Connections tab shows `failure_reason` only on
+> `failed` rows, so the hold reason on a returned row is visible through the API, not on screen.
+>
+> **What held drafts block until the owner closes them.** Held connection drafts stay open (`pending`), and the
+> smart-targeting scan subtracts open rows from the brand's `max_invites_per_day`. So once the held drafts
+> number that cap, the scan files no new sourced drafts. The lanes that still send (profile viewer, roster
+> ladder) leave held acquisition rows out of that count (`brand_account.held_connect_sources`), so they are not
+> starved. Held funnel targets count toward `MAX_OPEN_FUNNEL_TARGETS` (default 25); at that depth the funnel
+> sourcing scan files nothing new. Both limits only throttle drafting for the held lanes.
+>
+> **Counting held rows** (read-only; `<brand_user_id>` is 1 unless `BRAND_USER_ID` is set):
+>
+> ```sql
+> -- Connection requests returned to pending by the hold (sourced drafts that were never approved carry no reason)
+> SELECT COUNT(*) FROM connection_requests
+>  WHERE user_id = <brand_user_id> AND status = 'pending'
+>    AND failure_reason = 'held: brand acquisition outbound is sent by the owner (issue #2376)';
+> -- All open brand acquisition drafts
+> SELECT COUNT(*) FROM connection_requests
+>  WHERE user_id = <brand_user_id> AND status IN ('pending','approved','sending')
+>    AND source IN ('own_post','adjacent_post','outreach_funnel');
+> -- Funnel targets held at the connect or DM stage
+> SELECT COUNT(*) FROM outreach_funnel_targets
+>  WHERE user_id = <brand_user_id> AND status = 'pending'
+>    AND notes = 'held: brand acquisition outbound is sent by the owner (issue #2376)';
+> ```
+>
+> **Not held:** feed comments, replies, the funnel's comment stage, DMs to existing connections (appreciation, the non-funnel
+> follow-ups, nurture), profile-viewer outreach, roster follows and roster connect invites, company-page
+> invites, catch-up touches, seed comments, and connection requests the owner files by hand. These keep the
+> owner's own caps (`engagement_preferences`, seeded per `LAUNCH_PHASE` as described below). No code path sends
+> a follow sourced for acquisition, so there is no follow to hold. No environment variable or setting lifts
+> the hold; `BRAND_USER_ID` only moves it to a different account.
+
 1. **Content about the problem LEM solves.** The brand account's `focus_topics` are set to the ICP's pains
    ("consistent LinkedIn presence without the grind", "solo-founder pipeline", "AI content that sounds like
    you"). `plan_content_for_user` + `auto_generate_content` produce the 30-day mix (thought-leadership,
    industry-news commentary, personal-story, engagement prompts, carousels, video). Every post is a live demo of
    LEM's output quality — the product *is* the ad.
-2. **Feed commenting → connect → DM funnel, run as the brand.** `automate_commenting` /
+2. *[Superseded 2026-10-10 by the owner ruling above (issue #2376): the funnel's connect and DM stages and
+   sourced connection requests are drafted for the owner and never sent automatically. Feed commenting
+   continues as ordinary engagement.]* ~~**Feed commenting → connect → DM funnel, run as the brand.**~~
+   `automate_commenting` /
    `comment_on_feed_inline` add value on ICP posts (founders, consultants, coaches); the smart-connection-
    targeting feature (#486/#398) turns engagers into connection requests via `invite_to_connect`; appreciation +
    outreach DMs (`build_dm_from_template`, `automate_appreciation_dms_for_user`, `process_user_followups`) run a
@@ -292,7 +363,9 @@ self-marketing off. What the brand does:
    a LinkedIn newsletter on LinkedIn-growth tactics → recurring top-of-funnel with a subscribe CTA to the trial.
 4. **Company-page invitations.** Monthly `automate_invites_to_company_page_for_user` grows the LEM company page
    audience.
-5. **Self-lead-gen.** Once #482–#486 ship, the brand account's inbound-intent detection + lead scoring surface
+5. *[Superseded 2026-10-10 by the owner ruling above (issue #2376): lead detection and scoring still surface
+   warm prospects, but no DM agent contacts them as the brand. In code, the only automated prospect DM is the
+   outreach funnel's DM stage and its follow-up ladder, both held.]* ~~**Self-lead-gen.**~~ Once #482–#486 ship, the brand account's inbound-intent detection + lead scoring surface
    warm prospects (people who commented "how does this work?") into a hot-lead list that the DM agent nurtures to
    signup — LEM eats its own lead-gen dog food.
 

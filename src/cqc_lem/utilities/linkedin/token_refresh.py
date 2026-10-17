@@ -20,6 +20,7 @@ from typing import Optional, Tuple
 
 import requests
 
+from cqc_lem.utilities.demo_mode import guard_linkedin, is_demo_mode
 from cqc_lem.utilities.env_constants import LI_CLIENT_ID, LI_CLIENT_SECRET
 from cqc_lem.utilities.logger import log_debug, log_info, log_warning
 
@@ -133,7 +134,11 @@ def attempt_token_refresh(user_id: int) -> Tuple[bool, Optional[str]]:
         (succeeded, new_access_token). A False with no error is the ORDINARY case for an app
         LinkedIn never granted refresh tokens to; that path is DEBUG, not a warning, because
         warning on it would file a defect against working behaviour.
+
+    Raises:
+        DemoModeError: ``DEMO_MODE`` is on — the one exception to "never raises" (#2372).
     """
+    guard_linkedin("token_refresh.attempt_token_refresh")
     # Import here to avoid circular imports at module load
     from cqc_lem.utilities.db import get_user_token_info, update_user_access_token
 
@@ -218,7 +223,8 @@ def resolve_token_status(user_id: int, auto_refresh: bool = True) -> dict:
     refresh_attempted = False
     refresh_succeeded = False
 
-    if auto_refresh and expiring_soon and refresh_token_usable(token_info):
+    # Demo mode keeps this READ working for the SPA countdown; only the LinkedIn renewal is skipped.
+    if auto_refresh and expiring_soon and refresh_token_usable(token_info) and not is_demo_mode():
         refresh_attempted = True
         refresh_succeeded, _ = attempt_token_refresh(user_id)
         if refresh_succeeded:
@@ -237,3 +243,25 @@ def resolve_token_status(user_id: int, auto_refresh: bool = True) -> dict:
         "refresh_attempted": refresh_attempted,
         "refresh_succeeded": refresh_succeeded,
     }
+
+
+def has_oauth_token(user_id: int) -> Optional[bool]:
+    """Whether this user has a LinkedIn OAuth token stored, expired or not (issue #2375).
+
+    Read off `resolve_token_status` without renewing anything. A trial account connects by OAuth
+    only, so a stored token means it HAS connected; an expired one is the authorization email's
+    to report, never a reason to tell the user they are not connected. Three-valued on purpose:
+    the "not connected" email is only honest when the answer is a definite no.
+
+    Args:
+        user_id: The user whose stored token is read.
+
+    Returns:
+        True when a token is stored, False when none is, None when the state cannot be read.
+    """
+    try:
+        status = resolve_token_status(user_id, auto_refresh=False)
+    except Exception as e:
+        log_warning("Could not read LinkedIn token state", exc=e, user_id=user_id)
+        return None
+    return bool(status.get("connected"))

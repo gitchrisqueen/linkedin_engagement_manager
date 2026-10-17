@@ -703,16 +703,24 @@ def update_connection_request(request_id: int, recipient_profile_url: str = None
     except mysql.connector.Error as err:
         log_error(f"Could not update connection request {request_id}", exc=err)
         return False
-def count_open_connection_requests(user_id: int) -> int:
+def count_open_connection_requests(user_id: int, exclude_sources: "tuple | frozenset" = ()) -> int:
     """Targets already queued but not yet sent (pending / approved / sending). The sourcing scan
     subtracts these from the daily invite budget so it can't pile up a backlog that would spend
     tomorrow's cap the moment it opens.
+
+    `exclude_sources` leaves out rows that can never spend the budget — the brand account's held
+    acquisition drafts (#2376) — so they do not starve the lanes that still send.
     """
+    sql = ("SELECT COUNT(*) FROM connection_requests WHERE user_id=%s "
+           "AND status IN ('pending','approved','sending')")
+    params: list = [user_id]
+    excluded = sorted(exclude_sources or ())
+    if excluded:
+        sql += f" AND (source IS NULL OR source NOT IN ({', '.join(['%s'] * len(excluded))}))"
+        params.extend(excluded)
     try:
         with db_cursor() as cursor:
-            cursor.execute(
-                "SELECT COUNT(*) FROM connection_requests WHERE user_id=%s "
-                "AND status IN ('pending','approved','sending')", (user_id,))
+            cursor.execute(sql, tuple(params))
             r = cursor.fetchone()
             return int(r[0]) if r else 0
     except mysql.connector.Error as err:

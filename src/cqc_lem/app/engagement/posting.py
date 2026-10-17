@@ -133,6 +133,7 @@ from cqc_lem.utilities.db import (
     update_db_post_status,
     upsert_engager,
 )
+from cqc_lem.utilities.demo_mode import DemoModeError
 from cqc_lem.utilities.dm_templates import render_dm_placeholders
 from cqc_lem.utilities.flags import OCCASION_NATIVE_PUBLISH, flag_enabled
 from cqc_lem.utilities.golden_hour import _record_golden_hour_report, _reply_outcome
@@ -214,8 +215,10 @@ from cqc_lem.utilities.selenium_util import (
     click_first,
     find_first,
     is_tab_crashed,
+    note_tab_crash,
     quit_gracefully,
 )
+from cqc_lem.utilities.trial_access import trial_lapsed
 
 __all__ = [
     # The publishing tasks and the sweeps that follow them. `run_scheduler` and `api/*` import each
@@ -1579,12 +1582,17 @@ def _run_comment_followups_sweep(user_id: int) -> str:
         release_run_lock(lock_name, lock_token)
         return "Skipped — rate limited"
     except Exception as e:
-        log_error("Error starting follow-up sweep", exc=e, user_id=user_id, task_name="sweep_comment_followups")
+        # A tab that crashed on the first login navigation was already warned about by
+        # `get_current_profile`; this wrapper only notes it (#2393).
+        if not note_tab_crash(e, task_name="sweep_comment_followups", crash_logged_upstream=True,
+                              user_id=user_id):
+            log_error("Error starting follow-up sweep", exc=e, user_id=user_id,
+                      task_name="sweep_comment_followups")
         release_run_lock(lock_name, lock_token)
         return f"Failed to start follow-up sweep: {e}"
+    reacted = replied = leads = filtered = 0
     try:
         synthesis = get_or_create_profile_synthesis(user_id, my_profile)
-        reacted = replied = leads = filtered = 0
         filtered_reasons: Counter = Counter()
         for row in posts:
             key = row.get("post_key")
@@ -1599,11 +1607,21 @@ def _run_comment_followups_sweep(user_id: int) -> str:
                 filtered += r.get("filtered", 0)
                 filtered_reasons.update(r.get("filtered_reasons") or {})
             except Exception as e:
+                if is_tab_crashed(e):
+                    # The renderer died, so every later post would fail on the same dead tab and
+                    # warn once each — one crash recurring into a grouped $exception (#2393). End
+                    # the sweep instead; what already shipped is recorded per post.
+                    raise
                 log_warning("Follow-up: post failed", exc=e, user_id=user_id,
                             task_name="sweep_comment_followups")
         _log_filter_summary(filtered_reasons, filtered, user_id, task_name="sweep_comment_followups")
         return (f"Follow-ups: reacted {reacted}, replied {replied}, leads {leads}, "
                 f"filtered {filtered} across {len(posts)} post(s)")
+    except Exception as e:
+        if not note_tab_crash(e, task_name="sweep_comment_followups", user_id=user_id):
+            raise  # unchanged: any other fault still fails the task and is filed by the Celery hook
+        return (f"Follow-ups stopped — browser tab crashed: reacted {reacted}, replied {replied}, "
+                f"leads {leads} before the crash")
     finally:
         quit_gracefully(driver)
         release_run_lock(lock_name, lock_token)
@@ -2509,6 +2527,16 @@ def post_to_linkedin(self, user_id: int, post_id: int):
                     user_id=user_id, post_id=post_id, task_name="post_to_linkedin")
         return f"Post {post_id} publishes natively — skipped"
 
+    # A free trial that ended with no paid plan publishes nothing (issue #2380). The scheduler stops
+    # dispatching for such a user; this is the cross-check for a post queued with an eta before the
+    # trial ended, and for the orphan re-queue. The post goes back to APPROVED with no actor — a
+    # re-queue, not an approval (#2116) — so it publishes on the next scan after the user upgrades.
+    if trial_lapsed(user_id):
+        update_db_post_status(post_id, PostStatus.APPROVED)
+        log_info("Post not published: the free trial has ended", user_id=user_id, post_id=post_id,
+                 task_name="post_to_linkedin")
+        return f"Post {post_id} not published — free trial ended"
+
     # Login and publish post to LinkedIn
     user_email, user_password = get_user_password_pair_by_id(user_id)
     log_info(f"Posting to LinkedIn as user: {user_email}")
@@ -2792,6 +2820,14 @@ def auto_publish_occasion_post(self, user_id: int, post_id: int):
                   user_id=user_id, post_id=post_id, task_name=task_name)
         return "Native occasion publishing is off"
 
+    # A free trial that ended with no paid plan publishes nothing (issue #2380) — the native
+    # composer is a publish path too. Nothing is claimed, so the draft stays APPROVED and goes out on
+    # a later scan if the user upgrades. DEBUG: every scan meets the same draft until then.
+    if trial_lapsed(user_id):
+        log_debug("Occasion post not published: the free trial has ended", user_id=user_id,
+                  post_id=post_id, task_name=task_name)
+        return f"Post {post_id} not published — free trial ended"
+
     # Cross-checks at the choke point, in the same spirit as post_to_linkedin's: the dispatcher's
     # query already filters on all three, so any of them failing here means some OTHER caller
     # reached this task with a row it must never touch.
@@ -2852,6 +2888,17 @@ def auto_publish_occasion_post(self, user_id: int, post_id: int):
     try:
         driver, wait, user_email, my_profile = get_current_profile(
             user_id=user_id, session_name="Occasion Post")
+    except DemoModeError:
+        # DEMO_MODE (#2372) refused before a browser opened. Released to 'approved' (the branch
+        # below), the dispatcher would re-run it every beat for a day and publish it once demo mode
+        # is off. Held at 'error' instead — the same hold an abandoned claim gets — so the author
+        # decides. The INFO line is what tells this hold apart from a real publish failure — both
+        # leave the post at 'error'.
+        log_info(f"Occasion post {post_id} held: demo mode", user_id=user_id, post_id=post_id,
+                 task_name=task_name)
+        update_db_post_status(post_id, PostStatus.ERROR)
+        release_run_lock(lock_name, lock_token)
+        return f"Post {post_id} held at error (DEMO_MODE)"
     except Exception as e:
         log_error("Error getting profile for the native occasion publish", exc=e, user_id=user_id,
                   post_id=post_id, task_name=task_name)

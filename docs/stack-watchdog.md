@@ -34,8 +34,58 @@ compares against `docker compose config --services`, and flags anything not `run
   state in the pool is what gets recorded, so seven dead nodes cannot hide behind one healthy one.
 - **Alerts on both channels**, talking to PostHog and SendGrid **directly over HTTPS**. It depends
   on nothing in the stack, so it still alerts when every container on the box is down.
-  - PostHog: `stack_watchdog_report` (`down`, `healed`, `recovered`, `down_count`)
-  - Email: only for a real outage or a heal. A pure recovery is worth an event, not an inbox.
+  - PostHog: `stack_watchdog_report` (`down`, `healed`, `recovered`, `down_count`), once per run
+    that has anything to report. Not deduped: it is a time series, and a gap during an outage would
+    read as "nothing down".
+  - Email: deduped per check (see **Alert dedupe** below). Plain text, with SendGrid click tracking
+    disabled (`tracking_settings.click_tracking.enable` and `enable_text` both `false`), so a URL in
+    the body reaches the inbox as written rather than as a tracking redirect.
+- **Alert dedupe.** Each down token maps to one *check key*: the service name, `tunnel-origin`, or
+  `backup-db` / `backup-offsite`. Dedupe is by key, never by token, because a token carries an
+  elapsed time or error count that changes every run. Per key, the state file
+  `/var/lib/lem-watchdog/alert-<key>.state` (under `WATCHDOG_STATE_DIR`) holds
+  `<first_down_epoch> <last_notified_epoch> <emailed 0|1> <pending>`. The rules:
+  - **First DOWN** (after the grace window and the self-heal attempt): one email and one `DOWN` event.
+    If the send fails, the next run retries the email (no second event) until one is delivered.
+  - **Still down:** no email, no event, until `WATCHDOG_REMINDER_SECONDS` (default 3600) has passed
+    since the last *delivered* email for that check; then one reminder email (subject `STILL DOWN`)
+    and one `DOWN` event. A failed reminder is retried each run without another event, and the
+    clock restarts only when it is delivered.
+  - **Cleared:** one `RECOVERED` event, plus one `RECOVERED` email if that check's DOWN email was
+    delivered. The state file is removed once that email is delivered (failed sends are retried), or
+    at once if the check never emailed DOWN. A check that recovers inside its grace window never
+    alerted and stays silent. A check that could not be read this run (the tunnel check's
+    WARN-and-skip paths) is neither down nor recovered: its state is left alone.
+  - **Heal:** one email and one `HEALED` event, as before.
+  - Only the checks an email was sent *for* (new DOWN, due reminder, RECOVERED) have their clocks
+    moved; a check that is still down but not due keeps its own schedule.
+  - A run where nothing changed and no reminder is due sends no email. The exit code is unchanged:
+    `1` while anything is down, whether or not that run emailed.
+  - **Re-arm a check:** as root, `rm /var/lib/lem-watchdog/alert-<key>.state`. If the check is still
+    down, the next run treats it as a new DOWN: one email and one `DOWN` event.
+- **Local event log** (`WATCHDOG_EVENT_FILE`, default `/var/lib/lem-watchdog/events.jsonl`). One
+  JSON object per line, written on each state change and each reminder:
+
+  ```json
+  {"ts":"2026-10-12T14:05:00Z","check":"tunnel-origin","host":"<hostname>","state":"DOWN","detail":"tunnel-origin:http://172.18.0.1:8420:6in600s"}
+  ```
+
+  `state` is `DOWN`, `RECOVERED` or `HEALED`; `detail` is the down token(s) for that check, the
+  recovered token, or the healed service. Lines are built with `jq`, so values are escaped, and
+  credentials in an origin URL (`://user:pass@`) are stripped before they reach the event file, the
+  email or PostHog. The file is created `0644` inside the `0755` state directory, so a non-root
+  account can read it. A failed write logs a WARN and never changes whether the run alerts or what
+  it exits with.
+
+  **Consumer contract.** Once the file passes 2000 lines it is replaced by its newest 1000 (via a
+  `mktemp` file in the state directory, then a rename). The headroom means this happens rarely, but
+  when it does the inode changes and the file shrinks. Follow it **by name** (`tail -F`), and do
+  not rely on byte offsets or the inode surviving between reads.
+- **State directory safety.** The script runs as root and writes, trims and deletes files in
+  `WATCHDOG_STATE_DIR`. After creating it, the run refuses to continue (FATAL, non-zero exit) unless
+  it is a real directory (not a symlink) owned by the running user and not group- or
+  world-writable. Otherwise another account could plant a symlink there and turn a root write into a
+  write to any file.
 - **Backup freshness** (issue #1090) — the newest `db-*.sql.gz` in `BACKUP_DIR` must be younger
   than `WATCHDOG_BACKUP_AGE_HOURS` (default 48; the cron runs at 03:00, so that is two missed runs
   plus slack) **and** larger than `WATCHDOG_BACKUP_MIN_BYTES` (default 1024). Age alone is not
@@ -106,13 +156,24 @@ logged at ERROR rather than silently ignored. `SENDGRID_API_KEY`, `SENDGRID_FROM
 
 Overridable: `LEM_DIR`, `LEM_ENV_FILE`, `WATCHDOG_STATE_DIR`, `WATCHDOG_GRACE_SECONDS`,
 `WATCHDOG_HEAL`, `WATCHDOG_BACKUP_AGE_HOURS`, `WATCHDOG_BACKUP_MIN_BYTES`,
-`WATCHDOG_TUNNEL_WINDOW_SECONDS`, `WATCHDOG_TUNNEL_ERROR_THRESHOLD`, `WATCHDOG_ALERT_EMAIL`.
+`WATCHDOG_TUNNEL_WINDOW_SECONDS`, `WATCHDOG_TUNNEL_ERROR_THRESHOLD`, `WATCHDOG_ALERT_EMAIL`,
+`WATCHDOG_REMINDER_SECONDS` (default 3600), `WATCHDOG_EVENT_FILE` (default
+`$WATCHDOG_STATE_DIR/events.jsonl`).
 
 ### Exit codes
 
 `0` = healthy, or a self-heal that worked. `1` = something is still down. The unit sets
 `SuccessExitStatus=0 1` so a true "still down" report is not also a systemd unit failure — otherwise
-the next timer tick is all systemd would talk about.
+the next timer tick is all systemd would talk about. `2` = the state directory failed the safety
+check above; the run did nothing, and the unit shows as failed.
+
+### Rollback
+
+The script ships with the release checkout, so redeploying the previous tag reverts it. The older
+script does not read `alert-*.state` or `events.jsonl`; they are left in place and ignored. Before
+rolling forward again, clear the stale alert state as root
+(`rm /var/lib/lem-watchdog/alert-*.state`) so the new script starts from what is down at that
+moment, not from an incident the older script already handled. `events.jsonl` can stay.
 
 ## Layer 2 — `GET /health/deep`
 

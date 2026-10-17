@@ -73,6 +73,7 @@ from cqc_lem.app.engagement.invites import automate_invites_to_company_page_for_
 from cqc_lem.app.engagement.outreach import scheduled_dm_is_stale, send_lead_response
 from cqc_lem.app.engagement.posting import automate_reply_commenting, sweep_reply_comments
 from cqc_lem.app.run_content_plan import auto_create_weekly_content, plan_content_for_user
+from cqc_lem.utilities.ai_spend_cap import DailyAICapReached
 from cqc_lem.utilities.auth_factors import (
     enrollment_required,
 )
@@ -155,6 +156,7 @@ from cqc_lem.utilities.db import (
     user_approver,
     user_owns_posts,
 )
+from cqc_lem.utilities.demo_mode import DemoModeError, guard_linkedin, is_demo_mode
 from cqc_lem.utilities.env_constants import (
     API_ACCESS_TOKENS,
     AUTH_CHALLENGE_TTL_SECONDS,
@@ -172,7 +174,9 @@ from cqc_lem.utilities.linkedin.verification_pin import (
 from cqc_lem.utilities.logger import log_critical, log_debug, log_error, log_info, log_warning
 from cqc_lem.utilities.mime_type_helper import get_file_mime_type
 from cqc_lem.utilities.observability import (
+    FEATURE_CONTENT,
     capture_exception,
+    llm_trace,
     track_api_call,
 )
 from cqc_lem.utilities.post_image import (
@@ -206,8 +210,28 @@ app = FastAPI(
     swagger_ui_oauth2_redirect_url="/api/docs/oauth2-redirect",
 )
 
+@app.exception_handler(DailyAICapReached)
+async def daily_ai_cap_handler(request: Request, exc: DailyAICapReached) -> JSONResponse:
+    """Answer a request the free-trial daily AI cap refused (issue #2378) with a clear 429.
+
+    Registered as a handler, so it never reaches `observability_middleware`'s `except` — a designed
+    refusal is a response, not an error-tracking issue. `Retry-After` is the seconds to the next UTC
+    midnight, when the cap resets.
+    """
+    retry_after = max(1, int((exc.resets_at - datetime.now(timezone.utc)).total_seconds()))
+    return JSONResponse(status_code=429, headers={"Retry-After": str(retry_after)},
+                        content={"status_code": 429, "detail": str(exc), "reason": "daily_ai_limit",
+                                 "resets_at": exc.resets_at.isoformat()})
+
+
 # All API routes live under /api so the React client's baseURL: '/api' works
 router = APIRouter(prefix="/api")
+
+
+@app.exception_handler(DemoModeError)
+async def demo_mode_refused(request: Request, exc: DemoModeError) -> JSONResponse:
+    """A LinkedIn call refused by DEMO_MODE (#2372) is a 503 the SPA can read, not a 500 defect."""
+    return JSONResponse(status_code=503, content={"detail": "Demo mode: LinkedIn is disabled."})
 
 
 @app.middleware("http")
@@ -1522,6 +1546,8 @@ def get_app_info() -> ResponseModel[dict[str, Any]]:
     return ResponseModel(status_code=200, detail={
         "version": get_app_version(),
         "show_version": SHOW_VERSION_FOOTER,
+        # The SPA's "Demo data" badge (#2372) renders only when this is true.
+        "demo_mode": is_demo_mode(),
     })
 
 
@@ -2040,7 +2066,10 @@ def _handle_gmail_forwarding_confirmation(user_id: int, subject: str, text: str,
             from cqc_lem.utilities.email import send_reply_forward_confirmation_email
             user_email = get_user_email(user_id)
             if user_email:
-                forwarded = send_reply_forward_confirmation_email(user_email, url, code)
+                from cqc_lem.utilities.trial_copy import is_trial_subscription
+                trial = is_trial_subscription(get_user_subscription_info(user_id))
+                forwarded = send_reply_forward_confirmation_email(user_email, url, code,
+                                                                  trial=trial)
         except Exception as e:
             log_warning("Could not forward Gmail confirmation to user", exc=e, user_id=user_id)
     _store_gmail_forward_confirmation(user_id, {
@@ -2728,6 +2757,7 @@ def linkedin_auth_init(session_token: str = None) -> RedirectResponse:
     signature named an account it did not use, and it put the address in a URL (browser history,
     `Referer`) for nothing. An unused actor parameter is the next author's invitation to use it.
     """
+    guard_linkedin("api.linkedin_auth_init")
     client = AuthClient(LI_CLIENT_ID, LI_CLIENT_SECRET, LI_REDIRECT_URL)
     # Embed the session_token in state so the callback can find the right user,
     # even when the LinkedIn account email differs from the login email.
@@ -2753,6 +2783,8 @@ def linkedin_callback(code: str, state: str = None) -> Union[ResponseModel, Redi
     caller is a browser mid-flow, and an API error page strands the user outside the app.
     """
     from urllib.parse import urlencode
+
+    guard_linkedin("api.linkedin_callback")
 
     def _account_redirect(params: dict) -> RedirectResponse:
         parsed_url = urlparse(LI_REDIRECT_URL)
@@ -3488,41 +3520,45 @@ def generate_carousel_preview(request: GenerateCarouselPreviewRequest) -> Respon
     assets_root = os.path.join(current_dir, "..", "assets", "images", "carousel", preview_id)
     output_dir = os.path.realpath(assets_root)
 
-    try:
-        post_text, carousel_dict = generate_carousel_content(user_id, stage)
+    # One pipeline for the whole request (issue #2378): every call is the session user's, a
+    # capped free-trial user is refused (429) before any spend, and an admitted one finishes.
+    with llm_trace("carousel_preview", user_id=user_id, feature=FEATURE_CONTENT):
+        try:
+            post_text, carousel_dict = generate_carousel_content(user_id, stage)
 
-        # The shared stage map (issue #1681): this route used to keep its own, which is how a
-        # "personal" preview asked the generator for one deck shape and validated another.
-        model_cls = carousel_model_for_stage(stage)
+            # The shared stage map (issue #1681): this route used to keep its own, which is how a
+            # "personal" preview asked the generator for one deck shape and validated another.
+            model_cls = carousel_model_for_stage(stage)
 
-        # The generator's own shape gate already spent its repair call, so a deck still missing a
-        # required slide is an upstream failure — say which slides, rather than handing the SPA a
-        # raw pydantic ValidationError dump from the constructor (issue #1666).
-        missing = missing_carousel_fields(model_cls, carousel_dict)
-        if missing:
-            raise HTTPException(
-                status_code=502,
-                detail="The carousel generator returned a deck missing required slide(s): "
-                       + ", ".join(missing) + ". Try again.")
+            # The generator's own shape gate already spent its repair call, so a deck still missing a
+            # required slide is an upstream failure — say which slides, rather than handing the SPA a
+            # raw pydantic ValidationError dump from the constructor (issue #1666).
+            missing = missing_carousel_fields(model_cls, carousel_dict)
+            if missing:
+                raise HTTPException(
+                    status_code=502,
+                    detail="The carousel generator returned a deck missing required slide(s): "
+                           + ", ".join(missing) + ". Try again.")
 
-        carousel_obj = build_carousel_model(model_cls, carousel_dict, user_id=user_id)
-        # The author's brand kit themes the preview exactly as it themes the posted deck; the
-        # likeness path stays unreached here (`brand_user_id` reads the kit and nothing else).
-        image_paths = create_carousel_slide_images(
-            carousel_obj, post_id=0, output_dir=output_dir, template=carousel_template,
-            brand_user_id=user_id,
-        )
-        slide_urls = [
-            f"{API_URL_FINAL}/api/assets?file_name=images/carousel/{preview_id}/{os.path.basename(p)}"
-            for p in image_paths
-        ]
-    except HTTPException:
-        # Already the answer we mean to send — re-wrapping it would bury a 502 inside a 500 whose
-        # detail is the repr of this exception.
-        raise
-    except Exception as exc:
-        log_info(f"generate-carousel: failed for user_id={user_id} — {exc}")
-        raise HTTPException(status_code=500, detail=str(exc))
+            carousel_obj = build_carousel_model(model_cls, carousel_dict, user_id=user_id)
+            # The author's brand kit themes the preview exactly as it themes the posted deck; the
+            # likeness path stays unreached here (`brand_user_id` reads the kit and nothing else).
+            image_paths = create_carousel_slide_images(
+                carousel_obj, post_id=0, output_dir=output_dir, template=carousel_template,
+                brand_user_id=user_id,
+            )
+            slide_urls = [
+                f"{API_URL_FINAL}/api/assets?file_name=images/carousel/{preview_id}/{os.path.basename(p)}"
+                for p in image_paths
+            ]
+        except (HTTPException, DailyAICapReached):
+            # DailyAICapReached is the free-trial cap's designed 429 (issue #2378).
+            # Already the answer we mean to send — re-wrapping it would bury a 502 inside a 500 whose
+            # detail is the repr of this exception.
+            raise
+        except Exception as exc:
+            log_info(f"generate-carousel: failed for user_id={user_id} — {exc}")
+            raise HTTPException(status_code=500, detail=str(exc))
 
     return ResponseModel(status_code=200, detail={
         "slide_urls": slide_urls,

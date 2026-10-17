@@ -105,11 +105,57 @@ def brand_user_id() -> int:
 
 
 def is_brand_user(user_id: Any) -> bool:
-    """Whether `user_id` is the brand account (for attribution/observability, not for privileges)."""
+    """Whether `user_id` is the brand account.
+
+    Used for attribution/observability and for the acquisition-outbound hold below — never to
+    grant the brand anything a paying user does not have.
+    """
     try:
         return int(user_id) == brand_user_id()
     except (TypeError, ValueError):
         return False
+
+
+# Owner ruling 2026-10-10 (issue #2376): the brand runs NO automated outbound sourced for user
+# acquisition — agents draft, the owner sends. This is deliberately narrow. It covers only the
+# paths that SOURCE prospects for marketing: smart connection targeting (#486, `connection_requests`
+# rows whose source is an own-post engager or an adjacent author's commenter) and the comment-first
+# outreach funnel's connect and DM stages (#399/#623). The owner's ordinary engagement on the same
+# account — feed comments, replies, DMs to existing connections, company-page invites, catch-up
+# touches, seed comments, roster follows — keeps its caps. The strings mirror
+# `connection_targeting.SOURCE_OWN_POST` / `SOURCE_ADJACENT_POST` and
+# `engagement.outreach.CONNECTION_REQUEST_SOURCE_OUTREACH_FUNNEL`; a unit test pins them together.
+ACQUISITION_CONNECT_SOURCES = frozenset({"own_post", "adjacent_post", "outreach_funnel"})
+ACQUISITION_HOLD_REASON = "held: brand acquisition outbound is sent by the owner (issue #2376)"
+
+
+def acquisition_outbound_held(user_id: Any, source: Optional[str] = None,
+                              funnel: bool = False) -> bool:
+    """Whether an outbound action is brand acquisition outreach the ruling holds at 0.
+
+    Args:
+        user_id: The account the action would go out from.
+        source: The `connection_requests.source` of a connect request, when there is one.
+        funnel: True for a connect or DM stage of the comment-first outreach funnel.
+
+    Returns:
+        True only for the brand account AND an acquisition-sourced action; False for every other
+        user and for the brand's ordinary engagement.
+    """
+    if not is_brand_user(user_id):
+        return False
+    return bool(funnel) or (source or "").strip().lower() in ACQUISITION_CONNECT_SOURCES
+
+
+def held_connect_sources(user_id: Any) -> frozenset:
+    """The `connection_requests.source` values whose rows can never send for `user_id`.
+
+    The brand account's held acquisition drafts sit at 'pending' until the owner closes them, and an
+    open row is counted against the daily invite budget. Lanes that still SEND (profile viewer,
+    roster ladder) leave these out of that count so the held drafts do not starve them. Empty for
+    every other user.
+    """
+    return ACQUISITION_CONNECT_SOURCES if is_brand_user(user_id) else frozenset()
 
 
 def _over_ceiling(current: Any, ceiling: int) -> Optional[int]:
