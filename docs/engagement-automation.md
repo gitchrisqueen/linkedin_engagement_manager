@@ -1456,6 +1456,16 @@ Three separate books, and #1867 is what stopped them being one:
   before this line the log could only say *that* a scan found nothing, never *which* stage emptied
   it. `own_post` is `post_engagers` in the 30-day lookback; `adjacent` is commenters harvested from
   `connection_target_authors`; `ranked` is what survived dedup, first-degree and the ICP floor.
+- **The 14-day check failed, and the owner chose adjacent authors (issue #2169).** From 2026-09-25
+  to 2026-10-09 the 15 daily scans read `own_post=0 adjacent=0 ranked=0 filed=0` every time, so
+  0 of 15 met the "≥ 1 ranked candidate in ≥ 50% of scans" bar. The two sources were empty for
+  different reasons. `own_post=0` is an AUDIENCE fact: no third party commented on our own posts in
+  the lookback, and reactors are never recorded (#1091). `adjacent=0` was CONFIG:
+  `connection_target_authors` was empty, so the harvest skipped without opening Chrome. On
+  2026-10-17 the owner picked option A and configured three adjacent authors. No code changed.
+  Widening `_CONNECT_ENGAGER_LOOKBACK_DAYS` was rejected because the sweeps show no third-party
+  commenters to widen into. Counting reactors would be a new source and needs its own issue. A
+  re-check of the funnel line, due 2026-10-31, is #2456.
 
 ## A lane run ends in the Celery state its outcome earned (`app/task_outcome.py`, issue #2097)
 
