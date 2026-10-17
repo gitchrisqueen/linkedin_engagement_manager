@@ -35,6 +35,13 @@ class TestValidators:
         p = _profile(profile_url="https://www.linkedin.com/in/jane/")
         assert "linkedin.com/in/jane" in str(p.profile_url)
 
+    def test_position_without_title_accepted(self):
+        # parse_experience_entity keeps a position with no title when it has details or skills,
+        # so the scraper hands over an explicit None; rejecting it aborted the whole viewer touch.
+        p = _profile(experiences=[{"company_name": "Acme", "positions": [
+            {"title": None, "details": ["Led the data team"]}]}])
+        assert p.experiences[0].positions[0].title is None
+
 
 class TestProperties:
     def test_first_and_last_name(self):
