@@ -12,7 +12,7 @@ export default function MarketingFooter() {
 
   return (
     <footer data-theme="dark" className="lem-marketing bg-raised text-fg">
-      <div className="max-w-6xl mx-auto px-4 py-12">
+      <div className="box-content max-w-6xl mx-auto px-4 py-12">
         <div className="flex flex-col gap-8 md:flex-row md:items-start md:justify-between">
           <div className="max-w-sm">
             <img
@@ -20,7 +20,7 @@ export default function MarketingFooter() {
               alt="LinkedIn Engagement Manager"
               width={1340}
               height={300}
-              className="h-8 w-auto"
+              className="-ml-[5px] h-8 w-auto"
               loading="lazy"
             />
             <p className="mt-4 text-sm leading-relaxed text-fg-muted">

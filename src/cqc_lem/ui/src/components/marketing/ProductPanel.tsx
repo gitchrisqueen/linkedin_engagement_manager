@@ -42,7 +42,7 @@ function Panel({
         <span className="h-2.5 w-2.5 rounded-full bg-hairline" />
         <span className="ml-2 text-xs font-medium text-fg-muted">Content Studio</span>
       </div>
-      <div aria-hidden="true" className={fill ? 'flex flex-1 flex-col gap-3 p-4' : 'p-4 space-y-3'}>
+      <div aria-hidden="true" className={fill ? 'flex flex-1 flex-col gap-6 p-4' : 'p-4 space-y-3'}>
         {children}
       </div>
     </div>
@@ -153,11 +153,13 @@ export default function ProductPanel({ variant }: { variant: PanelVariant }) {
         fill
         label="Diagram of LEM: the approval queue with three drafts beside a suggested comment you edit and send yourself."
       >
-        <div className="grid flex-1 content-start gap-4 xl:grid-cols-[3fr_2fr]">
-          <div className="space-y-3">
+        {/* Stretched to the trial line, the extra height goes between the cards (equal gaps), and
+            the right column's last line ends level with the left column's last card. */}
+        <div className="grid flex-1 gap-4 xl:grid-cols-[3fr_2fr]">
+          <div className="flex flex-col justify-between gap-3">
             <QueueRows />
           </div>
-          <div className="space-y-3">
+          <div className="flex flex-col justify-between gap-3">
             <EngagementPane />
           </div>
         </div>

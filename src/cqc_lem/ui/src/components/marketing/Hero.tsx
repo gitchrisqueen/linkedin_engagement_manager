@@ -12,7 +12,7 @@ export default function Hero() {
   const { openLoginModal } = useAuth()
 
   return (
-    <Section analyticsName="hero" tone="white" width="max-w-7xl" className="pt-12 sm:pt-16">
+    <Section analyticsName="hero" tone="white" className="pt-12 sm:pt-16">
       {/* `min-w-0` on both columns, not decoration (issue #1556): a grid item's automatic minimum
           size is its min-content width, and ProductPanel's rows hold non-wrapping (`truncate`)
           titles, so the panel column asked for 498px on a 375px phone and took the page with it. */}
