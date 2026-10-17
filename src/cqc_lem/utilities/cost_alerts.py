@@ -118,12 +118,13 @@ def evaluate_user_cost_ceiling(users: Optional[Sequence[Mapping]],
     run-rate basis, so they are comparable with monthly MRR). Users with $0 MRR — free trials — are
     skipped: "% of MRR" is undefined against no revenue, and their drag is caught by the system
     gross-margin floor instead. A user whose cost exceeds their whole MRR is critical: that user is
-    margin-negative, not merely expensive.
+    margin-negative, not merely expensive. Internal accounts (#2453) are skipped whatever MRR the
+    row carries: no money moves, so there is no revenue to judge their cost against.
     """
     alerts, judged = [], 0
     for row in users or []:
         mrr = float(row.get("mrr_usd") or 0.0)
-        if mrr <= 0:
+        if mrr <= 0 or row.get("internal"):
             continue
         judged += 1
         cost = float(row.get("variable_cost_usd") or 0.0) + float(row.get("semi_variable_cost_usd") or 0.0)

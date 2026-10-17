@@ -1871,11 +1871,13 @@ def get_margin_users() -> list:
     Trials are included (tier `free_trial`, $0 MRR) so the cost they incur still lands in system
     margin instead of vanishing. `cohort` is the signup month — `users` has no created_at, so
     trial_started_at is the signup timestamp, falling back to updated_at for pre-trial rows.
+    Internal (`is_admin = 1`) accounts stay IN so their cost still counts; `margin.user_mrr_usd`
+    prices them at $0 (#2453), the same accounts the trial-cohort cap excludes.
     """
     try:
         with db_cursor(dictionary=True) as cursor:
             cursor.execute(
-                """SELECT id, subscription_tier, subscription_status,
+                """SELECT id, subscription_tier, subscription_status, is_admin,
                           DATE_FORMAT(COALESCE(trial_started_at, updated_at), '%Y-%m') AS cohort
                    FROM users
                    WHERE subscription_status IN ('active', 'past_due', 'trial')"""
