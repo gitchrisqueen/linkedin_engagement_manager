@@ -23,7 +23,7 @@ export default function MarketingNav() {
         <Link to="/" className="flex items-center shrink-0" aria-label="LinkedIn Engagement Manager — home">
           {/* The charcoal wordmark vanishes on the dark nav, so the dark scheme gets the on-dark cut:
               v2 is the official on-dark PNG with only "Manager" recoloured to the pack's dark primary
-              #7FB0FF (owner ruling 101), since brand blue on charcoal is under 2:1. */}
+              (owner ruling 101), since brand blue on charcoal is under 2:1. */}
           <picture>
             <source srcSet="/brand/lem-wordmark-on-dark-v2.png" media="(prefers-color-scheme: dark)" />
             <img
