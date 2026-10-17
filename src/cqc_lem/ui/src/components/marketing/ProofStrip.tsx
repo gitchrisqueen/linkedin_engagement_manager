@@ -29,7 +29,7 @@ const PROOF: { title: string; body: string }[] = [
 export default function ProofStrip() {
   return (
     <Section analyticsName="proof" tone="tinted" className="py-12 sm:py-14">
-      <p className="text-sm font-semibold text-fg-muted">
+      <p className="max-w-[65ch] text-sm font-semibold text-fg-muted">
         Early access — we are onboarding a small first cohort
       </p>
       <p className="mt-2 max-w-2xl text-fg-muted">

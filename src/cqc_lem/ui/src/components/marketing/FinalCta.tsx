@@ -29,7 +29,7 @@ export default function FinalCta() {
           Start free trial
         </CtaButton>
       </div>
-      <p className="mt-4 text-sm text-fg-muted">
+      <p className="mx-auto mt-4 max-w-[65ch] text-sm text-fg-muted">
         {TRIAL_DAYS}-day free trial. No credit card. Cancel any time.
       </p>
     </Section>
