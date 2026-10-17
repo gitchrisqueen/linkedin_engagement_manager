@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.196.1](https://github.com/christopherqueenconsulting/linkedin_engagement_manager/compare/v0.196.0...v0.196.1) (2026-10-17)
+
+
+### Documentation
+
+* **pipeline:** the receiver serve() docstring says it listens on 0.0.0.0 ([#2440](https://github.com/christopherqueenconsulting/linkedin_engagement_manager/issues/2440)) ([34f12fa](https://github.com/christopherqueenconsulting/linkedin_engagement_manager/commit/34f12faf534f1e5c5350a3a6e92461b6d407a7f6))
+
 ## [0.196.0](https://github.com/christopherqueenconsulting/linkedin_engagement_manager/compare/v0.195.2...v0.196.0) (2026-10-16)
 
 
