@@ -10,8 +10,9 @@ _M = "cqc_lem.api.main"
 _USER = "cqc_lem.api.routers.user"
 
 
-def _patches(*, oauth, session, password, sub_status, lat, display_name="Jordan Alvarez"):
+def _patches(*, oauth, session, password, sub_status, lat, display_name="Jordan Alvarez", browser=True):
     return [
+        patch(f"{_USER}.browser_automation_allowed", return_value=browser),
         patch(f"{_M}.get_session_user_id", return_value=42),
         patch(f"{_USER}.get_user_linkedin_display_name", return_value=display_name),
         patch(f"{_USER}.get_user_token_info",
@@ -112,6 +113,17 @@ class TestCookieMigrationFlag:
 
 
 class TestAccountReadinessAuth:
+    def test_suggest_only_account_does_not_require_browser_items(self, api_client):
+        # Issue #2367: a trial runs no browser lane, so a missing session login and display name
+        # must not hold its setup checklist open.
+        resp = _run(api_client, oauth=True, session=False, password=False, sub_status="trial",
+                    lat=None, display_name=None, browser=False)
+        d = resp.json()["detail"]
+        assert d["ready"] is True
+        for key in ("linkedin_session", "linkedin_display_name"):
+            item = next(i for i in d["items"] if i["key"] == key)
+            assert item["required"] is False and "does not run" in item["hint"]
+
     def test_401_invalid_session(self, api_client):
         with patch(f"{_M}.get_session_user_id", return_value=None):
             resp = api_client.get("/api/user/account-readiness?session_token=bad")

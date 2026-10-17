@@ -45,6 +45,7 @@ from cqc_lem.api.response_schemas import (
     CatchupContactIntervalBounds,
     CatchupPerContactCapBounds,
     DmTemplate,
+    EngagementSuggestionsDetail,
     EngagementTargetsDetail,
     FeedReach,
     GateDefaults,
@@ -147,6 +148,7 @@ from cqc_lem.utilities.db import (
     get_daily_action_counts,
     get_dm_templates,
     get_engagement_preferences,
+    get_engagement_suggestions,
     get_engagement_targets,
     get_follower_stats,
     get_latest_edition_scheduled_for,
@@ -216,6 +218,7 @@ from cqc_lem.utilities.db import (
     verify_pin_for_email,
 )
 from cqc_lem.utilities.email import generate_pin, hash_pin, send_pin_email
+from cqc_lem.utilities.engagement_mode import browser_automation_allowed, resolve_engagement_mode
 from cqc_lem.utilities.geocoding import GeocodeError, geocode_city
 from cqc_lem.utilities.group_post_slot import group_skip_undo_open, skip_undo_deadline
 from cqc_lem.utilities.linkedin.helper import load_profile_for_user
@@ -1852,6 +1855,37 @@ def get_user_settings(session_token: str) -> ResponseModel[dict[str, Any]]:
         "blog_url": blog_url,
         "sitemap_url": sitemap_url,
         "company_linked_in_url": company_linked_in_url,
+        # Read-only (#2367): the account's engagement mode, read fail-closed exactly as the lanes
+        # read it, so the SPA never shows "automate" for an account the lanes treat as suggest.
+        "engagement_mode": resolve_engagement_mode(user_id).value,
+    })
+
+
+#: How many suggestions the Suggested list shows — newest first.
+ENGAGEMENT_SUGGESTIONS_LIMIT = 50
+
+
+@router.get("/engagement-suggestions",
+            responses={200: {"model": ResponseModel[EngagementSuggestionsDetail]}})
+def get_engagement_suggestions_endpoint(session_token: str) -> ResponseModel[dict[str, Any]]:
+    """The caller's newest engagement suggestions — drafts to copy and post by hand (#2367).
+
+    A suggest-only account runs no browser automation; the comment and DM drafts its lanes wrote
+    are stored instead and listed here. A failed read is 503, never an empty list — "you have no
+    suggestions" is an answer this endpoint only gives when it is true.
+    """
+    user_id = _main.get_session_user_id(session_token)
+    if not user_id:
+        raise HTTPException(status_code=401, detail="Invalid or expired session")
+    rows = get_engagement_suggestions(user_id, limit=ENGAGEMENT_SUGGESTIONS_LIMIT)
+    if rows is None:
+        raise HTTPException(status_code=503, detail="Suggestions are temporarily unavailable")
+    return ResponseModel(status_code=200, detail={
+        "engagement_mode": resolve_engagement_mode(user_id).value,
+        "suggestions": [
+            {**row, "created_at": row["created_at"].isoformat() if row.get("created_at") else None}
+            for row in rows
+        ],
     })
 
 
@@ -3730,18 +3764,26 @@ def account_readiness_endpoint(session_token: str) -> ResponseModel[dict[str, An
     # without it every DM follow-up is skipped as unreadable — a silently dead sequencer.
     has_display_name = bool(get_user_linkedin_display_name(user_id))
 
+    # A suggest-only account (issue #2367) runs no browser lane, so the session login and display
+    # name only the browser uses are optional for it: listing them as required would tell a trial
+    # user to finish setup for automation their account does not run.
+    browser_needed = browser_automation_allowed(user_id)
+    browser_only_hint = "Only used by browser automation, which this account does not run."
+
     items = [
         {"key": "email", "label": "Verified email", "ok": True, "required": True,
          "hint": None},
         {"key": "linkedin_oauth", "label": "LinkedIn connected (posting)", "ok": has_oauth,
          "required": True, "hint": "Connect LinkedIn in your account."},
         {"key": "linkedin_session", "label": "LinkedIn session (engagement)",
-         "ok": has_engagement_login, "required": True,
-         "hint": "Connect your LinkedIn session (cookie) — the one-click extension is easiest."},
+         "ok": has_engagement_login, "required": browser_needed,
+         "hint": ("Connect your LinkedIn session (cookie) — the one-click extension is easiest."
+                  if browser_needed else browser_only_hint)},
         {"key": "linkedin_display_name", "label": "Your LinkedIn display name",
-         "ok": has_display_name, "required": True,
-         "hint": "Enter your name exactly as it appears on your LinkedIn profile — LEM needs it to "
-                 "tell your own messages apart from replies."},
+         "ok": has_display_name, "required": browser_needed,
+         "hint": ("Enter your name exactly as it appears on your LinkedIn profile — LEM needs it to "
+                  "tell your own messages apart from replies."
+                  if browser_needed else browser_only_hint)},
         {"key": "subscription", "label": "Active plan", "ok": sub_active, "required": True,
          "hint": "Start a plan or trial under Subscription."},
         {"key": "location", "label": "Login location set", "ok": has_location,
