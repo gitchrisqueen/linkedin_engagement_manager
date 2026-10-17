@@ -51,6 +51,16 @@ class TestUserMrr:
         assert m.total_mrr_usd(users) == pytest.approx(m.TIER_MRR_PROFESSIONAL + m.TIER_MRR_STARTER)
         assert m.total_mrr_usd([]) == 0.0
 
+    def test_an_internal_account_earns_nothing_whatever_tier_and_status(self):
+        """Issue #2453: the owner's demo account (`is_admin`) is marked paid but no money moves."""
+        assert m.user_mrr_usd({"subscription_tier": "enterprise", "subscription_status": "active",
+                               "is_admin": 1}) == 0.0
+        assert m.user_mrr_usd({"tier": "professional", "status": "past_due", "internal": True}) == 0.0
+        assert m.user_mrr_usd({"subscription_tier": "starter", "is_admin": 0}) == m.TIER_MRR_STARTER
+        users = [{"subscription_tier": "enterprise", "is_admin": 1},
+                 {"subscription_tier": "starter", "is_admin": 0}]
+        assert m.total_mrr_usd(users) == pytest.approx(m.TIER_MRR_STARTER)
+
 
 class TestSplitCostByKind:
     def test_buckets_by_category(self):
@@ -342,6 +352,25 @@ class TestCollectors:
         assert block["mrr_usd"] == pytest.approx(expected)
         assert report["system"]["mrr_usd"] == pytest.approx(expected)
         assert {r["user_id"]: r["mrr_usd"] for r in report["users"]}[2] == 0.0
+
+    def test_owner_demo_account_reads_zero_mrr_but_keeps_its_cost(self):
+        """Issue #2453: today's prod shape reads $0 MRR in both consumers.
+
+        User 1 is an admin on active Enterprise and the only margin user; its spend still lands in
+        system cost.
+        """
+        users = [{"id": 1, "subscription_tier": "enterprise", "subscription_status": "active",
+                  "is_admin": 1, "cohort": "2026-06"}]
+        rollups = {("category", 1): {"llm": 7.0}, ("category", None): {"llm": 7.0}}
+        with self._patch_db(rollups=rollups, users=users)[0]:
+            block = m.collect_daily_margin_block(date(2026, 10, 17))
+            report = m.collect_margin_report(end=date(2026, 10, 17), days=7)
+        assert block["mrr_usd"] == 0.0
+        assert report["system"]["mrr_usd"] == 0.0 and report["system"]["paying_users"] == 0
+        row = report["users"][0]
+        assert row["internal"] is True and row["mrr_usd"] == 0.0
+        assert report["system"]["variable_cost_usd"] > 0
+        assert report["system"]["gross_margin_usd"] < 0
 
 
 class TestDelivery:

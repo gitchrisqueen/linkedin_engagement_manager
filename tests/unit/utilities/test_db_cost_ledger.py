@@ -122,6 +122,8 @@ class TestGetMarginUsers:
         sql = cur.execute.call_args[0][0]
         assert "'active', 'past_due', 'trial'" in sql  # trials cost money → included at $0 MRR
         assert "trial_started_at" in sql
+        # #2453: internal accounts stay IN (their cost counts) and carry is_admin so MRR reads $0
+        assert "is_admin" in sql and "is_admin = 0" not in sql
 
     def test_empty_on_db_error(self, fake_cursor):
         conn, _ = fake_cursor(execute_error=mysql.connector.Error("boom"))

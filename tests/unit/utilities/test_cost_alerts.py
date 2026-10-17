@@ -70,6 +70,38 @@ class TestUserCostCeiling:
     def test_no_users_at_all_is_skipped_not_ok(self):
         assert ca.evaluate_user_cost_ceiling([], pct_of_mrr=0.25)["status"] == ca.STATUS_SKIPPED
 
+    def test_internal_accounts_are_skipped_whatever_mrr_the_row_carries(self):
+        """Issue #2453: the owner's demo account alerted daily against $199 nobody paid."""
+        internal = {**_user(user_id=1, mrr=199.0, variable=90.0, tier="enterprise"), "internal": True}
+        check = ca.evaluate_user_cost_ceiling([internal], pct_of_mrr=0.25)
+        assert check["status"] == ca.STATUS_SKIPPED and check["users_judged"] == 0
+        assert check["reason"] == "no paying users to judge"
+        mixed = ca.evaluate_user_cost_ceiling([internal, _user(user_id=2, variable=30.0)],
+                                              pct_of_mrr=0.25)
+        assert mixed["users_judged"] == 1 and [a["user_id"] for a in mixed["alerts"]] == [2]
+
+
+class TestInternalAccountThroughTheMarginReport:
+    """Issue #2453, end to end on the pure builders.
+
+    An internal Enterprise account earns $0, its cost still lands in system cost and gross margin,
+    and neither revenue-based check alerts.
+    """
+
+    def _report(self):
+        from cqc_lem.utilities import margin as m
+        users = [{"user_id": 1, "tier": "enterprise", "status": "active", "internal": True,
+                  "cost_by_category": {"llm": 7.0}}]
+        return m.build_margin_report(DAY - timedelta(days=6), DAY, users)
+
+    def test_both_checks_skip_and_cost_still_counts(self):
+        report = self._report()
+        system = report["system"]
+        assert system["mrr_usd"] == 0.0 and system["paying_users"] == 0
+        assert system["variable_cost_usd"] > 0 and system["gross_margin_usd"] < 0
+        assert ca.evaluate_user_cost_ceiling(report["users"])["status"] == ca.STATUS_SKIPPED
+        assert ca.evaluate_gross_margin_floor(system)["status"] == ca.STATUS_SKIPPED
+
 
 class TestGrossMarginFloor:
     def test_fires_below_the_floor(self):

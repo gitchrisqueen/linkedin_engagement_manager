@@ -217,8 +217,10 @@ instead of degrade.
 
 ```
 MRR(user)                  = monthly price of the user's active Stripe tier (starter/professional/enterprise);
-                             $0 on a `trial` subscription. ONE function, `margin.user_mrr_usd`, is
-                             the only MRR source — the daily block, weekly report and cost alerts (#2131)
+                             $0 on a `trial` subscription, and $0 on an internal (`users.is_admin = 1`)
+                             account whatever its tier — its cost still counts (#2453). ONE function,
+                             `margin.user_mrr_usd`, is the only MRR source — the daily block, weekly
+                             report and cost alerts (#2131); the per-user cost ceiling skips internal rows
 variable_cost(user, month) = Σ cost_ledger[user, category ∈ {llm, media, email, geocoding}]   (attributed)
 semi_var_cost(user, month) = proxy_cost(user, month)                                            (linear-ish)
 allocated_fixed(user)      = INFRA_FIXED_MONTHLY / active_users(month)                          (amortized)

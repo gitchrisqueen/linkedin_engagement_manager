@@ -63,14 +63,27 @@ def tier_mrr_usd(tier: Optional[str]) -> float:
     return float(TIER_MRR_USD.get((tier or "").strip().lower(), 0.0))
 
 
+def is_internal_user(user: Mapping) -> bool:
+    """Whether a margin user is an internal account that earns no revenue (#2453).
+
+    Reads `is_admin` off a `get_margin_users` row or `internal` off a report entry — the same
+    `users.is_admin` the trial-cohort cap excludes.
+    """
+    return bool(user.get("internal") or user.get("is_admin"))
+
+
 def user_mrr_usd(user: Mapping) -> float:
     """THE MRR of one margin user — the one MRR source (issue #2131).
 
     The daily block, the weekly report and the cost alerts all read it; before #2131 the alerts and
     `--daily-json` disagreed on MRR. Takes a `get_margin_users` row (`subscription_tier`) or a
     report entry (`tier`). A `trial` subscription earns nothing yet whatever tier it is trialling,
-    so it is $0 rather than the price of a plan nobody has paid for.
+    so it is $0 rather than the price of a plan nobody has paid for. An internal account (the
+    owner's demo/dev user, `is_admin` on a DB row, `internal` on a report entry) is $0 whatever its
+    tier and status — no money moves (#2453); its cost still counts.
     """
+    if is_internal_user(user):
+        return 0.0
     if str(user.get("subscription_status") or user.get("status") or "").strip().lower() == "trial":
         return 0.0
     return tier_mrr_usd(user.get("subscription_tier") or user.get("tier"))
@@ -271,6 +284,7 @@ def build_margin_report(period_start: date, period_end: date, users: Sequence[Ma
             "user_id": user.get("user_id"),
             "tier": user.get("tier"),
             "cohort": user.get("cohort"),
+            "internal": is_internal_user(user),
             "mrr_usd": _round(mrr, 2),
             "variable_cost_usd": _round(variable, 4),
             "semi_variable_cost_usd": _round(semi, 4),
@@ -456,6 +470,7 @@ def collect_margin_report(end: Optional[date] = None, days: int = 7) -> dict:
             "user_id": user_id,
             "tier": row.get("subscription_tier"),
             "status": row.get("subscription_status"),
+            "internal": is_internal_user(row),
             "cohort": row.get("cohort"),
             "cost_by_category": get_cost_rollup(start, end, group_by="category", user_id=user_id),
             "engagement": engagement_lift(get_post_engagement_rows(user_id), start),
