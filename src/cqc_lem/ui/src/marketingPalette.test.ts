@@ -22,6 +22,13 @@ const MARKETING_FILES = [
   'components/TutorialVideos.tsx',
   'components/BrandShowcase.tsx',
 ]
+// App-tree components moved onto the brand tokens after #2445 (issue #2448). Listed by name for the
+// same reason: the rest of the app is not yet held to this allowlist.
+const APP_TOKEN_FILES = [
+  'components/DailyAiLimitNotice.tsx',
+  'components/DemoBadge.tsx',
+  'components/LoginModal.tsx',
+]
 
 const DEFAULT_PALETTE =
   '(?:slate|gray|zinc|neutral|stone|red|orange|amber|yellow|lime|green|emerald|teal|cyan|sky|blue|' +
@@ -45,6 +52,7 @@ function filesUnder(dir: string): string[] {
 const marketingSources = [
   ...MARKETING_DIRS.flatMap((dir) => filesUnder(join(SRC, dir))),
   ...MARKETING_FILES.map((rel) => join(SRC, rel)),
+  ...APP_TOKEN_FILES.map((rel) => join(SRC, rel)),
 ].map((path) => ({
   rel: path.slice(SRC.length).split(sep).join('/'),
   source: readFileSync(path, 'utf8'),

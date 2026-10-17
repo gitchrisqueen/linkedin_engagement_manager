@@ -22,14 +22,14 @@ export default function DailyAiLimitNotice() {
     <div
       role="alert"
       className="fixed top-4 left-1/2 -translate-x-1/2 z-50 max-w-md w-[calc(100%-2rem)]
-                 bg-amber-50 border border-amber-300 rounded-lg shadow-lg p-4"
+                 bg-warning/5 border border-warning/50 rounded-panel shadow-lg p-4"
     >
-      <p className="text-sm font-semibold text-amber-900">Daily AI limit reached</p>
-      <p className="mt-1 text-sm text-amber-800">{message}</p>
+      <p className="text-sm font-semibold text-warning">Daily AI limit reached</p>
+      <p className="mt-1 text-sm text-warning">{message}</p>
       <button
         type="button"
         onClick={() => setMessage(null)}
-        className="mt-3 px-3 py-1.5 text-sm font-medium rounded-md bg-amber-600 text-white hover:bg-amber-700"
+        className="mt-3 px-3 py-1.5 text-sm font-medium rounded-control bg-warning text-white hover:bg-warning/90"
       >
         Dismiss
       </button>
