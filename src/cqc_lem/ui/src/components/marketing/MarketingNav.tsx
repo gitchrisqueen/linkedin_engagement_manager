@@ -21,14 +21,18 @@ export default function MarketingNav() {
     >
       <div className="max-w-6xl mx-auto px-4 h-16 flex items-center gap-4">
         <Link to="/" className="flex items-center shrink-0" aria-label="LinkedIn Engagement Manager — home">
-          <img
-            src="/brand/lem-wordmark.png"
-            alt="LinkedIn Engagement Manager"
-            width={1340}
-            height={300}
-            className="h-7 w-auto sm:h-8"
-            fetchPriority="high"
-          />
+          {/* The charcoal wordmark vanishes on the dark nav, so the dark scheme gets the on-dark cut. */}
+          <picture>
+            <source srcSet="/brand/lem-wordmark-on-dark.png" media="(prefers-color-scheme: dark)" />
+            <img
+              src="/brand/lem-wordmark.png"
+              alt="LinkedIn Engagement Manager"
+              width={1340}
+              height={300}
+              className="h-7 w-auto sm:h-8"
+              fetchPriority="high"
+            />
+          </picture>
         </Link>
 
         <div className="hidden md:flex items-center gap-6 ml-4">

@@ -16,6 +16,11 @@ import type { ReactNode } from 'react'
 // live front page at a 375px viewport: `document.body` min-content 672px, and 530px with this one
 // declaration. Inline rather than a utility class because it must not depend on which display
 // utility Tailwind emits last.
+//
+// `relative` closes the other escape route (design pass, 86e3rnp9a). An overflow container clips
+// only descendants whose containing block is inside it, and a non-positioned wrapper is no such
+// block: every `sr-only` label in a cell (position: absolute) sat at its static place 600px across
+// and still widened the document, so the front page scrolled sideways at 390px (scrollWidth 611).
 export default function TableScroll({
   children,
   label,
@@ -38,7 +43,7 @@ export default function TableScroll({
       tabIndex={0}
       data-testid={testId}
       style={{ contain: 'inline-size' }}
-      className={`overflow-x-auto ${className}`.trim()}
+      className={`relative overflow-x-auto ${className}`.trim()}
     >
       <div style={{ minWidth: `${minWidth}px` }}>{children}</div>
     </div>
