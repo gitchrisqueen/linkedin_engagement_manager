@@ -669,7 +669,7 @@ export default function ContentStudio() {
       {/* Content tabs */}
       {/* One row that scrolls sideways on a phone instead of wrapping ten tabs into two ragged
           rows; the active tab carries the same primary bar as the app nav. */}
-      <div className="flex gap-1 overflow-x-auto scrollbar-none border-b border-hairline">
+      <div className="flex gap-1 overflow-x-auto scrollbar-none border-b border-hairline [mask-image:linear-gradient(to_right,#000_85%,transparent)] sm:[mask-image:none]">
         {VIEWS.map((v) => (
           <button
             key={v.key}

@@ -68,7 +68,7 @@ export default function Layout() {
           {user && (
             <div
               data-testid="nav-links"
-              className="flex items-center gap-5 sm:gap-7 min-w-0 overflow-x-auto scrollbar-none"
+              className="flex items-center gap-5 sm:gap-7 min-w-0 overflow-x-auto scrollbar-none [mask-image:linear-gradient(to_right,#000_85%,transparent)] sm:[mask-image:none]"
             >
               {navLinks.map(({ to, label, end }) => (
                 <NavLink key={to} to={to} end={end} className={navLinkClass}>
@@ -106,7 +106,7 @@ export default function Layout() {
           </div>
         </div>
       </nav>
-      <main className="flex-1 w-full box-content max-w-6xl mx-auto px-4 py-8 sm:py-10">
+      <main className="flex-1 w-full max-w-[74rem] mx-auto px-4 py-8 sm:py-10">
         {/* Mandatory strong-factor enrolment (issue #905). The gate REPLACES the page: a held
             session is refused everywhere but the enrolment surface, so rendering the app behind it
             would only produce 403s. The prompt is the pre-deadline half. */}
