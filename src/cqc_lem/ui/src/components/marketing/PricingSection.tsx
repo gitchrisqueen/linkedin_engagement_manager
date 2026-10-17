@@ -49,7 +49,13 @@ export default function PricingSection() {
             <CtaButton
               section="pricing"
               cta={`pricing_${plan.tier}`}
-              label={`Start free trial on the ${plan.label} plan`}
+              // The accessible name contains the visible text (WCAG 2.5.3, Label in Name), so a
+              // voice-control user who says "click Choose Professional" finds the button.
+              label={
+                plan.tier === 'free_trial'
+                  ? 'Start free trial on the Free Trial plan'
+                  : `Choose ${plan.label} and start the free trial`
+              }
               variant={plan.recommended ? 'primary' : 'ghost'}
               className="mt-6 w-full"
               onClick={() => {

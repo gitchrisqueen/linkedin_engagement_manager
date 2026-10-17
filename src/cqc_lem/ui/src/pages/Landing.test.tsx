@@ -378,13 +378,23 @@ describe('landing analytics (issue #1300)', () => {
   it('reports which plan was chosen, and carries the intent into signup', () => {
     renderApp()
     act(() => {
-      screen.getByRole('button', { name: 'Start free trial on the Professional plan' }).click()
+      screen.getByRole('button', { name: 'Choose Professional and start the free trial' }).click()
     })
     expect(captured).toContainEqual({
       event: 'landing_plan_selected',
       properties: { tier: 'professional', price: '$79' },
     })
     expect(window.sessionStorage.getItem('lem:plan-intent')).toBe('professional')
+  })
+
+  it('names every pricing button with its visible text (WCAG 2.5.3)', () => {
+    const { container } = renderApp()
+    const buttons = [...container.querySelectorAll('[data-section="pricing"] button')]
+    expect(buttons.length).toBe(4)
+    for (const button of buttons) {
+      const visible = (button.textContent ?? '').trim()
+      expect(button.getAttribute('aria-label') ?? '', visible).toContain(visible)
+    }
   })
 
   it('reports the sections a visitor actually reached', () => {
