@@ -99,7 +99,7 @@ export default function StoryBankCard() {
   const filled = entries.filter((e) => e.body.trim() && e.active).length
 
   return (
-    <div className="bg-raised rounded-lg shadow-sm border border-hairline p-6 space-y-4"
+    <div className="bg-raised rounded-panel shadow-panel border border-hairline p-6 space-y-4"
          data-testid="story-bank">
       <h2 className="text-base font-semibold text-fg">Story Bank</h2>
       <p className="text-xs text-fg-muted">
@@ -118,7 +118,7 @@ export default function StoryBankCard() {
       <div className="space-y-3">
         {entries.map((e, idx) => (
           <div key={e.id ?? `new-${idx}`}
-               className="border border-hairline rounded-lg p-3 space-y-2">
+               className="border border-hairline rounded-panel p-3 space-y-2">
             <div className="flex flex-wrap items-center gap-2">
               <select value={e.kind} aria-label="Kind"
                 onChange={(ev) => update(idx, { kind: ev.target.value as StoryKind })}
@@ -150,7 +150,7 @@ export default function StoryBankCard() {
               onChange={(ev) => update(idx, { body: ev.target.value })}
               aria-label="What actually happened"
               placeholder="What actually happened — the real numbers, names, dates and outcome. Write it how you'd tell a colleague."
-              {...maskProps('w-full border border-field rounded-lg px-3 py-2 text-sm')} />
+              {...maskProps('w-full border border-field rounded-panel px-3 py-2 text-sm')} />
             {typeof e.used_count === 'number' && e.used_count > 0 && (
               <p className="text-xs text-fg-muted">
                 Used in {e.used_count} post{e.used_count === 1 ? '' : 's'} — LEM rotates to your
@@ -167,7 +167,7 @@ export default function StoryBankCard() {
       {msg && <p className={`text-sm font-medium ${msg.ok ? 'text-success' : 'text-danger'}`}>{msg.text}</p>}
       <button type="button" onClick={() => saveMutation.mutate(undefined, sectionSaveCallbacks('story-bank'))}
         disabled={saveMutation.isPending}
-        className="w-full bg-accent text-white py-2 rounded-lg text-sm font-semibold hover:bg-accent/90 disabled:opacity-50 transition-colors">
+        className="w-full bg-accent text-white py-2 rounded-panel text-sm font-semibold hover:bg-accent/90 disabled:opacity-50 transition-colors">
         {saveMutation.isPending ? 'Saving…' : 'Save Story Bank'}
       </button>
     </div>

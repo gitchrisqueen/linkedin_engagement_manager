@@ -180,7 +180,7 @@ export default function AuthFactorsCard() {
         {factors.length === 0 ? (
           <p className="text-xs text-fg-muted">Nothing enrolled yet.</p>
         ) : (
-          <ul className="divide-y divide-hairline border border-hairline rounded-lg">
+          <ul className="divide-y divide-hairline border border-hairline rounded-panel">
             {factors.map((f) => (
               <li key={f.id} className="flex items-center justify-between gap-3 px-3 py-2">
                 <div className="min-w-0">
@@ -230,11 +230,11 @@ export default function AuthFactorsCard() {
       </div>
 
       {totpSecret && (
-        <div className="border border-hairline rounded-lg p-3 space-y-2">
+        <div className="border border-hairline rounded-panel p-3 space-y-2">
           <p className="text-xs text-fg-muted">
             Add this key to your authenticator app, then enter the 6-digit code it shows.
           </p>
-          <code className="block text-sm font-mono bg-page px-2 py-1 rounded break-all"
+          <code className="block text-sm font-mono bg-page px-2 py-1 rounded-control break-all"
                 data-testid="totp-secret">
             {totpSecret.secret}
           </code>
@@ -253,7 +253,7 @@ export default function AuthFactorsCard() {
               type="button"
               onClick={() => confirmTotp.mutate()}
               disabled={confirmTotp.isPending || totpCode.trim().length !== 6}
-              className="bg-fg text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-fg disabled:opacity-50"
+              className="bg-fg text-white px-4 py-2 rounded-panel text-sm font-semibold hover:bg-fg disabled:opacity-50"
             >
               {confirmTotp.isPending ? 'Checking…' : 'Confirm'}
             </button>
@@ -279,7 +279,7 @@ export default function AuthFactorsCard() {
       </div>
 
       {freshCodes && (
-        <div className="border-2 border-warning/50 bg-warning/5 rounded-lg p-3 space-y-2">
+        <div className="border-2 border-warning/50 bg-warning/5 rounded-panel p-3 space-y-2">
           <p className="text-xs font-semibold text-warning">
             Save these now — this is the only time they will be shown. The previous set no longer
             works.

@@ -64,7 +64,7 @@ export default function YouTubePublishingCard() {
       headerRight={
         <span
           data-testid="youtube-status-badge"
-          className={`text-xs font-semibold px-2 py-0.5 rounded whitespace-nowrap ${badge.className}`}
+          className={`text-xs font-semibold px-2 py-0.5 rounded-control whitespace-nowrap ${badge.className}`}
         >
           {badge.text}
         </span>
@@ -104,7 +104,7 @@ export default function YouTubePublishingCard() {
           refetch()
         }}
         disabled={isFetching}
-        className="w-full bg-accent text-white py-2 rounded-lg text-sm font-semibold hover:bg-accent/90 disabled:opacity-50 transition-colors"
+        className="w-full bg-accent text-white py-2 rounded-panel text-sm font-semibold hover:bg-accent/90 disabled:opacity-50 transition-colors"
       >
         {isFetching ? 'Checking…' : 'Check now'}
       </button>

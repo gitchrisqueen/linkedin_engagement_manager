@@ -101,13 +101,13 @@ export default function LinkedInLoginCard() {
         <div className="bg-raised rounded-panel shadow-panel border border-hairline p-6 space-y-4">
           <h2 className="text-base font-semibold text-fg">
             LinkedIn Connection <span className="text-danger">*</span>
-            <span className="ml-2 text-xs font-semibold text-danger bg-danger/5 px-2 py-0.5 rounded">
+            <span className="ml-2 text-xs font-semibold text-danger bg-danger/5 px-2 py-0.5 rounded-control">
               Required
             </span>
           </h2>
 
           {isLinkedInConnected && tokenExpiringSoon && !tokenExpired && (
-            <div className="bg-warning/5 border border-warning/25 rounded-lg p-3 text-sm text-warning">
+            <div className="bg-warning/5 border border-warning/25 rounded-panel p-3 text-sm text-warning">
               Your LinkedIn authorization expires in{' '}
               <strong>
                 {daysRemaining === null
@@ -126,7 +126,7 @@ export default function LinkedInLoginCard() {
           )}
 
           {tokenExpired && isLinkedInConnected && (
-            <div className="bg-danger/5 border border-danger/25 rounded-lg p-3 text-sm text-danger">
+            <div className="bg-danger/5 border border-danger/25 rounded-panel p-3 text-sm text-danger">
               Your LinkedIn connection has expired. Please reconnect to continue posting.
             </div>
           )}
@@ -148,7 +148,7 @@ export default function LinkedInLoginCard() {
 
           <a
             href={`${LI_AUTH_URL}?session_token=${encodeURIComponent(sessionToken ?? '')}`}
-            className="inline-block w-full text-center py-2 rounded-lg text-sm font-semibold bg-accent text-white hover:bg-accent/90 cursor-pointer transition-colors"
+            className="inline-block w-full text-center py-2 rounded-panel text-sm font-semibold bg-accent text-white hover:bg-accent/90 cursor-pointer transition-colors"
           >
             {isLinkedInConnected ? 'Reconnect LinkedIn' : 'Connect LinkedIn'}
           </a>
@@ -184,14 +184,14 @@ export default function LinkedInLoginCard() {
       {/* LinkedIn Automation Password — DEPRECATED, collapsed behind a disclosure so the cookie
           path above is the one users take. Kept working for accounts that already rely on it. */}
       {isLinkedInConnected && !tokenExpired && (
-        <details className="bg-raised rounded-lg shadow-sm border border-hairline p-6 space-y-4">
+        <details className="bg-raised rounded-panel shadow-panel border border-hairline p-6 space-y-4">
           <summary className="cursor-pointer text-sm font-medium text-fg-muted">
             Use a LinkedIn password instead (not recommended)
           </summary>
           <div className="pt-4">
             <h2 className="text-base font-semibold text-fg">
               LinkedIn Automation Password{' '}
-              <span className="ml-1 text-xs font-semibold text-warning bg-warning/5 px-2 py-0.5 rounded">
+              <span className="ml-1 text-xs font-semibold text-warning bg-warning/5 px-2 py-0.5 rounded-control">
                 Deprecated
               </span>
             </h2>
@@ -234,7 +234,7 @@ export default function LinkedInLoginCard() {
             type="button"
             onClick={() => liPasswordMutation.mutate()}
             disabled={liPasswordMutation.isPending || !liPassword}
-            className="w-full bg-accent text-white py-2 rounded-lg text-sm font-semibold hover:bg-accent/90 disabled:opacity-50 transition-colors"
+            className="w-full bg-accent text-white py-2 rounded-panel text-sm font-semibold hover:bg-accent/90 disabled:opacity-50 transition-colors"
           >
             {liPasswordMutation.isPending ? 'Saving…' : 'Save Password'}
           </button>

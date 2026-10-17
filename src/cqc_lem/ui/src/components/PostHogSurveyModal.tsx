@@ -62,7 +62,7 @@ export default function PostHogSurveyModal() {
             <p className="text-xs text-fg-muted mb-4">That goes straight to the team.</p>
             <button
               onClick={dismiss}
-              className="w-full bg-accent text-white py-2 rounded-lg text-xs font-semibold hover:bg-accent/90 transition-colors"
+              className="w-full bg-accent text-white py-2 rounded-panel text-xs font-semibold hover:bg-accent/90 transition-colors"
             >
               Done
             </button>
@@ -83,7 +83,7 @@ export default function PostHogSurveyModal() {
                   onClick={() => setScore(n)}
                   aria-label={`Score ${n}`}
                   aria-pressed={score === n}
-                  className={`w-8 h-8 rounded-lg border text-xs font-semibold ${
+                  className={`w-8 h-8 rounded-panel border text-xs font-semibold ${
                     score === n
                       ? 'bg-accent border-accent text-white'
                       : 'bg-raised border-hairline text-fg-muted hover:border-accent/50'
@@ -117,7 +117,7 @@ export default function PostHogSurveyModal() {
               type="button"
               onClick={send}
               disabled={loading || score === null}
-              className="w-full bg-accent text-white py-2 rounded-lg text-xs font-semibold hover:bg-accent/90 disabled:opacity-50 transition-colors"
+              className="w-full bg-accent text-white py-2 rounded-panel text-xs font-semibold hover:bg-accent/90 disabled:opacity-50 transition-colors"
             >
               {loading ? 'Sending…' : 'Submit'}
             </button>

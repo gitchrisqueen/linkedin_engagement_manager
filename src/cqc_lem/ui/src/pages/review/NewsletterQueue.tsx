@@ -298,7 +298,7 @@ export default function NewsletterQueue(
           <div
             key={e.id}
             onClick={() => selectEdition(e)}
-            className={`bg-raised rounded-lg border p-4 cursor-pointer hover:border-accent/50 transition-colors ${
+            className={`bg-raised rounded-panel border p-4 cursor-pointer hover:border-accent/50 transition-colors ${
               selectedId === e.id ? 'border-accent ring-1 ring-accent' : 'border-hairline'
             }`}
           >
@@ -332,12 +332,12 @@ export default function NewsletterQueue(
             {(e.format || e.hook_style) && (
               <div className="flex flex-wrap gap-1 mt-1.5">
                 {e.format && (
-                  <span className="px-1.5 py-0.5 rounded bg-accent/5 text-accent text-xs font-medium">
+                  <span className="px-1.5 py-0.5 rounded-control bg-accent/5 text-accent text-xs font-medium">
                     {prettyKey(e.format)}
                   </span>
                 )}
                 {e.hook_style && (
-                  <span className="px-1.5 py-0.5 rounded bg-accent/5 text-accent text-xs font-medium">
+                  <span className="px-1.5 py-0.5 rounded-control bg-accent/5 text-accent text-xs font-medium">
                     {prettyKey(e.hook_style)} hook
                   </span>
                 )}
@@ -370,17 +370,17 @@ export default function NewsletterQueue(
             <div>
               <label className="block text-sm font-medium text-fg mb-1">Title</label>
               <input type="text" value={draftEdit.title || ''} onChange={(e) => setDe({ title: e.target.value })}
-                className="w-full border border-field rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent" />
+                className="w-full border border-field rounded-control px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent" />
             </div>
             <div>
               <label className="block text-sm font-medium text-fg mb-1">Subtitle</label>
               <input type="text" value={draftEdit.subtitle || ''} onChange={(e) => setDe({ subtitle: e.target.value })}
-                className="w-full border border-field rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent" />
+                className="w-full border border-field rounded-control px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent" />
             </div>
             <div>
               <label className="block text-sm font-medium text-fg mb-1">Body</label>
               <textarea value={draftEdit.body || ''} onChange={(e) => setDe({ body: e.target.value })} rows={10}
-                {...maskProps('w-full border border-field rounded-lg px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-accent')} />
+                {...maskProps('w-full border border-field rounded-panel px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-accent')} />
             </div>
             <div>
               <label className="block text-sm font-medium text-fg mb-1">
@@ -398,7 +398,7 @@ export default function NewsletterQueue(
                 onChange={(e) =>
                   setDe({ scheduled_for: zonedInputToUtcIso(e.target.value, userTimezone) ?? draftEdit.scheduled_for })
                 }
-                className="w-full border border-field rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent disabled:bg-page"
+                className="w-full border border-field rounded-control px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent disabled:bg-page"
               />
             </div>
 
@@ -422,13 +422,13 @@ export default function NewsletterQueue(
               {draftEdit.cover_image_url ? (
                 <>
                   <img src={draftEdit.cover_image_url} alt="Newsletter cover"
-                    className="w-full rounded-lg border border-hairline object-cover" />
+                    className="w-full rounded-panel border border-hairline object-cover" />
                   {/* The consequence clause depends on the account's own publish gate (#1135):
                       for an opted-out draft the edition does NOT reach its slot at all, so
                       promising it "publishes on time" is the reassurance that stops the author
                       acting on the thing this box exists to make them act on. */}
                   {draftEdit.cover_image_status !== 'approved' && (
-                    <p className="text-xs text-warning bg-warning/5 border border-warning/25 rounded-lg px-3 py-2">
+                    <p className="text-xs text-warning bg-warning/5 border border-warning/25 rounded-panel px-3 py-2">
                       A generated cover is a public brand asset, so it only goes out once you
                       approve it here.{' '}
                       {draftEdit.status === 'approved' || data?.auto_publish_newsletters
@@ -462,11 +462,11 @@ export default function NewsletterQueue(
               </div>
               <div className="grid grid-cols-2 gap-2">
                 <button type="button" onClick={() => coverFileRef.current?.click()} disabled={busy || coverBusy}
-                  className="bg-page text-fg py-2 rounded-lg text-sm font-semibold hover:bg-hairline disabled:opacity-50 transition-colors">
+                  className="bg-page text-fg py-2 rounded-panel text-sm font-semibold hover:bg-hairline disabled:opacity-50 transition-colors">
                   {uploadCoverMutation.isPending ? 'Uploading…' : 'Upload image'}
                 </button>
                 <button type="button" onClick={() => generateCoverMutation.mutate()} disabled={busy || coverBusy}
-                  className="bg-accent/5 text-accent py-2 rounded-lg text-sm font-semibold hover:bg-accent/10 disabled:opacity-50 transition-colors">
+                  className="bg-accent/5 text-accent py-2 rounded-panel text-sm font-semibold hover:bg-accent/10 disabled:opacity-50 transition-colors">
                   {coverWaitId != null ? 'Generating…' : 'Generate with AI'}
                 </button>
               </div>
@@ -488,13 +488,13 @@ export default function NewsletterQueue(
                   {draftEdit.cover_image_status !== 'approved' && (
                     <button type="button" onClick={() => coverDecisionMutation.mutate('approve')}
                       disabled={busy || coverBusy}
-                      className="bg-success text-white py-2 rounded-lg text-sm font-semibold hover:bg-success/90 disabled:opacity-50 transition-colors">
+                      className="bg-accent text-on-accent py-2 rounded-panel text-sm font-semibold hover:bg-accent/90 disabled:opacity-50 transition-colors">
                       Approve cover
                     </button>
                   )}
                   <button type="button" onClick={() => coverDecisionMutation.mutate('remove')}
                     disabled={busy || coverBusy}
-                    className={`text-fg-muted py-2 rounded-lg text-sm font-semibold bg-page hover:bg-hairline disabled:opacity-50 transition-colors ${
+                    className={`text-fg-muted py-2 rounded-panel text-sm font-semibold bg-page hover:bg-hairline disabled:opacity-50 transition-colors ${
                       draftEdit.cover_image_status === 'approved' ? 'col-span-2' : ''
                     }`}>
                     Remove cover
@@ -514,7 +514,7 @@ export default function NewsletterQueue(
                 disabled={busy}
                 className="w-full border border-field rounded-control px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent disabled:opacity-50" />
               <button type="button" onClick={() => regenerateMutation.mutate()} disabled={busy}
-                className="w-full bg-accent text-white py-2 rounded-lg text-sm font-semibold hover:bg-accent/90 disabled:opacity-50 transition-colors">
+                className="w-full bg-accent text-white py-2 rounded-panel text-sm font-semibold hover:bg-accent/90 disabled:opacity-50 transition-colors">
                 {regenerating ? 'Regenerating…' : 'Re-generate'}
               </button>
             </div>
@@ -531,11 +531,11 @@ export default function NewsletterQueue(
             )}
             <div className="grid grid-cols-2 gap-2">
               <button type="button" onClick={() => draftMutation.mutate('save')} disabled={busy}
-                className="bg-page text-fg py-2 rounded-lg text-sm font-semibold hover:bg-hairline disabled:opacity-50 transition-colors">
+                className="bg-page text-fg py-2 rounded-panel text-sm font-semibold hover:bg-hairline disabled:opacity-50 transition-colors">
                 Save Draft
               </button>
               <button type="button" onClick={() => draftMutation.mutate('approve')} disabled={busy}
-                className="bg-accent text-white py-2 rounded-lg text-sm font-semibold hover:bg-accent/90 disabled:opacity-50 transition-colors">
+                className="bg-accent text-white py-2 rounded-panel text-sm font-semibold hover:bg-accent/90 disabled:opacity-50 transition-colors">
                 Approve &amp; Schedule
               </button>
             </div>

@@ -69,7 +69,7 @@ export default function TimezoneCard() {
   return (
     <form
       onSubmit={(e) => { e.preventDefault(); tzMutation.mutate() }}
-      className="bg-raised rounded-lg shadow-sm border border-hairline p-6 space-y-4"
+      className="bg-raised rounded-panel shadow-panel border border-hairline p-6 space-y-4"
     >
       <h2 className="text-base font-semibold text-fg">Timezone</h2>
       <div>
@@ -77,7 +77,7 @@ export default function TimezoneCard() {
         <select
           value={timezone}
           onChange={(e) => setTzEdit(e.target.value)}
-          className="w-full border border-field rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent"
+          className="w-full border border-field rounded-control px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent"
         >
           {COMMON_TIMEZONES.map((tz) => (
             <option key={tz} value={tz}>{tz}</option>
@@ -97,7 +97,7 @@ export default function TimezoneCard() {
       <button
         type="submit"
         disabled={tzMutation.isPending}
-        className="w-full bg-accent text-white py-2 rounded-lg text-sm font-semibold hover:bg-accent/90 disabled:opacity-50 transition-colors"
+        className="w-full bg-accent text-white py-2 rounded-panel text-sm font-semibold hover:bg-accent/90 disabled:opacity-50 transition-colors"
       >
         {tzMutation.isPending ? 'Saving…' : 'Save Timezone'}
       </button>

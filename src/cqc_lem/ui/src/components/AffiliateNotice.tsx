@@ -22,7 +22,7 @@ export default function AffiliateNotice() {
   }
 
   return (
-    <div className="bg-accent/5 border border-accent/25 rounded-lg p-4" data-testid="affiliate-notice">
+    <div className="bg-accent/5 border border-accent/25 rounded-panel p-4" data-testid="affiliate-notice">
       <p className="text-sm font-semibold text-accent">
         {data.bonus_days > 0
           ? `🎉 You're in the LEM affiliate program — and your trial is ${data.bonus_days} days longer`

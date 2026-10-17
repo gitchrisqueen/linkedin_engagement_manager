@@ -66,7 +66,7 @@ export default function AdminAuditLogPage() {
   return (
     <div className="max-w-5xl space-y-6">
       <div>
-        <h1 className="text-section font-semibold tabular-nums text-fg">Audit log</h1>
+        <h1 className="text-section lg:text-section-lg font-semibold text-fg">Audit log</h1>
         <p className="text-sm text-fg-muted">
           Every admin role, disable/enable and subscription-grant change — who did it, and to whom.
         </p>
@@ -79,7 +79,7 @@ export default function AdminAuditLogPage() {
           placeholder="Filter by user id…"
           value={userIdFilter}
           onChange={(e) => { setUserIdFilter(e.target.value); setPage(0) }}
-          className="text-sm border border-field rounded-lg px-3 py-1.5 w-48"
+          className="text-sm border border-field rounded-control px-3 py-1.5 w-48"
         />
         <button
           onClick={() => void refetch()}
@@ -94,7 +94,7 @@ export default function AdminAuditLogPage() {
         <p className="text-sm text-danger">Could not load the audit log: {errorText(error)}</p>
       )}
 
-      <div className="bg-raised border border-hairline rounded-xl shadow-sm overflow-hidden">
+      <div className="bg-raised border border-hairline rounded-panel shadow-panel overflow-hidden">
         <TableScroll label="Audit log" minWidth={800} testId="audit-log-table">
           <table className="w-full text-sm text-left">
             <thead className="bg-page text-fg-muted font-medium">

@@ -66,7 +66,7 @@ export default function LinkedInDisplayNameCard() {
       title="Your LinkedIn Name"
       subtitle="Type your name exactly as it appears at the top of your LinkedIn profile — same spelling, accents and capitalisation LinkedIn shows on your messages. One field: your full display name, not separate first and last names."
       headerRight={
-        <span className="text-xs font-semibold text-danger bg-danger/5 px-2 py-0.5 rounded whitespace-nowrap">
+        <span className="text-xs font-semibold text-danger bg-danger/5 px-2 py-0.5 rounded-control whitespace-nowrap">
           Required
         </span>
       }
@@ -88,7 +88,7 @@ export default function LinkedInDisplayNameCard() {
           onChange={(e) => setTyped(e.target.value)}
           aria-required="true"
           aria-invalid={loaded && !trimmed}
-          className="w-full border border-field rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent"
+          className="w-full border border-field rounded-control px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent"
           placeholder="e.g. Jordan Alvarez"
         />
         {loaded && !trimmed && (
@@ -118,7 +118,7 @@ export default function LinkedInDisplayNameCard() {
         type="button"
         onClick={() => mutation.mutate()}
         disabled={mutation.isPending || !trimmed || trimmed === saved}
-        className="w-full bg-accent text-white py-2 rounded-lg text-sm font-semibold hover:bg-accent/90 disabled:opacity-50 transition-colors"
+        className="w-full bg-accent text-white py-2 rounded-panel text-sm font-semibold hover:bg-accent/90 disabled:opacity-50 transition-colors"
       >
         {mutation.isPending ? 'Saving…' : 'Save Name'}
       </button>

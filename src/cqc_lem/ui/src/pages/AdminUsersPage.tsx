@@ -195,7 +195,7 @@ export default function AdminUsersPage() {
   return (
     <div className="max-w-6xl space-y-6">
       <div>
-        <h1 className="text-section font-semibold tabular-nums text-fg">User management</h1>
+        <h1 className="text-section lg:text-section-lg font-semibold text-fg">User management</h1>
         <p className="text-sm text-fg-muted">
           Every account, who can administer LEM, and whether their automation runs. Subscription
           state comes from billing (a grant is a one-time comp, not an override), and preferences
@@ -210,7 +210,7 @@ export default function AdminUsersPage() {
           placeholder="Search email…"
           value={search}
           onChange={(e) => { setSearch(e.target.value); setPage(0) }}
-          className="text-sm border border-field rounded-lg px-3 py-1.5 w-64"
+          className="text-sm border border-field rounded-control px-3 py-1.5 w-64"
         />
         <div className="flex items-center gap-2">
           <label htmlFor="subscription-filter" className="text-sm text-fg-muted">Subscription</label>
@@ -218,7 +218,7 @@ export default function AdminUsersPage() {
             id="subscription-filter"
             value={subscriptionFilter}
             onChange={(e) => { setSubscriptionFilter(e.target.value); setPage(0) }}
-            className="text-sm border border-field rounded-lg px-2 py-1"
+            className="text-sm border border-field rounded-control px-2 py-1"
           >
             <option value="">All</option>
             {Object.entries(SUBSCRIPTION_LABELS).map(([value, label]) => (
@@ -232,7 +232,7 @@ export default function AdminUsersPage() {
             id="connection-filter"
             value={connectionFilter}
             onChange={(e) => { setConnectionFilter(e.target.value); setPage(0) }}
-            className="text-sm border border-field rounded-lg px-2 py-1"
+            className="text-sm border border-field rounded-control px-2 py-1"
           >
             <option value="">All</option>
             {Object.entries(CONNECTION_LABELS).map(([value, label]) => (
@@ -261,7 +261,7 @@ export default function AdminUsersPage() {
         <p className="text-sm text-danger">Could not load users: {errorText(error)}</p>
       )}
 
-      <div className="bg-raised border border-hairline rounded-xl shadow-sm overflow-hidden">
+      <div className="bg-raised border border-hairline rounded-panel shadow-panel overflow-hidden">
         <TableScroll label="Users" minWidth={900} testId="users-table">
           <table className="w-full text-sm text-left">
             <thead className="bg-page text-fg-muted font-medium">
@@ -342,7 +342,7 @@ export default function AdminUsersPage() {
                           onClick={() => handleRole(item)}
                           disabled={role.isPending}
                           className={classNames(
-                            'text-xs px-2.5 py-1 rounded disabled:opacity-50',
+                            'text-xs px-2.5 py-1 rounded-control disabled:opacity-50',
                             item.is_admin
                               ? 'bg-page text-fg hover:bg-hairline'
                               : 'bg-accent text-white hover:bg-accent/90'
@@ -364,7 +364,7 @@ export default function AdminUsersPage() {
                           disabled={disabling.isPending || item.id === user?.userId}
                           title={item.id === user?.userId ? 'You cannot disable your own account' : undefined}
                           className={classNames(
-                            'text-xs px-2.5 py-1 rounded disabled:opacity-50',
+                            'text-xs px-2.5 py-1 rounded-control disabled:opacity-50',
                             item.disabled
                               ? 'bg-success/5 text-success hover:bg-success/10'
                               : 'bg-danger/5 text-danger hover:bg-danger/10'

@@ -74,7 +74,7 @@ export function SaveAllBar() {
   const bar = (
     <div className={dock ? 'max-w-xs' : 'fixed bottom-4 right-4 z-40 max-w-xs'}>
       {summary && (
-        <div className="mb-2 bg-raised rounded-lg shadow-lg border border-hairline p-3 space-y-1">
+        <div className="mb-2 bg-raised rounded-panel shadow-lg border border-hairline p-3 space-y-1">
           {summary.map((r, i) => (
             <p key={i} className={`text-xs font-medium ${r.ok ? 'text-success' : 'text-danger'}`}>
               {r.ok ? '✓' : '✕'} {r.label}

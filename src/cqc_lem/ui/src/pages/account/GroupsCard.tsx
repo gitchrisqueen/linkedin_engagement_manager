@@ -142,7 +142,7 @@ export default function GroupsCard() {
   const postingGroups = groups.filter((g) => g.post_enabled)
 
   return (
-    <div className="bg-raised rounded-lg shadow-sm border border-hairline p-6 space-y-4">
+    <div className="bg-raised rounded-panel shadow-panel border border-hairline p-6 space-y-4">
       <h2 className="text-base font-semibold text-fg">LinkedIn Groups</h2>
       <div className="text-xs text-fg-muted space-y-1">
         <p>Two separate things happen in your joined groups, and each has its own switch per group. Both are on by default.</p>
@@ -169,7 +169,7 @@ export default function GroupsCard() {
       </div>
 
       {draft && draftText !== null && (
-        <div className="border border-accent/25 bg-accent/5 rounded p-3 space-y-2">
+        <div className="border border-accent/25 bg-accent/5 rounded-control p-3 space-y-2">
           <h3 className="text-sm font-semibold text-fg">
             Next group post — {draft.group_name || `Group ${draft.group_id}`}
           </h3>
@@ -188,7 +188,7 @@ export default function GroupsCard() {
             value={draftText}
             onChange={(e) => setDraftEdit(e.target.value)}
             rows={8}
-            {...maskProps('w-full border border-field rounded p-2 text-sm text-fg')}
+            {...maskProps('w-full border border-field rounded-control p-2 text-sm text-fg')}
           />
           <div className="flex items-center justify-between gap-3">
             <span className={`text-xs ${draftText.length > GROUP_POST_MAX ? 'text-danger' : 'text-fg-muted'}`}>
@@ -199,14 +199,14 @@ export default function GroupsCard() {
                 <button type="button"
                   onClick={() => draftMutation.mutate({ status: draftSkipped ? 'ready' : 'skipped' })}
                   disabled={draftMutation.isPending}
-                  className="px-3 py-1.5 rounded-lg text-sm font-semibold border border-field text-fg hover:bg-page disabled:opacity-50 transition-colors">
+                  className="px-3 py-1.5 rounded-control text-sm font-semibold border border-field text-fg hover:bg-page disabled:opacity-50 transition-colors">
                   {draftSkipped ? 'Undo skip' : 'Skip this week'}
                 </button>
               )}
               <button type="button"
                 onClick={() => draftMutation.mutate({ content: draftText }, sectionSaveCallbacks('group-post'))}
                 disabled={draftMutation.isPending || !draftDirty}
-                className="px-3 py-1.5 rounded-lg text-sm font-semibold bg-accent text-white hover:bg-accent/90 disabled:opacity-50 transition-colors">
+                className="px-3 py-1.5 rounded-control text-sm font-semibold bg-accent text-white hover:bg-accent/90 disabled:opacity-50 transition-colors">
                 {draftMutation.isPending ? 'Saving…' : 'Save post'}
               </button>
             </span>
@@ -218,7 +218,7 @@ export default function GroupsCard() {
         <p className={`text-sm font-medium ${draftMsg.ok ? 'text-success' : 'text-danger'}`}>{draftMsg.text}</p>
       )}
 
-      <p className="text-xs text-fg-muted bg-page border border-hairline rounded p-2">
+      <p className="text-xs text-fg-muted bg-page border border-hairline rounded-control p-2">
         {postingGroups.length === 0
           ? 'Next group post: none — no group has Post turned on, so LEM will not post in any group.'
           : markedNext
@@ -239,7 +239,7 @@ export default function GroupsCard() {
             <span className="text-sm text-fg truncate pr-3">
               {groupLabel(g)}
               {markedNext?.group_id === g.group_id && (
-                <span className="ml-2 text-xs font-semibold uppercase text-accent bg-accent/5 rounded px-1.5 py-0.5">
+                <span className="ml-2 text-xs font-semibold uppercase text-accent bg-accent/5 rounded-control px-1.5 py-0.5">
                   Next post
                 </span>
               )}
@@ -256,7 +256,7 @@ export default function GroupsCard() {
       {groupsMsg && <p className={`text-sm font-medium ${groupsMsg.ok ? 'text-success' : 'text-danger'}`}>{groupsMsg.text}</p>}
       <button type="button" onClick={() => groupsMutation.mutate(undefined, sectionSaveCallbacks('groups'))}
         disabled={groupsMutation.isPending}
-        className="w-full bg-accent text-white py-2 rounded-lg text-sm font-semibold hover:bg-accent/90 disabled:opacity-50 transition-colors">
+        className="w-full bg-accent text-white py-2 rounded-panel text-sm font-semibold hover:bg-accent/90 disabled:opacity-50 transition-colors">
         {groupsMutation.isPending ? 'Saving…' : 'Save Group Settings'}
       </button>
     </div>

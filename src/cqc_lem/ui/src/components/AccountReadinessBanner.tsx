@@ -11,7 +11,7 @@ export default function AccountReadinessBanner() {
   if (missing.length === 0) return null
 
   return (
-    <div className="bg-warning/5 border border-warning/50 rounded-lg p-4 mb-6">
+    <div className="bg-warning/5 border border-warning/50 rounded-panel p-4 mb-6">
       <p className="text-sm font-semibold text-warning">
         ⚠️ Finish setting up your account before automation can run
       </p>

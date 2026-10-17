@@ -92,7 +92,7 @@ export default function LinkedInProfileRefreshCard() {
         data-testid="refresh-profile-data"
         onClick={() => mutation.mutate()}
         disabled={mutation.isPending || spent}
-        className="w-full bg-accent text-white py-2 rounded-lg text-sm font-semibold hover:bg-accent/90 disabled:opacity-50 transition-colors"
+        className="w-full bg-accent text-white py-2 rounded-panel text-sm font-semibold hover:bg-accent/90 disabled:opacity-50 transition-colors"
       >
         {mutation.isPending
           ? 'Starting…'

@@ -136,7 +136,7 @@ export default function OutreachFunnel() {
           className="w-full border border-field rounded-control px-3 py-2 text-sm" />
         <textarea value={draft} onChange={(e) => setDraft(e.target.value)} rows={3} maxLength={DRAFT_MAX}
           placeholder="Your value-adding comment…"
-          {...maskProps('w-full border border-field rounded-lg px-3 py-2 text-sm')} />
+          {...maskProps('w-full border border-field rounded-panel px-3 py-2 text-sm')} />
         <div className="flex flex-wrap items-center gap-3">
           <button onClick={() => createMutation.mutate('pending')} disabled={!canSubmit || createMutation.isPending}
             className="px-4 py-2 border border-field rounded-control text-sm text-fg hover:bg-page disabled:opacity-50">
@@ -198,7 +198,7 @@ export default function OutreachFunnel() {
                     onChange={(e) => setEdits((prev) => ({ ...prev, [t.id]: e.target.value }))}
                     rows={3} maxLength={DRAFT_MAX}
                     placeholder={t.stage === 'comment' ? 'Comment text…' : t.stage === 'connect' ? 'Connection note…' : 'DM message…'}
-                    {...maskProps('w-full border border-field rounded-lg px-3 py-2 text-sm')} />
+                    {...maskProps('w-full border border-field rounded-panel px-3 py-2 text-sm')} />
                   <div className="flex gap-2 flex-wrap">
                     <button onClick={() => saveMutation.mutate({ id: t.id, draft_text: draftValue })}
                       disabled={!editing || saveMutation.isPending}
@@ -208,7 +208,7 @@ export default function OutreachFunnel() {
                     {['pending', 'failed', 'skipped'].includes(t.status) && (
                       <button onClick={() => actionMutation.mutate({ id: t.id, action: 'approve' })}
                         disabled={actionMutation.isPending}
-                        className="px-3 py-1 bg-success text-white rounded-control text-xs font-semibold hover:bg-success/90 disabled:opacity-50">
+                        className="px-3 py-1 bg-accent text-on-accent rounded-control text-xs font-semibold hover:bg-accent/90 disabled:opacity-50">
                         {t.status === 'pending' ? 'Approve' : 'Retry'} {t.stage}
                       </button>
                     )}

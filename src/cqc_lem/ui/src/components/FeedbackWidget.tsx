@@ -142,7 +142,7 @@ export default function FeedbackWidget() {
           </p>
           <button
             onClick={close}
-            className="w-full bg-accent text-white py-2 rounded-lg text-xs font-semibold hover:bg-accent/90 transition-colors"
+            className="w-full bg-accent text-white py-2 rounded-panel text-xs font-semibold hover:bg-accent/90 transition-colors"
           >
             Done
           </button>
@@ -177,7 +177,7 @@ export default function FeedbackWidget() {
               type="file"
               accept="image/*"
               onChange={handleScreenshot}
-              className="mt-1 block w-full text-xs text-fg-muted file:mr-2 file:py-1 file:px-2 file:rounded file:border-0 file:bg-page file:text-fg-muted"
+              className="mt-1 block w-full text-xs text-fg-muted file:mr-2 file:py-1 file:px-2 file:rounded-control file:border-0 file:bg-page file:text-fg-muted"
             />
           </label>
           {screenshotName && (
@@ -192,7 +192,7 @@ export default function FeedbackWidget() {
           <button
             type="submit"
             disabled={loading || !body.trim()}
-            className="w-full bg-accent text-white py-2 rounded-lg text-xs font-semibold hover:bg-accent/90 disabled:opacity-50 transition-colors"
+            className="w-full bg-accent text-white py-2 rounded-panel text-xs font-semibold hover:bg-accent/90 disabled:opacity-50 transition-colors"
           >
             {loading ? 'Sending…' : 'Send feedback'}
           </button>

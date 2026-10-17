@@ -160,12 +160,12 @@ export default function LeadsInbox({ userTimezone }: { userTimezone: string }) {
                 <textarea value={draftFor(s)} rows={3} maxLength={DRAFT_MAX}
                   onChange={(e) => setDrafts({ ...drafts, [s.id]: e.target.value })}
                   placeholder="Your response…"
-                  {...maskProps('w-full border border-field rounded-lg px-3 py-2 text-sm')} />
+                  {...maskProps('w-full border border-field rounded-panel px-3 py-2 text-sm')} />
                 <div className="flex gap-2">
                   <button
                     onClick={() => actionMutation.mutate({ id: s.id, action: 'approve', draft_response: draftFor(s) })}
                     disabled={actionMutation.isPending || !draftFor(s).trim()}
-                    className="px-3 py-1 bg-success text-white rounded-control text-xs font-semibold hover:bg-success/90 disabled:opacity-50">
+                    className="px-3 py-1 bg-accent text-on-accent rounded-control text-xs font-semibold hover:bg-accent/90 disabled:opacity-50">
                     Approve &amp; send
                   </button>
                   <button

@@ -113,7 +113,7 @@ export default function AdminFeedbackPage() {
     <div className="max-w-5xl space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-section font-semibold tabular-nums text-fg">Feedback triage</h1>
+          <h1 className="text-section lg:text-section-lg font-semibold text-fg">Feedback triage</h1>
           <p className="text-sm text-fg-muted">
             Approve feedback for the auto-work pipeline or dismiss it. Only feedback from admin users is auto-triaged without review.
           </p>
@@ -127,7 +127,7 @@ export default function AdminFeedbackPage() {
             id="status-filter"
             value={statusFilter}
             onChange={(e) => { setStatusFilter(e.target.value); setPage(0) }}
-            className="text-sm border border-field rounded-lg px-2 py-1"
+            className="text-sm border border-field rounded-control px-2 py-1"
           >
             <option value="">All</option>
             {Object.entries(STATUS_LABELS).map(([value, label]) => (
@@ -141,7 +141,7 @@ export default function AdminFeedbackPage() {
             id="source-filter"
             value={sourceFilter}
             onChange={(e) => { setSourceFilter(e.target.value); setPage(0) }}
-            className="text-sm border border-field rounded-lg px-2 py-1"
+            className="text-sm border border-field rounded-control px-2 py-1"
           >
             <option value="">All</option>
             {Object.entries(SOURCE_LABELS).map(([value, label]) => (
@@ -176,7 +176,7 @@ export default function AdminFeedbackPage() {
         </p>
       )}
 
-      <div className="bg-raised border border-hairline rounded-xl shadow-sm overflow-hidden">
+      <div className="bg-raised border border-hairline rounded-panel shadow-panel overflow-hidden">
         <TableScroll label="Feedback submissions" minWidth={900} testId="feedback-table">
           <table className="w-full text-sm text-left">
             <thead className="bg-page text-fg-muted font-medium">
@@ -242,14 +242,14 @@ export default function AdminFeedbackPage() {
                           <button
                             onClick={() => handleAction(item.id, 'approve')}
                             disabled={review.isPending}
-                            className="text-xs bg-accent text-white px-2.5 py-1 rounded hover:bg-accent/90 disabled:opacity-50"
+                            className="text-xs bg-accent text-white px-2.5 py-1 rounded-control hover:bg-accent/90 disabled:opacity-50"
                           >
                             {review.isPending && actedId === item.id ? 'Working…' : 'Approve'}
                           </button>
                           <button
                             onClick={() => handleAction(item.id, 'dismiss')}
                             disabled={review.isPending}
-                            className="text-xs bg-page text-fg px-2.5 py-1 rounded hover:bg-hairline disabled:opacity-50"
+                            className="text-xs bg-page text-fg px-2.5 py-1 rounded-control hover:bg-hairline disabled:opacity-50"
                           >
                             Dismiss
                           </button>

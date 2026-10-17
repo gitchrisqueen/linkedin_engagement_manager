@@ -12,7 +12,7 @@ export default function SuppressionBanner() {
   if (!data.tripped) {
     if (data.current?.status !== 'watch') return null
     return (
-      <div className="bg-warning/5 border border-warning/50 rounded-lg p-4">
+      <div className="bg-warning/5 border border-warning/50 rounded-panel p-4">
         <p className="text-sm font-semibold text-warning">👀 Watching your reach</p>
         <p className="mt-1 text-sm text-warning">{data.current.reason}</p>
         <p className="mt-2 text-xs text-warning">
@@ -32,7 +32,7 @@ export default function SuppressionBanner() {
     : null
 
   return (
-    <div className="bg-danger/5 border border-danger/50 rounded-lg p-4">
+    <div className="bg-danger/5 border border-danger/50 rounded-panel p-4">
       <p className="text-sm font-semibold text-danger">
         ⚠️ Engagement automation is paused — your reach dropped sharply
       </p>
@@ -59,7 +59,7 @@ export default function SuppressionBanner() {
         type="button"
         onClick={() => resume.mutate()}
         disabled={resume.isPending}
-        className="mt-3 px-4 py-2 rounded-md bg-danger text-white text-sm font-semibold hover:bg-danger/90 disabled:opacity-50"
+        className="mt-3 px-4 py-2 rounded-control bg-danger text-white text-sm font-semibold hover:bg-danger/90 disabled:opacity-50"
       >
         {resume.isPending ? 'Re-enabling…' : 'Re-enable engagement automation'}
       </button>

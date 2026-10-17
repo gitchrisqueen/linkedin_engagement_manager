@@ -114,7 +114,7 @@ export default function LoginLocationCard() {
         type="button"
         onClick={() => setLocationByCityMutation.mutate()}
         disabled={setLocationByCityMutation.isPending || !locCity.trim()}
-        className="w-full bg-accent text-white py-2 rounded-lg text-sm font-semibold hover:bg-accent/90 disabled:opacity-50 transition-colors"
+        className="w-full bg-accent text-white py-2 rounded-panel text-sm font-semibold hover:bg-accent/90 disabled:opacity-50 transition-colors"
       >
         {setLocationByCityMutation.isPending ? 'Setting…' : 'Set location'}
       </button>
@@ -130,7 +130,7 @@ export default function LoginLocationCard() {
         type="button"
         onClick={() => autocaptureLocationMutation.mutate()}
         disabled={autocaptureLocationMutation.isPending}
-        className="w-full bg-page text-fg py-2 rounded-lg text-sm font-semibold hover:bg-hairline disabled:opacity-50 transition-colors"
+        className="w-full bg-page text-fg py-2 rounded-panel text-sm font-semibold hover:bg-hairline disabled:opacity-50 transition-colors"
       >
         {autocaptureLocationMutation.isPending ? 'Detecting…' : 'Use my current location (auto-detect)'}
       </button>

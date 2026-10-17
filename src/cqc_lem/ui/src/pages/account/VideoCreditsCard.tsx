@@ -51,7 +51,7 @@ export default function VideoCreditsCard() {
         {VIDEO_PACKAGES.map((pkg) => (
           <div
             key={pkg.key}
-            className={`relative border rounded-xl p-4 flex flex-col items-center gap-1 ${
+            className={`relative border rounded-panel p-4 flex flex-col items-center gap-1 ${
               pkg.key === 'medium' ? 'border-accent/50 bg-accent/5' : 'border-hairline bg-raised'
             }`}
           >
@@ -60,7 +60,7 @@ export default function VideoCreditsCard() {
             <button
               onClick={() => buyVideoCreditsMutation.mutate(pkg.key)}
               disabled={buyVideoCreditsMutation.isPending}
-              className="mt-2 w-full py-1.5 rounded-lg bg-accent hover:bg-accent/90 text-white text-sm font-medium disabled:opacity-50 transition-colors"
+              className="mt-2 w-full py-1.5 rounded-panel bg-accent hover:bg-accent/90 text-white text-sm font-medium disabled:opacity-50 transition-colors"
             >
               {buyVideoCreditsMutation.isPending ? '…' : 'Buy'}
             </button>

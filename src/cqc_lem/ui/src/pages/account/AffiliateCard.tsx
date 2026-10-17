@@ -53,7 +53,7 @@ export default function AffiliateCard() {
     : null
 
   return (
-    <div className="bg-raised rounded-lg shadow-sm border border-hairline p-6 space-y-5">
+    <div className="bg-raised rounded-panel shadow-panel border border-hairline p-6 space-y-5">
       <div className="flex items-start justify-between gap-4">
         <div>
           <h2 className="text-base font-semibold text-fg">Affiliate program</h2>
@@ -79,15 +79,15 @@ export default function AffiliateCard() {
       {data.eligible && data.enrolled && (
         <>
           <div className="grid grid-cols-3 gap-3 text-center">
-            <div className="rounded-lg bg-page p-3">
+            <div className="rounded-panel bg-page p-3">
               <p className="text-lg font-bold text-fg">{data.referrals.converted}</p>
               <p className="text-xs text-fg-muted">Referrals active</p>
             </div>
-            <div className="rounded-lg bg-page p-3">
+            <div className="rounded-panel bg-page p-3">
               <p className="text-lg font-bold text-fg">{data.referrals.pending}</p>
               <p className="text-xs text-fg-muted">Signed up, not yet active</p>
             </div>
-            <div className="rounded-lg bg-page p-3">
+            <div className="rounded-panel bg-page p-3">
               <p className="text-lg font-bold text-fg">
                 {data.days_earned}
                 <span className="text-xs font-normal text-fg-muted"> / {data.max_reward_days}</span>
@@ -105,12 +105,12 @@ export default function AffiliateCard() {
                   readOnly
                   value={data.referral_url}
                   data-testid="referral-link"
-                  className="flex-1 border border-field rounded-lg px-3 py-2 text-sm bg-page"
+                  className="flex-1 border border-field rounded-control px-3 py-2 text-sm bg-page"
                 />
                 <button
                   type="button"
                   onClick={copyLink}
-                  className="px-4 py-2 rounded-lg bg-accent text-white text-sm font-semibold hover:bg-accent/90"
+                  className="px-4 py-2 rounded-control bg-accent text-white text-sm font-semibold hover:bg-accent/90"
                 >
                   {copied ? 'Copied' : 'Copy'}
                 </button>
@@ -127,7 +127,7 @@ export default function AffiliateCard() {
           </div>
 
           {/* (B) — a separate, explicit opt-IN. Never bundled with the toggle above. */}
-          <div className="rounded-lg border border-warning/25 bg-warning/5 p-4 space-y-3">
+          <div className="rounded-panel border border-warning/25 bg-warning/5 p-4 space-y-3">
             <div className="flex items-start justify-between gap-4">
               <div>
                 <p className="text-sm font-semibold text-warning">
@@ -162,14 +162,14 @@ export default function AffiliateCard() {
                     setConfirmingPromo(false)
                   }}
                   disabled={setPromo.isPending}
-                  className="px-3 py-1.5 rounded-md bg-warning text-white text-xs font-semibold hover:bg-warning/90 disabled:opacity-50"
+                  className="px-3 py-1.5 rounded-control bg-accent text-on-accent text-xs font-semibold hover:bg-accent/90 disabled:opacity-50"
                 >
                   I agree — post about LEM from my account
                 </button>
                 <button
                   type="button"
                   onClick={() => setConfirmingPromo(false)}
-                  className="px-3 py-1.5 rounded-md border border-warning/50 text-warning text-xs font-semibold"
+                  className="px-3 py-1.5 rounded-control border border-warning/50 text-warning text-xs font-semibold"
                 >
                   Cancel
                 </button>

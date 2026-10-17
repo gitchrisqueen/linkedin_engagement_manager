@@ -147,7 +147,7 @@ export default function ScheduledDMs(
         </div>
         <textarea value={body} onChange={(e) => setBody(e.target.value)} rows={3} maxLength={MSG_MAX}
           placeholder="Your message…"
-          {...maskProps('w-full border border-field rounded-lg px-3 py-2 text-sm')} />
+          {...maskProps('w-full border border-field rounded-panel px-3 py-2 text-sm')} />
         <div className="flex flex-wrap items-center gap-3">
           <label className="flex items-center gap-2 text-xs text-fg-muted">
             <input type="datetime-local" value={when} onChange={(e) => setWhen(e.target.value)}
@@ -210,7 +210,7 @@ export default function ScheduledDMs(
                 {dm.status === 'pending' && (
                   <button onClick={() => actionMutation.mutate({ id: dm.id, action: 'approve' })}
                     disabled={actionMutation.isPending}
-                    className="px-3 py-1 bg-success text-white rounded-control text-xs font-semibold hover:bg-success/90 disabled:opacity-50">
+                    className="px-3 py-1 bg-accent text-on-accent rounded-control text-xs font-semibold hover:bg-accent/90 disabled:opacity-50">
                     Approve
                   </button>
                 )}

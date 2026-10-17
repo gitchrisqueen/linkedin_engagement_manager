@@ -66,7 +66,7 @@ export default function LeadMagnetCard() {
             <textarea value={leadMagnet.message || ''} onChange={(e) => setLm({ message: e.target.value })} rows={3}
               maxLength={FIELD_LIMITS.lm_message}
               placeholder="Thanks for the interest! Here's the resource: …"
-              {...maskProps('w-full border border-field rounded-lg px-3 py-2 text-sm')} />
+              {...maskProps('w-full border border-field rounded-panel px-3 py-2 text-sm')} />
             <div className="mt-1.5">
               <PlaceholderChips placeholders={[
                 { token: '{first_name}', desc: "The commenter's first name" },
@@ -78,7 +78,7 @@ export default function LeadMagnetCard() {
       {lmMsg && <p className={`text-sm font-medium ${lmMsg.ok ? 'text-success' : 'text-danger'}`}>{lmMsg.text}</p>}
       <button type="button" onClick={() => lmMutation.mutate(undefined, sectionSaveCallbacks('lead-magnet'))}
         disabled={lmMutation.isPending}
-        className="w-full bg-accent text-white py-2 rounded-lg text-sm font-semibold hover:bg-accent/90 disabled:opacity-50 transition-colors">
+        className="w-full bg-accent text-white py-2 rounded-panel text-sm font-semibold hover:bg-accent/90 disabled:opacity-50 transition-colors">
         {lmMutation.isPending ? 'Saving…' : 'Save Lead Magnet'}
       </button>
     </div>

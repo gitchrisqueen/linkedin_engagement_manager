@@ -123,7 +123,7 @@ export default function DmTemplatesCard() {
                 <textarea value={t.template_text} rows={2} maxLength={FIELD_LIMITS.dm_template}
                   onChange={(e) => updateTemplate(ev.key, t.step, { template_text: e.target.value })}
                   placeholder="Leave blank for the default message"
-                  {...maskProps('w-full border border-field rounded-lg px-3 py-2 text-sm')} />
+                  {...maskProps('w-full border border-field rounded-panel px-3 py-2 text-sm')} />
               </div>
             ))}
             <button type="button" onClick={() => addFollowupStep(ev.key)}
@@ -136,7 +136,7 @@ export default function DmTemplatesCard() {
       )}
       <button type="button" onClick={() => dmMutation.mutate(undefined, sectionSaveCallbacks('dm-templates'))}
         disabled={dmMutation.isPending}
-        className="w-full bg-accent text-white py-2 rounded-lg text-sm font-semibold hover:bg-accent/90 disabled:opacity-50 transition-colors">
+        className="w-full bg-accent text-white py-2 rounded-panel text-sm font-semibold hover:bg-accent/90 disabled:opacity-50 transition-colors">
         {dmMutation.isPending ? 'Saving…' : 'Save DM Templates'}
       </button>
     </div>

@@ -188,19 +188,19 @@ export default function SecurityCard() {
         {sessions.length === 0 ? (
           <p className="text-xs text-fg-muted">No active sessions to show.</p>
         ) : (
-          <ul className="divide-y divide-hairline border border-hairline rounded-lg">
+          <ul className="divide-y divide-hairline border border-hairline rounded-panel">
             {sessions.map((s) => (
               <li key={s.id} className="flex items-center justify-between gap-3 px-3 py-2">
                 <div className="min-w-0">
                   <p className="text-sm font-medium text-fg truncate">
                     {s.label}
                     {s.is_current && (
-                      <span className="ml-2 text-xs font-semibold text-success bg-success/5 px-2 py-0.5 rounded">
+                      <span className="ml-2 text-xs font-semibold text-success bg-success/5 px-2 py-0.5 rounded-control">
                         This device
                       </span>
                     )}
                     {s.scope === 'agent' && (
-                      <span className="ml-2 text-xs font-semibold text-accent bg-accent/5 px-2 py-0.5 rounded">
+                      <span className="ml-2 text-xs font-semibold text-accent bg-accent/5 px-2 py-0.5 rounded-control">
                         Agent
                       </span>
                     )}
@@ -267,7 +267,7 @@ export default function SecurityCard() {
         </div>
         {mintError && <p className="text-xs text-danger mt-2">{mintError}</p>}
         {mintedToken && (
-          <div className="mt-3 rounded-lg border border-warning/50 bg-warning/5 p-3 space-y-2">
+          <div className="mt-3 rounded-panel border border-warning/50 bg-warning/5 p-3 space-y-2">
             <p className="text-xs font-semibold text-warning">
               Shown once — copy it now. It will not be shown again.
             </p>
@@ -276,7 +276,7 @@ export default function SecurityCard() {
             <button
               type="button"
               onClick={copyMintedToken}
-              className="bg-raised border border-warning/50 text-warning px-3 py-1.5 rounded-lg text-xs font-semibold hover:bg-warning/10"
+              className="bg-raised border border-warning/50 text-warning px-3 py-1.5 rounded-panel text-xs font-semibold hover:bg-warning/10"
             >
               {mintedTokenCopied ? '✓ Copied' : 'Copy token'}
             </button>
@@ -298,13 +298,13 @@ export default function SecurityCard() {
             value={newEmail}
             onChange={(e) => setNewEmail(e.target.value)}
             placeholder={data?.email || 'you@example.com'}
-            className="flex-1 border border-field rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent"
+            className="flex-1 border border-field rounded-control px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent"
           />
           <button
             type="button"
             onClick={() => changeInit.mutate()}
             disabled={changeInit.isPending || !newEmail.trim()}
-            className="bg-accent text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-accent/90 disabled:opacity-50"
+            className="bg-accent text-white px-4 py-2 rounded-control text-sm font-semibold hover:bg-accent/90 disabled:opacity-50"
           >
             {changeInit.isPending ? 'Sending…' : 'Send code'}
           </button>
@@ -318,13 +318,13 @@ export default function SecurityCard() {
               value={pin}
               onChange={(e) => setPin(e.target.value)}
               placeholder="6-digit code"
-              className="flex-1 border border-field rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent"
+              className="flex-1 border border-field rounded-control px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent"
             />
             <button
               type="button"
               onClick={() => changeVerify.mutate()}
               disabled={changeVerify.isPending || !pin.trim()}
-              className="bg-fg text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-fg disabled:opacity-50"
+              className="bg-fg text-white px-4 py-2 rounded-panel text-sm font-semibold hover:bg-fg disabled:opacity-50"
             >
               {changeVerify.isPending ? 'Confirming…' : 'Confirm change'}
             </button>

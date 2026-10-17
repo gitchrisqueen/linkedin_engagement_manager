@@ -25,7 +25,7 @@ export default function PostHogStatsPanel() {
   const topFeatures = llmCost.rows.slice(0, 5)
 
   return (
-    <div className="bg-raised rounded-lg shadow-sm p-5">
+    <div className="bg-raised rounded-panel shadow-panel p-5">
       <h3 className="text-sm font-semibold text-fg mb-3">Live stats</h3>
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <div>

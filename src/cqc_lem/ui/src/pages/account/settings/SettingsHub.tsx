@@ -71,7 +71,7 @@ function SectionNav({
                 onClick={() => onSelect(s.key)}
                 aria-current={selected ? 'page' : undefined}
                 data-testid={`nav-${s.key}`}
-                className={`w-full whitespace-nowrap text-left px-3 py-2 rounded-lg text-sm font-semibold transition-colors flex items-center justify-between gap-2 ${
+                className={`w-full whitespace-nowrap text-left px-3 py-2 rounded-panel text-sm font-semibold transition-colors flex items-center justify-between gap-2 ${
                   selected ? 'bg-accent/5 text-accent' : 'text-fg-muted hover:bg-page'
                 }`}
               >
@@ -80,7 +80,7 @@ function SectionNav({
                   <span
                     data-testid={`nav-alerts-${s.key}`}
                     title={`${alerts} thing${alerts === 1 ? '' : 's'} to look at`}
-                    className="shrink-0 min-w-5 h-5 px-1 rounded-full bg-warning text-warning text-xs font-bold flex items-center justify-center"
+                    className="shrink-0 min-w-5 h-5 px-1 rounded-full bg-warning text-white text-xs font-bold flex items-center justify-center"
                   >
                     {alerts}
                   </span>

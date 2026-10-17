@@ -50,7 +50,7 @@ export default function ShippedNotice() {
   const line = notice.changelog_line.replace(/\*\*/g, '')
 
   return (
-    <div className="mb-4 border border-success/25 bg-success/5 rounded-lg p-3">
+    <div className="mb-4 border border-success/25 bg-success/5 rounded-panel p-3">
       <div className="flex items-start gap-2">
         <span aria-hidden="true">🎉</span>
         <div className="flex-1">
@@ -86,7 +86,7 @@ export default function ShippedNotice() {
                 type="button"
                 disabled={loading}
                 onClick={() => ack(true)}
-                className="border border-success/50 bg-raised text-success px-2.5 py-1 rounded-lg text-xs font-semibold hover:border-success disabled:opacity-50 transition-colors"
+                className="border border-success/50 bg-raised text-success px-2.5 py-1 rounded-panel text-xs font-semibold hover:border-success disabled:opacity-50 transition-colors"
               >
                 Yes
               </button>

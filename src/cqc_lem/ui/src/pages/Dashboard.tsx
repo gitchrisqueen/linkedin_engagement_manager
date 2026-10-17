@@ -434,7 +434,7 @@ export default function Dashboard() {
       {/* Title plus both CTAs need ~390px of one line — more than a 375px phone has, so the row
           wraps instead of pushing "Review Posts" off the screen (issue #894). */}
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <h1 className="text-section font-semibold tabular-nums text-fg">Dashboard</h1>
+        <h1 className="text-section lg:text-section-lg font-semibold text-fg">Dashboard</h1>
         <div className="flex flex-wrap gap-2">
           <Link
             to="/content"
@@ -466,9 +466,9 @@ export default function Dashboard() {
 
       {/* Audience growth — follower/profile-view telemetry next to the activity that drove it (#627) */}
       {sessionToken && (
-        <div className="bg-raised rounded-lg shadow-sm border border-hairline p-6 space-y-6">
+        <div className="bg-raised rounded-panel shadow-panel border border-hairline p-6 space-y-6">
           <div className="flex items-baseline justify-between">
-            <h2 className="text-lg font-semibold text-fg">Audience Growth</h2>
+            <h2 className="text-xl font-semibold text-fg">Audience Growth</h2>
             <span className="text-xs text-fg-muted">Last {audience?.days ?? 90} days</span>
           </div>
 
@@ -539,9 +539,9 @@ export default function Dashboard() {
 
       {/* Engagement analytics — trends, leaderboards, and per-post drill-down from post_stats (#395) */}
       {sessionToken && (
-        <div className="bg-raised rounded-lg shadow-sm border border-hairline p-6 space-y-6">
+        <div className="bg-raised rounded-panel shadow-panel border border-hairline p-6 space-y-6">
           <div className="flex items-baseline justify-between">
-            <h2 className="text-lg font-semibold text-fg">Engagement Analytics</h2>
+            <h2 className="text-xl font-semibold text-fg">Engagement Analytics</h2>
             <span className="text-xs text-fg-muted">Last {analyticsDays} days</span>
           </div>
 
@@ -827,7 +827,7 @@ export default function Dashboard() {
               {upcoming.map((task) => (
                 <li
                   key={`${task.kind}-${task.id}`}
-                  className="flex items-start gap-3 p-3 rounded-lg bg-page hover:bg-accent/5 transition-colors"
+                  className="flex items-start gap-3 p-3 rounded-panel bg-page hover:bg-accent/5 transition-colors"
                 >
                   <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-control bg-raised text-accent" aria-hidden="true">
                     <Icon name={KIND_ICONS[task.kind] ?? 'clock'} className="h-4 w-4" />
@@ -950,7 +950,7 @@ export default function Dashboard() {
 
       {/* Best times to post (data-driven) */}
       {postStats && (
-        <div className="bg-raised rounded-lg shadow-sm border border-hairline p-6 space-y-3">
+        <div className="bg-raised rounded-panel shadow-panel border border-hairline p-6 space-y-3">
           <h2 className="text-base font-semibold text-fg">Your Best Times to Post</h2>
           {postStats.recommendations.length > 0 ? (
             <>

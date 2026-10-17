@@ -59,7 +59,7 @@ export default function Account() {
 
       {/* Account setup checklist — exactly what automation needs, from the readiness API */}
       {readiness && !readiness.ready && (
-        <div className="bg-warning/5 rounded-lg border border-warning/25 p-4">
+        <div className="bg-warning/5 rounded-panel border border-warning/25 p-4">
           <p className="text-sm font-semibold text-warning mb-3">Finish account setup</p>
           <div className="space-y-2">
             {readiness.items.map((it) => (

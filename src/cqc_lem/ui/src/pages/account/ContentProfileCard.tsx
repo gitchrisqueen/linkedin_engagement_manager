@@ -102,7 +102,7 @@ export default function ContentProfileCard() {
 
       <div>
         <label className="block text-sm font-medium text-fg mb-1">Email</label>
-        <p className="text-sm text-fg bg-page border border-hairline rounded-lg px-3 py-2">
+        <p className="text-sm text-fg bg-page border border-hairline rounded-panel px-3 py-2">
           {email}
         </p>
         <p className="text-xs text-success mt-1">✓ Verified email</p>
@@ -140,7 +140,7 @@ export default function ContentProfileCard() {
       <button
         type="submit"
         disabled={saveMutation.isPending}
-        className="w-full bg-accent text-white py-2 rounded-lg text-sm font-semibold hover:bg-accent/90 disabled:opacity-50 transition-colors"
+        className="w-full bg-accent text-white py-2 rounded-panel text-sm font-semibold hover:bg-accent/90 disabled:opacity-50 transition-colors"
       >
         {saveMutation.isPending ? 'Saving…' : 'Save'}
       </button>

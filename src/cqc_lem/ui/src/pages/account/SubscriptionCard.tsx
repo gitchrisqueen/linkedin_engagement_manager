@@ -118,7 +118,7 @@ export default function SubscriptionCard() {
       </div>
 
       {isOnTrial && trialDays !== null && (
-        <div className={`rounded-lg p-3 text-sm ${trialDays <= 3 ? 'bg-danger/5 text-danger border border-danger/25' : 'bg-warning/5 text-warning border border-warning/25'}`}>
+        <div className={`rounded-panel p-3 text-sm ${trialDays <= 3 ? 'bg-danger/5 text-danger border border-danger/25' : 'bg-warning/5 text-warning border border-warning/25'}`}>
           {trialDays === 0
             ? 'Your free trial has expired. Upgrade to keep using LEM.'
             : `Free trial: ${trialDays} day${trialDays === 1 ? '' : 's'} remaining.`}
@@ -139,7 +139,7 @@ export default function SubscriptionCard() {
                 key={plan.tier}
                 onClick={() => checkoutMutation.mutate(plan.tier)}
                 disabled={checkoutMutation.isPending}
-                className={`flex flex-col items-center rounded-lg p-3 transition-colors disabled:opacity-50 text-center ${
+                className={`flex flex-col items-center rounded-panel p-3 transition-colors disabled:opacity-50 text-center ${
                   plan.tier === intendedTier
                     ? 'border-2 border-accent bg-accent/5'
                     : 'border border-accent/25 hover:bg-accent/5'

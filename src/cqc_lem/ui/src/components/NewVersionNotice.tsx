@@ -25,7 +25,7 @@ export default function NewVersionNotice() {
     <div
       role="alert"
       className="fixed bottom-4 left-1/2 -translate-x-1/2 z-50 max-w-md w-[calc(100%-2rem)]
-                 bg-warning/5 border border-warning/50 rounded-lg shadow-lg p-4"
+                 bg-warning/5 border border-warning/50 rounded-panel shadow-lg p-4"
     >
       <p className="text-sm font-semibold text-warning">{NEW_VERSION_MESSAGE}</p>
       <p className="mt-1 text-sm text-warning">

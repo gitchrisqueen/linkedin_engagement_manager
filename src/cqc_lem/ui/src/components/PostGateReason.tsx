@@ -38,7 +38,7 @@ export default function PostGateReason({
 
   return (
     <div
-      className={`rounded-lg border p-4 space-y-3 ${
+      className={`rounded-panel border p-4 space-y-3 ${
         isHeld ? 'bg-warning/5 border-warning/25' : 'bg-page border-hairline'
       }`}
     >
@@ -95,7 +95,7 @@ export default function PostGateReason({
             type="button"
             onClick={onRescore}
             disabled={rescoring}
-            className="bg-warning text-white px-3 py-1.5 rounded-lg text-xs font-semibold hover:bg-warning/90 disabled:opacity-50 transition-colors"
+            className="bg-accent text-on-accent px-3 py-1.5 rounded-control text-xs font-semibold hover:bg-accent/90 disabled:opacity-50 transition-colors"
           >
             {rescoring ? 'Re-scoring…' : 'Save & re-score'}
           </button>

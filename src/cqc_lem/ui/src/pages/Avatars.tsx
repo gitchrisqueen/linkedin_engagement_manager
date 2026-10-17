@@ -241,7 +241,7 @@ export default function Avatars() {
 
       {/* Credit balance + usage */}
       <div
-        className="flex items-center justify-between bg-accent/5 border border-accent/25 rounded-xl px-6 py-4"
+        className="flex items-center justify-between bg-accent/5 border border-accent/25 rounded-panel px-6 py-4"
         data-testid="avatar-credit-balance"
       >
         <div>
@@ -319,7 +319,7 @@ export default function Avatars() {
           {PACKAGES.map((pkg) => (
             <div
               key={pkg.key}
-              className={`relative border rounded-xl p-4 flex flex-col items-center gap-2 shadow-sm hover:shadow-md transition-shadow ${
+              className={`relative border rounded-panel p-4 flex flex-col items-center gap-2 shadow-panel hover:shadow-panel transition-shadow ${
                 pkg.key === 'value' ? 'border-accent/50 bg-accent/5' : 'border-hairline bg-raised'
               }`}
             >
@@ -336,7 +336,7 @@ export default function Avatars() {
               <button
                 onClick={() => buyMutation.mutate(pkg.key)}
                 disabled={buyMutation.isPending}
-                className="mt-2 w-full py-1.5 rounded-lg bg-accent hover:bg-accent/90 text-white text-sm font-medium disabled:opacity-50 transition-colors"
+                className="mt-2 w-full py-1.5 rounded-panel bg-accent hover:bg-accent/90 text-white text-sm font-medium disabled:opacity-50 transition-colors"
               >
                 {buyMutation.isPending ? 'Loading…' : 'Buy'}
               </button>
@@ -352,14 +352,14 @@ export default function Avatars() {
 
       {/* Train new avatar */}
       <section>
-        <h2 className="text-lg font-semibold text-fg mb-1">Train New Avatar</h2>
+        <h2 className="text-xl font-semibold text-fg mb-1">Train New Avatar</h2>
         <p className="text-sm text-fg-muted mb-4">
           Upload 10–20 clear photos of yourself (different angles and lighting). Each training
           costs 1 credit. Credits are refunded automatically if training fails.
         </p>
 
         <div
-          className={`border-2 border-dashed rounded-xl p-6 space-y-4 ${
+          className={`border-2 border-dashed rounded-panel p-6 space-y-4 ${
             hasCredits ? 'border-hairline bg-raised' : 'border-hairline bg-page opacity-60'
           }`}
         >
@@ -374,7 +374,7 @@ export default function Avatars() {
               accept="image/jpeg,image/png,image/webp"
               disabled={!hasCredits}
               onChange={handleFileChange}
-              className="block w-full text-sm text-fg-muted file:mr-4 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:bg-accent/5 file:text-accent file:font-medium hover:file:bg-accent/10"
+              className="block w-full text-sm text-fg-muted file:mr-4 file:py-1.5 file:px-3 file:rounded-panel file:border-0 file:bg-accent/5 file:text-accent file:font-medium hover:file:bg-accent/10"
             />
             {files && (
               <p className="mt-1 text-xs text-fg-muted">{files.length} file(s) selected</p>
@@ -392,7 +392,7 @@ export default function Avatars() {
               onChange={(e) => setTriggerWord(e.target.value.toUpperCase())}
               disabled={!hasCredits}
               placeholder="e.g. LEMAVTR42"
-              className="block w-full rounded-lg border border-field px-3 py-2 text-sm focus:border-accent/50 focus:outline-none disabled:bg-page"
+              className="block w-full rounded-control border border-field px-3 py-2 text-sm focus:border-accent/50 focus:outline-none disabled:bg-page"
             />
           </div>
 
@@ -403,7 +403,7 @@ export default function Avatars() {
           <button
             onClick={() => trainMutation.mutate()}
             disabled={!hasCredits || trainMutation.isPending || inProgress}
-            className="py-2 px-5 rounded-lg bg-accent hover:bg-accent/90 text-white text-sm font-semibold disabled:opacity-50 transition-colors"
+            className="py-2 px-5 rounded-control bg-accent hover:bg-accent/90 text-white text-sm font-semibold disabled:opacity-50 transition-colors"
           >
             {trainMutation.isPending
               ? 'Starting training…'
@@ -419,13 +419,13 @@ export default function Avatars() {
       {/* Training list */}
       {trainings.length > 0 && (
         <section>
-          <h2 className="text-lg font-semibold text-fg mb-4">My Trained Avatars</h2>
+          <h2 className="text-xl font-semibold text-fg mb-4">My Trained Avatars</h2>
           <div className="space-y-3">
             {trainings.map((t) => (
               <div
                 key={t.id}
                 data-testid={`avatar-card-${t.id}`}
-                className={`border rounded-xl px-5 py-4 space-y-4 ${
+                className={`border rounded-panel px-5 py-4 space-y-4 ${
                   t.is_active ? 'border-success/50 bg-success/5' : 'border-hairline bg-raised'
                 }`}
               >
@@ -468,7 +468,7 @@ export default function Avatars() {
                       <button
                         onClick={() => syncMutation.mutate(t.id)}
                         disabled={syncMutation.isPending}
-                        className="text-xs px-3 py-1.5 rounded-lg border border-accent/50 text-accent hover:bg-accent/5 disabled:opacity-50"
+                        className="text-xs px-3 py-1.5 rounded-panel border border-accent/50 text-accent hover:bg-accent/5 disabled:opacity-50"
                       >
                         Refresh
                       </button>
@@ -480,7 +480,7 @@ export default function Avatars() {
                         title={t.approval_status !== 'approved'
                           ? 'Approve the preview images first'
                           : undefined}
-                        className="text-xs px-3 py-1.5 rounded-lg bg-success hover:bg-success/90 text-white font-medium disabled:opacity-50"
+                        className="text-xs px-3 py-1.5 rounded-control bg-success hover:bg-success/90 text-white font-medium disabled:opacity-50"
                       >
                         Set Active
                       </button>
@@ -581,7 +581,7 @@ function AvatarReviewPanel({ training, sessionToken }: { training: Training; ses
         {nothingDeclared && (
           <p
             data-testid={`avatar-attributes-undeclared-${training.id}`}
-            className="text-xs text-warning bg-warning/5 border border-warning/25 rounded-lg px-3 py-2 mb-2"
+            className="text-xs text-warning bg-warning/5 border border-warning/25 rounded-panel px-3 py-2 mb-2"
           >
             Nothing declared yet, so two things are switched off for this avatar: the likeness check
             on generated video frames has nothing to verify and reports every frame unchecked, and
@@ -592,7 +592,7 @@ function AvatarReviewPanel({ training, sessionToken }: { training: Training; ses
         {declinedWithoutAgeBand && (
           <p
             data-testid={`avatar-attributes-age-only-${training.id}`}
-            className="text-xs text-warning bg-warning/5 border border-warning/25 rounded-lg px-3 py-2 mb-2"
+            className="text-xs text-warning bg-warning/5 border border-warning/25 rounded-panel px-3 py-2 mb-2"
           >
             “Prefer not to say” is saved and we won’t ask again. On its own it describes no one,
             though: add an age band and the likeness check on generated video frames has something
@@ -606,7 +606,7 @@ function AvatarReviewPanel({ training, sessionToken }: { training: Training; ses
               value={gender}
               onChange={(e) => setGender(e.target.value)}
               data-testid={`avatar-gender-${training.id}`}
-              className="rounded-lg border border-field px-2 py-1.5 text-sm"
+              className="rounded-control border border-field px-2 py-1.5 text-sm"
             >
               {GENDER_OPTIONS.map((o) => (
                 <option key={o.value} value={o.value}>{o.label}</option>
@@ -619,7 +619,7 @@ function AvatarReviewPanel({ training, sessionToken }: { training: Training; ses
               value={ageBand}
               onChange={(e) => setAgeBand(e.target.value)}
               data-testid={`avatar-age-${training.id}`}
-              className="rounded-lg border border-field px-2 py-1.5 text-sm"
+              className="rounded-control border border-field px-2 py-1.5 text-sm"
             >
               {AGE_OPTIONS.map((o) => (
                 <option key={o} value={o}>{o || 'Not specified'}</option>
@@ -629,7 +629,7 @@ function AvatarReviewPanel({ training, sessionToken }: { training: Training; ses
           <button
             onClick={() => attributesMutation.mutate()}
             disabled={attributesMutation.isPending}
-            className="text-xs px-3 py-1.5 rounded-lg border border-accent/50 text-accent hover:bg-accent/5 disabled:opacity-50"
+            className="text-xs px-3 py-1.5 rounded-panel border border-accent/50 text-accent hover:bg-accent/5 disabled:opacity-50"
           >
             {attributesMutation.isPending ? 'Saving…' : 'Save'}
           </button>
@@ -651,7 +651,7 @@ function AvatarReviewPanel({ training, sessionToken }: { training: Training; ses
                   src={s.url}
                   alt={`${training.trigger_word} ${s.label} sample`}
                   loading="lazy"
-                  className="w-full aspect-square object-cover rounded-lg border border-hairline"
+                  className="w-full aspect-square object-cover rounded-panel border border-hairline"
                 />
                 <figcaption className="text-xs text-fg-muted text-center">
                   {s.label.replace('_', ' ')}
@@ -669,7 +669,7 @@ function AvatarReviewPanel({ training, sessionToken }: { training: Training; ses
           onClick={() => verdictMutation.mutate('approve')}
           disabled={verdictMutation.isPending || gallery.length === 0}
           data-testid={`avatar-approve-${training.id}`}
-          className="text-xs px-3 py-1.5 rounded-lg bg-success hover:bg-success/90 text-white font-medium disabled:opacity-50"
+          className="text-xs px-3 py-1.5 rounded-control bg-success hover:bg-success/90 text-white font-medium disabled:opacity-50"
         >
           Approve — this looks like me
         </button>
@@ -677,7 +677,7 @@ function AvatarReviewPanel({ training, sessionToken }: { training: Training; ses
           onClick={() => verdictMutation.mutate('reject')}
           disabled={verdictMutation.isPending}
           data-testid={`avatar-reject-${training.id}`}
-          className="text-xs px-3 py-1.5 rounded-lg border border-danger/50 text-danger hover:bg-danger/5 disabled:opacity-50"
+          className="text-xs px-3 py-1.5 rounded-panel border border-danger/50 text-danger hover:bg-danger/5 disabled:opacity-50"
         >
           Reject
         </button>
@@ -685,7 +685,7 @@ function AvatarReviewPanel({ training, sessionToken }: { training: Training; ses
           onClick={() => regenerateMutation.mutate()}
           disabled={regenerateMutation.isPending || regenRemaining <= 0}
           data-testid={`avatar-regenerate-${training.id}`}
-          className="text-xs px-3 py-1.5 rounded-lg border border-field text-fg hover:bg-page disabled:opacity-50"
+          className="text-xs px-3 py-1.5 rounded-control border border-field text-fg hover:bg-page disabled:opacity-50"
         >
           Regenerate previews
         </button>

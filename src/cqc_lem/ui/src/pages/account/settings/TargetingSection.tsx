@@ -32,7 +32,7 @@ function FeedReachFunnel() {
   const reach = eng?.feed_reach
   if (!reach) return null
   return (
-    <div className="rounded-lg bg-page border border-hairline p-3 text-xs text-fg-muted" data-testid="feed-reach">
+    <div className="rounded-panel bg-page border border-hairline p-3 text-xs text-fg-muted" data-testid="feed-reach">
       <p className="font-medium text-fg mb-1">Your last feed scan</p>
       <p>
         Examined <span className="font-semibold">{reach.examined}</span> posts →{' '}

@@ -118,7 +118,7 @@ export function useStepUp() {
             type="button"
             onClick={() => verify('passkey')}
             disabled={busy}
-            className="w-full bg-accent text-white py-2.5 rounded-lg text-sm font-semibold hover:bg-accent/90 disabled:opacity-50 mb-3"
+            className="w-full bg-accent text-white py-2.5 rounded-panel text-sm font-semibold hover:bg-accent/90 disabled:opacity-50 mb-3"
           >
             Use your passkey
           </button>
@@ -134,13 +134,13 @@ export function useStepUp() {
               value={code}
               onChange={(e) => setCode(e.target.value.replace(/\D/g, ''))}
               placeholder="6-digit code"
-              className="w-full border border-field rounded-lg px-3 py-2 text-sm text-center font-mono"
+              className="w-full border border-field rounded-control px-3 py-2 text-sm text-center font-mono"
             />
             <button
               type="button"
               onClick={() => verify('totp')}
               disabled={busy || code.trim().length !== 6}
-              className="w-full bg-fg text-white py-2.5 rounded-lg text-sm font-semibold hover:bg-fg disabled:opacity-50"
+              className="w-full bg-fg text-white py-2.5 rounded-panel text-sm font-semibold hover:bg-fg disabled:opacity-50"
             >
               {busy ? 'Checking…' : 'Confirm'}
             </button>

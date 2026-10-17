@@ -131,7 +131,7 @@ export default function NewsletterCard() {
               <label className="block text-sm font-medium text-fg mb-1">Generate drafts this many days ahead</label>
               <input type="number" min={0} max={60} value={newsletter.generate_lead_days}
                 onChange={(e) => setNl({ generate_lead_days: Number(e.target.value) })}
-                className="w-full border border-field rounded-lg px-3 py-2 text-sm" />
+                className="w-full border border-field rounded-control px-3 py-2 text-sm" />
               <p className="text-xs text-fg-muted mt-1">How early each new draft appears for review.</p>
             </div>
           </div>
@@ -229,7 +229,7 @@ export default function NewsletterCard() {
       )}
       {nlMsg && <p className={`text-sm font-medium ${nlMsg.ok ? 'text-success' : 'text-danger'}`}>{nlMsg.text}</p>}
       <button type="button" onClick={() => nlMutation.mutate()} disabled={nlMutation.isPending}
-        className="w-full bg-accent text-white py-2 rounded-lg text-sm font-semibold hover:bg-accent/90 disabled:opacity-50 transition-colors">
+        className="w-full bg-accent text-white py-2 rounded-panel text-sm font-semibold hover:bg-accent/90 disabled:opacity-50 transition-colors">
         {nlMutation.isPending ? 'Saving…' : 'Save Newsletter Settings'}
       </button>
     </div>

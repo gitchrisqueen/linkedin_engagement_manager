@@ -81,7 +81,7 @@ export default function CompanyPageCard() {
         type="button"
         onClick={() => companyPageMutation.mutate()}
         disabled={companyPageMutation.isPending}
-        className="w-full bg-accent text-white py-2 rounded-lg text-sm font-semibold hover:bg-accent/90 disabled:opacity-50 transition-colors"
+        className="w-full bg-accent text-white py-2 rounded-panel text-sm font-semibold hover:bg-accent/90 disabled:opacity-50 transition-colors"
       >
         {companyPageMutation.isPending ? 'Saving…' : 'Save Company Page'}
       </button>

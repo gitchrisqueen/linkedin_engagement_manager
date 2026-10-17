@@ -583,12 +583,12 @@ export default function ContentStudio() {
     <div className="space-y-4">
       {/* Header */}
       <div className="flex items-center justify-between flex-wrap gap-3">
-        <h1 className="text-section font-semibold tabular-nums text-fg">Content Studio</h1>
+        <h1 className="text-section lg:text-section-lg font-semibold text-fg">Content Studio</h1>
         {view === 'review' && (
           <button
             onClick={() => weeklyMutation.mutate()}
             disabled={generating}
-            className="bg-success text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-success/90 disabled:opacity-50 transition-colors"
+            className="bg-accent text-on-accent px-4 min-h-11 rounded-control text-sm font-semibold hover:bg-accent/90 disabled:opacity-50 transition-colors"
           >
             {generateLabel}
           </button>
@@ -596,7 +596,7 @@ export default function ContentStudio() {
         {view === 'review' && (
           <button
             onClick={() => setView('posts')}
-            className="border border-accent text-accent px-4 py-2 rounded-lg text-sm font-semibold hover:bg-accent/5 transition-colors"
+            className="border border-field bg-raised text-fg px-4 min-h-11 rounded-control text-sm font-semibold hover:bg-page transition-colors"
           >
             + Schedule a post
           </button>
@@ -607,7 +607,7 @@ export default function ContentStudio() {
           it is doing instead of leaving the page looking unchanged (issue #545). */}
       {showGenBanner && genStatus && (
         <div
-          className={`rounded-lg border p-3 text-sm ${
+          className={`rounded-panel border p-3 text-sm ${
             isGenerationRunning(genStatus)
               ? 'bg-accent/5 border-accent/25 text-accent'
               : genStatus.state === 'failed'
@@ -667,15 +667,17 @@ export default function ContentStudio() {
       )}
 
       {/* Content tabs */}
-      <div className="flex flex-wrap gap-1 border-b border-hairline">
+      {/* One row that scrolls sideways on a phone instead of wrapping ten tabs into two ragged
+          rows; the active tab carries the same primary bar as the app nav. */}
+      <div className="flex gap-1 overflow-x-auto scrollbar-none border-b border-hairline">
         {VIEWS.map((v) => (
           <button
             key={v.key}
             onClick={() => setView(v.key)}
-            className={`px-3 py-2 text-sm font-semibold border-b-2 -mb-px transition-colors ${
+            className={`min-h-11 shrink-0 whitespace-nowrap px-3 text-sm border-b-2 -mb-px transition-colors ${
               view === v.key
-                ? 'border-accent text-accent'
-                : 'border-transparent text-fg-muted hover:text-fg hover:border-field'
+                ? 'border-accent font-semibold text-fg'
+                : 'border-transparent font-medium text-fg-muted hover:text-fg'
             }`}
           >
             {v.label}
@@ -710,7 +712,7 @@ export default function ContentStudio() {
       {view === 'review' && (
       <>
       {regenNotice && (
-        <div className="bg-accent/5 border border-accent/25 text-accent rounded-lg px-4 py-2 text-sm">
+        <div className="bg-accent/5 border border-accent/25 text-accent rounded-panel px-4 py-2 text-sm">
           {regenNotice}
         </div>
       )}
@@ -833,7 +835,7 @@ export default function ContentStudio() {
             <button
               key={n}
               onClick={() => { setPageSize(n); resetPage() }}
-              className={`px-2 py-1 rounded border transition-colors ${
+              className={`px-2 py-1 rounded-control border transition-colors ${
                 pageSize === n ? 'bg-accent text-white border-accent' : 'border-field hover:border-accent/50'
               }`}
             >
@@ -847,7 +849,7 @@ export default function ContentStudio() {
 
       {/* Bulk action bar */}
       {selectedIds.size > 0 && (
-        <div className="bg-accent/5 border border-accent/25 rounded-lg px-4 py-3 flex flex-wrap items-center gap-3">
+        <div className="bg-accent/5 border border-accent/25 rounded-panel px-4 py-3 flex flex-wrap items-center gap-3">
           <span className="text-sm font-semibold text-accent">{selectedIds.size} selected</span>
 
           <div className="flex items-center gap-2">
@@ -942,7 +944,7 @@ export default function ContentStudio() {
                 <button
                   onClick={() => weeklyMutation.mutate()}
                   disabled={generating}
-                  className="bg-success text-white px-6 py-2.5 rounded-control text-sm font-semibold hover:bg-success/90 disabled:opacity-50 transition-colors"
+                  className="bg-accent text-on-accent px-6 py-2.5 rounded-control text-sm font-semibold hover:bg-accent/90 disabled:opacity-50 transition-colors"
                 >
                   {generateLabel}
                 </button>
@@ -954,7 +956,7 @@ export default function ContentStudio() {
             <div
               key={post.post_id}
               onClick={() => setEditingPost(post)}
-              className={`bg-raised rounded-lg border p-4 cursor-pointer hover:border-accent/50 transition-colors ${
+              className={`bg-raised rounded-panel border p-4 cursor-pointer hover:border-accent/50 transition-colors ${
                 editingPost?.post_id === post.post_id ? 'border-accent ring-1 ring-accent' : 'border-hairline'
               }`}
             >
@@ -1026,7 +1028,7 @@ export default function ContentStudio() {
               <button
                 onClick={() => setPage((p) => Math.max(1, p - 1))}
                 disabled={page <= 1}
-                className="px-3 py-1.5 border border-field rounded-lg text-xs text-fg-muted hover:border-accent/50 disabled:opacity-40 transition-colors"
+                className="px-3 py-1.5 border border-field rounded-control text-xs text-fg-muted hover:border-accent/50 disabled:opacity-40 transition-colors"
               >
                 ← Prev
               </button>
@@ -1034,7 +1036,7 @@ export default function ContentStudio() {
               <button
                 onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
                 disabled={page >= totalPages}
-                className="px-3 py-1.5 border border-field rounded-lg text-xs text-fg-muted hover:border-accent/50 disabled:opacity-40 transition-colors"
+                className="px-3 py-1.5 border border-field rounded-control text-xs text-fg-muted hover:border-accent/50 disabled:opacity-40 transition-colors"
               >
                 Next →
               </button>
@@ -1046,7 +1048,7 @@ export default function ContentStudio() {
           <div className="sticky top-4 self-start space-y-4 max-h-[calc(100vh-2rem)] overflow-y-auto">
             {editingPost.status === 'posted' ? (
               /* Read-only view for published posts */
-              <div className="bg-raised rounded-lg border border-hairline shadow-sm p-5 space-y-4">
+              <div className="bg-raised rounded-panel border border-hairline shadow-panel p-5 space-y-4">
                 <div className="flex items-center justify-between">
                   <h3 className="font-semibold text-fg">
                     Post #{editingPost.post_id}
@@ -1075,7 +1077,7 @@ export default function ContentStudio() {
                       href={postUrlData.detail.post_url}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="inline-flex items-center gap-1.5 bg-accent text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-accent/90 transition-colors"
+                      className="inline-flex items-center gap-1.5 bg-accent text-white px-4 py-2 rounded-control text-sm font-semibold hover:bg-accent/90 transition-colors"
                     >
                       View on LinkedIn ↗
                     </a>
@@ -1086,20 +1088,20 @@ export default function ContentStudio() {
 
                 <button
                   onClick={() => setEditingPost(null)}
-                  className="w-full px-4 py-2 border border-field rounded-lg text-sm text-fg-muted hover:bg-page"
+                  className="w-full px-4 py-2 border border-field rounded-control text-sm text-fg-muted hover:bg-page"
                 >
                   Close
                 </button>
               </div>
             ) : (
               /* Editable form for non-posted statuses */
-              <div className="bg-raised rounded-lg border border-hairline shadow-sm p-5 space-y-4">
+              <div className="bg-raised rounded-panel border border-hairline shadow-panel p-5 space-y-4">
                 <h3 className="font-semibold text-fg">Edit Post #{editingPost.post_id}</h3>
 
                 {/* Occasion / milestone draft (issue #1074). LinkedIn's occasion composer has no
                     API, so this post never publishes itself — copy it across, then say it landed. */}
                 {editingPost.manual_publish && (
-                  <div className="border border-warning/50 bg-warning/5 rounded-lg p-4 space-y-3">
+                  <div className="border border-warning/50 bg-warning/5 rounded-panel p-4 space-y-3">
                     <p className="text-sm font-semibold text-warning">Post natively on LinkedIn</p>
                     {/* Since #1088 a native-publish attempt that could not be confirmed lands the
                         draft at 'error' — the post may already be live. The default copy below
@@ -1123,7 +1125,7 @@ export default function ContentStudio() {
                       <button
                         type="button"
                         onClick={() => copyNativeText(editingPost.content)}
-                        className="bg-warning text-white px-3 py-1.5 rounded-lg text-xs font-semibold hover:bg-warning/90 transition-colors"
+                        className="bg-accent text-on-accent px-3 py-1.5 rounded-control text-xs font-semibold hover:bg-accent/90 transition-colors"
                       >
                         {nativeCopied ? 'Copied ✓' : 'Copy post text'}
                       </button>
@@ -1131,7 +1133,7 @@ export default function ContentStudio() {
                         href="https://www.linkedin.com/feed/"
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="border border-warning/50 text-warning px-3 py-1.5 rounded-lg text-xs font-semibold hover:bg-warning/10 transition-colors"
+                        className="border border-warning/50 text-warning px-3 py-1.5 rounded-panel text-xs font-semibold hover:bg-warning/10 transition-colors"
                       >
                         Open LinkedIn ↗
                       </a>
@@ -1139,7 +1141,7 @@ export default function ContentStudio() {
                         type="button"
                         onClick={() => markPostedMutation.mutate(editingPost.post_id)}
                         disabled={markPostedMutation.isPending}
-                        className="border border-warning/50 text-warning px-3 py-1.5 rounded-lg text-xs font-semibold hover:bg-warning/10 disabled:opacity-50 transition-colors"
+                        className="border border-warning/50 text-warning px-3 py-1.5 rounded-panel text-xs font-semibold hover:bg-warning/10 disabled:opacity-50 transition-colors"
                       >
                         {markPostedMutation.isPending ? 'Saving…' : 'I posted this'}
                       </button>
@@ -1151,7 +1153,7 @@ export default function ContentStudio() {
                 {/* The approval card for a curated post: what it comments on, how, and the exact
                     credit it publishes with (docs/curated-sources.md). */}
                 {editingPost.curated && (
-                  <div className="rounded-lg border border-accent/25 bg-accent/5 p-3 text-sm space-y-1">
+                  <div className="rounded-panel border border-accent/25 bg-accent/5 p-3 text-sm space-y-1">
                     <p className="font-medium text-accent">
                       Curated post — it publishes only after you approve it
                     </p>
@@ -1189,7 +1191,7 @@ export default function ContentStudio() {
                   rows={6}
                   value={editingPost.content}
                   onChange={(e) => setEditingPost({ ...editingPost, content: e.target.value })}
-                  {...maskProps('w-full border border-field rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent resize-none')}
+                  {...maskProps('w-full border border-field rounded-panel px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent resize-none')}
                 />
 
                 <div>
@@ -1205,7 +1207,7 @@ export default function ContentStudio() {
                         carousel_slides: isDeckType(newType) ? editingPost.carousel_slides : null,
                       })
                     }}
-                    className="w-full border border-field rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent"
+                    className="w-full border border-field rounded-control px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent"
                   >
                     {['text', 'video', 'carousel', 'document'].map((t) => (
                       <option key={t} value={t}>{t.toUpperCase()}</option>
@@ -1220,7 +1222,7 @@ export default function ContentStudio() {
                       type="url"
                       value={editingPost.video_url ?? ''}
                       onChange={(e) => setEditingPost({ ...editingPost, video_url: e.target.value || null })}
-                      className="w-full border border-field rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent"
+                      className="w-full border border-field rounded-control px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent"
                       placeholder="https://example.com/video.mp4"
                     />
                   </div>
@@ -1238,7 +1240,7 @@ export default function ContentStudio() {
                         <img
                           src={editingPost.image_url}
                           alt={`Image on post ${editingPost.post_id}`}
-                          className="w-24 h-24 object-cover rounded-lg border border-hairline"
+                          className="w-24 h-24 object-cover rounded-panel border border-hairline"
                         />
                         <button
                           type="button"
@@ -1261,13 +1263,13 @@ export default function ContentStudio() {
                           const file = e.target.files?.[0]
                           if (file) uploadImageMutation.mutate({ post_id: editingPost.post_id, file })
                         }}
-                        className="text-xs text-fg-muted file:mr-2 file:py-1.5 file:px-3 file:rounded-lg file:border file:border-hairline file:text-xs file:font-semibold file:bg-raised hover:file:border-accent/50"
+                        className="text-xs text-fg-muted file:mr-2 file:py-1.5 file:px-3 file:rounded-panel file:border file:border-hairline file:text-xs file:font-semibold file:bg-raised hover:file:border-accent/50"
                       />
                       <button
                         type="button"
                         onClick={() => generateImageMutation.mutate(editingPost)}
                         disabled={imageBusy !== null}
-                        className="bg-accent text-white px-3 py-1.5 rounded-lg text-xs font-semibold hover:bg-accent/90 disabled:opacity-50 transition-colors"
+                        className="bg-accent text-white px-3 py-1.5 rounded-control text-xs font-semibold hover:bg-accent/90 disabled:opacity-50 transition-colors"
                       >
                         {imageBusy === 'generate' ? 'Generating image…' : 'Generate with AI'}
                       </button>
@@ -1287,7 +1289,7 @@ export default function ContentStudio() {
                     </label>
                     <ul className="space-y-1">
                       {editingPost.carousel_slides.map((slide, i) => (
-                        <li key={i} className="text-xs text-fg-muted bg-page rounded px-2 py-1">
+                        <li key={i} className="text-xs text-fg-muted bg-page rounded-control px-2 py-1">
                           <span className="text-fg-muted mr-1">{i + 1}.</span>{slide}
                         </li>
                       ))}
@@ -1301,7 +1303,7 @@ export default function ContentStudio() {
                     <select
                       value={editingPost.status}
                       onChange={(e) => setEditingPost({ ...editingPost, status: e.target.value })}
-                      className="w-full border border-field rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent"
+                      className="w-full border border-field rounded-control px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent"
                     >
                       {['pending', 'approved', 'scheduled', 'posted', 'rejected'].map((s) => (
                         <option key={s} value={s}>{s.toUpperCase()}</option>
@@ -1324,7 +1326,7 @@ export default function ContentStudio() {
                             zonedInputToUtcIso(e.target.value, userTimezone) ?? editingPost.scheduled_time,
                         })
                       }
-                      className="w-full border border-field rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent disabled:bg-page"
+                      className="w-full border border-field rounded-control px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent disabled:bg-page"
                     />
                   </div>
                 </div>
@@ -1333,13 +1335,13 @@ export default function ContentStudio() {
                   <button
                     onClick={() => updateMutation.mutate(editingPost)}
                     disabled={updateMutation.isPending}
-                    className="flex-1 bg-accent text-white py-2 rounded-lg text-sm font-semibold hover:bg-accent/90 disabled:opacity-50"
+                    className="flex-1 bg-accent text-white py-2 rounded-panel text-sm font-semibold hover:bg-accent/90 disabled:opacity-50"
                   >
                     {updateMutation.isPending ? 'Saving…' : 'Save Changes'}
                   </button>
                   <button
                     onClick={() => setEditingPost(null)}
-                    className="px-4 py-2 border border-field rounded-lg text-sm text-fg-muted hover:bg-page"
+                    className="px-4 py-2 border border-field rounded-control text-sm text-fg-muted hover:bg-page"
                   >
                     Cancel
                   </button>
@@ -1362,7 +1364,7 @@ export default function ContentStudio() {
                       onChange={(e) => setRegenGuidance(e.target.value)}
                       rows={2}
                       placeholder="e.g. lead with a client result, drop the stat, make it a personal story"
-                      className="w-full border border-field rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent resize-none"
+                      className="w-full border border-field rounded-control px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent resize-none"
                     />
                     <button
                       onClick={() => {
@@ -1370,7 +1372,7 @@ export default function ContentStudio() {
                         regenerateMutation.mutate({ post_id: editingPost.post_id, guidance })
                       }}
                       disabled={regenerateMutation.isPending}
-                      className="w-full bg-accent text-white py-2 rounded-lg text-sm font-semibold hover:bg-accent/90 disabled:opacity-50 transition-colors"
+                      className="w-full bg-accent text-white py-2 rounded-panel text-sm font-semibold hover:bg-accent/90 disabled:opacity-50 transition-colors"
                     >
                       {regenerateMutation.isPending ? 'Starting…' : 'Re-generate Post'}
                     </button>
@@ -1396,7 +1398,7 @@ export default function ContentStudio() {
                     <button
                       onClick={() => regenerateRejectedMutation.mutate(editingPost.post_id)}
                       disabled={regenerateRejectedMutation.isPending}
-                      className="w-full bg-accent text-white py-2 rounded-lg text-sm font-semibold hover:bg-accent/90 disabled:opacity-50 transition-colors"
+                      className="w-full bg-accent text-white py-2 rounded-panel text-sm font-semibold hover:bg-accent/90 disabled:opacity-50 transition-colors"
                     >
                       {regenerateRejectedMutation.isPending ? 'Starting…' : 'Regenerate using this feedback'}
                     </button>
@@ -1428,14 +1430,14 @@ export default function ContentStudio() {
       {confirmDeletePost && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-fg/40 p-4"
              onClick={() => !deleteMutation.isPending && setConfirmDeletePost(null)}>
-          <div className="bg-raised rounded-lg shadow-xl max-w-sm w-full p-6 space-y-4 max-h-viewport overflow-y-auto"
+          <div className="bg-raised rounded-panel shadow-xl max-w-sm w-full p-6 space-y-4 max-h-viewport overflow-y-auto"
                onClick={(e) => e.stopPropagation()}>
             <h3 className="text-base font-semibold text-fg">Remove this post?</h3>
             <p className="text-sm text-fg-muted">
               This will remove post #{confirmDeletePost.post_id} from your queue — it won't be published
               and will disappear from all views. You can't undo this from the UI.
             </p>
-            <p className="text-xs text-fg-muted line-clamp-3 bg-page rounded p-2">{confirmDeletePost.content}</p>
+            <p className="text-xs text-fg-muted line-clamp-3 bg-page rounded-control p-2">{confirmDeletePost.content}</p>
             <div className="space-y-2">
               <label className="block text-xs font-medium text-fg-muted">
                 Why are you removing this? <span className="font-normal text-fg-muted">(optional)</span>
@@ -1445,7 +1447,7 @@ export default function ContentStudio() {
                 onChange={(e) => setDeleteRejectionReason(e.target.value)}
                 rows={2}
                 placeholder="e.g. too salesy, wrong tone, not relevant to my audience"
-                className="w-full border border-field rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent resize-none"
+                className="w-full border border-field rounded-control px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent resize-none"
               />
               <p className="text-xs text-fg-muted">
                 Your reason will help future drafts avoid the same issue.
@@ -1455,14 +1457,14 @@ export default function ContentStudio() {
               <button
                 onClick={() => setConfirmDeletePost(null)}
                 disabled={deleteMutation.isPending}
-                className="px-4 py-2 border border-field rounded-lg text-sm text-fg-muted hover:bg-accent/5 disabled:opacity-50"
+                className="px-4 py-2 border border-field rounded-control text-sm text-fg-muted hover:bg-accent/5 disabled:opacity-50"
               >
                 Cancel
               </button>
               <button
                 onClick={() => deleteMutation.mutate(confirmDeletePost.post_id)}
                 disabled={deleteMutation.isPending}
-                className="px-4 py-2 bg-danger text-white rounded-lg text-sm font-semibold hover:bg-danger/90 disabled:opacity-50"
+                className="px-4 py-2 bg-danger text-white rounded-control text-sm font-semibold hover:bg-danger/90 disabled:opacity-50"
               >
                 {deleteMutation.isPending ? 'Removing…' : 'Remove post'}
               </button>

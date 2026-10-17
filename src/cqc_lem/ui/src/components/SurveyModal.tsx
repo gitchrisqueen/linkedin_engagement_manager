@@ -112,7 +112,7 @@ export default function SurveyModal() {
             <p className="text-xs text-fg-muted mb-4">{done}</p>
             <button
               onClick={() => setClosed(true)}
-              className="w-full bg-accent text-white py-2 rounded-lg text-xs font-semibold hover:bg-accent/90 transition-colors"
+              className="w-full bg-accent text-white py-2 rounded-panel text-xs font-semibold hover:bg-accent/90 transition-colors"
             >
               Done
             </button>
@@ -136,7 +136,7 @@ export default function SurveyModal() {
                   onClick={() => setRating(n)}
                   aria-label={`${n} star${n > 1 ? 's' : ''}`}
                   aria-pressed={rating === n}
-                  className={`w-9 h-9 rounded-lg border text-sm ${
+                  className={`w-9 h-9 rounded-panel border text-sm ${
                     rating !== null && n <= rating
                       ? 'bg-warning border-warning/50 text-white'
                       : 'bg-raised border-hairline text-fg-muted hover:border-accent/50'
@@ -180,7 +180,7 @@ export default function SurveyModal() {
               type="button"
               onClick={submitReview}
               disabled={loading || rating === null}
-              className="w-full bg-accent text-white py-2 rounded-lg text-xs font-semibold hover:bg-accent/90 disabled:opacity-50 transition-colors"
+              className="w-full bg-accent text-white py-2 rounded-panel text-xs font-semibold hover:bg-accent/90 disabled:opacity-50 transition-colors"
             >
               {loading ? 'Sending…' : 'Submit review'}
             </button>
@@ -198,7 +198,7 @@ export default function SurveyModal() {
                   onClick={() => setScore(n)}
                   aria-label={`Score ${n}`}
                   aria-pressed={score === n}
-                  className={`w-8 h-8 rounded-lg border text-xs font-semibold ${
+                  className={`w-8 h-8 rounded-panel border text-xs font-semibold ${
                     score === n
                       ? 'bg-accent border-accent text-white'
                       : 'bg-raised border-hairline text-fg-muted hover:border-accent/50'
@@ -228,7 +228,7 @@ export default function SurveyModal() {
               type="button"
               onClick={submitNps}
               disabled={loading || score === null}
-              className="w-full bg-accent text-white py-2 rounded-lg text-xs font-semibold hover:bg-accent/90 disabled:opacity-50 transition-colors"
+              className="w-full bg-accent text-white py-2 rounded-panel text-xs font-semibold hover:bg-accent/90 disabled:opacity-50 transition-colors"
             >
               {loading ? 'Sending…' : survey.cta_label}
             </button>

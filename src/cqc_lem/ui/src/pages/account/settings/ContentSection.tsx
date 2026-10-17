@@ -159,7 +159,7 @@ function ProfileSkillsPanel() {
   }
 
   return (
-    <div className="mt-4 rounded-lg border border-accent/25 bg-accent/5 px-4 py-3">
+    <div className="mt-4 rounded-panel border border-accent/25 bg-accent/5 px-4 py-3">
       <h4 className="text-sm font-semibold text-accent">Profile skills</h4>
       <p className="text-xs text-accent mt-1">
         Top skills from your LinkedIn profile:
@@ -179,7 +179,7 @@ function ProfileSkillsPanel() {
         <button
           type="button"
           onClick={adopt}
-          className="mt-2 text-xs font-semibold text-white bg-accent hover:bg-accent/90 px-3 py-1.5 rounded-md"
+          className="mt-2 text-xs font-semibold text-white bg-accent hover:bg-accent/90 px-3 py-1.5 rounded-control"
         >
           Adopt {unadopted.length} skill{unadopted.length === 1 ? '' : 's'} as focus topics
         </button>

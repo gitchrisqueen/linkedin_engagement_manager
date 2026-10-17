@@ -131,7 +131,7 @@ export default function ConnectionRequests({ userTimezone }: { userTimezone: str
       {msg && <p className={`text-sm font-medium ${msg.ok ? 'text-success' : 'text-danger'}`}>{msg.text}</p>}
 
       {/* New connection-request target */}
-      <div className="bg-raised rounded-lg border border-hairline shadow-sm p-5 space-y-3">
+      <div className="bg-raised rounded-panel border border-hairline shadow-panel p-5 space-y-3">
         <h3 className="font-semibold text-fg">Add a connection target</h3>
         <p className="text-xs text-fg-muted">
           Add an ICP-fit prospect to invite. New targets follow your account's Connection approval mode
@@ -157,10 +157,10 @@ export default function ConnectionRequests({ userTimezone }: { userTimezone: str
         <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} maxLength={255}
           aria-label="Recipient email (optional)"
           placeholder="Recipient email (optional — only used if LinkedIn asks to verify you know them)"
-          {...maskProps('w-full border border-field rounded-lg px-3 py-2 text-sm')} />
+          {...maskProps('w-full border border-field rounded-panel px-3 py-2 text-sm')} />
         <textarea value={note} onChange={(e) => setNote(e.target.value)} rows={2} maxLength={NOTE_MAX}
           placeholder="Connection note (optional, ≤300 chars)"
-          {...maskProps('w-full border border-field rounded-lg px-3 py-2 text-sm')} />
+          {...maskProps('w-full border border-field rounded-panel px-3 py-2 text-sm')} />
         <div className="flex flex-wrap items-center gap-3">
           <button onClick={() => createMutation.mutate()} disabled={!canSubmit || createMutation.isPending}
             className="px-4 py-2 bg-accent text-white rounded-control text-sm font-semibold hover:bg-accent/90 disabled:opacity-50">
@@ -235,7 +235,7 @@ export default function ConnectionRequests({ userTimezone }: { userTimezone: str
                     <input type="email" value={rowEmail} onChange={(e) => setRowEmail(e.target.value)}
                       maxLength={255} aria-label={`Recipient email for ${req.recipient_name || req.recipient_profile_url}`}
                       placeholder="name@company.com"
-                      {...maskProps('flex-1 min-w-[12rem] border border-field rounded px-2 py-1 text-xs')} />
+                      {...maskProps('flex-1 min-w-[12rem] border border-field rounded-control px-2 py-1 text-xs')} />
                     <button onClick={() => emailMutation.mutate({ id: req.id, email: rowEmail.trim() })}
                       disabled={!rowEmail.trim() || emailMutation.isPending}
                       className="px-3 py-1 bg-accent text-white rounded-control text-xs font-semibold hover:bg-accent/90 disabled:opacity-50">
@@ -266,14 +266,14 @@ export default function ConnectionRequests({ userTimezone }: { userTimezone: str
                 {req.status === 'pending' && (
                   <button onClick={() => actionMutation.mutate({ id: req.id, action: 'approve' })}
                     disabled={actionMutation.isPending}
-                    className="px-3 py-1 bg-success text-white rounded-control text-xs font-semibold hover:bg-success/90 disabled:opacity-50">
+                    className="px-3 py-1 bg-accent text-on-accent rounded-control text-xs font-semibold hover:bg-accent/90 disabled:opacity-50">
                     Approve
                   </button>
                 )}
                 {req.status === 'failed' && (
                   <button onClick={() => actionMutation.mutate({ id: req.id, action: 'retry' })}
                     disabled={actionMutation.isPending}
-                    className="px-3 py-1 bg-success text-white rounded-control text-xs font-semibold hover:bg-success/90 disabled:opacity-50">
+                    className="px-3 py-1 bg-accent text-on-accent rounded-control text-xs font-semibold hover:bg-accent/90 disabled:opacity-50">
                     Retry
                   </button>
                 )}

@@ -11,7 +11,7 @@ export default function OnboardingChecklist() {
   const next = data.steps.find((s) => !s.ok)
 
   return (
-    <div className="bg-raised border border-accent/25 rounded-lg p-4 mb-6">
+    <div className="bg-raised border border-accent/25 rounded-panel p-4 mb-6">
       <div className="flex items-baseline justify-between gap-3">
         <p className="text-sm font-semibold text-fg">Get to your first live post</p>
         <span className="text-xs text-fg-muted">
@@ -20,7 +20,7 @@ export default function OnboardingChecklist() {
       </div>
 
       {data.nudge && (
-        <div className="mt-3 bg-accent/5 border border-accent/25 rounded p-3">
+        <div className="mt-3 bg-accent/5 border border-accent/25 rounded-control p-3">
           <p className="text-sm font-semibold text-accent">{data.nudge.headline}</p>
           <p className="text-sm text-accent mt-1">{data.nudge.body}</p>
           <Link

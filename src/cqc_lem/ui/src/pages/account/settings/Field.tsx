@@ -16,7 +16,7 @@ export function ConflictNotice({ finding }: { finding: Finding }) {
   return (
     <div
       data-testid={`conflict-${finding.id}`}
-      className={`mt-1.5 rounded-lg border px-3 py-2 text-xs ${TONE[finding.severity]}`}
+      className={`mt-1.5 rounded-panel border px-3 py-2 text-xs ${TONE[finding.severity]}`}
     >
       <span className="mr-1.5 font-semibold">{ICON[finding.severity]}</span>
       {finding.message}
@@ -69,7 +69,7 @@ export function Field({
       {children}
       <p className="text-xs text-fg-muted mt-1">{d.what}</p>
       {open && (
-        <div className="mt-1.5 rounded-lg bg-page border border-hairline px-3 py-2 text-xs text-fg-muted space-y-1">
+        <div className="mt-1.5 rounded-panel bg-page border border-hairline px-3 py-2 text-xs text-fg-muted space-y-1">
           <p><span className="font-semibold text-fg">Why it matters</span> — {d.why}</p>
           <p><span className="font-semibold text-fg">Recommended</span> — {d.recommended}</p>
         </div>
@@ -111,4 +111,4 @@ export function SectionCard({
   )
 }
 
-export const inputClass = 'w-full border border-hairline rounded-lg px-3 py-2 text-sm'
+export const inputClass = 'w-full border border-hairline rounded-panel px-3 py-2 text-sm'

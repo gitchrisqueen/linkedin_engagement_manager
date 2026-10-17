@@ -117,7 +117,7 @@ export default function LeadsPipeline({ userTimezone }: { userTimezone: string }
           <button
             onClick={() => refreshMutation.mutate()}
             disabled={refreshMutation.isPending}
-            className="shrink-0 px-3 py-1.5 border border-field text-fg rounded-lg text-xs font-semibold hover:bg-page disabled:opacity-50"
+            className="shrink-0 px-3 py-1.5 border border-field text-fg rounded-control text-xs font-semibold hover:bg-page disabled:opacity-50"
           >
             Re-score now
           </button>
@@ -214,7 +214,7 @@ export default function LeadsPipeline({ userTimezone }: { userTimezone: string }
                     if (noteFor(l) !== (l.notes ?? '')) updateMutation.mutate({ id: l.id, notes: noteFor(l) })
                   }}
                   placeholder="Your notes on this lead…"
-                  className="w-full border border-hairline rounded-lg px-3 py-2 text-xs" />
+                  className="w-full border border-hairline rounded-panel px-3 py-2 text-xs" />
               </div>
             ))}
           </div>

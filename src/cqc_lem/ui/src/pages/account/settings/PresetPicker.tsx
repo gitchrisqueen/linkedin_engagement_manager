@@ -19,7 +19,7 @@ export default function PresetPicker() {
         </p>
       </div>
       {presetApplied && (
-        <p className="text-xs text-accent bg-accent/5 border border-accent/25 rounded-lg px-3 py-2" data-testid="preset-applied">
+        <p className="text-xs text-accent bg-accent/5 border border-accent/25 rounded-panel px-3 py-2" data-testid="preset-applied">
           New account — we've started you on <span className="font-semibold">Balanced</span>. Nothing
           is stored until you save, so change anything you like first.
         </p>
@@ -35,7 +35,7 @@ export default function PresetPicker() {
               data-testid={`preset-${p.key}`}
               aria-pressed={selected}
               onClick={() => setEng(values)}
-              className={`text-left rounded-xl border p-4 transition-colors ${
+              className={`text-left rounded-panel border p-4 transition-colors ${
                 selected ? 'border-accent bg-accent/5' : 'border-hairline hover:border-field'
               }`}
             >

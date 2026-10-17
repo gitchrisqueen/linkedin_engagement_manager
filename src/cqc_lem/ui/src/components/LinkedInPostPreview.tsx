@@ -62,7 +62,7 @@ function CarouselPreview({ slides }: { slides: string[] }) {
             type="button"
             onClick={(e) => { e.stopPropagation(); go(-1) }}
             aria-label="Previous slide"
-            className="absolute left-2 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-raised/90 text-fg shadow flex items-center justify-center hover:bg-raised"
+            className="absolute left-2 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-raised/90 text-fg shadow-panel flex items-center justify-center hover:bg-raised"
           >
             ‹
           </button>
@@ -70,7 +70,7 @@ function CarouselPreview({ slides }: { slides: string[] }) {
             type="button"
             onClick={(e) => { e.stopPropagation(); go(1) }}
             aria-label="Next slide"
-            className="absolute right-2 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-raised/90 text-fg shadow flex items-center justify-center hover:bg-raised"
+            className="absolute right-2 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-raised/90 text-fg shadow-panel flex items-center justify-center hover:bg-raised"
           >
             ›
           </button>
@@ -78,7 +78,7 @@ function CarouselPreview({ slides }: { slides: string[] }) {
       )}
 
       {/* Page counter badge, like LinkedIn document posts */}
-      <div className="absolute bottom-2 right-2 bg-fg/60 text-white text-xs font-medium px-2 py-0.5 rounded">
+      <div className="absolute bottom-2 right-2 bg-fg/60 text-white text-xs font-medium px-2 py-0.5 rounded-control">
         {index + 1} / {total}
       </div>
 
@@ -120,7 +120,7 @@ export default function LinkedInPostPreview({
   const showImage = !showVideo && !showCarousel && !!mediaUrl
 
   return (
-    <div className="bg-raised rounded-lg border border-hairline shadow-sm max-w-lg font-sans">
+    <div className="bg-raised rounded-panel border border-hairline shadow-panel max-w-lg font-sans">
       {/* Header */}
       <div className="flex items-center gap-3 p-4">
         <div className="w-12 h-12 rounded-full bg-accent flex items-center justify-center text-white font-bold text-lg flex-shrink-0">

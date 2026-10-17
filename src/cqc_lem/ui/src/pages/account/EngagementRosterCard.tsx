@@ -233,7 +233,7 @@ export default function EngagementRosterCard() {
     (s) => !targets.some((t) => t.profile_url === s.profile_url))
 
   return (
-    <div className="bg-raised rounded-lg shadow-sm border border-hairline p-6 space-y-4"
+    <div className="bg-raised rounded-panel shadow-panel border border-hairline p-6 space-y-4"
          data-testid="engagement-roster">
       <h2 className="text-base font-semibold text-fg">Engagement Roster</h2>
       <p className="text-xs text-fg-muted">
@@ -268,14 +268,14 @@ export default function EngagementRosterCard() {
               onChange={(e) => update(idx, { profile_url: e.target.value })}
               placeholder="https://www.linkedin.com/in/their-handle"
               aria-label="Profile URL"
-              className="sm:col-span-4 border border-field rounded-lg px-3 py-2 text-sm" />
+              className="sm:col-span-4 border border-field rounded-control px-3 py-2 text-sm" />
             <input type="text" value={t.name ?? ''} maxLength={255}
               onChange={(e) => update(idx, { name: e.target.value })}
               placeholder="Name (optional)" aria-label="Name"
-              className="sm:col-span-3 border border-field rounded-lg px-3 py-2 text-sm" />
+              className="sm:col-span-3 border border-field rounded-control px-3 py-2 text-sm" />
             <select value={t.category} aria-label="Category"
               onChange={(e) => update(idx, { category: e.target.value as EngagementTargetCategory })}
-              className="sm:col-span-2 border border-field rounded-lg px-2 py-2 text-sm">
+              className="sm:col-span-2 border border-field rounded-control px-2 py-2 text-sm">
               {TARGET_CATEGORIES.map((c) => (
                 <option key={c.key} value={c.key} title={c.hint}>{c.label}</option>
               ))}
@@ -285,7 +285,7 @@ export default function EngagementRosterCard() {
               <input type="number" min={0} max={14} value={t.max_comments_per_week}
                 onChange={(e) => update(idx, { max_comments_per_week: Number(e.target.value) })}
                 aria-label={PER_WEEK_LABEL} title={PER_WEEK_HINT}
-                className="w-14 border border-field rounded px-1 py-1" />
+                className="w-14 border border-field rounded-control px-1 py-1" />
               <span className="sm:hidden">{PER_WEEK_LABEL}</span>
               <span className="hidden sm:inline">/wk</span>
             </label>
@@ -376,7 +376,7 @@ export default function EngagementRosterCard() {
       {msg && <p className={`text-sm font-medium ${msg.ok ? 'text-success' : 'text-danger'}`}>{msg.text}</p>}
       <button type="button" onClick={() => { void saveRoster() }}
         disabled={saveMutation.isPending}
-        className="w-full bg-accent text-white py-2 rounded-lg text-sm font-semibold hover:bg-accent/90 disabled:opacity-50 transition-colors">
+        className="w-full bg-accent text-white py-2 rounded-panel text-sm font-semibold hover:bg-accent/90 disabled:opacity-50 transition-colors">
         {saveMutation.isPending ? 'Saving…' : 'Save Roster'}
       </button>
     </div>

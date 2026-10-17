@@ -38,7 +38,7 @@ export default function TopicAuthorityMeter({
     headline?.trim() || about?.trim() ? 'focus topics and profile' : 'focus topics'
 
   return (
-    <div className="mt-3 rounded-lg border border-hairline bg-page p-3">
+    <div className="mt-3 rounded-panel border border-hairline bg-page p-3">
       <div className="flex items-center justify-between mb-1">
         <p className="text-xs font-medium text-fg">Topic authority consistency</p>
         <span className={`text-xs font-semibold ${labelColor}`}>

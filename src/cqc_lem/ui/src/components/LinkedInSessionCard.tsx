@@ -76,12 +76,12 @@ export default function LinkedInSessionCard({
   })
 
   return (
-    <div className="bg-raised rounded-lg shadow-sm border border-hairline p-6 space-y-4">
+    <div className="bg-raised rounded-panel shadow-panel border border-hairline p-6 space-y-4">
       {stepUpModal}
       <div>
         <h2 className="text-base font-semibold text-fg">
           LinkedIn Session <span className="text-danger">*</span>
-          <span className="ml-2 text-xs font-semibold text-danger bg-danger/5 px-2 py-0.5 rounded">
+          <span className="ml-2 text-xs font-semibold text-danger bg-danger/5 px-2 py-0.5 rounded-control">
             Required
           </span>
         </h2>
@@ -96,7 +96,7 @@ export default function LinkedInSessionCard({
       {migrationNeeded && (
         <div
           data-testid="cookie-migration-notice"
-          className="rounded-lg border border-warning/50 bg-warning/5 p-4 space-y-2"
+          className="rounded-panel border border-warning/50 bg-warning/5 p-4 space-y-2"
         >
           <p className="text-sm font-semibold text-warning">
             Switch to session-only login
@@ -111,7 +111,7 @@ export default function LinkedInSessionCard({
               type="checkbox"
               checked={dropPassword}
               onChange={(e) => setDropPassword(e.target.checked)}
-              className="rounded border-warning/50"
+              className="rounded-control border-warning/50"
             />
             Delete my saved LinkedIn password once the session is saved
           </label>
@@ -120,7 +120,7 @@ export default function LinkedInSessionCard({
 
       {/* Recommended path: the browser extension grabs the httpOnly li_at cookie the paste
           flow can't reach, and sends it in one click. */}
-      <div className="rounded-lg border border-accent/25 bg-accent/5 p-4 space-y-3">
+      <div className="rounded-panel border border-accent/25 bg-accent/5 p-4 space-y-3">
         <div className="flex items-center justify-between gap-3">
           <div>
             <p className="text-sm font-semibold text-accent">Recommended: one-click extension</p>
@@ -141,7 +141,7 @@ export default function LinkedInSessionCard({
             type="button"
             onClick={copyToken}
             disabled={!sessionToken}
-            className="bg-raised border border-accent/50 text-accent px-3 py-1.5 rounded-lg text-xs font-semibold hover:bg-accent/10 disabled:opacity-50 transition-colors"
+            className="bg-raised border border-accent/50 text-accent px-3 py-1.5 rounded-panel text-xs font-semibold hover:bg-accent/10 disabled:opacity-50 transition-colors"
           >
             {tokenCopied ? '✓ Token copied' : 'Copy my LEM token'}
           </button>
@@ -204,7 +204,7 @@ export default function LinkedInSessionCard({
         type="button"
         onClick={() => mutation.mutate()}
         disabled={mutation.isPending || liAt.trim().length < 20}
-        className="w-full bg-accent text-white py-2 rounded-lg text-sm font-semibold hover:bg-accent/90 disabled:opacity-50 transition-colors"
+        className="w-full bg-accent text-white py-2 rounded-panel text-sm font-semibold hover:bg-accent/90 disabled:opacity-50 transition-colors"
       >
         {mutation.isPending ? 'Saving…' : 'Save LinkedIn Session'}
       </button>

@@ -48,7 +48,7 @@ export default function ReplySetupSteps() {
         <p className="font-medium text-fg">2. Copy your personal forwarding address</p>
         {eng.reply_inbound_address ? (
           <div className="flex items-center gap-2 mt-1">
-            <code className="bg-page rounded px-2 py-1 text-fg break-all">{eng.reply_inbound_address}</code>
+            <code className="bg-page rounded-control px-2 py-1 text-fg break-all">{eng.reply_inbound_address}</code>
             <button type="button" onClick={() => navigator.clipboard?.writeText(eng.reply_inbound_address || '')}
               className="text-accent hover:underline shrink-0">Copy</button>
           </div>
@@ -64,8 +64,8 @@ export default function ReplySetupSteps() {
           In Gmail: <span className="text-fg-muted">Settings → Forwarding and POP/IMAP → Add a forwarding
           address</span> (paste the address above and confirm it). Then <span className="text-fg-muted">Settings →
           Filters and Blocked Addresses → Create a new filter</span> with
-          From <code className="bg-page rounded px-1">linkedin.com</code> and
-          Subject <code className="bg-page rounded px-1">commented OR replied</code>, click
+          From <code className="bg-page rounded-control px-1">linkedin.com</code> and
+          Subject <code className="bg-page rounded-control px-1">commented OR replied</code>, click
           <span className="italic"> Create filter</span>, then check
           <span className="italic"> "Forward it to"</span> and pick your address. Using another provider?
           Any rule that forwards LinkedIn comment emails to the address works.
@@ -78,7 +78,7 @@ export default function ReplySetupSteps() {
           <p className="mt-1 text-warning">
             We received Gmail's confirmation but couldn't auto-click it. If forwarding still shows
             "pending" in Gmail, enter this code there:{' '}
-            <code className="bg-page rounded px-1">{confirmation.code}</code>
+            <code className="bg-page rounded-control px-1">{confirmation.code}</code>
           </p>
         )}
       </div>
