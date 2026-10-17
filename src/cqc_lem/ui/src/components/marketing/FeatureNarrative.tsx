@@ -85,7 +85,7 @@ export default function FeatureNarrative() {
                 the panel column's min-content width becomes the page's, and a phone lays the whole
                 front page out wider than the screen and zooms out to fit. */}
             <div className={`min-w-0 ${index % 2 === 1 ? 'lg:order-2' : ''}`.trim()}>
-              <p className="text-sm font-semibold uppercase tracking-wide text-accent">
+              <p className="text-sm font-semibold text-fg-muted">
                 {beat.eyebrow}
               </p>
               <h3 className="mt-3 text-section font-semibold text-fg">{beat.title}</h3>
