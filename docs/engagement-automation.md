@@ -572,6 +572,14 @@ The ONE way LEM opens (and reads) a 1:1 thread.
   first/last — message-group label is the full display name as ONE string.
 - Winning route logged (`action_type='followup'`); `--dm-thread-url` reports the `reply_state`
   live.
+- `--dm-thread-url` walks the ladder TRACED (`open_message_thread(trace=True)`, issue #2325), so
+  its report carries, per route (`route_trace`): every candidate each scan saw (`aria_label_present`,
+  `shown`, `belongs_to_target`), each element it chose, and the post-click surface (`url_path`,
+  `composer`, `events`, `open_thread` and its `reason` from `open_thread_reason`). It also reports
+  the top card's `degree` (`unknown` when no badge reads — never guessed) and the tab count
+  `windows.before`/`after`. A walk whose every click reads `compose_screen_without_messages` is the
+  no-prior-thread compose screen the ladder rejects by design (#1851) — the verdict names it rather
+  than reading it as drift. Production walks leave `trace` off.
 
 ### Reading a thread and SENDING into one are different questions (issue #1030)
 

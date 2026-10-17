@@ -676,6 +676,70 @@ class TestMessageThreadProbe:
         assert report["last_sender"] == ""
         assert report["routes_tried"] == ["anchor", "button"]
 
+    def test_probe_reports_degree_route_trace_and_window_counts(self, monkeypatch):
+        """#2325: the traced walk's evidence, degree badge and tab count all reach the report.
+
+        The probe asks the ladder for the trace.
+        """
+        from cqc_lem.utilities.linkedin.message_thread import ThreadOpen
+        trace = [{"route": "anchor", "candidates": [{"aria_label_present": False, "shown": True,
+                                                     "belongs_to_target": True}],
+                  "clicks": [{"chosen": {"aria_label_present": False}, "clicked": True,
+                              "surface": {"url_path": "/messaging/compose/", "events": 0,
+                                          "composer": True, "surface": "page",
+                                          "open_thread": False,
+                                          "reason": "compose_screen_without_messages"}}]}]
+        captured = {}
+
+        def _fake_open(driver, wait, profile_url, **kwargs):
+            captured.update(kwargs)
+            return ThreadOpen(tried=["anchor", "direct_url"], skipped=["messaging_search"],
+                              degree="1st", route_trace=trace)
+
+        monkeypatch.setattr("cqc_lem.utilities.linkedin.message_thread.open_message_thread",
+                            _fake_open)
+        monkeypatch.setattr("cqc_lem.utilities.linkedin.message_thread.profile_urn_from_page",
+                            lambda *_a: None)
+        driver = MagicMock()
+        driver.window_handles = ["only-tab"]
+        report = llv.probe_message_thread(driver, "https://x/in/jane", sleep=lambda s: None)
+        assert captured.get("trace") is True
+        assert report["degree"] == "1st"
+        assert report["route_trace"] == trace
+        assert report["windows"] == {"before": 1, "after": 1}
+        # Every click landed on the no-prior-thread compose screen: named, not read as plain drift.
+        assert llv.compose_screen_only(report)
+        assert "NO prior thread" in report["verdict"]
+
+    def test_probe_reports_an_unreadable_degree_and_window_count_as_unknown(self, monkeypatch):
+        from cqc_lem.utilities.linkedin.message_thread import ThreadOpen
+        monkeypatch.setattr("cqc_lem.utilities.linkedin.message_thread.open_message_thread",
+                            lambda *a, **k: ThreadOpen(tried=["anchor"]))
+        monkeypatch.setattr("cqc_lem.utilities.linkedin.message_thread.profile_urn_from_page",
+                            lambda *_a: None)
+
+        class _Blind:
+            @property
+            def window_handles(self):
+                raise RuntimeError("session gone")
+
+        report = llv.probe_message_thread(_Blind(), "https://x/in/jane", sleep=lambda s: None)
+        assert report["degree"] == "unknown"
+        assert report["windows"] == {"before": None, "after": None}
+        assert report["route_trace"] == []
+        assert report["verdict"] == "no route opened a thread"
+
+    def test_compose_screen_only_needs_every_click_to_be_that_screen(self):
+        compose = {"clicked": True, "surface": {"reason": "compose_screen_without_messages"}}
+        nothing = {"clicked": True, "surface": {"reason": "nothing_rendered"}}
+        assert llv.compose_screen_only({"route_trace": [{"clicks": [compose]},
+                                                        {"clicks": [compose]}]})
+        assert not llv.compose_screen_only({"route_trace": [{"clicks": [compose]},
+                                                            {"clicks": [nothing]}]})
+        # Nothing clicked proves nothing about the compose screen.
+        assert not llv.compose_screen_only({"route_trace": [{"clicks": []}]})
+        assert not llv.compose_screen_only(None)
+
 
 @pytest.mark.unit
 class TestFeedSortProbe:
