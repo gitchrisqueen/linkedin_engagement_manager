@@ -153,6 +153,24 @@ export const PACK_THEMES = {
 
 export type PackToken = keyof (typeof PACK_THEMES)['light']
 
+/**
+ * Status colours for errors, confirmations and warnings in the app (light theme; the app has no
+ * dark mode yet). PROPOSED for brand/lem/DESIGN.md and pending the brand owner's approval; until
+ * then this is the one place they are defined, mirrored by `:root` in index.css. Each is used as
+ * text on the page ground, on a surface, on its own 10% tint, and as a fill under white text.
+ */
+export const STATUS_TOKENS = {
+  danger: '#B42318',
+  success: '#16794A',
+  warning: '#8A5A00',
+} as const
+
+/** A status colour laid over white at `alpha`, as `bg-<status>/10` renders it on a surface. */
+export function tint(hex: string, alpha: number): string {
+  const channel = (i: number) => Math.round(alpha * parseInt(hex.slice(i, i + 2), 16) + (1 - alpha) * 255)
+  return `#${[1, 3, 5].map((i) => channel(i).toString(16).padStart(2, '0')).join('')}`
+}
+
 /** Every pair the marketing tree draws with the pack tokens. Each must hold in BOTH themes. */
 export const PACK_PAIRS: { fg: PackToken; bg: PackToken; role: ContrastRole; usage: string }[] = [
   { fg: 'text', bg: 'bg', role: 'body', usage: 'headings and body on the page ground' },

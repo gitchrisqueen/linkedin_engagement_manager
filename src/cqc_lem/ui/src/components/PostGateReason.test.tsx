@@ -52,7 +52,7 @@ describe('PostGateReason — malformed media (issue #1402)', () => {
     const { container } = harness([MISSING, MALFORMED])
     expect(container.textContent).toContain('advisory')
     // The header names the hold, not the note.
-    expect(screen.getByText('⏸ Why this is pending')).toBeTruthy()
+    expect(screen.getByText('Why this is pending')).toBeTruthy()
   })
 
   it('shows a demoting probe reason without the advisory marker (VIDEO_PROBE_ENABLED)', () => {

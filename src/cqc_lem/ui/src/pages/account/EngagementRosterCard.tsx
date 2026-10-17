@@ -68,37 +68,37 @@ function TargetBadges({ target }: { target: EngagementTarget }) {
          data-testid={`roster-badges-${target.id ?? target.profile_url}`}>
       {blocked && (
         <span title={BLOCKED_HINT} data-testid="roster-blocked-badge"
-              className="bg-amber-100 text-amber-900 rounded-full px-2 py-0.5 font-medium">
+              className="bg-warning/10 text-warning rounded-full px-2 py-0.5 font-medium">
           {BLOCKED_LABEL}
         </span>
       )}
       {needsConnection && (
         <span title={NEEDS_CONNECTION_HINT} data-testid="roster-needs-connection-badge"
-              className="bg-amber-100 text-amber-900 rounded-full px-2 py-0.5 font-medium">
+              className="bg-warning/10 text-warning rounded-full px-2 py-0.5 font-medium">
           {NEEDS_CONNECTION_LABEL}
         </span>
       )}
       {requested && (
         <span title={CONNECT_REQUESTED_HINT} data-testid="roster-connect-requested-badge"
-              className="bg-gray-100 text-gray-600 rounded-full px-2 py-0.5">
+              className="bg-page text-fg-muted rounded-full px-2 py-0.5">
           {CONNECT_REQUESTED_LABEL}
         </span>
       )}
       {connectFailed && (
         <span title={CONNECT_FAILED_HINT} data-testid="roster-connect-failed-badge"
-              className="bg-red-100 text-red-800 rounded-full px-2 py-0.5 font-medium">
+              className="bg-danger/10 text-danger rounded-full px-2 py-0.5 font-medium">
           {CONNECT_FAILED_LABEL}
         </span>
       )}
       {failed && (
         <span title={FOLLOW_FAILED_HINT} data-testid="roster-follow-failed-badge"
-              className="bg-red-100 text-red-800 rounded-full px-2 py-0.5 font-medium">
+              className="bg-danger/10 text-danger rounded-full px-2 py-0.5 font-medium">
           {FOLLOW_FAILED_LABEL}
         </span>
       )}
       {following && !failed && (
         <span data-testid="roster-following-badge"
-              className="bg-gray-100 text-gray-600 rounded-full px-2 py-0.5">
+              className="bg-page text-fg-muted rounded-full px-2 py-0.5">
           {FOLLOWING_LABEL}
         </span>
       )}
@@ -116,7 +116,7 @@ function MixBar({ targets }: { targets: EngagementTarget[] }) {
   const active = targets.filter((t) => t.active && t.profile_url.trim())
   if (active.length === 0) return null
   return (
-    <div className="flex flex-wrap gap-3 text-xs text-gray-600" data-testid="roster-mix">
+    <div className="flex flex-wrap gap-3 text-xs text-fg-muted" data-testid="roster-mix">
       {TARGET_CATEGORIES.map((c) => {
         const n = active.filter((t) => t.category === c.key).length
         return (
@@ -233,10 +233,10 @@ export default function EngagementRosterCard() {
     (s) => !targets.some((t) => t.profile_url === s.profile_url))
 
   return (
-    <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 space-y-4"
+    <div className="bg-raised rounded-panel shadow-panel border border-hairline p-6 space-y-4"
          data-testid="engagement-roster">
-      <h2 className="text-base font-semibold text-gray-700">Engagement Roster</h2>
-      <p className="text-xs text-gray-500">
+      <h2 className="text-base font-semibold text-fg">Engagement Roster</h2>
+      <p className="text-xs text-fg-muted">
         LEM comments on these accounts' recent posts <span className="font-semibold">before</span> it
         looks at your home feed. The <span className="font-semibold">{PER_WEEK_LABEL}</span> number on
         each row is that account's weekly ceiling — set it to 0 to pause an account without removing
@@ -253,7 +253,7 @@ export default function EngagementRosterCard() {
         {/* Column headers name each field on wide screens; on mobile the rows stack, so every field
             carries its own inline label instead. */}
         {targets.length > 0 && (
-          <div className="hidden sm:grid sm:grid-cols-12 gap-2 items-end text-xs font-medium text-gray-500"
+          <div className="hidden sm:grid sm:grid-cols-12 gap-2 items-end text-xs font-medium text-fg-muted"
                data-testid="roster-headers">
             <span className="sm:col-span-4">Profile URL</span>
             <span className="sm:col-span-3">Name</span>
@@ -268,29 +268,29 @@ export default function EngagementRosterCard() {
               onChange={(e) => update(idx, { profile_url: e.target.value })}
               placeholder="https://www.linkedin.com/in/their-handle"
               aria-label="Profile URL"
-              className="sm:col-span-4 border border-gray-300 rounded-lg px-3 py-2 text-sm" />
+              className="sm:col-span-4 border border-field rounded-control px-3 py-2 text-sm" />
             <input type="text" value={t.name ?? ''} maxLength={255}
               onChange={(e) => update(idx, { name: e.target.value })}
               placeholder="Name (optional)" aria-label="Name"
-              className="sm:col-span-3 border border-gray-300 rounded-lg px-3 py-2 text-sm" />
+              className="sm:col-span-3 border border-field rounded-control px-3 py-2 text-sm" />
             <select value={t.category} aria-label="Category"
               onChange={(e) => update(idx, { category: e.target.value as EngagementTargetCategory })}
-              className="sm:col-span-2 border border-gray-300 rounded-lg px-2 py-2 text-sm">
+              className="sm:col-span-2 border border-field rounded-control px-2 py-2 text-sm">
               {TARGET_CATEGORIES.map((c) => (
                 <option key={c.key} value={c.key} title={c.hint}>{c.label}</option>
               ))}
             </select>
-            <label className="sm:col-span-2 flex items-center gap-1 text-xs text-gray-500"
+            <label className="sm:col-span-2 flex items-center gap-1 text-xs text-fg-muted"
                    title={PER_WEEK_HINT}>
               <input type="number" min={0} max={14} value={t.max_comments_per_week}
                 onChange={(e) => update(idx, { max_comments_per_week: Number(e.target.value) })}
                 aria-label={PER_WEEK_LABEL} title={PER_WEEK_HINT}
-                className="w-14 border border-gray-300 rounded px-1 py-1" />
+                className="w-14 border border-field rounded-control px-1 py-1" />
               <span className="sm:hidden">{PER_WEEK_LABEL}</span>
               <span className="hidden sm:inline">/wk</span>
             </label>
             <div className="sm:col-span-1 flex items-center justify-end gap-2 text-xs">
-              <label className="flex items-center gap-1 text-gray-500">
+              <label className="flex items-center gap-1 text-fg-muted">
                 <input type="checkbox" checked={t.active} aria-label="Active"
                   onChange={(e) => update(idx, { active: e.target.checked })} />
                 On
@@ -298,7 +298,7 @@ export default function EngagementRosterCard() {
               <button type="button" onClick={() => removeRow(idx)}
                 aria-label={`Remove ${t.name || t.profile_url || 'account'}`}
                 title="Remove account"
-                className="text-red-500 hover:text-red-600">×</button>
+                className="text-danger hover:text-danger">×</button>
             </div>
             <TargetBadges target={t} />
           </div>
@@ -306,11 +306,11 @@ export default function EngagementRosterCard() {
       </div>
 
       <button type="button" onClick={addRow}
-        className="text-xs text-blue-600 font-medium hover:text-blue-700">+ Add account</button>
+        className="text-xs text-accent font-medium hover:text-accent">+ Add account</button>
 
       {eng && (
-        <div className="border-t border-gray-100 pt-3 space-y-3">
-          <label className="flex items-start gap-2 text-sm text-gray-700">
+        <div className="border-t border-hairline pt-3 space-y-3">
+          <label className="flex items-start gap-2 text-sm text-fg">
             <input type="checkbox" checked={autoFollow} data-testid="roster-auto-follow"
               aria-label="Follow roster accounts automatically"
               onChange={(e) => {
@@ -320,7 +320,7 @@ export default function EngagementRosterCard() {
               className="mt-0.5" />
             <span>
               Follow roster accounts automatically
-              <span className="block text-xs text-gray-500">
+              <span className="block text-xs text-fg-muted">
                 Off by default. When on, LEM follows up to{' '}
                 <span className="font-semibold">{eng.max_follows_per_day ?? 3}</span> roster accounts
                 a day while it is already on their activity page — never in a separate browsing
@@ -332,7 +332,7 @@ export default function EngagementRosterCard() {
           {/* The rung above (issue #979). Its own switch, because an invite is heavier and less
               reversible than a follow — and the copy has to make the LADDER obvious, or a user
               switching this on will expect LEM to invite their whole roster. */}
-          <label className="flex items-start gap-2 text-sm text-gray-700">
+          <label className="flex items-start gap-2 text-sm text-fg">
             <input type="checkbox" checked={autoConnect} data-testid="roster-auto-connect"
               aria-label="Send a connection request when following doesn't unlock commenting"
               onChange={(e) => {
@@ -342,7 +342,7 @@ export default function EngagementRosterCard() {
               className="mt-0.5" />
             <span>
               Connect when following doesn't unlock commenting
-              <span className="block text-xs text-gray-500">
+              <span className="block text-xs text-fg-muted">
                 Off by default, and separate from the switch above. LEM sends{' '}
                 <span className="font-semibold">one</span> connection request — ever — and only to an
                 account it already follows that is still refusing comments. Those invites come out of
@@ -357,15 +357,15 @@ export default function EngagementRosterCard() {
       )}
 
       {suggestions.length > 0 && (
-        <div className="border-t border-gray-100 pt-3 space-y-2">
-          <p className="text-xs text-gray-500">
+        <div className="border-t border-hairline pt-3 space-y-2">
+          <p className="text-xs text-fg-muted">
             Suggested seeds — people who recently engaged with your posts. Add them, then set the
             right category:
           </p>
           <div className="flex flex-wrap gap-2">
             {suggestions.map((s) => (
               <button key={s.profile_url} type="button" onClick={() => addSuggestion(s)}
-                className="text-xs bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-full px-3 py-1">
+                className="text-xs bg-page hover:bg-hairline text-fg rounded-full px-3 py-1">
                 + {s.name || s.profile_url}
               </button>
             ))}
@@ -373,10 +373,10 @@ export default function EngagementRosterCard() {
         </div>
       )}
 
-      {msg && <p className={`text-sm font-medium ${msg.ok ? 'text-green-600' : 'text-red-600'}`}>{msg.text}</p>}
+      {msg && <p className={`text-sm font-medium ${msg.ok ? 'text-success' : 'text-danger'}`}>{msg.text}</p>}
       <button type="button" onClick={() => { void saveRoster() }}
         disabled={saveMutation.isPending}
-        className="w-full bg-blue-600 text-white py-2 rounded-lg text-sm font-semibold hover:bg-blue-700 disabled:opacity-50 transition-colors">
+        className="w-full bg-accent text-white py-2 rounded-panel text-sm font-semibold hover:bg-accent/90 disabled:opacity-50 transition-colors">
         {saveMutation.isPending ? 'Saving…' : 'Save Roster'}
       </button>
     </div>

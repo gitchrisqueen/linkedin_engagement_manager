@@ -38,11 +38,11 @@ const STAGE_LABELS: Record<string, string> = {
 }
 
 const STAGE_COLORS: Record<string, string> = {
-  opportunity: 'bg-purple-100 text-purple-700',
-  in_conversation: 'bg-blue-100 text-blue-700',
-  hot: 'bg-orange-100 text-orange-700',
-  warm: 'bg-amber-100 text-amber-700',
-  cold: 'bg-gray-100 text-gray-500',
+  opportunity: 'bg-accent/10 text-accent',
+  in_conversation: 'bg-accent/10 text-accent',
+  hot: 'bg-warning/10 text-warning',
+  warm: 'bg-warning/10 text-warning',
+  cold: 'bg-page text-fg-muted',
 }
 
 export default function LeadsPipeline({ userTimezone }: { userTimezone: string }) {
@@ -100,15 +100,15 @@ export default function LeadsPipeline({ userTimezone }: { userTimezone: string }
 
   return (
     <div className="space-y-4">
-      {msg && <p className={`text-sm font-medium ${msg.ok ? 'text-green-600' : 'text-red-600'}`}>{msg.text}</p>}
+      {msg && <p className={`text-sm font-medium ${msg.ok ? 'text-success' : 'text-danger'}`}>{msg.text}</p>}
 
-      <div className="bg-white rounded-lg border border-gray-200 shadow-sm p-5">
+      <div className="bg-raised rounded-panel border border-hairline shadow-panel p-5">
         <div className="flex items-start justify-between gap-3">
           <div>
-            <h3 className="font-semibold text-gray-700">
+            <h3 className="font-semibold text-fg">
               Lead pipeline{data?.hot_count ? ` — ${data.hot_count} worth acting on` : ''}
             </h3>
-            <p className="text-xs text-gray-500 mt-1">
+            <p className="text-xs text-fg-muted mt-1">
               Everyone engaging with you, scored on how well they fit what you do and how recently
               and often they show up. Rebuilt nightly. Move someone by hand or leave a note — the
               re-score won't touch it.
@@ -117,20 +117,20 @@ export default function LeadsPipeline({ userTimezone }: { userTimezone: string }
           <button
             onClick={() => refreshMutation.mutate()}
             disabled={refreshMutation.isPending}
-            className="shrink-0 px-3 py-1.5 border border-gray-300 text-gray-700 rounded-lg text-xs font-semibold hover:bg-gray-50 disabled:opacity-50"
+            className="shrink-0 px-3 py-1.5 border border-field text-fg rounded-control text-xs font-semibold hover:bg-page disabled:opacity-50"
           >
             Re-score now
           </button>
         </div>
-        <label className="flex items-center gap-2 mt-3 text-xs text-gray-600">
+        <label className="flex items-center gap-2 mt-3 text-xs text-fg-muted">
           <input type="checkbox" checked={showDismissed} onChange={(e) => setShowDismissed(e.target.checked)} />
           Show people I've removed
         </label>
       </div>
 
-      {isLoading && <p className="text-gray-400 text-sm">Loading your pipeline…</p>}
+      {isLoading && <p className="text-fg-muted text-sm">Loading your pipeline…</p>}
       {!isLoading && leads.length === 0 && (
-        <div className="text-center py-10 bg-white rounded-lg border border-gray-200 text-sm text-gray-500">
+        <div className="text-center py-10 bg-raised rounded-panel border border-hairline text-sm text-fg-muted">
           No scored leads yet — they appear once people engage with your posts, or right after the
           nightly re-score.
         </div>
@@ -143,36 +143,36 @@ export default function LeadsPipeline({ userTimezone }: { userTimezone: string }
               <span className={`px-2 py-0.5 rounded-full text-xs font-semibold ${STAGE_COLORS[stage]}`}>
                 {STAGE_LABELS[stage]}
               </span>
-              <span className="text-xs text-gray-400">
+              <span className="text-xs text-fg-muted">
                 {leads.filter((l) => stageOf(l) === stage).length}
               </span>
             </div>
 
             {leads.filter((l) => stageOf(l) === stage).map((l) => (
-              <div key={l.id} className={`bg-white rounded-lg border border-gray-200 p-4 space-y-2 ${l.dismissed ? 'opacity-60' : ''}`}>
+              <div key={l.id} className={`bg-raised rounded-panel border border-hairline p-4 space-y-2 ${l.dismissed ? 'opacity-60' : ''}`}>
                 <div className="flex items-center justify-between gap-2">
                   {l.person_profile_url ? (
                     <a href={l.person_profile_url} target="_blank" rel="noopener noreferrer"
-                      className="text-sm font-medium text-blue-700 truncate hover:underline">
+                      className="text-sm font-medium text-accent truncate hover:underline">
                       {l.person_name || l.person_profile_url}
                     </a>
                   ) : (
-                    <span className="text-sm font-medium text-gray-700 truncate">{l.person_name || 'Unknown'}</span>
+                    <span className="text-sm font-medium text-fg truncate">{l.person_name || 'Unknown'}</span>
                   )}
-                  <span className="shrink-0 px-2 py-0.5 rounded-full text-xs font-semibold bg-amber-100 text-amber-700">
+                  <span className="shrink-0 px-2 py-0.5 rounded-full text-xs font-semibold bg-warning/10 text-warning">
                     {l.score}
                   </span>
                 </div>
 
-                {l.reasons && <p className="text-xs text-gray-500">{l.reasons}</p>}
+                {l.reasons && <p className="text-xs text-fg-muted">{l.reasons}</p>}
 
                 {l.next_action && (
-                  <p className="text-sm text-gray-700">
-                    <span className="font-semibold text-gray-500">Next: </span>{l.next_action}
+                  <p className="text-sm text-fg">
+                    <span className="font-semibold text-fg-muted">Next: </span>{l.next_action}
                   </p>
                 )}
 
-                <div className="flex flex-wrap items-center gap-2 text-xs text-gray-400">
+                <div className="flex flex-wrap items-center gap-2 text-xs text-fg-muted">
                   <span>fit {l.icp_score}</span>
                   <span>·</span>
                   <span>engagement {l.engagement_score}</span>
@@ -188,7 +188,7 @@ export default function LeadsPipeline({ userTimezone }: { userTimezone: string }
                   <select
                     value={stageOf(l)}
                     onChange={(e) => updateMutation.mutate({ id: l.id, stage: e.target.value })}
-                    className="border border-gray-300 rounded px-2 py-1 text-xs"
+                    className="border border-field rounded-control px-2 py-1 text-xs"
                   >
                     {STAGES.map((s) => (
                       <option key={s} value={s}>{STAGE_LABELS[s]}</option>
@@ -196,14 +196,14 @@ export default function LeadsPipeline({ userTimezone }: { userTimezone: string }
                   </select>
                   {l.manual_stage && (
                     <button onClick={() => updateMutation.mutate({ id: l.id, stage: '' })}
-                      className="text-xs text-gray-500 hover:underline">
+                      className="text-xs text-fg-muted hover:underline">
                       use scored stage
                     </button>
                   )}
                   <button
                     onClick={() => updateMutation.mutate({ id: l.id, action: l.dismissed ? 'restore' : 'dismiss' })}
                     disabled={updateMutation.isPending}
-                    className="px-2 py-1 border border-gray-300 text-gray-600 rounded text-xs font-semibold hover:bg-gray-50 disabled:opacity-50">
+                    className="px-2 py-1 border border-field text-fg-muted rounded-control text-xs font-semibold hover:bg-page disabled:opacity-50">
                     {l.dismissed ? 'Restore' : 'Remove'}
                   </button>
                 </div>
@@ -214,7 +214,7 @@ export default function LeadsPipeline({ userTimezone }: { userTimezone: string }
                     if (noteFor(l) !== (l.notes ?? '')) updateMutation.mutate({ id: l.id, notes: noteFor(l) })
                   }}
                   placeholder="Your notes on this lead…"
-                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-xs" />
+                  className="w-full border border-hairline rounded-panel px-3 py-2 text-xs" />
               </div>
             ))}
           </div>

@@ -1,4 +1,5 @@
 import { Link } from 'react-router-dom'
+import Icon from './marketing/Icon'
 import { gateHold } from '../utils/gateFindings'
 import type { GateFinding } from '../utils/gateFindings'
 
@@ -38,16 +39,17 @@ export default function PostGateReason({
 
   return (
     <div
-      className={`rounded-lg border p-4 space-y-3 ${
-        isHeld ? 'bg-amber-50 border-amber-200' : 'bg-gray-50 border-gray-200'
+      className={`rounded-panel border p-4 space-y-3 ${
+        isHeld ? 'bg-warning/5 border-warning/25' : 'bg-page border-hairline'
       }`}
     >
-      <h4 className={`text-sm font-semibold ${isHeld ? 'text-amber-900' : 'text-gray-700'}`}>
-        {isHeld ? '⏸ Why this is pending' : 'Quality checks'}
+      <h4 className={`flex items-center gap-1 text-sm font-semibold ${isHeld ? 'text-warning' : 'text-fg'}`}>
+        {isHeld && <Icon name="pause" className="h-4 w-4 shrink-0" />}
+        {isHeld ? 'Why this is pending' : 'Quality checks'}
       </h4>
 
       {!findings.length && (
-        <p className="text-sm text-gray-600">
+        <p className="text-sm text-fg-muted">
           No quality gate is holding this post. Edit it and re-score to re-run the checks.
         </p>
       )}
@@ -60,26 +62,26 @@ export default function PostGateReason({
             <div className="flex items-center gap-2 flex-wrap">
               <span
                 className={`px-2 py-0.5 rounded-full text-xs font-semibold ${
-                  f.demoted ? 'bg-amber-200 text-amber-900' : 'bg-gray-200 text-gray-700'
+                  f.demoted ? 'bg-warning/15 text-warning' : 'bg-hairline text-fg'
                 }`}
               >
                 {f.label}
               </span>
               {score && (
-                <span className="text-xs text-gray-500">
+                <span className="text-xs text-fg-muted">
                   {f.gate === 'similarity' ? 'overlap' : 'score'} {score}
                   {threshold && ` · your limit ${threshold}`}
                 </span>
               )}
-              {!f.demoted && <span className="text-xs text-gray-400">advisory</span>}
+              {!f.demoted && <span className="text-xs text-fg-muted">advisory</span>}
             </div>
-            <p className="text-sm text-gray-700">{f.explanation}</p>
-            <p className="text-sm text-gray-600">
+            <p className="text-sm text-fg">{f.explanation}</p>
+            <p className="text-sm text-fg-muted">
               <span className="font-medium">Fix: </span>
               {f.remediation}
             </p>
             {!!f.details?.length && (
-              <ul className="text-xs text-gray-500 list-disc list-inside">
+              <ul className="text-xs text-fg-muted list-disc list-inside">
                 {f.details.map((d, i) => (
                   <li key={i}>{d}</li>
                 ))}
@@ -95,20 +97,20 @@ export default function PostGateReason({
             type="button"
             onClick={onRescore}
             disabled={rescoring}
-            className="bg-amber-600 text-white px-3 py-1.5 rounded-lg text-xs font-semibold hover:bg-amber-700 disabled:opacity-50 transition-colors"
+            className="bg-accent text-on-accent px-3 py-1.5 rounded-control text-xs font-semibold hover:bg-accent/90 disabled:opacity-50 transition-colors"
           >
             {rescoring ? 'Re-scoring…' : 'Save & re-score'}
           </button>
         )}
         <Link
           to="/account#engagement"
-          className="text-xs font-semibold text-blue-700 underline hover:text-blue-800"
+          className="text-xs font-semibold text-accent underline hover:text-accent"
         >
           Adjust thresholds
         </Link>
       </div>
 
-      {rescoreResult && <p className="text-xs font-medium text-gray-700">{rescoreResult}</p>}
+      {rescoreResult && <p className="text-xs font-medium text-fg">{rescoreResult}</p>}
     </div>
   )
 }

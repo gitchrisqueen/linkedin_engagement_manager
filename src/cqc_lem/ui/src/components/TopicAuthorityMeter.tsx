@@ -29,29 +29,29 @@ export default function TopicAuthorityMeter({
   const offNiche = score < OFF_NICHE_THRESHOLD
   const strong = score >= 0.35
 
-  const barColor = offNiche ? 'bg-red-500' : strong ? 'bg-green-500' : 'bg-amber-500'
+  const barColor = offNiche ? 'bg-danger' : strong ? 'bg-success' : 'bg-warning'
   const label = offNiche ? 'Off-niche' : strong ? 'On-niche' : 'Loosely on-niche'
-  const labelColor = offNiche ? 'text-red-600' : strong ? 'text-green-600' : 'text-amber-600'
+  const labelColor = offNiche ? 'text-danger' : strong ? 'text-success' : 'text-warning'
 
   // Only claim the profile is part of the score when profile inputs are actually wired in.
   const scoredAgainst =
     headline?.trim() || about?.trim() ? 'focus topics and profile' : 'focus topics'
 
   return (
-    <div className="mt-3 rounded-lg border border-gray-200 bg-gray-50 p-3">
+    <div className="mt-3 rounded-panel border border-hairline bg-page p-3">
       <div className="flex items-center justify-between mb-1">
-        <p className="text-xs font-medium text-gray-700">Topic authority consistency</p>
+        <p className="text-xs font-medium text-fg">Topic authority consistency</p>
         <span className={`text-xs font-semibold ${labelColor}`}>
           {label} · {pct}%
         </span>
       </div>
-      <div className="h-2 w-full overflow-hidden rounded-full bg-gray-200" aria-hidden="true">
+      <div className="h-2 w-full overflow-hidden rounded-full bg-hairline" aria-hidden="true">
         <div
           className={`h-full rounded-full ${barColor} transition-all`}
           style={{ width: `${Math.max(pct, 3)}%` }}
         />
       </div>
-      <p className="mt-1.5 text-[11px] leading-snug text-gray-500">
+      <p className="mt-1.5 text-xs leading-snug text-fg-muted">
         {offNiche
           ? 'This draft drifts off your focus topics. 2026 LinkedIn suppresses off-niche posts — steer it back toward your Topic DNA.'
           : `How tightly this draft sits inside your ${scoredAgainst} — LinkedIn now rewards profile↔content consistency.`}

@@ -161,12 +161,12 @@ export default function AuthFactorsCard() {
       {stepUpModal}
 
       {data && (
-        <p className="text-xs text-gray-500">
+        <p className="text-xs text-fg-muted">
           {data.pin_is_bootstrap_only
             ? 'An emailed code alone will no longer sign you in — it now has to be followed by one of the factors below.'
             : 'Right now, anyone who can read your email can sign in as you. Add a factor to change that.'}
           {!data.has_strong_factor && data.strong_factor_deadline && (
-            <span className="block mt-1 font-semibold text-amber-700" data-testid="factor-deadline">
+            <span className="block mt-1 font-semibold text-warning" data-testid="factor-deadline">
               {data.enrollment_required
                 ? 'Required now — the rest of LEM unlocks once a factor is saved.'
                 : `Required from ${when(data.strong_factor_deadline)}.`}
@@ -176,19 +176,19 @@ export default function AuthFactorsCard() {
       )}
 
       <div>
-        <h4 className="text-sm font-semibold text-gray-800 mb-2">Your factors</h4>
+        <h4 className="text-sm font-semibold text-fg mb-2">Your factors</h4>
         {factors.length === 0 ? (
-          <p className="text-xs text-gray-500">Nothing enrolled yet.</p>
+          <p className="text-xs text-fg-muted">Nothing enrolled yet.</p>
         ) : (
-          <ul className="divide-y divide-gray-100 border border-gray-200 rounded-lg">
+          <ul className="divide-y divide-hairline border border-hairline rounded-panel">
             {factors.map((f) => (
               <li key={f.id} className="flex items-center justify-between gap-3 px-3 py-2">
                 <div className="min-w-0">
-                  <p className="text-sm font-medium text-gray-800 truncate">
+                  <p className="text-sm font-medium text-fg truncate">
                     {KIND_LABELS[f.kind] ?? f.kind}
                     {f.label && f.label !== KIND_LABELS[f.kind] ? ` — ${f.label}` : ''}
                   </p>
-                  <p className="text-xs text-gray-500">
+                  <p className="text-xs text-fg-muted">
                     Added {when(f.created_at)} · last used {when(f.last_used_at)}
                   </p>
                 </div>
@@ -196,7 +196,7 @@ export default function AuthFactorsCard() {
                   type="button"
                   onClick={() => removeFactor.mutate(f.id)}
                   disabled={removeFactor.isPending}
-                  className="text-xs font-semibold text-red-600 hover:underline disabled:opacity-50 whitespace-nowrap"
+                  className="text-xs font-semibold text-danger hover:underline disabled:opacity-50 whitespace-nowrap"
                 >
                   Remove
                 </button>
@@ -212,7 +212,7 @@ export default function AuthFactorsCard() {
             type="button"
             onClick={() => addPasskey.mutate()}
             disabled={addPasskey.isPending}
-            className="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-blue-700 disabled:opacity-50"
+            className="bg-accent text-white px-4 py-2 rounded-control text-sm font-semibold hover:bg-accent/90 disabled:opacity-50"
           >
             {addPasskey.isPending ? 'Waiting for your device…' : 'Add a passkey'}
           </button>
@@ -222,7 +222,7 @@ export default function AuthFactorsCard() {
             type="button"
             onClick={() => startTotp.mutate()}
             disabled={startTotp.isPending}
-            className="border border-gray-300 text-gray-700 px-4 py-2 rounded-lg text-sm font-semibold hover:bg-gray-50 disabled:opacity-50"
+            className="border border-field text-fg px-4 py-2 rounded-control text-sm font-semibold hover:bg-page disabled:opacity-50"
           >
             Use an authenticator app
           </button>
@@ -230,11 +230,11 @@ export default function AuthFactorsCard() {
       </div>
 
       {totpSecret && (
-        <div className="border border-gray-200 rounded-lg p-3 space-y-2">
-          <p className="text-xs text-gray-600">
+        <div className="border border-hairline rounded-panel p-3 space-y-2">
+          <p className="text-xs text-fg-muted">
             Add this key to your authenticator app, then enter the 6-digit code it shows.
           </p>
-          <code className="block text-sm font-mono bg-gray-50 px-2 py-1 rounded break-all"
+          <code className="block text-sm font-mono bg-page px-2 py-1 rounded-control break-all"
                 data-testid="totp-secret">
             {totpSecret.secret}
           </code>
@@ -247,13 +247,13 @@ export default function AuthFactorsCard() {
               value={totpCode}
               onChange={(e) => setTotpCode(e.target.value.replace(/\D/g, ''))}
               placeholder="123456"
-              className="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm text-center tracking-widest font-mono"
+              className="flex-1 border border-field rounded-control px-3 py-2 text-sm text-center font-mono"
             />
             <button
               type="button"
               onClick={() => confirmTotp.mutate()}
               disabled={confirmTotp.isPending || totpCode.trim().length !== 6}
-              className="bg-gray-800 text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-gray-900 disabled:opacity-50"
+              className="bg-fg text-white px-4 py-2 rounded-panel text-sm font-semibold hover:bg-fg disabled:opacity-50"
             >
               {confirmTotp.isPending ? 'Checking…' : 'Confirm'}
             </button>
@@ -262,8 +262,8 @@ export default function AuthFactorsCard() {
       )}
 
       <div>
-        <h4 className="text-sm font-semibold text-gray-800 mb-1">Recovery codes</h4>
-        <p className="text-xs text-gray-500 mb-2">
+        <h4 className="text-sm font-semibold text-fg mb-1">Recovery codes</h4>
+        <p className="text-xs text-fg-muted mb-2">
           {data ? `${data.recovery_codes_unused} of ${data.recovery_codes_total || 0} unused.` : ''}{' '}
           Each one signs you in once if you lose your device — then lets you enrol a new factor. They
           are shown once and never again.
@@ -272,15 +272,15 @@ export default function AuthFactorsCard() {
           type="button"
           onClick={() => regenerate.mutate()}
           disabled={regenerate.isPending}
-          className="text-xs font-semibold text-blue-600 hover:underline disabled:opacity-50"
+          className="text-xs font-semibold text-accent hover:underline disabled:opacity-50"
         >
           {data?.recovery_codes_total ? 'Generate a new set' : 'Generate recovery codes'}
         </button>
       </div>
 
       {freshCodes && (
-        <div className="border-2 border-amber-300 bg-amber-50 rounded-lg p-3 space-y-2">
-          <p className="text-xs font-semibold text-amber-900">
+        <div className="border-2 border-warning/50 bg-warning/5 rounded-panel p-3 space-y-2">
+          <p className="text-xs font-semibold text-warning">
             Save these now — this is the only time they will be shown. The previous set no longer
             works.
           </p>
@@ -292,7 +292,7 @@ export default function AuthFactorsCard() {
           <button
             type="button"
             onClick={() => setFreshCodes(null)}
-            className="text-xs font-semibold text-amber-900 hover:underline"
+            className="text-xs font-semibold text-warning hover:underline"
           >
             I've saved them
           </button>
@@ -300,7 +300,7 @@ export default function AuthFactorsCard() {
       )}
 
       {msg && (
-        <p className={`text-sm font-medium ${msg.ok ? 'text-green-600' : 'text-red-600'}`}>{msg.text}</p>
+        <p className={`text-sm font-medium ${msg.ok ? 'text-success' : 'text-danger'}`}>{msg.text}</p>
       )}
     </SettingsCard>
   )

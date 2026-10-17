@@ -9,6 +9,10 @@ import type { ReactNode } from 'react'
 // boxes make the stacking order structural instead of last-render-wins.
 export const FLOATING_DOCK_ID = 'floating-dock'
 
+// Below md the feedback launcher lives in the app menu instead of floating over the page; the
+// menu row dispatches this window event and FeedbackWidget opens its panel.
+export const OPEN_FEEDBACK_EVENT = 'lem:open-feedback'
+
 export default function FloatingDock({ children }: { children?: ReactNode }) {
   return (
     <div

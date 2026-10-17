@@ -60,7 +60,7 @@ function SectionNav({
   const { alertCounts } = useConflicts()
   return (
     <nav aria-label="Settings sections" className="lg:w-56 lg:shrink-0">
-      <ul className="flex lg:flex-col gap-1 overflow-x-auto lg:overflow-visible border-b lg:border-b-0 border-gray-200 pb-1 lg:pb-0">
+      <ul className="flex lg:flex-col gap-1 overflow-x-auto lg:overflow-visible border-b lg:border-b-0 border-hairline pb-1 lg:pb-0">
         {SECTIONS.map((s) => {
           const alerts = alertCounts[s.key] ?? 0
           const selected = active === s.key
@@ -71,8 +71,8 @@ function SectionNav({
                 onClick={() => onSelect(s.key)}
                 aria-current={selected ? 'page' : undefined}
                 data-testid={`nav-${s.key}`}
-                className={`w-full whitespace-nowrap text-left px-3 py-2 rounded-lg text-sm font-semibold transition-colors flex items-center justify-between gap-2 ${
-                  selected ? 'bg-blue-50 text-blue-700' : 'text-gray-600 hover:bg-gray-50'
+                className={`w-full whitespace-nowrap text-left px-3 py-2 rounded-panel text-sm font-semibold transition-colors flex items-center justify-between gap-2 ${
+                  selected ? 'bg-accent/5 text-accent' : 'text-fg-muted hover:bg-page'
                 }`}
               >
                 <span>{s.label}</span>
@@ -80,7 +80,7 @@ function SectionNav({
                   <span
                     data-testid={`nav-alerts-${s.key}`}
                     title={`${alerts} thing${alerts === 1 ? '' : 's'} to look at`}
-                    className="shrink-0 min-w-5 h-5 px-1 rounded-full bg-amber-400 text-amber-950 text-[11px] font-bold flex items-center justify-center"
+                    className="shrink-0 min-w-5 h-5 px-1 rounded-full bg-warning text-white text-xs font-bold flex items-center justify-center"
                   >
                     {alerts}
                   </span>
@@ -104,7 +104,7 @@ function SharedSaveStatus() {
   return (
     <div className="space-y-1">
       {messages.map((m, i) => (
-        <p key={i} className={`text-sm font-medium ${m!.ok ? 'text-green-600' : 'text-red-600'}`}>
+        <p key={i} className={`text-sm font-medium ${m!.ok ? 'text-success' : 'text-danger'}`}>
           {m!.text}
         </p>
       ))}
@@ -148,8 +148,8 @@ export default function SettingsHub() {
                     className={s.key === active ? 'space-y-6' : 'hidden'}
                   >
                     <div>
-                      <h2 className="text-lg font-bold text-gray-800">{s.label}</h2>
-                      <p className="text-sm text-gray-500">{s.blurb}</p>
+                      <h2 className="text-xl font-semibold text-fg">{s.label}</h2>
+                      <p className="text-sm text-fg-muted">{s.blurb}</p>
                     </div>
                     <SectionBody section={s.key} />
                   </div>

@@ -46,11 +46,11 @@ export default function PostHogSurveyModal() {
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/40 p-4">
-      <div className="relative w-full max-w-md max-h-viewport overflow-y-auto bg-white border border-gray-200 rounded-xl shadow-xl p-5">
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-fg/40 p-4">
+      <div className="relative w-full max-w-md max-h-viewport overflow-y-auto bg-raised border border-hairline rounded-panel shadow-xl p-5">
         <button
           onClick={dismiss}
-          className="absolute top-2 right-3 text-gray-400 hover:text-gray-600 text-xl leading-none"
+          className="absolute top-2 right-3 text-fg-muted hover:text-fg-muted text-xl leading-none"
           aria-label="Close survey"
         >
           ×
@@ -58,18 +58,18 @@ export default function PostHogSurveyModal() {
 
         {done ? (
           <div className="pt-2">
-            <h2 className="text-sm font-bold text-gray-800 mb-1">Thanks 🙏</h2>
-            <p className="text-xs text-gray-500 mb-4">That goes straight to the team.</p>
+            <h2 className="text-sm font-semibold text-fg mb-1">Thanks 🙏</h2>
+            <p className="text-xs text-fg-muted mb-4">That goes straight to the team.</p>
             <button
               onClick={dismiss}
-              className="w-full bg-blue-600 text-white py-2 rounded-lg text-xs font-semibold hover:bg-blue-700 transition-colors"
+              className="w-full bg-accent text-white py-2 rounded-panel text-xs font-semibold hover:bg-accent/90 transition-colors"
             >
               Done
             </button>
           </div>
         ) : (
           <div className="space-y-3 pt-1">
-            <h2 className="text-sm font-bold text-gray-800">{rating.question}</h2>
+            <h2 className="text-sm font-semibold text-fg">{rating.question}</h2>
 
             <div
               className="flex flex-wrap gap-1"
@@ -83,10 +83,10 @@ export default function PostHogSurveyModal() {
                   onClick={() => setScore(n)}
                   aria-label={`Score ${n}`}
                   aria-pressed={score === n}
-                  className={`w-8 h-8 rounded-lg border text-xs font-semibold ${
+                  className={`w-8 h-8 rounded-panel border text-xs font-semibold ${
                     score === n
-                      ? 'bg-blue-600 border-blue-600 text-white'
-                      : 'bg-white border-gray-300 text-gray-600 hover:border-blue-400'
+                      ? 'bg-accent border-accent text-white'
+                      : 'bg-raised border-hairline text-fg-muted hover:border-accent/50'
                   }`}
                 >
                   {n}
@@ -94,7 +94,7 @@ export default function PostHogSurveyModal() {
               ))}
             </div>
             {(rating.lowerBoundLabel || rating.upperBoundLabel) && (
-              <div className="flex justify-between text-[11px] text-gray-400">
+              <div className="flex justify-between text-xs text-fg-muted">
                 <span>{rating.lowerBoundLabel}</span>
                 <span>{rating.upperBoundLabel}</span>
               </div>
@@ -108,16 +108,16 @@ export default function PostHogSurveyModal() {
                 onChange={(e) => setComment(e.target.value)}
                 aria-label={open.question}
                 placeholder={open.question}
-                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full border border-field rounded-control px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-accent"
               />
             )}
 
-            {error && <p className="text-xs text-red-600">{error}</p>}
+            {error && <p className="text-xs text-danger">{error}</p>}
             <button
               type="button"
               onClick={send}
               disabled={loading || score === null}
-              className="w-full bg-blue-600 text-white py-2 rounded-lg text-xs font-semibold hover:bg-blue-700 disabled:opacity-50 transition-colors"
+              className="w-full bg-accent text-white py-2 rounded-panel text-xs font-semibold hover:bg-accent/90 disabled:opacity-50 transition-colors"
             >
               {loading ? 'Sending…' : 'Submit'}
             </button>

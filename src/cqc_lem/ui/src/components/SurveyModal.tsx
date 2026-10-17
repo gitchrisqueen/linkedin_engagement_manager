@@ -96,11 +96,11 @@ export default function SurveyModal() {
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/40 p-4">
-      <div className="relative w-full max-w-md max-h-viewport overflow-y-auto bg-white border border-gray-200 rounded-xl shadow-xl p-5">
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-fg/40 p-4">
+      <div className="relative w-full max-w-md max-h-viewport overflow-y-auto bg-raised border border-hairline rounded-panel shadow-xl p-5">
         <button
           onClick={dismiss}
-          className="absolute top-2 right-3 text-gray-400 hover:text-gray-600 text-xl leading-none"
+          className="absolute top-2 right-3 text-fg-muted hover:text-fg-muted text-xl leading-none"
           aria-label="Close survey"
         >
           ×
@@ -108,21 +108,21 @@ export default function SurveyModal() {
 
         {done ? (
           <div className="pt-2">
-            <h2 className="text-sm font-bold text-gray-800 mb-1">Thanks 🙏</h2>
-            <p className="text-xs text-gray-500 mb-4">{done}</p>
+            <h2 className="text-sm font-semibold text-fg mb-1">Thanks 🙏</h2>
+            <p className="text-xs text-fg-muted mb-4">{done}</p>
             <button
               onClick={() => setClosed(true)}
-              className="w-full bg-blue-600 text-white py-2 rounded-lg text-xs font-semibold hover:bg-blue-700 transition-colors"
+              className="w-full bg-accent text-white py-2 rounded-panel text-xs font-semibold hover:bg-accent/90 transition-colors"
             >
               Done
             </button>
           </div>
         ) : isReview ? (
           <div className="space-y-3 pt-1">
-            <h2 className="text-sm font-bold text-gray-800">
+            <h2 className="text-sm font-semibold text-fg">
               {showReview ? 'Turn that into a review?' : survey.headline}
             </h2>
-            <p className="text-xs text-gray-500">
+            <p className="text-xs text-fg-muted">
               {showReview
                 ? 'A short review unlocks the early-adopter extended trial.'
                 : survey.body}
@@ -136,10 +136,10 @@ export default function SurveyModal() {
                   onClick={() => setRating(n)}
                   aria-label={`${n} star${n > 1 ? 's' : ''}`}
                   aria-pressed={rating === n}
-                  className={`w-9 h-9 rounded-lg border text-sm ${
+                  className={`w-9 h-9 rounded-panel border text-sm ${
                     rating !== null && n <= rating
-                      ? 'bg-yellow-400 border-yellow-400 text-white'
-                      : 'bg-white border-gray-300 text-gray-400 hover:border-blue-400'
+                      ? 'bg-warning border-warning/50 text-white'
+                      : 'bg-raised border-hairline text-fg-muted hover:border-accent/50'
                   }`}
                 >
                   ★
@@ -154,7 +154,7 @@ export default function SurveyModal() {
               onChange={(e) => setImprovement(e.target.value)}
               aria-label="What would make this a 10?"
               placeholder="What would make this a 10?"
-              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full border border-field rounded-control px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-accent"
             />
             <textarea
               rows={3}
@@ -163,9 +163,9 @@ export default function SurveyModal() {
               onChange={(e) => setTestimonial(e.target.value)}
               aria-label="Your review"
               placeholder="Your review, in your words (optional)"
-              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full border border-field rounded-control px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-accent"
             />
-            <label className="flex items-start gap-2 text-[11px] text-gray-600">
+            <label className="flex items-start gap-2 text-xs text-fg-muted">
               <input
                 type="checkbox"
                 checked={consent}
@@ -175,20 +175,20 @@ export default function SurveyModal() {
               You may quote this (with my name) as a testimonial.
             </label>
 
-            {error && <p className="text-xs text-red-600">{error}</p>}
+            {error && <p className="text-xs text-danger">{error}</p>}
             <button
               type="button"
               onClick={submitReview}
               disabled={loading || rating === null}
-              className="w-full bg-blue-600 text-white py-2 rounded-lg text-xs font-semibold hover:bg-blue-700 disabled:opacity-50 transition-colors"
+              className="w-full bg-accent text-white py-2 rounded-panel text-xs font-semibold hover:bg-accent/90 disabled:opacity-50 transition-colors"
             >
               {loading ? 'Sending…' : 'Submit review'}
             </button>
           </div>
         ) : (
           <div className="space-y-3 pt-1">
-            <h2 className="text-sm font-bold text-gray-800">{survey.headline}</h2>
-            <p className="text-xs text-gray-500">{survey.body}</p>
+            <h2 className="text-sm font-semibold text-fg">{survey.headline}</h2>
+            <p className="text-xs text-fg-muted">{survey.body}</p>
 
             <div className="flex flex-wrap gap-1" role="group" aria-label="Score 0 to 10">
               {Array.from({ length: maxScore + 1 }, (_, n) => n).map((n) => (
@@ -198,17 +198,17 @@ export default function SurveyModal() {
                   onClick={() => setScore(n)}
                   aria-label={`Score ${n}`}
                   aria-pressed={score === n}
-                  className={`w-8 h-8 rounded-lg border text-xs font-semibold ${
+                  className={`w-8 h-8 rounded-panel border text-xs font-semibold ${
                     score === n
-                      ? 'bg-blue-600 border-blue-600 text-white'
-                      : 'bg-white border-gray-300 text-gray-600 hover:border-blue-400'
+                      ? 'bg-accent border-accent text-white'
+                      : 'bg-raised border-hairline text-fg-muted hover:border-accent/50'
                   }`}
                 >
                   {n}
                 </button>
               ))}
             </div>
-            <div className="flex justify-between text-[11px] text-gray-400">
+            <div className="flex justify-between text-xs text-fg-muted">
               <span>Not likely</span>
               <span>Very likely</span>
             </div>
@@ -220,15 +220,15 @@ export default function SurveyModal() {
               onChange={(e) => setWhy(e.target.value)}
               aria-label="Why that score?"
               placeholder="What's the main reason for your score?"
-              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full border border-field rounded-control px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-accent"
             />
 
-            {error && <p className="text-xs text-red-600">{error}</p>}
+            {error && <p className="text-xs text-danger">{error}</p>}
             <button
               type="button"
               onClick={submitNps}
               disabled={loading || score === null}
-              className="w-full bg-blue-600 text-white py-2 rounded-lg text-xs font-semibold hover:bg-blue-700 disabled:opacity-50 transition-colors"
+              className="w-full bg-accent text-white py-2 rounded-panel text-xs font-semibold hover:bg-accent/90 disabled:opacity-50 transition-colors"
             >
               {loading ? 'Sending…' : survey.cta_label}
             </button>

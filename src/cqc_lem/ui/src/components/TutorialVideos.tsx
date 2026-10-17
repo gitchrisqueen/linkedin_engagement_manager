@@ -52,7 +52,7 @@ export default function TutorialVideos() {
           {videos.map((video) => (
             <div key={video.flow} className="rounded-panel border border-hairline shadow-panel overflow-hidden">
               <video
-                className="w-full bg-black"
+                className="w-full bg-fg"
                 controls
                 preload="none"
                 poster={video.thumbnail_url ?? undefined}
@@ -63,7 +63,7 @@ export default function TutorialVideos() {
                 )}
               </video>
               <div className="p-5">
-                <h3 className="font-bold text-fg mb-1">{video.title}</h3>
+                <h3 className="font-semibold text-fg mb-1">{video.title}</h3>
                 {video.description && (
                   <p className="text-sm text-fg-muted leading-relaxed line-clamp-3">{video.description}</p>
                 )}

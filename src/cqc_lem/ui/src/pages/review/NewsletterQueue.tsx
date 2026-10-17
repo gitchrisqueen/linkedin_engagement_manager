@@ -8,8 +8,8 @@ import type { NewsletterDraft, NewsletterEdition } from '../account/types'
 import { maskProps } from '../../utils/analytics'
 
 const STATUS_COLORS: Record<string, string> = {
-  draft: 'bg-yellow-100 text-yellow-700',
-  approved: 'bg-green-100 text-green-700',
+  draft: 'bg-warning/10 text-warning',
+  approved: 'bg-success/10 text-success',
 }
 
 // e.g. "case_study" -> "Case Study" for the format/hook badges.
@@ -270,14 +270,14 @@ export default function NewsletterQueue(
     setSelectedId(e.id)
   }
 
-  if (isLoading) return <p className="text-gray-400 text-sm">Loading drafts…</p>
+  if (isLoading) return <p className="text-fg-muted text-sm">Loading drafts…</p>
 
   if (editions.length === 0) {
     return (
-      <div className="flex flex-col items-center text-center py-12 px-4 bg-white rounded-lg border border-gray-200">
+      <div className="flex flex-col items-center text-center py-12 px-4 bg-raised rounded-panel border border-hairline">
         <div className="text-4xl mb-4">📰</div>
-        <p className="text-gray-600 text-sm mb-2 max-w-sm">No newsletter drafts queued yet.</p>
-        <p className="text-gray-400 text-xs max-w-sm">
+        <p className="text-fg-muted text-sm mb-2 max-w-sm">No newsletter drafts queued yet.</p>
+        <p className="text-fg-muted text-xs max-w-sm">
           Enable your newsletter and set how many drafts to keep ready on the Account page — drafts will
           appear here for you to review, edit and approve.
         </p>
@@ -290,7 +290,7 @@ export default function NewsletterQueue(
       {/* Queue list */}
       <div className="space-y-3">
         {data?.next_publish && (
-          <p className="text-xs text-gray-400">
+          <p className="text-xs text-fg-muted">
             Next auto-generated slot: {formatInTimezone(data.next_publish, userTimezone)}
           </p>
         )}
@@ -298,24 +298,24 @@ export default function NewsletterQueue(
           <div
             key={e.id}
             onClick={() => selectEdition(e)}
-            className={`bg-white rounded-lg border p-4 cursor-pointer hover:border-blue-400 transition-colors ${
-              selectedId === e.id ? 'border-blue-500 ring-1 ring-blue-500' : 'border-gray-200'
+            className={`bg-raised rounded-panel border p-4 cursor-pointer hover:border-accent/50 transition-colors ${
+              selectedId === e.id ? 'border-accent ring-1 ring-accent' : 'border-hairline'
             }`}
           >
             <div className="flex items-center justify-between mb-1 gap-2">
               {/* The id is how audits, PRs and decision comments name an edition ("edition 14"),
                   so it has to be readable here or those instructions cannot be acted on (#2206). */}
-              <span className="text-xs text-gray-400 truncate">
-                <span className="font-mono text-gray-500" title="Edition id">#{e.id}</span>
+              <span className="text-xs text-fg-muted truncate">
+                <span className="font-mono text-fg-muted" title="Edition id">#{e.id}</span>
                 {' · '}
                 {e.scheduled_for ? formatInTimezone(e.scheduled_for, userTimezone) : 'Unscheduled'}
               </span>
-              <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${STATUS_COLORS[e.status] ?? 'bg-gray-100 text-gray-600'}`}>
+              <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${STATUS_COLORS[e.status] ?? 'bg-page text-fg-muted'}`}>
                 {e.status.toUpperCase()}
               </span>
             </div>
-            <p className="text-sm font-medium text-gray-800 truncate">{e.title || 'Untitled edition'}</p>
-            {e.subtitle && <p className="text-xs text-gray-500 line-clamp-1">{e.subtitle}</p>}
+            <p className="text-sm font-medium text-fg truncate">{e.title || 'Untitled edition'}</p>
+            {e.subtitle && <p className="text-xs text-fg-muted line-clamp-1">{e.subtitle}</p>}
             {/* A pending cover is only approvable inside the editor below, so the LIST has to say
                 it exists (issue #1432) — every edition in production shipped cover-less because
                 nothing outside the open editor ever mentioned the cover was waiting. The
@@ -323,7 +323,7 @@ export default function NewsletterQueue(
                 account does not reach its slot at all, so that clause would be a false
                 reassurance on the very row it is asking the author to open. */}
             {e.cover_image_status === 'pending_review' && (
-              <p className="mt-1.5 text-xs font-medium text-yellow-700">
+              <p className="mt-1.5 text-xs font-medium text-warning">
                 {e.status === 'approved' || data?.auto_publish_newsletters
                   ? '🖼️ Cover needs your approval — publishes without it otherwise'
                   : '🖼️ Cover needs your approval — approve it along with the edition'}
@@ -332,12 +332,12 @@ export default function NewsletterQueue(
             {(e.format || e.hook_style) && (
               <div className="flex flex-wrap gap-1 mt-1.5">
                 {e.format && (
-                  <span className="px-1.5 py-0.5 rounded bg-indigo-50 text-indigo-600 text-[10px] font-medium uppercase tracking-wide">
+                  <span className="px-1.5 py-0.5 rounded-control bg-accent/5 text-accent text-xs font-medium">
                     {prettyKey(e.format)}
                   </span>
                 )}
                 {e.hook_style && (
-                  <span className="px-1.5 py-0.5 rounded bg-purple-50 text-purple-600 text-[10px] font-medium uppercase tracking-wide">
+                  <span className="px-1.5 py-0.5 rounded-control bg-accent/5 text-accent text-xs font-medium">
                     {prettyKey(e.hook_style)} hook
                   </span>
                 )}
@@ -350,17 +350,17 @@ export default function NewsletterQueue(
       {/* Editor + preview */}
       {draftEdit && (
         <div className="sticky top-4 self-start space-y-4 max-h-[calc(100vh-2rem)] overflow-y-auto">
-          <div className="bg-white rounded-lg border border-gray-200 shadow-sm p-5 space-y-3">
+          <div className="bg-raised rounded-panel border border-hairline shadow-panel p-5 space-y-3">
             <div>
-              <h3 className="text-sm font-semibold text-gray-700">
+              <h3 className="text-sm font-semibold text-fg">
                 Review draft{' '}
-                <span className="font-mono font-normal text-gray-500" title="Edition id">#{draftEdit.id}</span>
+                <span className="font-mono font-normal text-fg-muted" title="Edition id">#{draftEdit.id}</span>
               </h3>
               {/* What happens at the slot depends on the account's own setting (issue #1135), so
                   this reports it rather than asserting one universal truth. An APPROVED edition
                   publishes either way — the toggle only decides whether an untouched draft does. */}
               {draftEdit.scheduled_for && (
-                <p className="text-xs text-gray-500">
+                <p className="text-xs text-fg-muted">
                   {draftEdit.status === 'approved' || data?.auto_publish_newsletters
                     ? `Auto-publishes ${formatInTimezone(draftEdit.scheduled_for, userTimezone)} unless you skip it.`
                     : `Scheduled for ${formatInTimezone(draftEdit.scheduled_for, userTimezone)} — it publishes only once you approve it.`}
@@ -368,24 +368,24 @@ export default function NewsletterQueue(
               )}
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Title</label>
+              <label className="block text-sm font-medium text-fg mb-1">Title</label>
               <input type="text" value={draftEdit.title || ''} onChange={(e) => setDe({ title: e.target.value })}
-                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                className="w-full border border-field rounded-control px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent" />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Subtitle</label>
+              <label className="block text-sm font-medium text-fg mb-1">Subtitle</label>
               <input type="text" value={draftEdit.subtitle || ''} onChange={(e) => setDe({ subtitle: e.target.value })}
-                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                className="w-full border border-field rounded-control px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent" />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Body</label>
+              <label className="block text-sm font-medium text-fg mb-1">Body</label>
               <textarea value={draftEdit.body || ''} onChange={(e) => setDe({ body: e.target.value })} rows={10}
-                {...maskProps('w-full border border-gray-300 rounded-lg px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-blue-500')} />
+                {...maskProps('w-full border border-field rounded-panel px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-accent')} />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
+              <label className="block text-sm font-medium text-fg mb-1">
                 Publish date &amp; time{' '}
-                <span className="font-normal text-gray-400">
+                <span className="font-normal text-fg-muted">
                   ({timezoneResolved ? userTimezone : 'loading your timezone…'})
                 </span>
               </label>
@@ -398,21 +398,21 @@ export default function NewsletterQueue(
                 onChange={(e) =>
                   setDe({ scheduled_for: zonedInputToUtcIso(e.target.value, userTimezone) ?? draftEdit.scheduled_for })
                 }
-                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100"
+                className="w-full border border-field rounded-control px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent disabled:bg-page"
               />
             </div>
 
             {/* Cover image (issue #893): upload your own, or generate one. A generated cover is
                 NOT published until it's approved here — it's a public brand asset. */}
-            <div className="border-t border-gray-100 pt-3 space-y-2">
+            <div className="border-t border-hairline pt-3 space-y-2">
               <div className="flex items-center justify-between">
-                <label className="block text-sm font-medium text-gray-700">Cover image</label>
+                <label className="block text-sm font-medium text-fg">Cover image</label>
                 {draftEdit.cover_image_url && (
                   <span
                     className={`px-2 py-0.5 rounded-full text-xs font-medium ${
                       draftEdit.cover_image_status === 'approved'
-                        ? 'bg-green-100 text-green-700'
-                        : 'bg-yellow-100 text-yellow-700'
+                        ? 'bg-success/10 text-success'
+                        : 'bg-warning/10 text-warning'
                     }`}
                   >
                     {draftEdit.cover_image_status === 'approved' ? 'PUBLISHES WITH THIS EDITION' : 'NEEDS YOUR APPROVAL'}
@@ -422,13 +422,13 @@ export default function NewsletterQueue(
               {draftEdit.cover_image_url ? (
                 <>
                   <img src={draftEdit.cover_image_url} alt="Newsletter cover"
-                    className="w-full rounded-lg border border-gray-200 object-cover" />
+                    className="w-full rounded-panel border border-hairline object-cover" />
                   {/* The consequence clause depends on the account's own publish gate (#1135):
                       for an opted-out draft the edition does NOT reach its slot at all, so
                       promising it "publishes on time" is the reassurance that stops the author
                       acting on the thing this box exists to make them act on. */}
                   {draftEdit.cover_image_status !== 'approved' && (
-                    <p className="text-xs text-yellow-700 bg-yellow-50 border border-yellow-200 rounded-lg px-3 py-2">
+                    <p className="text-xs text-warning bg-warning/5 border border-warning/25 rounded-panel px-3 py-2">
                       A generated cover is a public brand asset, so it only goes out once you
                       approve it here.{' '}
                       {draftEdit.status === 'approved' || data?.auto_publish_newsletters
@@ -438,7 +438,7 @@ export default function NewsletterQueue(
                   )}
                 </>
               ) : (
-                <p className="text-xs text-gray-400">
+                <p className="text-xs text-fg-muted">
                   No cover yet. Editions publish fine without one — a cover just makes the article
                   stand out in the feed and in subscriber email.
                 </p>
@@ -451,33 +451,33 @@ export default function NewsletterQueue(
                   e.target.value = ''  // let the same file be re-picked after a rejection
                 }} />
               <div>
-                <label htmlFor="cover-guidance" className="block text-xs text-gray-500 mb-1">
-                  Image guidance <span className="text-gray-400">(optional — for the cover image, not the article text)</span>
+                <label htmlFor="cover-guidance" className="block text-xs text-fg-muted mb-1">
+                  Image guidance <span className="text-fg-muted">(optional — for the cover image, not the article text)</span>
                 </label>
                 <textarea id="cover-guidance" value={coverGuidance}
                   onChange={(e) => setCoverGuidance(e.target.value)} rows={2}
                   placeholder="Describe what the cover should show or avoid (e.g. brighter colors, no text, a specific scene). Leave blank for the AI's own take."
                   disabled={busy || coverBusy}
-                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 disabled:opacity-50" />
+                  className="w-full border border-field rounded-control px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent disabled:opacity-50" />
               </div>
               <div className="grid grid-cols-2 gap-2">
                 <button type="button" onClick={() => coverFileRef.current?.click()} disabled={busy || coverBusy}
-                  className="bg-gray-100 text-gray-700 py-2 rounded-lg text-sm font-semibold hover:bg-gray-200 disabled:opacity-50 transition-colors">
+                  className="bg-page text-fg py-2 rounded-panel text-sm font-semibold hover:bg-hairline disabled:opacity-50 transition-colors">
                   {uploadCoverMutation.isPending ? 'Uploading…' : 'Upload image'}
                 </button>
                 <button type="button" onClick={() => generateCoverMutation.mutate()} disabled={busy || coverBusy}
-                  className="bg-indigo-50 text-indigo-700 py-2 rounded-lg text-sm font-semibold hover:bg-indigo-100 disabled:opacity-50 transition-colors">
+                  className="bg-accent/5 text-accent py-2 rounded-panel text-sm font-semibold hover:bg-accent/10 disabled:opacity-50 transition-colors">
                   {coverWaitId != null ? 'Generating…' : 'Generate with AI'}
                 </button>
               </div>
               <div className="flex items-center gap-2">
-                <label htmlFor="cover-avatar-choice" className="text-xs text-gray-500">
+                <label htmlFor="cover-avatar-choice" className="text-xs text-fg-muted">
                   My avatar in AI covers
                 </label>
                 <select id="cover-avatar-choice" value={coverAvatarChoice}
                   onChange={(e) => setCoverAvatarChoice(e.target.value as 'auto' | 'with' | 'without')}
                   disabled={busy || coverBusy}
-                  className="text-xs border border-gray-200 rounded-md px-2 py-1 text-gray-700 bg-white">
+                  className="text-xs border border-field rounded-control px-2 py-1 text-fg bg-raised">
                   <option value="auto">Auto — when the edition is about me</option>
                   <option value="with">Include me</option>
                   <option value="without">Never in this cover</option>
@@ -488,13 +488,13 @@ export default function NewsletterQueue(
                   {draftEdit.cover_image_status !== 'approved' && (
                     <button type="button" onClick={() => coverDecisionMutation.mutate('approve')}
                       disabled={busy || coverBusy}
-                      className="bg-green-600 text-white py-2 rounded-lg text-sm font-semibold hover:bg-green-700 disabled:opacity-50 transition-colors">
+                      className="bg-accent text-on-accent py-2 rounded-panel text-sm font-semibold hover:bg-accent/90 disabled:opacity-50 transition-colors">
                       Approve cover
                     </button>
                   )}
                   <button type="button" onClick={() => coverDecisionMutation.mutate('remove')}
                     disabled={busy || coverBusy}
-                    className={`text-gray-600 py-2 rounded-lg text-sm font-semibold bg-gray-100 hover:bg-gray-200 disabled:opacity-50 transition-colors ${
+                    className={`text-fg-muted py-2 rounded-panel text-sm font-semibold bg-page hover:bg-hairline disabled:opacity-50 transition-colors ${
                       draftEdit.cover_image_status === 'approved' ? 'col-span-2' : ''
                     }`}>
                     Remove cover
@@ -505,43 +505,43 @@ export default function NewsletterQueue(
 
             {/* Re-generate: the prominent action. Optional guidance steers the rewrite; empty guidance
                 lets the AI pick a fresh, distinct take. */}
-            <div className="border-t border-gray-100 pt-3 space-y-2">
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Added Guidance for article text <span className="font-normal text-gray-400">(optional)</span>
+            <div className="border-t border-hairline pt-3 space-y-2">
+              <label className="block text-sm font-medium text-fg mb-1">
+                Added Guidance for article text <span className="font-normal text-fg-muted">(optional)</span>
               </label>
               <textarea value={guidance} onChange={(e) => setGuidance(e.target.value)} rows={2}
                 placeholder="What should change and why? You can name a format (e.g. case study, listicle, contrarian). Leave blank for a fresh, distinct take. To guide the cover image instead, use Image guidance above."
                 disabled={busy}
-                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 disabled:opacity-50" />
+                className="w-full border border-field rounded-control px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent disabled:opacity-50" />
               <button type="button" onClick={() => regenerateMutation.mutate()} disabled={busy}
-                className="w-full bg-indigo-600 text-white py-2 rounded-lg text-sm font-semibold hover:bg-indigo-700 disabled:opacity-50 transition-colors">
+                className="w-full bg-accent text-white py-2 rounded-panel text-sm font-semibold hover:bg-accent/90 disabled:opacity-50 transition-colors">
                 {regenerating ? 'Regenerating…' : 'Re-generate'}
               </button>
             </div>
 
-            {msg && <p className={`text-sm font-medium ${msg.ok ? 'text-green-600' : 'text-red-600'}`}>{msg.text}</p>}
+            {msg && <p className={`text-sm font-medium ${msg.ok ? 'text-success' : 'text-danger'}`}>{msg.text}</p>}
             {/* Two separate approvals with near-identical names: this one schedules the EDITION,
                 "Approve cover" above releases the image. Say so, or the big blue button reads as
                 approving everything on the screen (issue #1432). */}
             {draftEdit.cover_image_url && draftEdit.cover_image_status !== 'approved' && (
-              <p className="text-xs text-yellow-700">
+              <p className="text-xs text-warning">
                 Heads up: this schedules the edition only — the cover above still needs
                 <strong> Approve cover</strong>.
               </p>
             )}
             <div className="grid grid-cols-2 gap-2">
               <button type="button" onClick={() => draftMutation.mutate('save')} disabled={busy}
-                className="bg-gray-100 text-gray-700 py-2 rounded-lg text-sm font-semibold hover:bg-gray-200 disabled:opacity-50 transition-colors">
+                className="bg-page text-fg py-2 rounded-panel text-sm font-semibold hover:bg-hairline disabled:opacity-50 transition-colors">
                 Save Draft
               </button>
               <button type="button" onClick={() => draftMutation.mutate('approve')} disabled={busy}
-                className="bg-blue-600 text-white py-2 rounded-lg text-sm font-semibold hover:bg-blue-700 disabled:opacity-50 transition-colors">
+                className="bg-accent text-white py-2 rounded-panel text-sm font-semibold hover:bg-accent/90 disabled:opacity-50 transition-colors">
                 Approve &amp; Schedule
               </button>
             </div>
             {/* Skip stays as a smaller secondary action — not publishing an edition is still useful. */}
             <button type="button" onClick={() => draftMutation.mutate('skip')} disabled={busy}
-              className="w-full text-xs text-gray-400 hover:text-gray-600 disabled:opacity-50 transition-colors">
+              className="w-full text-xs text-fg-muted hover:text-fg-muted disabled:opacity-50 transition-colors">
               Skip this edition
             </button>
           </div>

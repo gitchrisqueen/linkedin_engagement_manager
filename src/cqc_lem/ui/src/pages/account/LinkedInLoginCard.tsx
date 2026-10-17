@@ -98,16 +98,16 @@ export default function LinkedInLoginCard() {
       {stepUpModal}
       {/* LinkedIn connection — hidden when connected and token healthy */}
       {showLinkedInSection && (
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 space-y-4">
-          <h2 className="text-base font-semibold text-gray-700">
-            LinkedIn Connection <span className="text-red-500">*</span>
-            <span className="ml-2 text-[11px] font-semibold text-red-600 bg-red-50 px-2 py-0.5 rounded">
+        <div className="bg-raised rounded-panel shadow-panel border border-hairline p-6 space-y-4">
+          <h2 className="text-base font-semibold text-fg">
+            LinkedIn Connection <span className="text-danger">*</span>
+            <span className="ml-2 text-xs font-semibold text-danger bg-danger/5 px-2 py-0.5 rounded-control">
               Required
             </span>
           </h2>
 
           {isLinkedInConnected && tokenExpiringSoon && !tokenExpired && (
-            <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3 text-sm text-yellow-800">
+            <div className="bg-warning/5 border border-warning/25 rounded-panel p-3 text-sm text-warning">
               Your LinkedIn authorization expires in{' '}
               <strong>
                 {daysRemaining === null
@@ -126,7 +126,7 @@ export default function LinkedInLoginCard() {
           )}
 
           {tokenExpired && isLinkedInConnected && (
-            <div className="bg-red-50 border border-red-200 rounded-lg p-3 text-sm text-red-800">
+            <div className="bg-danger/5 border border-danger/25 rounded-panel p-3 text-sm text-danger">
               Your LinkedIn connection has expired. Please reconnect to continue posting.
             </div>
           )}
@@ -134,21 +134,21 @@ export default function LinkedInLoginCard() {
           <div className="flex items-center gap-3">
             <div
               className={`w-3 h-3 rounded-full flex-shrink-0 ${
-                isLinkedInConnected && !tokenExpired ? 'bg-green-500' : 'bg-gray-300'
+                isLinkedInConnected && !tokenExpired ? 'bg-success' : 'bg-hairline'
               }`}
             />
-            <span className="text-sm text-gray-600">
+            <span className="text-sm text-fg-muted">
               {isLinkedInConnected && !tokenExpired ? 'Connected to LinkedIn' : 'Not connected'}
             </span>
           </div>
 
-          <p className="text-xs text-gray-500">
+          <p className="text-xs text-fg-muted">
             Connecting allows LEM to post on your behalf, send DMs, reply to comments, and engage with your network automatically.
           </p>
 
           <a
             href={`${LI_AUTH_URL}?session_token=${encodeURIComponent(sessionToken ?? '')}`}
-            className="inline-block w-full text-center py-2 rounded-lg text-sm font-semibold bg-blue-700 text-white hover:bg-blue-800 cursor-pointer transition-colors"
+            className="inline-block w-full text-center py-2 rounded-panel text-sm font-semibold bg-accent text-white hover:bg-accent/90 cursor-pointer transition-colors"
           >
             {isLinkedInConnected ? 'Reconnect LinkedIn' : 'Connect LinkedIn'}
           </a>
@@ -156,17 +156,17 @@ export default function LinkedInLoginCard() {
       )}
 
       {showHealthyCountdown && (
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 px-6 py-4 flex items-center justify-between gap-3">
+        <div className="bg-raised rounded-panel shadow-panel border border-hairline px-6 py-4 flex items-center justify-between gap-3">
           <div className="flex items-center gap-3 min-w-0">
-            <div className="w-3 h-3 rounded-full flex-shrink-0 bg-green-500" />
-            <span className="text-sm text-gray-600 truncate">
+            <div className="w-3 h-3 rounded-full flex-shrink-0 bg-success" />
+            <span className="text-sm text-fg-muted truncate">
               Connected to LinkedIn ·{' '}
-              <span className="text-gray-500">{countdownText}</span>
+              <span className="text-fg-muted">{countdownText}</span>
             </span>
           </div>
           <a
             href={`${LI_AUTH_URL}?session_token=${encodeURIComponent(sessionToken ?? '')}`}
-            className="text-xs font-semibold text-blue-700 hover:text-blue-800 whitespace-nowrap"
+            className="text-xs font-semibold text-accent hover:text-accent whitespace-nowrap"
           >
             Reconnect
           </a>
@@ -184,18 +184,18 @@ export default function LinkedInLoginCard() {
       {/* LinkedIn Automation Password — DEPRECATED, collapsed behind a disclosure so the cookie
           path above is the one users take. Kept working for accounts that already rely on it. */}
       {isLinkedInConnected && !tokenExpired && (
-        <details className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 space-y-4">
-          <summary className="cursor-pointer text-sm font-medium text-gray-500">
+        <details className="bg-raised rounded-panel shadow-panel border border-hairline p-6 space-y-4">
+          <summary className="cursor-pointer text-sm font-medium text-fg-muted">
             Use a LinkedIn password instead (not recommended)
           </summary>
           <div className="pt-4">
-            <h2 className="text-base font-semibold text-gray-700">
+            <h2 className="text-base font-semibold text-fg">
               LinkedIn Automation Password{' '}
-              <span className="ml-1 text-[11px] font-semibold text-amber-700 bg-amber-50 px-2 py-0.5 rounded">
+              <span className="ml-1 text-xs font-semibold text-warning bg-warning/5 px-2 py-0.5 rounded-control">
                 Deprecated
               </span>
             </h2>
-            <p className="text-xs text-gray-500 mt-1">
+            <p className="text-xs text-fg-muted mt-1">
               Browser automation types this password into LinkedIn's login form, so it has to be
               stored in a reversible form — encrypted at rest, but still recoverable by the app.
               A session cookie above does the same job, is revocable from LinkedIn, and is not a
@@ -204,20 +204,20 @@ export default function LinkedInLoginCard() {
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">LinkedIn Password</label>
+            <label className="block text-sm font-medium text-fg mb-1">LinkedIn Password</label>
             <div className="relative">
               <input
                 type={showLiPassword ? 'text' : 'password'}
                 value={liPassword}
                 onChange={(e) => setLiPassword(e.target.value)}
-                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm pr-16 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full border border-field rounded-control px-3 py-2 text-sm pr-16 focus:outline-none focus:ring-2 focus:ring-accent"
                 placeholder="Enter your LinkedIn password"
                 autoComplete="new-password"
               />
               <button
                 type="button"
                 onClick={() => setShowLiPassword((v) => !v)}
-                className="absolute inset-y-0 right-2 flex items-center px-2 text-xs text-gray-500 hover:text-gray-700"
+                className="absolute inset-y-0 right-2 flex items-center px-2 text-xs text-fg-muted hover:text-fg"
               >
                 {showLiPassword ? 'Hide' : 'Show'}
               </button>
@@ -225,7 +225,7 @@ export default function LinkedInLoginCard() {
           </div>
 
           {liPasswordMsg && (
-            <p className={`text-sm font-medium ${liPasswordMsg.ok ? 'text-green-600' : 'text-red-600'}`}>
+            <p className={`text-sm font-medium ${liPasswordMsg.ok ? 'text-success' : 'text-danger'}`}>
               {liPasswordMsg.text}
             </p>
           )}
@@ -234,7 +234,7 @@ export default function LinkedInLoginCard() {
             type="button"
             onClick={() => liPasswordMutation.mutate()}
             disabled={liPasswordMutation.isPending || !liPassword}
-            className="w-full bg-blue-600 text-white py-2 rounded-lg text-sm font-semibold hover:bg-blue-700 disabled:opacity-50 transition-colors"
+            className="w-full bg-accent text-white py-2 rounded-panel text-sm font-semibold hover:bg-accent/90 disabled:opacity-50 transition-colors"
           >
             {liPasswordMutation.isPending ? 'Saving…' : 'Save Password'}
           </button>

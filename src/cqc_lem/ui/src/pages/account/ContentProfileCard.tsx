@@ -97,42 +97,42 @@ export default function ContentProfileCard() {
   }
 
   return (
-    <form onSubmit={handleSave} className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 space-y-4">
-      <h2 className="text-base font-semibold text-gray-700">Content &amp; Profile</h2>
+    <form onSubmit={handleSave} className="bg-raised rounded-panel shadow-panel border border-hairline p-6 space-y-4">
+      <h2 className="text-base font-semibold text-fg">Content &amp; Profile</h2>
 
       <div>
-        <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
-        <p className="text-sm text-gray-800 bg-gray-50 border border-gray-200 rounded-lg px-3 py-2">
+        <label className="block text-sm font-medium text-fg mb-1">Email</label>
+        <p className="text-sm text-fg bg-page border border-hairline rounded-panel px-3 py-2">
           {email}
         </p>
-        <p className="text-xs text-green-600 mt-1">✓ Verified email</p>
+        <p className="text-xs text-success mt-1">✓ Verified email</p>
       </div>
 
       <div>
-        <label className="block text-sm font-medium text-gray-700 mb-1">Blog URL</label>
+        <label className="block text-sm font-medium text-fg mb-1">Blog URL</label>
         <input
           type="url"
           value={blogUrl}
           onChange={(e) => setBlogEdit(e.target.value)}
-          className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+          className="w-full border border-field rounded-control px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent"
           placeholder="https://yourblog.com"
         />
       </div>
 
       <div>
-        <label className="block text-sm font-medium text-gray-700 mb-1">Sitemap URL</label>
+        <label className="block text-sm font-medium text-fg mb-1">Sitemap URL</label>
         <input
           type="url"
           value={sitemapUrl}
           onChange={(e) => setSitemapEdit(e.target.value)}
-          className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+          className="w-full border border-field rounded-control px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent"
           placeholder="https://yourblog.com/sitemap.xml"
         />
-        <p className="text-xs text-gray-400 mt-1">Used by AI to generate content ideas from your existing posts.</p>
+        <p className="text-xs text-fg-muted mt-1">Used by AI to generate content ideas from your existing posts.</p>
       </div>
 
       {savedMsg && (
-        <p className={`text-sm font-medium ${saveMutation.isError ? 'text-red-600' : 'text-green-600'}`}>
+        <p className={`text-sm font-medium ${saveMutation.isError ? 'text-danger' : 'text-success'}`}>
           {savedMsg}
         </p>
       )}
@@ -140,7 +140,7 @@ export default function ContentProfileCard() {
       <button
         type="submit"
         disabled={saveMutation.isPending}
-        className="w-full bg-blue-600 text-white py-2 rounded-lg text-sm font-semibold hover:bg-blue-700 disabled:opacity-50 transition-colors"
+        className="w-full bg-accent text-white py-2 rounded-panel text-sm font-semibold hover:bg-accent/90 disabled:opacity-50 transition-colors"
       >
         {saveMutation.isPending ? 'Saving…' : 'Save'}
       </button>

@@ -14,8 +14,8 @@ const GROUP_POST_MAX = 3000
 // The status badge's colours. A skipped draft is deliberately NOT red — nothing failed, the user
 // decided, and it can be put back until the slot passes (issue #1224).
 const STATUS_STYLES: Record<string, string> = {
-  ready: 'bg-yellow-100 text-yellow-700',
-  skipped: 'bg-gray-200 text-gray-600',
+  ready: 'bg-warning/10 text-warning',
+  skipped: 'bg-hairline text-fg-muted',
 }
 
 function errorText(err: unknown, fallback: string): string {
@@ -149,19 +149,19 @@ export default function GroupPostQueue(
   // Rendered by every branch below: a status change retires the panel it was clicked from, so the
   // confirmation has to outlive it.
   const banner = msg && (
-    <p className={`text-sm font-medium ${msg.ok ? 'text-green-600' : 'text-red-600'}`}>{msg.text}</p>
+    <p className={`text-sm font-medium ${msg.ok ? 'text-success' : 'text-danger'}`}>{msg.text}</p>
   )
 
-  if (isLoading) return <p className="text-gray-400 text-sm">Loading group post draft…</p>
+  if (isLoading) return <p className="text-fg-muted text-sm">Loading group post draft…</p>
 
   if (!draft) {
     return (
       <div className="space-y-3">
         {banner}
-        <div className="flex flex-col items-center text-center py-12 px-4 bg-white rounded-lg border border-gray-200">
+        <div className="flex flex-col items-center text-center py-12 px-4 bg-raised rounded-panel border border-hairline">
           <div className="text-4xl mb-4">👥</div>
-          <p className="text-gray-600 text-sm mb-2 max-w-sm">No group post draft queued yet.</p>
-          <p className="text-gray-400 text-xs max-w-sm">
+          <p className="text-fg-muted text-sm mb-2 max-w-sm">No group post draft queued yet.</p>
+          <p className="text-fg-muted text-xs max-w-sm">
             Group posts are drafted Sunday and published Tuesday. Enable Post on a group in Account
             settings to start the rotation.
           </p>
@@ -174,19 +174,19 @@ export default function GroupPostQueue(
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
       {/* Summary card */}
       <div className="space-y-3">
-        <div className={`bg-white rounded-lg border p-4 ${skipped ? 'border-gray-300' : 'border-blue-500 ring-1 ring-blue-500'}`}>
+        <div className={`bg-raised rounded-panel border p-4 ${skipped ? 'border-hairline' : 'border-accent ring-1 ring-accent'}`}>
           <div className="flex items-center justify-between mb-1 gap-2">
-            <span className="text-xs text-gray-400 truncate">
+            <span className="text-xs text-fg-muted truncate">
               Drafted {formatInTimezone(draft.created_at, userTimezone)}
             </span>
-            <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${STATUS_STYLES[draft.status] ?? 'bg-gray-100 text-gray-600'}`}>
+            <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${STATUS_STYLES[draft.status] ?? 'bg-page text-fg-muted'}`}>
               {draft.status.toUpperCase()}
             </span>
           </div>
-          <p className="text-sm font-medium text-gray-800">
+          <p className="text-sm font-medium text-fg">
             {draft.group_name || `Group ${draft.group_id}`}
           </p>
-          <p className="text-xs text-gray-500 mt-1">
+          <p className="text-xs text-fg-muted mt-1">
             {skipped
               ? canUndoSkip
                 ? 'Skipped — nothing goes out this week unless you undo the skip.'
@@ -196,16 +196,16 @@ export default function GroupPostQueue(
         </div>
 
         {/* Media (issue #1224) — a native image or short video out-performs text alone. */}
-        <div className="bg-white rounded-lg border border-gray-200 p-4 space-y-3">
-          <h3 className="text-sm font-semibold text-gray-700">Media</h3>
+        <div className="bg-raised rounded-panel border border-hairline p-4 space-y-3">
+          <h3 className="text-sm font-semibold text-fg">Media</h3>
           {draft.media_url ? (
             draft.media_type === 'video' ? (
-              <video src={draft.media_url} controls className="w-full rounded-lg border border-gray-200" />
+              <video src={draft.media_url} controls className="w-full rounded-panel border border-hairline" />
             ) : (
-              <img src={draft.media_url} alt="Group post media" className="w-full rounded-lg border border-gray-200" />
+              <img src={draft.media_url} alt="Group post media" className="w-full rounded-panel border border-hairline" />
             )
           ) : (
-            <p className="text-xs text-gray-500">
+            <p className="text-xs text-fg-muted">
               Text only. Add a native image or short video — link-outs and plain text are the two
               lowest-reach formats in a group.
             </p>
@@ -236,26 +236,26 @@ export default function GroupPostQueue(
             <button type="button"
               onClick={() => mediaFileRef.current?.click()}
               disabled={busy}
-              className="px-3 py-1.5 rounded-lg text-sm font-semibold border border-gray-300 text-gray-700 hover:bg-gray-100 disabled:opacity-50 transition-colors">
+              className="px-3 py-1.5 rounded-control text-sm font-semibold border border-field text-fg hover:bg-page disabled:opacity-50 transition-colors">
               {mediaBusy === 'upload' ? 'Uploading…' : 'Upload image'}
             </button>
             <button type="button"
               onClick={() => videoFileRef.current?.click()}
               disabled={busy}
-              className="px-3 py-1.5 rounded-lg text-sm font-semibold border border-gray-300 text-gray-700 hover:bg-gray-100 disabled:opacity-50 transition-colors">
+              className="px-3 py-1.5 rounded-control text-sm font-semibold border border-field text-fg hover:bg-page disabled:opacity-50 transition-colors">
               {mediaBusy === 'video' ? 'Uploading…' : 'Upload video'}
             </button>
             <button type="button"
               onClick={handleGenerate}
               disabled={busy}
-              className="px-3 py-1.5 rounded-lg text-sm font-semibold border border-gray-300 text-gray-700 hover:bg-gray-100 disabled:opacity-50 transition-colors">
+              className="px-3 py-1.5 rounded-control text-sm font-semibold border border-field text-fg hover:bg-page disabled:opacity-50 transition-colors">
               {mediaBusy === 'generate' ? 'Generating…' : 'Generate with AI'}
             </button>
             {draft.media_url && (
               <button type="button"
                 onClick={() => draftMutation.mutate({ remove_media: true })}
                 disabled={busy}
-                className="px-3 py-1.5 rounded-lg text-sm font-semibold text-red-600 hover:bg-red-50 disabled:opacity-50 transition-colors">
+                className="px-3 py-1.5 rounded-panel text-sm font-semibold text-danger hover:bg-danger/5 disabled:opacity-50 transition-colors">
                 Remove media
               </button>
             )}
@@ -264,9 +264,9 @@ export default function GroupPostQueue(
 
         {/* The SAME list the drafting prompt is held to, served with the draft. */}
         {!!draft.best_practices?.length && (
-          <div className="bg-white rounded-lg border border-gray-200 p-4">
-            <h3 className="text-sm font-semibold text-gray-700 mb-2">What works in groups</h3>
-            <ul className="list-disc pl-5 space-y-1 text-xs text-gray-600">
+          <div className="bg-raised rounded-panel border border-hairline p-4">
+            <h3 className="text-sm font-semibold text-fg mb-2">What works in groups</h3>
+            <ul className="list-disc pl-5 space-y-1 text-xs text-fg-muted">
               {draft.best_practices.map((rule) => <li key={rule}>{rule}</li>)}
             </ul>
           </div>
@@ -275,12 +275,12 @@ export default function GroupPostQueue(
 
       {/* Editor */}
       <div className="sticky top-4 self-start space-y-4 max-h-[calc(100vh-2rem)] overflow-y-auto">
-        <div className="bg-white rounded-lg border border-gray-200 shadow-sm p-5 space-y-3">
+        <div className="bg-raised rounded-panel border border-hairline shadow-panel p-5 space-y-3">
           <div>
-            <h3 className="text-sm font-semibold text-gray-700">
+            <h3 className="text-sm font-semibold text-fg">
               Group post — {draft.group_name || `Group ${draft.group_id}`}
             </h3>
-            <p className="text-xs text-gray-500">
+            <p className="text-xs text-fg-muted">
               {skipped
                 ? canUndoSkip
                   ? 'This post is skipped. Undo the skip to put it back in the queue for this week.'
@@ -293,10 +293,10 @@ export default function GroupPostQueue(
             value={draftText ?? ''}
             onChange={(e) => setDraftEdit(e.target.value)}
             rows={8}
-            {...maskProps('w-full border border-gray-300 rounded-lg px-3 py-2 text-sm text-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none')}
+            {...maskProps('w-full border border-field rounded-panel px-3 py-2 text-sm text-fg focus:outline-none focus:ring-2 focus:ring-accent resize-none')}
           />
           <div className="flex items-center justify-between gap-3">
-            <span className={`text-xs ${(draftText?.length ?? 0) > GROUP_POST_MAX ? 'text-red-600' : 'text-gray-500'}`}>
+            <span className={`text-xs ${(draftText?.length ?? 0) > GROUP_POST_MAX ? 'text-danger' : 'text-fg-muted'}`}>
               {draftText?.length ?? 0}/{GROUP_POST_MAX}
             </span>
             <span className="flex items-center gap-2">
@@ -305,7 +305,7 @@ export default function GroupPostQueue(
                   <button type="button"
                     onClick={() => draftMutation.mutate({ status: 'ready' })}
                     disabled={busy}
-                    className="px-3 py-1.5 rounded-lg text-sm font-semibold border border-gray-300 text-gray-700 hover:bg-gray-100 disabled:opacity-50 transition-colors">
+                    className="px-3 py-1.5 rounded-control text-sm font-semibold border border-field text-fg hover:bg-page disabled:opacity-50 transition-colors">
                     Undo skip
                   </button>
                 )
@@ -313,14 +313,14 @@ export default function GroupPostQueue(
                 <button type="button"
                   onClick={() => draftMutation.mutate({ status: 'skipped' })}
                   disabled={busy}
-                  className="px-3 py-1.5 rounded-lg text-sm font-semibold border border-gray-300 text-gray-700 hover:bg-gray-100 disabled:opacity-50 transition-colors">
+                  className="px-3 py-1.5 rounded-control text-sm font-semibold border border-field text-fg hover:bg-page disabled:opacity-50 transition-colors">
                   Skip this week
                 </button>
               )}
               <button type="button"
                 onClick={() => draftMutation.mutate({ content: draftText as string })}
                 disabled={busy || !dirty}
-                className="px-3 py-1.5 rounded-lg text-sm font-semibold bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50 transition-colors">
+                className="px-3 py-1.5 rounded-control text-sm font-semibold bg-accent text-white hover:bg-accent/90 disabled:opacity-50 transition-colors">
                 {draftMutation.isPending ? 'Saving…' : 'Save post'}
               </button>
             </span>

@@ -142,22 +142,22 @@ export default function GroupsCard() {
   const postingGroups = groups.filter((g) => g.post_enabled)
 
   return (
-    <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 space-y-4">
-      <h2 className="text-base font-semibold text-gray-700">LinkedIn Groups</h2>
-      <div className="text-xs text-gray-500 space-y-1">
+    <div className="bg-raised rounded-panel shadow-panel border border-hairline p-6 space-y-4">
+      <h2 className="text-base font-semibold text-fg">LinkedIn Groups</h2>
+      <div className="text-xs text-fg-muted space-y-1">
         <p>Two separate things happen in your joined groups, and each has its own switch per group. Both are on by default.</p>
         <p>
-          <span className="font-semibold text-gray-700">Comment</span> — LEM leaves value-add comments on
+          <span className="font-semibold text-fg">Comment</span> — LEM leaves value-add comments on
           other members' posts in that group, daily, out of your normal daily comment budget.
         </p>
         <p>
-          <span className="font-semibold text-gray-700">Post</span> — about once a week LEM publishes{' '}
-          <span className="font-semibold text-gray-700">one original post into one group</span>, written fresh
+          <span className="font-semibold text-fg">Post</span> — about once a week LEM publishes{' '}
+          <span className="font-semibold text-fg">one original post into one group</span>, written fresh
           for that group's members. Your scheduled feed posts are never duplicated, reshared or cross-posted
           into groups, and the same post never goes to more than one group.
         </p>
         <p>
-          The weekly slot rotates: it goes to whichever group with <span className="font-semibold text-gray-700">Post</span>{' '}
+          The weekly slot rotates: it goes to whichever group with <span className="font-semibold text-fg">Post</span>{' '}
           on has waited longest for its turn. A group that turns out not to take member posts
           (announcement or admin-only) uses up its turn and goes to the back of the queue, so it
           never holds up the others.
@@ -169,11 +169,11 @@ export default function GroupsCard() {
       </div>
 
       {draft && draftText !== null && (
-        <div className="border border-blue-200 bg-blue-50/40 rounded p-3 space-y-2">
-          <h3 className="text-sm font-semibold text-gray-700">
+        <div className="border border-accent/25 bg-accent/5 rounded-control p-3 space-y-2">
+          <h3 className="text-sm font-semibold text-fg">
             Next group post — {draft.group_name || `Group ${draft.group_id}`}
           </h3>
-          <p className="text-xs text-gray-600">
+          <p className="text-xs text-fg-muted">
             {draftSkipped
               ? (canUndoSkip
                   ? 'Skipped — nothing goes out this week unless you undo the skip. '
@@ -188,10 +188,10 @@ export default function GroupsCard() {
             value={draftText}
             onChange={(e) => setDraftEdit(e.target.value)}
             rows={8}
-            {...maskProps('w-full border border-gray-300 rounded p-2 text-sm text-gray-800')}
+            {...maskProps('w-full border border-field rounded-control p-2 text-sm text-fg')}
           />
           <div className="flex items-center justify-between gap-3">
-            <span className={`text-xs ${draftText.length > GROUP_POST_MAX ? 'text-red-600' : 'text-gray-500'}`}>
+            <span className={`text-xs ${draftText.length > GROUP_POST_MAX ? 'text-danger' : 'text-fg-muted'}`}>
               {draftText.length}/{GROUP_POST_MAX}
             </span>
             <span className="flex items-center gap-2">
@@ -199,14 +199,14 @@ export default function GroupsCard() {
                 <button type="button"
                   onClick={() => draftMutation.mutate({ status: draftSkipped ? 'ready' : 'skipped' })}
                   disabled={draftMutation.isPending}
-                  className="px-3 py-1.5 rounded-lg text-sm font-semibold border border-gray-300 text-gray-700 hover:bg-gray-100 disabled:opacity-50 transition-colors">
+                  className="px-3 py-1.5 rounded-control text-sm font-semibold border border-field text-fg hover:bg-page disabled:opacity-50 transition-colors">
                   {draftSkipped ? 'Undo skip' : 'Skip this week'}
                 </button>
               )}
               <button type="button"
                 onClick={() => draftMutation.mutate({ content: draftText }, sectionSaveCallbacks('group-post'))}
                 disabled={draftMutation.isPending || !draftDirty}
-                className="px-3 py-1.5 rounded-lg text-sm font-semibold bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50 transition-colors">
+                className="px-3 py-1.5 rounded-control text-sm font-semibold bg-accent text-white hover:bg-accent/90 disabled:opacity-50 transition-colors">
                 {draftMutation.isPending ? 'Saving…' : 'Save post'}
               </button>
             </span>
@@ -215,10 +215,10 @@ export default function GroupsCard() {
       )}
       {/* Outside the panel: a skip removes the panel, and the confirmation has to outlive it. */}
       {draftMsg && (
-        <p className={`text-sm font-medium ${draftMsg.ok ? 'text-green-600' : 'text-red-600'}`}>{draftMsg.text}</p>
+        <p className={`text-sm font-medium ${draftMsg.ok ? 'text-success' : 'text-danger'}`}>{draftMsg.text}</p>
       )}
 
-      <p className="text-xs text-gray-600 bg-gray-50 border border-gray-200 rounded p-2">
+      <p className="text-xs text-fg-muted bg-page border border-hairline rounded-control p-2">
         {postingGroups.length === 0
           ? 'Next group post: none — no group has Post turned on, so LEM will not post in any group.'
           : markedNext
@@ -226,8 +226,8 @@ export default function GroupsCard() {
             : 'Next group post: picked from the groups below when you save.'}
       </p>
 
-      <div className="divide-y divide-gray-100">
-        <div className="flex items-center justify-between pb-2 text-[11px] font-semibold uppercase tracking-wide text-gray-400">
+      <div className="divide-y divide-hairline">
+        <div className="flex items-center justify-between pb-2 text-xs font-semibold uppercase tracking-wide text-fg-muted">
           <span>Group</span>
           <span className="flex items-center gap-3">
             <span className="w-11 text-center">Comment</span>
@@ -236,10 +236,10 @@ export default function GroupsCard() {
         </div>
         {groups.map((g) => (
           <div key={g.group_id} className="flex items-center justify-between py-2">
-            <span className="text-sm text-gray-700 truncate pr-3">
+            <span className="text-sm text-fg truncate pr-3">
               {groupLabel(g)}
               {markedNext?.group_id === g.group_id && (
-                <span className="ml-2 text-[10px] font-semibold uppercase text-blue-700 bg-blue-50 rounded px-1.5 py-0.5">
+                <span className="ml-2 text-xs font-semibold uppercase text-accent bg-accent/5 rounded-control px-1.5 py-0.5">
                   Next post
                 </span>
               )}
@@ -253,10 +253,10 @@ export default function GroupsCard() {
           </div>
         ))}
       </div>
-      {groupsMsg && <p className={`text-sm font-medium ${groupsMsg.ok ? 'text-green-600' : 'text-red-600'}`}>{groupsMsg.text}</p>}
+      {groupsMsg && <p className={`text-sm font-medium ${groupsMsg.ok ? 'text-success' : 'text-danger'}`}>{groupsMsg.text}</p>}
       <button type="button" onClick={() => groupsMutation.mutate(undefined, sectionSaveCallbacks('groups'))}
         disabled={groupsMutation.isPending}
-        className="w-full bg-blue-600 text-white py-2 rounded-lg text-sm font-semibold hover:bg-blue-700 disabled:opacity-50 transition-colors">
+        className="w-full bg-accent text-white py-2 rounded-panel text-sm font-semibold hover:bg-accent/90 disabled:opacity-50 transition-colors">
         {groupsMutation.isPending ? 'Saving…' : 'Save Group Settings'}
       </button>
     </div>
