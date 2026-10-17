@@ -16,16 +16,20 @@
     "marketplace cannot resolve it, so the plugin silently does not load.",
     "",
     "Note that `caveman` installs a SessionStart hook, so enabling it HERE turns the compressed",
-    "response style on for every agent working in this checkout, not just for one person."
+    "response style on for every agent working in this checkout, not just for one person.",
+    "",
+    "graft's session-start refresh rewrites this file in any checkout whose graft/.cache wiring",
+    "stamp is missing or older than the installed graft (a fresh clone or worktree, or after an",
+    "upgrade). It re-adds `Bash(trail:*)`, `Bash(npx graft:*)`, `Bash(graft-dev:*)`,",
+    "`Bash(node dist/cli.js:*)` and a SessionEnd hook. Those are left out on purpose: revert them",
+    "with `git checkout -- .claude/settings.json`, never commit them.",
+    "tests/unit/test_claude_settings_wiring.py fails the build if one lands."
   ],
   "permissions": {
     "allow": [
       "Bash(poetry run pytest *)",
       "Bash(poetry run ruff check *)",
-      "Bash(graft:*)",
-      "Bash(npx graft:*)",
-      "Bash(graft-dev:*)",
-      "Bash(node dist/cli.js:*)"
+      "Bash(graft:*)"
     ]
   },
   "enabledMcpjsonServers": [
