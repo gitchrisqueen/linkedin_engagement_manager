@@ -10,7 +10,7 @@ anything edited away in the UI, and does nothing at all when the project already
 
 Issue #658 added a third dashboard (**LEM Channels**) and the two web-analytics conversion goals to
 the same script — where signups come from, and which link brought them. That surface has its own
-doc: `docs/marketing-attribution.md`. Everything below still describes Health and Growth.
+doc: `docs/marketing-attribution.md`. Issue #2374 added a fourth, **LEM Trial test** (section below).
 
 ```bash
 # what would change (default; no writes)
@@ -124,6 +124,33 @@ sweeps shows up as a moving line before the next drift issue would even file. It
 comment thread legitimately has no sort control at all (`docs/sdui-probe-coverage.md`) — so a
 threshold here would page on noise. The weekly sweep's own `drift` filing (`sdui_drift_issues.py`)
 stays the one signal that actually pages.
+
+## LEM Trial test (issue #2374)
+
+A fourth dashboard from the same `--apply`, for the free-trial go-to-market test. It adds no
+instrumentation: every tile is HogQL over the launch funnel events above plus the SPA's own
+activity, all keyed on `str(user_id)`, so one person joins across tiles by `distinct_id`.
+
+| Tile | Reads | Counts a trial only once |
+|---|---|---|
+| Signups by `utm_source` (90d) | `signup_completed`, grouped on `toString(properties.utm_source)`; untagged = `(none)` | — |
+| Activation within 7 days | `trial_started` → first `activated` within 7 days | it is ≥ 7 days old |
+| Week-2 retention | any `$pageview` or `post_approved` in days 7-13 after `trial_started` | it is ≥ 14 days old |
+| Trial to paid | a `subscription_started` after `trial_started` | its 14-day trial has ended |
+
+Three choices that are not arbitrary:
+
+- **A cohort is counted only once its window has closed.** A trial started yesterday has not failed
+  to activate yet; counting it as a miss would drag the newest week down every time it is read.
+  `TRIAL_LENGTH` mirrors `FREE_TRIAL_DAYS`' default (14) rather than importing it — the script runs
+  by hand with only the operator key exported, not the app's env.
+- **Retention reads SPA events, never `api_call`.** The API middleware emits `api_call` without a
+  user, so every row lands on the shared `"anonymous"` person and cannot show who came back.
+- **Every property a tile reads goes through `toString()`** — the string-property rule above. There
+  are no native property filters here, so `ALERT_FILTERED` gains nothing; a unit test fails the
+  build if a trial tile ever reads a property raw.
+
+Trial to paid keeps a late conversion in its ORIGINAL cohort, so older weeks can keep rising.
 
 ## The weekly report
 

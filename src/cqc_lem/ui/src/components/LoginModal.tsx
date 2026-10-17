@@ -5,7 +5,10 @@ import { getAttribution } from '../utils/attribution'
 import { recordSignup } from '../utils/analytics'
 import { getPasskeyAssertion, isPasskeySupported } from '../utils/webauthn'
 
-type Step = 'email' | 'pin' | 'second-factor'
+// 'waitlist' is the join-the-list form (issue #2377): while the trial cohort is full the server
+// answers a signup with `{ waitlist: true }` instead of an account, and this form takes the email
+// address and nothing else.
+type Step = 'email' | 'pin' | 'second-factor' | 'waitlist'
 
 // The factors the server will accept to finish a bootstrapped login. `passkey` is not in this list:
 // a passkey sign-in is standalone (it proves possession AND identity in one ceremony), so the SPA
@@ -25,6 +28,7 @@ export default function LoginModal() {
   const [methods, setMethods] = useState<string[]>([])
   const [factorMethod, setFactorMethod] = useState<SecondFactorMethod>('totp')
   const [factorCode, setFactorCode] = useState('')
+  const [waitlistJoined, setWaitlistJoined] = useState(false)
 
   function errorText(err: unknown, fallback: string): string {
     const detail = (err as { response?: { data?: { detail?: unknown } } })?.response?.data?.detail
@@ -50,6 +54,10 @@ export default function LoginModal() {
       })
       const detail = r.data.detail
 
+      if (detail.waitlist) {
+        setStep('waitlist')
+        return
+      }
       if (detail.second_factor_required) {
         enterSecondFactor(detail)
         return
@@ -77,6 +85,12 @@ export default function LoginModal() {
     try {
       const r = await api.post('/auth/email/verify', { email, pin, attribution: getAttribution() })
       const detail = r.data.detail
+      // The cohort filled between the code being sent and being entered — no account was made.
+      if (detail.waitlist) {
+        setPin('')
+        setStep('waitlist')
+        return
+      }
       // The emailed code is a bootstrap once a strong factor exists — it proved the mailbox, and
       // that is all it proves now.
       if (detail.second_factor_required) {
@@ -117,6 +131,20 @@ export default function LoginModal() {
         setPin('')
         setStep('email')
       }
+      setLoading(false)
+    }
+  }
+
+  async function handleWaitlistSubmit(e: React.FormEvent) {
+    e.preventDefault()
+    setError(null)
+    setLoading(true)
+    try {
+      await api.post('/auth/waitlist', { email: email.trim().toLowerCase() })
+      setWaitlistJoined(true)
+    } catch (err: unknown) {
+      setError(errorText(err, 'Could not save your email. Please try again.'))
+    } finally {
       setLoading(false)
     }
   }
@@ -313,6 +341,44 @@ export default function LoginModal() {
               )}
             </form>
           </>
+        )}
+
+        {step === 'waitlist' && !waitlistJoined && (
+          <>
+            <h2 className="text-xl font-bold text-gray-800 mb-1">Trial spots are full</h2>
+            <p className="text-sm text-gray-500 mb-6">
+              All trial spots are currently taken. Add your email to join the list.
+            </p>
+            <form onSubmit={handleWaitlistSubmit} className="space-y-4">
+              <input
+                type="email"
+                required
+                autoFocus
+                aria-label="Email address"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="your@email.com"
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+              {error && <p className="text-xs text-red-600">{error}</p>}
+              <button
+                type="submit"
+                disabled={loading || !email.trim()}
+                className="w-full bg-blue-600 text-white py-2.5 rounded-lg text-sm font-semibold hover:bg-blue-700 disabled:opacity-50 transition-colors"
+              >
+                {loading ? 'Saving…' : 'Join the list'}
+              </button>
+            </form>
+          </>
+        )}
+
+        {step === 'waitlist' && waitlistJoined && (
+          <div role="status">
+            <h2 className="text-xl font-bold text-gray-800 mb-1">You're on the list</h2>
+            <p className="text-sm text-gray-500">
+              <strong>{email.trim().toLowerCase()}</strong> has been added to the list.
+            </p>
+          </div>
         )}
       </div>
     </div>

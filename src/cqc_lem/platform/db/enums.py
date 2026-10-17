@@ -296,7 +296,7 @@ class AffiliateRewardKind(StrEnum):
 
 class OnboardingStep(StrEnum):
     """Steps of the activation checklist (issue #500), in the order a user completes them.
-    ACTIVATED is the "aha" moment: first AI post published AND first automated comment/DM sent.
+    ACTIVATED is the "aha" moment: the first approved post published (#2373) — never a comment or DM.
     """
     LINKEDIN_CONNECTED = 'linkedin_connected'
     VOICE_SET = 'voice_set'

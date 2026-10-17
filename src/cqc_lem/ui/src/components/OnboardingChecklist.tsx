@@ -2,7 +2,7 @@ import { Link } from 'react-router-dom'
 import { useOnboarding } from '../hooks/useOnboarding'
 
 // Activation checklist + in-app nudge (issue #500). Renders nothing once the user has activated
-// (first AI post published AND first automated comment/DM sent), so it disappears on its own.
+// (first approved post published, #2373), so it disappears on its own.
 export default function OnboardingChecklist() {
   const { data } = useOnboarding()
   if (!data || data.activated) return null

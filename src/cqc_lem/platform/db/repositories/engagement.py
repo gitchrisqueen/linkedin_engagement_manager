@@ -674,8 +674,9 @@ def get_daily_action_counts(user_id: int, days: int = 90,
         log_error("Could not get daily action counts", exc=err, user_id=user_id)
         return []
 def has_automated_engagement(user_id: int) -> bool:
-    """True once automation has successfully commented, replied, or DM'd on the user's behalf —
-    the engagement half of the activation ("aha") moment.
+    """True once automation has successfully commented, replied, or DM'd on the user's behalf.
+
+    No longer part of activation (issue #2373 made that the first approved post published).
     """
     try:
         with db_cursor() as cursor:

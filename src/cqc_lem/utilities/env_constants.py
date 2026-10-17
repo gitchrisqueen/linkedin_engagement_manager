@@ -373,6 +373,10 @@ EARLY_ADOPTER_COUPON_ID   = get_constant_from_env('EARLY_ADOPTER_COUPON_ID', def
 # P2 GA. It is the single knob that sets the brand account's outbound volume (see brand_account.py);
 # anything unrecognized falls back to P0 so a typo can never widen outbound.
 LAUNCH_PHASE              = get_constant_from_env('LAUNCH_PHASE', default_value='P0')
+# P0 trial cohort cap (issue #2377): while the phase resolves to P0, a NEW account is only created
+# while fewer than this many self-serve trial accounts exist; past it the signup path offers the
+# join-the-list form instead. Read only in P0 — P1/P2 never consult it.
+P0_TRIAL_COHORT_CAP       = int(get_constant_from_env('P0_TRIAL_COHORT_CAP', default_value='25'))
 # Dogfooding self-marketing (issue #504): the LEM brand LinkedIn account IS user 1 by convention
 # (issue #736) — the first account on the box is the owner's own, and it always will be. No env var
 # is required for the brand engine to run; this is an OPTIONAL override for a deployment that

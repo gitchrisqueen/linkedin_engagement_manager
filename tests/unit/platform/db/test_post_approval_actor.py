@@ -144,9 +144,11 @@ class TestInsertPost:
 
 # ---- call-site guard -------------------------------------------------------------------------
 
-# The ONE place an APPROVED write may omit its actor: the native occasion publish handing a claimed
-# post back to the queue. That is a re-queue, not an approval, so the original approver stays.
-_REQUEUE_SITES = {("app/engagement/posting.py", "auto_publish_occasion_post")}
+# The places an APPROVED write may omit its actor: a publish path handing a claimed post back to the
+# queue — the native occasion publish, and `post_to_linkedin` refusing a lapsed trial (#2380). That
+# is a re-queue, not an approval, so the original approver stays.
+_REQUEUE_SITES = {("app/engagement/posting.py", "auto_publish_occasion_post"),
+                  ("app/engagement/posting.py", "post_to_linkedin")}
 
 # Writers that may set any status; only a literal non-APPROVED status is exempt from naming an actor.
 _WRITERS = {"update_db_post_status": 1, "bulk_update_posts": None, "update_db_post": 5,

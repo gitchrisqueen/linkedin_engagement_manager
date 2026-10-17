@@ -19,10 +19,13 @@ const TIER_COLORS: Record<string, string> = {
   enterprise: 'bg-warning/10 text-warning',
 }
 
-function daysUntil(iso: string | null | undefined): number | null {
+const DAY_MS = 1000 * 60 * 60 * 24
+
+// Milliseconds until the trial ends; negative once it has. Null when there is no readable date.
+function msUntil(iso: string | null | undefined): number | null {
   if (!iso) return null
-  const diff = new Date(iso).getTime() - Date.now()
-  return Math.max(0, Math.floor(diff / (1000 * 60 * 60 * 24)))
+  const end = new Date(iso).getTime()
+  return Number.isNaN(end) ? null : end - Date.now()
 }
 
 export default function SubscriptionCard() {
@@ -61,9 +64,16 @@ export default function SubscriptionCard() {
 
   const subscription = settingsData?.subscription
   const tier = subscription?.tier ?? 'free_trial'
-  const trialDays = daysUntil(subscription?.trial_ends_at)
+  const trialMsLeft = msUntil(subscription?.trial_ends_at)
   const isOnTrial = subscription?.status === 'trial'
   const isPaidPlan = subscription?.status === 'active'
+  // Ended is decided on the instant, not on a rounded day count: flooring called a trial with
+  // hours left "expired" (issue #2380). A past-due plan is still a plan, so it never reads as a
+  // lapsed trial, whatever its old trial date says — the same rule the backend gate applies.
+  const trialEnded =
+    !isPaidPlan && subscription?.status !== 'past_due' && trialMsLeft !== null && trialMsLeft <= 0
+  const trialDays =
+    trialMsLeft !== null && trialMsLeft > 0 ? Math.ceil(trialMsLeft / DAY_MS) : null
   const hasStripeCustomer = !!subscription?.stripe_customer_id
 
   // Stripe checkout redirect
@@ -117,11 +127,20 @@ export default function SubscriptionCard() {
         </span>
       </div>
 
-      {isOnTrial && trialDays !== null && (
+      {trialEnded && (
+        <div
+          role="status"
+          data-testid="trial-expired-notice"
+          className="rounded-panel p-3 text-sm bg-danger/5 text-danger border border-danger/25"
+        >
+          Your free trial has expired. New posts are no longer generated or published — upgrade to
+          keep using LEM.
+        </div>
+      )}
+
+      {isOnTrial && !trialEnded && trialDays !== null && (
         <div className={`rounded-panel p-3 text-sm ${trialDays <= 3 ? 'bg-danger/5 text-danger border border-danger/25' : 'bg-warning/5 text-warning border border-warning/25'}`}>
-          {trialDays === 0
-            ? 'Your free trial has expired. Upgrade to keep using LEM.'
-            : `Free trial: ${trialDays} day${trialDays === 1 ? '' : 's'} remaining.`}
+          {`Free trial: ${trialDays} day${trialDays === 1 ? '' : 's'} remaining.`}
         </div>
       )}
 

@@ -9,6 +9,8 @@ import ProtectedRoute from './components/ProtectedRoute'
 import AdminRoute from './components/AdminRoute'
 import LoginModal from './components/LoginModal'
 import NewVersionNotice from './components/NewVersionNotice'
+import DemoBadge from './components/DemoBadge'
+import DailyAiLimitNotice from './components/DailyAiLimitNotice'
 import Landing from './pages/Landing'
 import PrivacyPolicy from './pages/PrivacyPolicy'
 import TermsAndConditions from './pages/TermsAndConditions'
@@ -78,6 +80,8 @@ function AppRoutes() {
     <>
       {isLoginModalOpen && <LoginModal />}
       <NewVersionNotice />
+      <DemoBadge />
+      <DailyAiLimitNotice />
       {isLoading ? (
         <SessionBoot />
       ) : (

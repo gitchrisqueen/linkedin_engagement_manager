@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "linkedin-engagement-manager"
-version = "0.190.0"
+version = "0.196.1"
 description = ""
 authors = ["gitchrisqueen <christopher.queen@gmail.com>"]
 readme = "README.md"
@@ -93,7 +93,7 @@ watchdog = ">=5.0.3,<7.0.0"
 optional = true
 
 [tool.poetry.group.lint.dependencies]
-ruff = ">=0.1.5,<0.17.0"
+ruff = ">=0.1.5,<0.18.0"
 mypy = ">=1.11,<3.0"
 
 [tool.poetry.group.mcp]
@@ -132,7 +132,7 @@ pyyaml = "^6.0"
 # `test_baseline_matches_the_real_count` (nightly `-m slow`) runs ruff, and that lane installs
 # `--with test` only, so without it here `poetry run ruff` is "Command not found" (#2111). Same
 # pin as the `lint` group — keep the two in step.
-ruff = ">=0.1.5,<0.17.0"
+ruff = ">=0.1.5,<0.18.0"
 
 
 [tool.coverage.run]
@@ -168,6 +168,11 @@ exclude_lines = [
 # line-too-long errors against code that has always been written to 120 — the flood that made the
 # lint step advisory (`continue-on-error`) and so hid every real defect behind it.
 line-length = 120
+# The interpreter floor (`python = ">=3.12"` above). Ruff does not read Poetry's dependency table, so
+# without this it guesses a default — and the guess decides what isort files as stdlib: 0.16 guessed
+# py310 and filed `tomllib` (3.11+) as third-party, 0.17 does not, so one import sorted differently
+# under each and the ratchet moved on an unchanged tree.
+target-version = "py312"
 
 [tool.ruff.lint]
 select = [

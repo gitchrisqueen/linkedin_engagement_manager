@@ -137,6 +137,73 @@ class TestBrandUserId:
             assert is_brand_user(1) is False
 
 
+class TestAcquisitionOutboundHold:
+    """Owner ruling 2026-10-10 (#2376, option A): only acquisition-sourced brand outbound is held.
+
+    The owner's ordinary engagement caps on the same account are untouched.
+    """
+
+    def test_the_sources_match_the_constants_the_lanes_write(self):
+        """A renamed source constant would silently fall out of the hold — pin them together."""
+        from cqc_lem.app.engagement.outreach import CONNECTION_REQUEST_SOURCE_OUTREACH_FUNNEL
+        from cqc_lem.utilities.brand_account import ACQUISITION_CONNECT_SOURCES
+        from cqc_lem.utilities.connection_targeting import SOURCE_ADJACENT_POST, SOURCE_OWN_POST
+        assert ACQUISITION_CONNECT_SOURCES == {SOURCE_OWN_POST, SOURCE_ADJACENT_POST,
+                                               CONNECTION_REQUEST_SOURCE_OUTREACH_FUNNEL}
+
+    def test_ordinary_sources_are_not_acquisition(self):
+        from cqc_lem.app.engagement.outreach import CONNECTION_REQUEST_SOURCE_PROFILE_VIEWER
+        from cqc_lem.utilities.brand_account import ACQUISITION_CONNECT_SOURCES
+        from cqc_lem.utilities.connection_targeting import SOURCE_ROSTER
+        assert not {SOURCE_ROSTER, CONNECTION_REQUEST_SOURCE_PROFILE_VIEWER} & ACQUISITION_CONNECT_SOURCES
+
+    def test_held_connect_sources_is_brand_only(self):
+        from cqc_lem.utilities.brand_account import ACQUISITION_CONNECT_SOURCES, held_connect_sources
+        with _Patched(_enabled()):
+            assert held_connect_sources(1) == ACQUISITION_CONNECT_SOURCES
+            assert held_connect_sources(2) == frozenset()
+            assert held_connect_sources(None) == frozenset()
+
+    @pytest.mark.parametrize("source", ["own_post", "adjacent_post", "outreach_funnel",
+                                        " own_post ", "OWN_POST", "Adjacent_Post"])
+    def test_brand_acquisition_sources_are_held(self, source):
+        from cqc_lem.utilities.brand_account import acquisition_outbound_held
+        with _Patched(_enabled()):
+            assert acquisition_outbound_held(1, source) is True
+            assert acquisition_outbound_held("1", source) is True
+
+    def test_a_brand_funnel_stage_is_held(self):
+        from cqc_lem.utilities.brand_account import acquisition_outbound_held
+        with _Patched(_enabled()):
+            assert acquisition_outbound_held(1, funnel=True) is True
+
+    @pytest.mark.parametrize("source", [None, "", "roster", "profile_viewer", "manual"])
+    def test_brand_ordinary_outbound_is_not_held(self, source):
+        from cqc_lem.utilities.brand_account import acquisition_outbound_held
+        with _Patched(_enabled()):
+            assert acquisition_outbound_held(1, source) is False
+
+    @pytest.mark.parametrize("user_id", [2, 8, None, "x"])
+    def test_other_users_are_never_held(self, user_id):
+        from cqc_lem.utilities.brand_account import acquisition_outbound_held
+        with _Patched(_enabled()):
+            assert acquisition_outbound_held(user_id, "own_post") is False
+            assert acquisition_outbound_held(user_id, funnel=True) is False
+
+    @pytest.mark.parametrize("phase", ["P0", "P1", "P2"])
+    def test_the_hold_does_not_depend_on_the_launch_phase(self, phase):
+        from cqc_lem.utilities.brand_account import acquisition_outbound_held
+        with _Patched(_enabled(phase=phase)):
+            assert acquisition_outbound_held(1, "adjacent_post") is True
+
+    def test_the_owners_ordinary_caps_are_unchanged(self):
+        """Option A leaves the phase caps the owner's engagement runs on exactly as they were."""
+        from cqc_lem.utilities.brand_account import brand_outbound_policy
+        assert {k: brand_outbound_policy("P0")[k] for k in
+                ("max_comments_per_day", "max_dms_per_day", "max_invites_per_day")} == {
+            "max_comments_per_day": 8, "max_dms_per_day": 5, "max_invites_per_day": 5}
+
+
 class TestBrandPreferenceOverrides:
     def test_seeds_icp_focus_topics_when_none_set(self):
         from cqc_lem.utilities.brand_account import BRAND_FOCUS_TOPICS, brand_preference_overrides

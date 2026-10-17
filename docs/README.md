@@ -72,6 +72,7 @@ index and the `CLAUDE.md` row that points at it, or the pointer becomes a dead e
 - ★ [Selenium Grid](SELENIUM_GRID.md) — the horizontal browser path and the session-slot capacity invariant
 - [Connect LinkedIn by session cookie](LINKEDIN_COOKIE.md) — `li_at` is the default engagement login; the extension and manual paths
 - [Email-reply verification PIN](EMAIL_PIN_VERIFICATION.md) — answering LinkedIn's login challenge without a human at the keyboard
+- [Demo mode](demo-mode.md) — `DEMO_MODE` refuses every LinkedIn client (HTTP and Selenium) before any connection and shows a croppable "Demo data" badge; a safety control, not a flag
 - [Per-user egress proxy](PER_USER_PROXY.md) — static residential egress per user and the MV3 auth-extension that carries its credentials
 - [Egress & LinkedIn access at scale](EGRESS_AT_SCALE.md) — the build-vs-buy decision behind the proxy posture
 - [Debugging the live browser](SELENIUM_DEBUGGING.md) — Selenium MCP + lemvnc against a running session
@@ -91,7 +92,7 @@ index and the `CLAUDE.md` row that points at it, or the pointer becomes a dead e
 
 - ★ [Observability map](observability-map.md) — the per-surface invariants; the paragraph behind every row in `CLAUDE.md`'s observability table
 - ★ [Error tracking](error-tracking.md) — `$exception` → PostHog issues → GitHub issues, and the warning-escalation contract
-- ★ [LLM analytics](llm-analytics.md) — `llm_call` vs `$ai_generation`; never summed
+- ★ [LLM analytics](llm-analytics.md) — `llm_call` vs `$ai_generation`; never summed; the free-trial daily AI cap and the trial-end stop
 - ★ [KPI dashboards & alerts](kpi-dashboards.md) — alert tiles must be single-series `TrendsQuery` on string properties
 - ★ [Session replay](session-replay.md) — error-triggered plus sampled SPA recording; never set project sampling
 - ★ [PostHog advanced surface](posthog-advanced-surface.md) — CDP destinations, Workflows, Logs, Scouts/Inbox
@@ -113,6 +114,10 @@ index and the `CLAUDE.md` row that points at it, or the pointer becomes a dead e
 - [Prompt inventory](prompt-evals/inventory.md) — GENERATED: one row per call site with family, status, version and latest verdicts
 - [Prompt eval runs](prompt-evals/README.md) — GENERATED: the leaderboard, one row per prompt@version × model per run
 - [Prompt eval run — `pe-20261008-0250fe`](prompt-evals/2026-10-08-pe-20261008-0250fe.md) — archived run report
+- [Prompt eval run — `pe-20261012-b68015`](prompt-evals/2026-10-12-pe-20261012-b68015.md) — archived run report
+- [Prompt eval run — `pe-20261016-eba194`](prompt-evals/2026-10-16-pe-20261016-eba194.md) — archived run report
+- [Prompt eval run — `pe-20261016-f9bfc4`](prompt-evals/2026-10-16-pe-20261016-f9bfc4.md) — archived run report
+- [Prompt eval run — `pe-20261016-655c78`](prompt-evals/2026-10-16-pe-20261016-655c78.md) — archived run report
 - ★ [Stack watchdog & deep health](stack-watchdog.md) — the host watchdog and the `/health/deep` monitor contract
 - ★ [Production log files](production-logs.md) — `/opt/lem/logs/`, one dated file per UTC day; INFO not DEBUG; grep beats `docker logs`
 
@@ -143,6 +148,7 @@ index and the `CLAUDE.md` row that points at it, or the pointer becomes a dead e
 ## Marketing, product & business
 
 - ★ [Marketing video tutorials](marketing-video-tutorials.md) — declarative `TutorialFlow` capture, fail-closed and cheapest-first
+- [Demo recording seed](demo-recording.md) — `scripts/seed_demo_account.py --scene demo1|demo2|demo3`: one synthetic account on a LOCAL database, idempotent, no LinkedIn call
 - ★ [YouTube publishing](youtube-publishing.md) — keeping the OAuth refresh token alive; `unknown` is not `needs_reauth`
 - [Launch & marketing plan](launch-and-marketing-plan.md) — the automated launch sequence
 - [Marketing front page — UX target spec](marketing-page-ux-spec.md) — what the public page should be

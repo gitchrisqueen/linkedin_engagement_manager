@@ -196,6 +196,47 @@ class TestProcessUserFollowups:
         warn.assert_not_called()
         err.assert_not_called()
 
+    def _run_with_reads(self, *reads):
+        """Run two due rows whose thread reads are `reads` (a state, or an exception to raise)."""
+        from cqc_lem.app.engagement.outreach import process_user_followups
+        with patch(f"{_OUT}.get_due_followups",
+                   return_value=[_due(), _due(id=2, profile_url="https://x/in/joe")]), \
+             patch(f"{_OUT}.get_current_profile",
+                   return_value=(MagicMock(), MagicMock(), "e", MagicMock())), \
+             patch(f"{_OUT}.quit_gracefully") as quit_driver, patch(f"{_OUT}.time.sleep"), \
+             patch(f"{_OUT}.insert_new_log"), \
+             patch(f"{_OUT}.resolve_self_name", return_value="Christopher Queen"), \
+             patch(f"{_OUT}.check_dm_replied", side_effect=list(reads)) as check, \
+             patch(f"{_OUT}.seconds_since_last_dm_touch", return_value=None), \
+             patch(f"{_OUT}.outbound_refusal_reason", return_value=None), \
+             patch(f"{_OUT}.build_dm_from_template", return_value="follow up msg"), \
+             patch(f"{_OUT}.send_private_dm") as dm, \
+             patch(f"{_OUT}.mark_followup") as mark, \
+             patch(f"{_OUT}.enqueue_next_followup"), \
+             patch(f"{_OUT}.log_error") as err, \
+             patch("cqc_lem.utilities.selenium_util.log_warning") as crash_warn:
+            result = process_user_followups.run(user_id=1)
+        return result, {"quit": quit_driver, "check": check, "dm": dm, "mark": mark, "err": err,
+                        "crash_warn": crash_warn}
+
+    def test_tab_crashed_mid_run_ends_the_run_on_one_warning(self):
+        # Issue #2421: the tab died after login, inside the thread-read loop. That used to warn on
+        # every poll of every route and escalate into a `$exception`; it now ends the run once.
+        from selenium.common.exceptions import WebDriverException
+        crash = WebDriverException("tab crashed\n  (Session info: chrome=153.0.8010.47)")
+        result, m = self._run_with_reads(ThreadState.NOT_REPLIED, crash)
+        assert "Browser tab crashed" in result and "sent 1" in result
+        m["dm"].apply_async.assert_called_once()  # the row read before the crash still went out
+        m["mark"].assert_called_once_with(1, "sent")  # the crashed row stays 'pending'
+        m["crash_warn"].assert_called_once()
+        assert "process_user_followups" in m["crash_warn"].call_args.args[0]
+        m["err"].assert_not_called()
+        m["quit"].assert_called_once()
+
+    def test_any_other_fault_mid_run_still_raises(self):
+        with pytest.raises(RuntimeError):
+            self._run_with_reads(RuntimeError("db gone"))
+
     def test_rate_limited_getting_profile_logs_debug_not_warning_or_error(self):
         # Issue #1940: `LinkedInRateLimited` is a known, self-clearing back-off (429 breaker,
         # manual pause, or a per-account challenge-unsolvable cooldown, ~175s). This task is
@@ -516,6 +557,17 @@ class TestCheckDmReplied:
             assert check_dm_replied(MagicMock(), MagicMock(), "https://x/in/b",
                                     my_name="Me") is ThreadState.UNKNOWN
 
+    def test_a_crashed_tab_is_not_an_unknown_thread(self):
+        # Issue #2421: a dead tab says nothing about THIS thread — it ends the run, so it re-raises
+        # for `process_user_followups` rather than warning once per remaining row.
+        from selenium.common.exceptions import WebDriverException
+
+        from cqc_lem.app.engagement.outreach import check_dm_replied
+        with patch(f"{_OUT}.open_message_thread", side_effect=WebDriverException("tab crashed")), \
+             patch(f"{_OUT}.log_warning") as warn, pytest.raises(WebDriverException):
+            check_dm_replied(MagicMock(), MagicMock(), "https://x/in/b", my_name="Me")
+        warn.assert_not_called()
+
 
 class _EmptyComposeDriver:
     """A driver that renders nothing but an empty full-page compose screen, on every route."""
@@ -643,3 +695,55 @@ class TestFollowupLedgerTruth:
             since_last=None)
         defer.assert_not_called()
         dm.apply_async.assert_called_once()
+
+
+class TestBrandFunnelFollowupHold:
+    """Owner ruling 2026-10-10 (#2376, option A): a brand funnel follow-up never sends.
+
+    The funnel's DM ladder is acquisition outbound. A due 'funnel' row for the brand account is
+    STOPPED without a send; a non-brand 'funnel' row and the brand's ordinary ladders still send.
+    """
+
+    def _run(self, user_id, event_type, brand_user_id=""):
+        from cqc_lem.app.engagement.outreach import process_user_followups
+        row = _due(user_id=user_id, event_type=event_type, next_step=1)
+        with patch("cqc_lem.utilities.brand_account.BRAND_USER_ID", brand_user_id), \
+             patch(f"{_OUT}.seconds_since_last_dm_touch", return_value=None), \
+             patch(f"{_OUT}.get_due_followups", return_value=[row]), \
+             patch(f"{_OUT}.get_current_profile",
+                   return_value=(MagicMock(), MagicMock(), "e", MagicMock())), \
+             patch(f"{_OUT}.quit_gracefully"), patch(f"{_OUT}.time.sleep"), \
+             patch(f"{_OUT}.insert_new_log"), \
+             patch(f"{_OUT}.resolve_self_name", return_value="Christopher Queen"), \
+             patch(f"{_OUT}.check_dm_replied", return_value=ThreadState.NOT_REPLIED), \
+             patch(f"{_OUT}.build_dm_from_template", return_value="step-1 follow up") as build, \
+             patch(f"{_OUT}.send_private_dm") as dm, \
+             patch(f"{_OUT}.mark_followup") as mark, \
+             patch(f"{_OUT}.enqueue_next_followup") as enq:
+            result = process_user_followups.run(user_id=user_id)
+        return result, build, dm, mark, enq
+
+    def test_a_brand_funnel_followup_sends_nothing_and_is_stopped(self):
+        result, build, dm, mark, enq = self._run(1, "funnel")
+        dm.apply_async.assert_not_called()
+        build.assert_not_called()                             # not even drafted into a send
+        mark.assert_called_once_with(1, "stopped")
+        enq.assert_not_called()                               # and the ladder does not continue
+        assert "Sent 0" in result
+
+    def test_the_hold_follows_an_overridden_brand_user(self):
+        _result, _build, dm, _mark, _enq = self._run(7, "funnel", brand_user_id="7")
+        dm.apply_async.assert_not_called()
+
+    def test_a_non_brand_funnel_followup_still_sends(self):
+        result, _build, dm, mark, _enq = self._run(2, "funnel")
+        dm.apply_async.assert_called_once()
+        mark.assert_called_once_with(1, "sent")
+        assert "Sent 1" in result
+
+    @pytest.mark.parametrize("event_type", ["profile_viewer", "connection_accepted"])
+    def test_the_brands_ordinary_followups_still_send(self, event_type):
+        result, _build, dm, mark, _enq = self._run(1, event_type)
+        dm.apply_async.assert_called_once()
+        mark.assert_called_once_with(1, "sent")
+        assert "Sent 1" in result

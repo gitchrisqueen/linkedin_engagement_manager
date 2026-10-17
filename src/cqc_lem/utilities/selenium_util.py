@@ -44,6 +44,7 @@ from selenium.webdriver.remote.webelement import WebElement
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.support.wait import WebDriverWait
 
+from cqc_lem.utilities.demo_mode import guard_linkedin
 from cqc_lem.utilities.env_constants import *
 # Named explicitly ON TOP of the star import above: these decide which HALF of the Grid a
 # session may run on (`apply_debug_node`) and how long we wait for readiness. The star import
@@ -127,6 +128,44 @@ def is_tab_crashed(exc: BaseException) -> bool:
         message = (getattr(exc, "msg", None) or str(exc) or "").lower()
         return any(marker in message for marker in _TAB_CRASHED_MARKERS)
     return False
+
+
+def note_tab_crash(exc: BaseException, *, task_name: str, crash_logged_upstream: bool = False,
+                   **context) -> bool:
+    """Log a crashed tab that ended a Selenium lane's run, and say whether it was one.
+
+    A crashed tab (`is_tab_crashed`) is an expected transient — the renderer was OOM-killed — and
+    ends the run the same way whatever the lane was doing, so it is a WARNING that escalates only
+    if it recurs, never an immediate `$exception` (issues #2393, #2402, #2403). Anything else is
+    NOT logged here: the lane keeps its own `log_error` call, so the log line still names the
+    lane's function rather than this helper. The caller must already have stopped using the
+    driver: a dead tab fails every later navigation, so this is never a cue to retry.
+
+    The warning names `task_name` so each lane keeps its own escalation key — the call-site half of
+    that key is this function for every lane, so the message is what tells them apart. On-call can
+    grep the persistent log for `Browser tab crashed — ending`.
+
+    Args:
+        exc: The exception that ended the run.
+        task_name: The lane's task name — part of the crash message and the log context.
+        crash_logged_upstream: True when the layer that raised already warned about this crash —
+            `get_current_profile` does for one on the first login navigation (#1749) — so this
+            logs it at DEBUG rather than filing the same occurrence twice.
+        **context: Structured log fields (`user_id`, `action_type`, ...).
+
+    Returns:
+        True when the run ended on a crashed tab (now logged); False when the caller must log `exc`
+        itself.
+    """
+    if not is_tab_crashed(exc):
+        return False
+    if crash_logged_upstream:
+        log_debug(f"Browser tab crashed — ending {task_name} (already reported where detected)",
+                  exc=exc, task_name=task_name, **context)
+    else:
+        log_warning(f"Browser tab crashed — ending {task_name}", exc=exc, task_name=task_name,
+                    **context)
+    return True
 
 
 # What the Grid's node-side HTTP relay says when it fails to deliver ONE command (issue #1784) —
@@ -241,7 +280,7 @@ def _wait_for_selenium_ready(host: str, port: str, timeout: int = None) -> None:
 def get_docker_driver(headless: bool = True, session_name: str = "ChromeTests", coordinates: dict = None,
                       user_id: int = None, lat: float = None, lng: float = None,
                       debug: bool = None, debug_required: bool = False,
-                      needs_images: bool = False) -> webdriver.Remote:
+                      needs_images: bool = False, demo_safe: bool = False) -> webdriver.Remote:
     """Open a Chrome session on the standalone-chrome container — the ONE way a driver is created.
 
     Everything that makes a session look like the user rather than a datacenter bot is applied here:
@@ -268,7 +307,17 @@ def get_docker_driver(headless: bool = True, session_name: str = "ChromeTests", 
     `bandwidth_saver=False` regardless of `PROXY_BANDWIDTH_SAVER_ENABLED` or proxy state. Every
     other caller keeps today's behavior — this must never widen past the messaging- and
     groups-surface lanes that pass it explicitly.
+
+    `DEMO_MODE` (#2372) refuses the session here, before the Grid is contacted: this is the
+    Selenium transport's choke point, so no LinkedIn lane can open a browser in demo mode.
+    `demo_safe=True` is the exemption for a session that films our OWN SPA and never navigates to
+    LinkedIn (the tutorial recorder); `test_demo_mode.py` pins who may pass it.
+
+    Raises:
+        DemoModeError: `DEMO_MODE` is on and the caller did not pass `demo_safe=True`.
     """
+    if not demo_safe:
+        guard_linkedin("selenium.get_docker_driver")
     if debug is None:
         debug = isTrue(os.getenv("SELENIUM_DEBUG_NODE", "False"))
     if debug_required:

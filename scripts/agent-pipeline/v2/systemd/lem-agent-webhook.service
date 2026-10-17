@@ -12,22 +12,33 @@ WorkingDirectory=/home/lem/agent-pipeline/v2
 Environment=BASE=/home/lem/agent-pipeline
 Environment=PYTHONUNBUFFERED=1
 
-# The webhook secret ONLY. This process holds no GitHub credential and does no GitHub work, so a
-# compromise of the one component reachable from outside the box yields the ability to write rows
-# into a queue whose every entry is re-verified against GitHub before anything acts on it.
+# The webhook secret ONLY. This process holds no GitHub credential and does no GitHub work, and every
+# queue row it writes is re-verified against GitHub before anything acts on it. That limits what its
+# requests can do, not what a compromised process can write: see ProtectSystem below.
 # Root-owned 0600; deliberately NOT the pipeline's secrets.env, which carries the App private key.
 EnvironmentFile=/etc/lem/agent-webhook.env
 
-ExecStart=/usr/bin/python3 -m lemd.receiver
+# These binds match the installed unit, but they are NOT the access control. Two binds on one port
+# make lemd.receiver.serve() open a single socket on 0.0.0.0:8420 (receiver.py, serve()), so the
+# receiver listens on every interface, the public one included. What keeps the internet out is the
+# host firewall; HMAC gates every POST, and GET serves only an unauthenticated /healthz.
+# 172.18.0.1 is the lem_default bridge gateway, which is the tunnel ORIGIN cloudflared dials, and
+# loopback is what the watchdog probes for /healthz. Re-check the gateway (`ip -4 -o addr show`)
+# if the stack is recreated. The flags override LEM_WEBHOOK_BIND in config.env for this unit.
+ExecStart=/usr/bin/python3 -m lemd.receiver --bind 172.18.0.1:8420 --bind 127.0.0.1:8420
 
 Restart=always
 RestartSec=3
 
-# Hardening: this is the internet-adjacent surface (via the tunnel), so it runs with the smallest
-# footprint that still lets it write the queue database.
+# Hardening for the internet-adjacent surface (via the tunnel).
 NoNewPrivileges=yes
 PrivateTmp=yes
-ProtectSystem=strict
+# `full`, matching the installed unit (unchanged since 2026-08-10 01:57Z by its mtime; why it is not
+# `strict` was not recorded). `full` makes only /usr, /boot and /etc read-only, and ProtectHome is
+# unset, so ReadWritePaths below narrows nothing: this process can write all of /home/lem, the
+# pipeline code under /home/lem/agent-pipeline included. Tightening (`strict` plus ProtectHome) is
+# a separate, root-run change, verified with /healthz afterwards.
+ProtectSystem=full
 ProtectKernelTunables=yes
 ProtectControlGroups=yes
 RestrictSUIDSGID=yes

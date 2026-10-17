@@ -48,19 +48,23 @@ from cqc_lem.utilities.auth_factors import (
 from cqc_lem.utilities.auth_rate_limit import (
     check_auth_init,
     check_auth_verify,
+    check_waitlist_join,
     clear_auth_limits,
 )
+from cqc_lem.utilities.brand_account import current_launch_phase
 from cqc_lem.utilities.db import (
     SESSION_SCOPE_ENROLL,
     SESSION_SCOPE_FULL,
     SESSION_SCOPE_RECOVERY,
     AuthAuditEvent,
+    add_to_trial_waitlist,
     add_user_by_email,
     claim_auth_challenge_attempt,
     clear_challenge_attempts,
     consume_auth_challenge,
     count_challenge_attempts,
     count_recovery_codes,
+    count_trial_cohort_members,
     create_auth_challenge,
     create_pin_for_email,
     create_session,
@@ -75,10 +79,12 @@ from cqc_lem.utilities.db import (
     is_user_admin,
     mark_email_verified,
     record_auth_event,
+    trial_cohort_slot,
     verify_pin_for_email,
 )
 from cqc_lem.utilities.email import generate_pin, hash_pin, send_pin_email
 from cqc_lem.utilities.env_constants import (
+    P0_TRIAL_COHORT_CAP,
     SECOND_FACTOR_ATTEMPT_WINDOW_MINUTES,
     SECOND_FACTOR_MAX_ATTEMPTS,
     SESSION_ABSOLUTE_MAX_DAYS,
@@ -264,6 +270,77 @@ def _start_affiliate_membership(user_id: int, attribution: dict) -> None:
         log_warning("Could not start affiliate membership", exc=e, user_id=user_id)
 
 
+# --- P0 trial cohort cap (issue #2377) ----------------------------------------------------------
+# While the launch phase is P0, a NEW account is created only while fewer than P0_TRIAL_COHORT_CAP
+# self-serve trial accounts exist. Past the cap — or whenever the count cannot be read — the
+# signup path answers `{"waitlist": true}` and the SPA shows the join-the-list form. P1 and P2 never
+# consult the counter. An existing account signing in is a login, not a signup, and is never gated.
+COHORT_GATED_PHASE = "P0"
+_LEN_WAITLIST_EMAIL = 255  # trial_waitlist.email VARCHAR(255)
+
+
+def _cohort_cap_applies() -> bool:
+    """Whether the active launch phase is the one the cohort cap gates.
+
+    `current_launch_phase` falls back to P0 on an unrecognised value, so a typo in the deployment
+    env keeps the cap ON rather than opening signup.
+
+    Returns:
+        True only while the resolved phase is P0.
+    """
+    return current_launch_phase() == COHORT_GATED_PHASE
+
+
+def _waitlist_detail(email: str) -> dict[str, Any]:
+    """The reply that tells the SPA to show the join-the-list form instead of an account.
+
+    Args:
+        email: The normalised address, echoed so the form can prefill it.
+
+    Returns:
+        The response detail.
+    """
+    return {"waitlist": True, "email": email}
+
+
+def _signup_has_room() -> bool:
+    """A lock-free preview of the cohort cap, taken BEFORE a PIN is mailed.
+
+    It only decides whether to spend a PIN email on a new address; the binding check is the locked
+    one in `_create_signup_account`, so a slot taken between the two still sends the later signup
+    to the list. Fails CLOSED: an unreadable count is no room.
+
+    Returns:
+        True when the phase is not gated, or when a slot is free.
+    """
+    if not _cohort_cap_applies():
+        return True
+    used = count_trial_cohort_members()
+    return used is not None and used < P0_TRIAL_COHORT_CAP
+
+
+def _create_signup_account(email: str) -> tuple[Optional[int], bool]:
+    """Create the trial account for a new address, inside the P0 cohort cap when it applies.
+
+    In P0 the count and the insert run under `trial_cohort_slot`'s named lock, so two signups
+    racing for the last slot cannot both get it. Any failure to read the count yields no room.
+
+    Args:
+        email: The normalised address of the account to create.
+
+    Returns:
+        `(user_id, waitlisted)`. `waitlisted` True means no account was created and the caller
+        must answer with the join-the-list form; otherwise `user_id` is `add_user_by_email`'s
+        answer, None when the insert itself failed.
+    """
+    if not _cohort_cap_applies():
+        return add_user_by_email(email), False
+    with trial_cohort_slot(P0_TRIAL_COHORT_CAP) as has_room:
+        if not has_room:
+            return None, True
+        return add_user_by_email(email), False
+
+
 @router.post("/email/init")
 def auth_email_init(request: AuthInitRequest, http_request: Request = None,
                     response: Response = None) -> ResponseModel[dict[str, Any]]:
@@ -295,6 +372,10 @@ def auth_email_init(request: AuthInitRequest, http_request: Request = None,
         # A known email re-authenticating is a login, not a signup — only new emails enter the funnel.
         track_funnel_event(FUNNEL_SIGNUP_STARTED, distinct_id=anonymous_distinct_id(email),
                            attribution=attribution, method="email_pin")
+        # P0 cohort cap (issue #2377): no PIN is mailed to an address that cannot get an account.
+        if not _signup_has_room():
+            log_debug("Trial cohort full or unreadable at PIN request; offered the list form")
+            return ResponseModel(status_code=200, detail=_waitlist_detail(email))
     pin = generate_pin()
     pin_hash = hash_pin(pin, email)
 
@@ -305,7 +386,9 @@ def auth_email_init(request: AuthInitRequest, http_request: Request = None,
         user_id = get_user_id(email)
         is_new_user = user_id is None
         if is_new_user:
-            user_id = add_user_by_email(email)
+            user_id, waitlisted = _create_signup_account(email)
+            if waitlisted:
+                return ResponseModel(status_code=200, detail=_waitlist_detail(email))
             if not user_id:
                 raise HTTPException(status_code=500, detail="Could not create user record")
         # The no-mail-provider bypass skips the PIN entirely, so it is the WEAKEST way in — an
@@ -401,7 +484,11 @@ def auth_email_verify(request: AuthVerifyRequest, http_request: Request = None,
     user_id = get_user_id(email)
     is_new_user = user_id is None
     if is_new_user:
-        user_id = add_user_by_email(email)
+        user_id, waitlisted = _create_signup_account(email)
+        if waitlisted:
+            # The PIN proved the mailbox, but the cohort filled (or could not be read) after it was
+            # mailed. No account, no session — the same list form /email/init would have shown.
+            return ResponseModel(status_code=200, detail=_waitlist_detail(email))
         if not user_id:
             raise HTTPException(status_code=500, detail="Could not create user record")
 
@@ -444,6 +531,52 @@ def auth_email_verify(request: AuthVerifyRequest, http_request: Request = None,
         detail={"session_token": session_token, "email": email, "is_new_user": is_new_user,
                 "enrollment_required": held},
     )
+
+
+class WaitlistJoinRequest(BaseModel):
+    """Body of `POST /auth/waitlist` — the join-the-list form (issue #2377).
+
+    The address is the only field: the form collects nothing it does not need.
+    """
+
+    email: str
+
+
+@router.post("/waitlist")
+def auth_waitlist_join(request: WaitlistJoinRequest,
+                       http_request: Request = None) -> ResponseModel[dict[str, Any]]:
+    """Put an address on the trial list shown when the P0 cohort is full (issue #2377).
+
+    Unauthenticated by definition — the caller has no account. Nothing is sent to the address, and
+    a repeat submission answers exactly like the first, so the form reveals nothing about who is
+    already on the list. A database fault is 503, never a silent success.
+
+    Args:
+        request: The address to add.
+        http_request: The raw request, read for the client IP the rate limit is keyed on.
+
+    Returns:
+        `{"joined": true}` once the address is on the list.
+
+    Raises:
+        HTTPException: 400 for an address that is not an email, 429 when rate limited, 503 when
+            the list could not be written.
+    """
+    email = (request.email or "").strip().lower()
+    # Shape check only, the same one the connection-request recipient field uses in `main`.
+    if (not email or len(email) > _LEN_WAITLIST_EMAIL
+            or not _main._RECIPIENT_EMAIL_RE.match(email)):
+        raise HTTPException(status_code=400, detail="Enter a valid email address")
+
+    ip = _main._client_ip(http_request)
+    verdict = check_waitlist_join(email, ip)
+    if not verdict.allowed:
+        raise HTTPException(status_code=429, detail="Too many requests — try again later",
+                            headers={"Retry-After": str(verdict.retry_after_seconds)})
+
+    if not add_to_trial_waitlist(email, current_launch_phase()):
+        raise HTTPException(status_code=503, detail="Could not save your email — try again shortly")
+    return ResponseModel(status_code=200, detail={"joined": True})
 
 
 @router.post("/logout")

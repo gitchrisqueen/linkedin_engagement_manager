@@ -106,6 +106,25 @@ def check_auth_verify(email: str, ip: Optional[str] = None) -> RateLimitVerdict:
     return _check("verify_ip", hash_client_ip(ip), AUTH_IP_MAX_PER_HOUR)
 
 
+def check_waitlist_join(email: str, ip: Optional[str] = None) -> RateLimitVerdict:
+    """Bound join-the-list submissions (issue #2377) per address and per client IP.
+
+    Its own buckets, so a visitor who was shown the form after asking for a PIN is not charged
+    against the sign-in budget a second time. Same fail-open posture as the sign-in limits.
+
+    Args:
+        email: The address being added.
+        ip: The caller's client IP, hashed before it becomes a key.
+
+    Returns:
+        The verdict; `allowed` False names the bucket that ran out.
+    """
+    verdict = _check("waitlist_email", (email or "").strip().lower(), AUTH_INIT_MAX_PER_HOUR)
+    if not verdict.allowed:
+        return verdict
+    return _check("waitlist_ip", hash_client_ip(ip), AUTH_IP_MAX_PER_HOUR)
+
+
 def clear_auth_limits(email: str, ip: Optional[str] = None) -> None:
     """Drop this identity's counters — called after a SUCCESSFUL login so a user who fat-fingered
     their PIN four times isn't throttled for the rest of the hour.

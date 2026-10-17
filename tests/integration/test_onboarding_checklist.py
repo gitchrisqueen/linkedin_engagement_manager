@@ -72,7 +72,7 @@ class _FakeConn:
         pass
 
 
-def _get(api_client, store, *, session, voice, approved, posted, engaged, trial_ends_at=None):
+def _get(api_client, store, *, session, voice, approved, posted, trial_ends_at=None):
     """Call the endpoint with the checklist EVIDENCE stubbed but state persistence real."""
     prefs = {"tone": "friendly" if voice else None, "comment_style": None, "focus_topics": [],
              "include_topics": [], "max_comments_per_day": 20, "max_dms_per_day": 20}
@@ -87,7 +87,6 @@ def _get(api_client, store, *, session, voice, approved, posted, engaged, trial_
          patch("cqc_lem.utilities.onboarding.get_engagement_preferences", return_value=prefs), \
          patch("cqc_lem.utilities.onboarding.has_engagement_preferences", return_value=True), \
          patch("cqc_lem.utilities.onboarding.has_post_with_status", side_effect=_has_post), \
-         patch("cqc_lem.utilities.onboarding.has_automated_engagement", return_value=engaged), \
          patch("cqc_lem.utilities.onboarding.get_user_subscription_info",
                return_value={"trial_ends_at": trial_ends_at}), \
          patch("cqc_lem.utilities.observability.track_onboarding_step") as track:
@@ -100,7 +99,7 @@ class TestOnboardingChecklistEndpoint:
         store = {"state": None, "nudges": {}, "started_at": datetime.now() - timedelta(days=3)}
 
         response, track = _get(api_client, store, session=True, voice=False, approved=False,
-                               posted=False, engaged=False)
+                               posted=False)
 
         assert response.status_code == 200
         detail = response.json()["detail"]
@@ -120,7 +119,7 @@ class TestOnboardingChecklistEndpoint:
 
         # A second read re-derives the same truth but must not re-emit the event.
         response2, track2 = _get(api_client, store, session=True, voice=False, approved=False,
-                                 posted=False, engaged=False)
+                                 posted=False)
         assert response2.json()["detail"]["steps"][0]["ok"] is True
         assert track2.call_count == 0
 
@@ -128,7 +127,7 @@ class TestOnboardingChecklistEndpoint:
         store = {"state": None, "nudges": {}, "started_at": datetime.now() - timedelta(days=6)}
 
         response, _track = _get(api_client, store, session=True, voice=True, approved=True,
-                                posted=True, engaged=True,
+                                posted=True,
                                 trial_ends_at=datetime.now() + timedelta(days=1))
 
         detail = response.json()["detail"]

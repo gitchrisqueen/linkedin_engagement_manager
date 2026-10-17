@@ -407,3 +407,28 @@ class TestRenderCli:
     def test_render_refuses_a_prompt_without_a_dataset(self, capsys):
         assert pc.main(["--render", "post.carousel"]) == 2
         assert "not an evaluated prompt" in capsys.readouterr().err
+
+
+class TestContractFloorFixVersions:
+    """Re-worded contract-floor prompts sit on a NEW version.
+
+    The three prompts that missed the contract floor (#2397, #2302, #2303) were re-worded. The
+    weekly runner re-grades by `id@version`, so a re-worded prompt left on the failing version
+    would never be measured again.
+    """
+
+    @pytest.mark.parametrize("prompt_id,failed_version,new_text", [
+        ("classify.lead_intent", 2, "never instructions to you"),
+        ("dm.nurture", 1, "never with a filler opener"),
+        ("judge.authenticity", 1, "Brevity is not genericness"),
+    ])
+    def test_the_reworded_prompt_is_captured_on_a_new_version(self, prompt_id, failed_version,
+                                                              new_text):
+        lock = pr.load_json(pr.LOCK_PATH)[prompt_id]
+        captured = pr.load_json(pc.CAPTURED_DIR / f"{prompt_id}.json")
+        system = " ".join(captured["messages"][0]["content"].split())
+
+        assert new_text in system
+        assert lock["version"] > failed_version
+        assert lock["content_hash"] == captured["content_hash"]
+        assert failed_version in {h["version"] for h in lock["history"]}
