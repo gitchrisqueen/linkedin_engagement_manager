@@ -23,7 +23,7 @@ const PROBLEMS: { icon: IconName; title: string; body: string }[] = [
   {
     icon: 'shield',
     title: 'And automation makes you nervous',
-    body: 'Reasonably. Rate limits, restrictions and blunt bots are real. Any tool worth using has to answer that before it asks for your session.',
+    body: 'Reasonably. Rate limits, restrictions and blunt bots are real. Any tool worth using has to answer that before you connect it.',
   },
 ]
 

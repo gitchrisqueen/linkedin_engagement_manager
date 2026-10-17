@@ -18,12 +18,10 @@ const ROWS: { capability: string; cells: [Cell, Cell, Cell] }[] = [
   { capability: 'Writes in your own voice', cells: [true, 'Generic unless you prompt it every time', true] },
   { capability: 'Plans a month across a buyer journey', cells: [false, false, true] },
   { capability: 'Publishes at your golden hours', cells: ['If you are free at the time', false, true] },
-  { capability: 'Comments and replies for you daily', cells: ['An hour a day', false, true] },
-  { capability: 'Follows up on DMs on a schedule', cells: ['If you remember', false, true] },
-  { capability: 'Per-day caps and human pacing', cells: ['Whatever you feel like', false, true] },
-  { capability: 'Stops on a rate limit automatically', cells: [false, false, true] },
-  { capability: 'Approval before anything is published', cells: [true, true, true] },
-  { capability: 'Measures what each comment earned', cells: [false, false, true] },
+  { capability: 'Suggests comments and replies you send yourself', cells: ['You write each one', 'Only for posts you paste in', true] },
+  { capability: 'Suggests DM follow-ups', cells: ['If you remember', false, true] },
+  { capability: 'Approval before a post is published', cells: [true, true, true] },
+  { capability: 'Shows how each published post performed', cells: [false, false, true] },
 ]
 
 function CellValue({ value }: { value: Cell }) {

@@ -6,7 +6,8 @@ import Section, { SectionHeading } from './Section'
 // three-card emoji grid whose bullets described a product more general than the one that exists.
 //
 // Every line below names something shipped. The four beats are the actual order of the loop:
-// write it, schedule it, engage with it, then measure what it earned.
+// write it, schedule it, engage with it, then measure what it earned. Since #2366 the engagement
+// beat describes suggestions the user sends, never actions LEM takes on their behalf.
 const BEATS: {
   key: string
   eyebrow: string
@@ -44,26 +45,22 @@ const BEATS: {
   {
     key: 'engagement',
     eyebrow: 'Engagement',
-    title: 'The daily hour, running without you',
-    body: 'The half that actually earns reach: commenting on the right posts, answering the people who answer you, and following up.',
+    title: 'The daily hour, cut down to a review',
+    body: 'The half that actually earns reach: commenting on the right posts, answering the people who answer you, and following up. LEM drafts these as suggestions; you review them and send the ones you want yourself.',
     points: [
-      'Feed commenting against your topics, keywords, authors and minimum-reaction rules',
-      'Replies on your own posts, plus a first comment under what you publish',
-      'Appreciation and outreach DMs with multi-step follow-ups, each one approval-gated',
-      'A weekly group post, roster targets and a paced company-page invite drip',
+      'Comment suggestions for posts that match your topics, keywords, authors and minimum-reaction rules',
+      'Suggested replies to comments on your own posts',
+      'Suggested appreciation and follow-up DMs',
     ],
     panel: 'engagement',
   },
   {
     key: 'measurement',
     eyebrow: 'Measurement',
-    title: 'You approve; then it measures what happened',
-    body: 'Nothing here is a vanity chart. Each measure exists because something downstream reads it and changes behaviour.',
+    title: 'You approve; then it shows what each post earned',
+    body: 'Nothing here is a vanity chart: the numbers come from your own LinkedIn account.',
     points: [
-      'Comment outcomes swept at T+24h, one row per comment',
       'Post and audience statistics pulled from your own account',
-      'A suppression tripwire comparing you against your own trailing median, never a global average',
-      'Reach demotion holds your feed commenting instead of quietly continuing',
     ],
     panel: 'measure',
   },
@@ -75,7 +72,7 @@ export default function FeatureNarrative() {
       <SectionHeading
         eyebrow="What it does"
         title="One loop: write, schedule, engage, measure"
-        lede="Four beats, in the order they run. Everything named here exists today."
+        lede="Four beats, in the order they run."
       />
       <div className="space-y-16 lg:space-y-24">
         {BEATS.map((beat, index) => (

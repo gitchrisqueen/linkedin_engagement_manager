@@ -10,22 +10,22 @@ import Section from './Section'
 // counts worth showing yet, and saying so is cheaper than being caught.
 const PROOF: { icon: IconName; title: string; body: string }[] = [
   {
-    icon: 'shield',
-    title: 'Approval before anything ships',
-    body: 'Posts preview before they publish and generated DMs land as drafts.',
+    icon: 'check',
+    title: 'Posts wait for your approval',
+    body: 'Each generated post is published through LinkedIn’s API only after you approve it.',
   },
   {
-    icon: 'gauge',
-    title: 'Caps you set, not caps we chose',
-    body: 'Comments, DMs and invites each stop at your own per-day number.',
-  },
-  {
-    icon: 'clock',
-    title: 'One pacing engine, not a loop',
-    body: 'Every delay is drawn per user, action and day, and persisted so a retry never re-rolls it.',
+    icon: 'chat',
+    title: 'Engagement you send yourself',
+    body: 'Comments, replies and DMs arrive as suggestions. You decide which ones to send.',
   },
   {
     icon: 'lock',
+    title: 'LinkedIn sign-in only',
+    body: 'You connect with LinkedIn sign-in. LEM never asks for your LinkedIn password or a cookie.',
+  },
+  {
+    icon: 'shield',
     title: 'Credentials encrypted at rest',
     body: 'AES-256-GCM per user and column, with passkey or TOTP step-up on the writes that matter.',
   },

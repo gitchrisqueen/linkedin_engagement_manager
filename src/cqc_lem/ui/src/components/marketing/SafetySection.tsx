@@ -13,44 +13,29 @@ import Section, { SectionHeading } from './Section'
 // caveat is deliberately the last thing in the section.
 const CLAIMS: { icon: IconName; title: string; body: string }[] = [
   {
-    icon: 'clock',
-    title: 'One cadence engine, and it does not re-roll',
-    body: 'Every delay is drawn from a single pacing engine, seeded on the user, the action and the day, then persisted — so a retry replays the same timing instead of rolling a fresh burst of activity.',
-  },
-  {
-    icon: 'gauge',
-    title: 'Per-day caps that are yours',
-    body: 'Comments, DMs and invites each stop at a number you set. Nothing raises them for you, and no campaign borrows tomorrow’s allowance.',
-  },
-  {
-    icon: 'shield',
-    title: 'A rate-limit breaker that is not a toggle',
-    body: 'When LinkedIn answers 429 or shows an auth wall, activity stops. That breaker is deliberately not a feature flag — safety controls here are not the kind of thing anyone gets to switch off in a hurry.',
-  },
-  {
     icon: 'lock',
-    title: 'Your session, egress matched to your location',
-    body: 'Automation runs from your own logged-in session through an egress proxy matched to your country, not a raw shared datacenter pool — a dedicated per-user proxy is available as a paid upgrade.',
+    title: 'LinkedIn sign-in, never your password',
+    body: 'You connect with LinkedIn’s own sign-in. LEM never asks for your LinkedIn password or a session cookie.',
+  },
+  {
+    icon: 'check',
+    title: 'No post goes out without your approval',
+    body: 'Each generated post waits in your queue. Only after you approve it is it published, through LinkedIn’s API.',
   },
   {
     icon: 'chat',
-    title: 'Approval gates, as a safety mechanism',
-    body: 'Generated DMs land as drafts and posts preview before they publish. A human shipping it is the cheapest protection there is, and no competitor frames it as one.',
+    title: 'Engagement stays in your hands',
+    body: 'Comments, replies, follow-ups and DMs arrive as suggestions. You review them and send the ones you want yourself; LEM does not send them for you.',
   },
   {
     icon: 'pen',
-    title: 'Quality gates before anything is sent',
-    body: 'Comments clear a quality contract and a similarity gate; five hard slop-lint checks block a draft outright. Nothing generic goes out under your name.',
+    title: 'Quality gates before you see a draft',
+    body: 'Every draft is checked against a quality contract and your recent posts. A draft that fails is held for review, with the reason shown.',
   },
   {
-    icon: 'calendar',
-    title: 'A tripwire that pauses engagement, never posting',
-    body: 'Reach is compared against your OWN trailing 14-day median, because the penalties this guards against are silent. A sustained drop pauses engagement and leaves publishing alone.',
-  },
-  {
-    icon: 'lock',
+    icon: 'shield',
     title: 'Secrets encrypted at rest',
-    body: 'Credentials and session cookies are AES-256-GCM encrypted per user and column, and passkey or TOTP step-up gates the writes that touch them.',
+    body: 'Your LinkedIn sign-in tokens are AES-256-GCM encrypted per user and column, and passkey or TOTP step-up gates the writes that touch them.',
   },
 ]
 
@@ -60,8 +45,8 @@ export default function SafetySection() {
       <SectionHeading
         onDark
         eyebrow="Account safety"
-        title="Built to act like you, and to stop before you would"
-        lede="Most tools in this category answer this with one sentence. Here is the whole mechanism list, each one a thing you can hold us to."
+        title="Nothing goes out under your name until you say so"
+        lede="Most tools in this category answer this with one sentence. Here is the whole list, each one a thing you can hold us to."
       />
       <ul className="grid gap-6 md:grid-cols-2">
         {CLAIMS.map(({ icon, title, body }) => (
@@ -83,8 +68,8 @@ export default function SafetySection() {
         <span>
           <strong className="font-semibold">And the limit:</strong> no tool can guarantee a LinkedIn
           account, and anyone who tells you otherwise is selling. What you control here is the whole
-          surface — pause it, lower the caps, or approve nothing. You remain responsible for your own
-          account.
+          surface — edit any draft, approve nothing, or send no suggestion at all. You remain
+          responsible for your own account.
         </span>
       </p>
     </Section>

@@ -24,8 +24,8 @@ export default function MarketingFooter() {
               loading="lazy"
             />
             <p className="mt-4 text-sm leading-relaxed text-brand-300">
-              Content and engagement for LinkedIn, run inside the caps you set — with you approving
-              what ships.
+              LinkedIn posts in your voice, published only when you approve them, plus engagement
+              suggestions you send yourself.
             </p>
           </div>
           {/* Deliberately NOT a second <nav> landmark: the page is meant to expose exactly one, and
