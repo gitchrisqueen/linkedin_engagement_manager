@@ -171,10 +171,14 @@ WARNING per run; an unreadable file collects nothing and says so.
 
 ## Still owed — live verification
 
-**Member-token reshare is UNTESTED.** LinkedIn's docs show only an organization author for a reshare;
-a member author is the same body with `urn:li:person:{sub}` and the docs list no separate scope, but
-nobody has run it. Do NOT enable the flag for real use until this one-shot test passes. After
-deploy, as the owner or the main session:
+**Member-token reshare: accepted for our own post (2026-10-07); someone else's post is still
+untested.** LinkedIn's docs show only an organization author for a reshare. On 2026-10-07 a live
+test approved by the owner reshared user 1's own post `urn:li:share:7513568851654074370` (published
+12:00:10Z that day) through `/rest/posts` with `reshareContext`, using user 1's member token, and
+LinkedIn returned `urn:li:share:7513738463985319937`. So a member author can create a reshare.
+Not yet shown: a reshare of someone else's public post, and the permalink embedding the original
+under the commentary (step 3). The flag stays OFF and phases 2-3 of #2260 stay deferred until the
+one-shot test below passes. After deploy, as the owner or the main session:
 
 1. Pick a PUBLIC LinkedIn post by someone else and copy its share or ugcPost URN. On the post, use
    "Copy link to post": the URL often carries `urn:li:share:N` or `urn:li:ugcPost:N`. An
