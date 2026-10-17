@@ -1012,7 +1012,8 @@ export default function ContentStudio() {
                   {/* One-line "why" for a gate-held draft — the full reason + fix is in the editor. */}
                   {post.status === 'pending' && gateHold(post.gate_reason).length > 0 && (
                     <p className="text-xs text-warning mt-1 truncate">
-                      ⏸ {gateHold(post.gate_reason).map((f) => f.label).join(' · ')} — click to see why
+                      <Icon name="pause" className="mr-1 inline h-3.5 w-3.5 align-[-2px]" />
+                      {gateHold(post.gate_reason).map((f) => f.label).join(' · ')} — click to see why
                     </p>
                   )}
                   {post.status === 'rejected' && post.rejection_reason && (

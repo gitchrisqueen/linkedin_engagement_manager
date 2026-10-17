@@ -1,4 +1,5 @@
 import { Link } from 'react-router-dom'
+import Icon from './marketing/Icon'
 import { gateHold } from '../utils/gateFindings'
 import type { GateFinding } from '../utils/gateFindings'
 
@@ -42,8 +43,9 @@ export default function PostGateReason({
         isHeld ? 'bg-warning/5 border-warning/25' : 'bg-page border-hairline'
       }`}
     >
-      <h4 className={`text-sm font-semibold ${isHeld ? 'text-warning' : 'text-fg'}`}>
-        {isHeld ? '⏸ Why this is pending' : 'Quality checks'}
+      <h4 className={`flex items-center gap-1 text-sm font-semibold ${isHeld ? 'text-warning' : 'text-fg'}`}>
+        {isHeld && <Icon name="pause" className="h-4 w-4 shrink-0" />}
+        {isHeld ? 'Why this is pending' : 'Quality checks'}
       </h4>
 
       {!findings.length && (

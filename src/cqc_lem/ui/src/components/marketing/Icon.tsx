@@ -35,6 +35,9 @@ const PATHS = {
   userPlus: 'M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8ZM19 8v6M22 11h-6',
   plus: 'M12 5v14M5 12h14',
   bell: 'M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9M10.3 21a1.94 1.94 0 0 0 3.4 0',
+  repost: 'M17 1l4 4-4 4M3 11V9a4 4 0 0 1 4-4h14M7 23l-4-4 4-4M21 13v2a4 4 0 0 1-4 4H3',
+  send: 'M22 2 11 13M22 2l-7 20-4-9-9-4Z',
+  pause: 'M6 4h4v16H6zM14 4h4v16h-4z',
 } as const
 
 export type IconName = keyof typeof PATHS

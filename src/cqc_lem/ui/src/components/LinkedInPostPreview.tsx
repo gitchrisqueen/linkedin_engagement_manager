@@ -1,4 +1,6 @@
 import { useState } from 'react'
+import Icon from './marketing/Icon'
+import type { IconName } from './marketing/Icon'
 
 interface LinkedInPostPreviewProps {
   content: string
@@ -120,7 +122,7 @@ export default function LinkedInPostPreview({
   const showImage = !showVideo && !showCarousel && !!mediaUrl
 
   return (
-    <div className="bg-raised rounded-panel border border-hairline shadow-panel max-w-lg font-sans">
+    <div className="bg-raised rounded-panel border border-hairline shadow-panel max-w-lg">
       {/* Header */}
       <div className="flex items-center gap-3 p-4">
         <div className="w-12 h-12 rounded-full bg-accent flex items-center justify-center text-white font-bold text-lg flex-shrink-0">
@@ -178,7 +180,7 @@ export default function LinkedInPostPreview({
       {/* Stats bar */}
       <div className="px-4 py-2 flex items-center justify-between text-xs text-fg-muted border-t border-hairline">
         <div className="flex items-center gap-1">
-          <span className="text-accent">👍</span>
+          <Icon name="thumbsUp" className="h-4 w-4 text-accent" />
           <span>Be the first to react</span>
         </div>
         <span>0 comments</span>
@@ -186,11 +188,12 @@ export default function LinkedInPostPreview({
 
       {/* Action buttons */}
       <div className="flex items-center border-t border-hairline">
-        {['👍 Like', '💬 Comment', '🔁 Repost', '📤 Send'].map((action) => (
+        {([['thumbsUp', 'Like'], ['chat', 'Comment'], ['repost', 'Repost'], ['send', 'Send']] as [IconName, string][]).map(([icon, action]) => (
           <button
             key={action}
             className="flex-1 py-3 text-xs font-semibold text-fg-muted hover:bg-page flex items-center justify-center gap-1"
           >
+            <Icon name={icon} className="h-4 w-4" />
             {action}
           </button>
         ))}

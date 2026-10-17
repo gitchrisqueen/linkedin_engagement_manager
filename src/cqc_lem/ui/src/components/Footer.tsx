@@ -27,7 +27,7 @@ export default function Footer() {
           others not would read as decoration rather than a statement — and the legal pages, where
           someone actually looks for it, render inside this chrome. */}
       <div className="box-content max-w-6xl mx-auto px-4 pb-4 pt-2 text-center text-fg-muted">
-        <LegalDisclaimer />
+        <LegalDisclaimer className="max-w-measure mx-auto" />
       </div>
     </footer>
   )
