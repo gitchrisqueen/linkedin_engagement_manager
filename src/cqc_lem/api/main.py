@@ -2066,7 +2066,10 @@ def _handle_gmail_forwarding_confirmation(user_id: int, subject: str, text: str,
             from cqc_lem.utilities.email import send_reply_forward_confirmation_email
             user_email = get_user_email(user_id)
             if user_email:
-                forwarded = send_reply_forward_confirmation_email(user_email, url, code)
+                from cqc_lem.utilities.trial_copy import is_trial_subscription
+                trial = is_trial_subscription(get_user_subscription_info(user_id))
+                forwarded = send_reply_forward_confirmation_email(user_email, url, code,
+                                                                  trial=trial)
         except Exception as e:
             log_warning("Could not forward Gmail confirmation to user", exc=e, user_id=user_id)
     _store_gmail_forward_confirmation(user_id, {

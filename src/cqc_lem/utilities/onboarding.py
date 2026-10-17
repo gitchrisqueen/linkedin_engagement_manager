@@ -31,6 +31,7 @@ from cqc_lem.utilities.db import (
     record_onboarding_nudge,
 )
 from cqc_lem.utilities.logger import log_info, log_warning
+from cqc_lem.utilities.trial_copy import automated_engagement_phrases, is_trial_subscription
 
 # The checklist as the SPA renders it: label + where the user goes to finish the step.
 STEP_LABELS: dict = {
@@ -130,8 +131,51 @@ _TRIAL_NUDGE: dict = {
     "cta_path": "/account",
 }
 
+# Trial wording for the nudges whose default copy promises automated commenting or messaging
+# (issue #2375). The trial covers posting through approval, and engagement there is suggestions the
+# user acts on, so a trial account gets these fields in place of the defaults. Nudges not listed
+# here say nothing about engagement and go out unchanged.
+_TRIAL_NUDGE_COPY: dict = {
+    NUDGE_CONNECT: {
+        "subject": "Connect LinkedIn so your approved posts can publish",
+        "headline": "First step: connect LinkedIn",
+        "body": ("Your account is ready, but LinkedIn isn't connected yet — so your approved posts "
+                 "can't publish. It takes about a minute from your account page."),
+    },
+    NUDGE_VOICE: {
+        "body": ("LinkedIn is connected. Next: pick your tone and the topics you want to be known "
+                 "for — that's what keeps every drafted post and engagement suggestion yours."),
+    },
+}
+
 # At most one onboarding nudge per user per this many hours, whatever the beat cadence.
 NUDGE_COOLDOWN_HOURS = 24
+
+
+def linkedin_connected(user_id: int, trial: Optional[bool] = None) -> bool:
+    """Whether this user has connected LinkedIn, for the onboarding step and the connect email.
+
+    A stored `li_at` session counts for everyone. A trial account connects by OAuth only, so for a
+    trial any stored OAuth token counts too, expired or not (expiry is the authorization email's
+    to report), and so does a token state that cannot be read: telling a connected trial account
+    it isn't connected is the failure this avoids (issue #2375). A paid account still needs the
+    session cookie, which the engagement lanes log in with.
+
+    Args:
+        user_id: The user to check.
+        trial: Whether the account is on the trial; read off its subscription when None.
+
+    Returns:
+        True when the user should be treated as connected.
+    """
+    if has_linkedin_session(user_id):
+        return True
+    if trial is None:
+        trial = is_trial_subscription(get_user_subscription_info(user_id))
+    if not trial:
+        return False
+    from cqc_lem.utilities.linkedin.token_refresh import has_oauth_token
+    return has_oauth_token(user_id) is not False
 
 
 def evaluate_steps(user_id: int) -> dict:
@@ -145,7 +189,7 @@ def evaluate_steps(user_id: int) -> dict:
     caps_enabled = configured and (int(prefs.get("max_comments_per_day") or 0) > 0
                                    or int(prefs.get("max_dms_per_day") or 0) > 0)
     return {
-        OnboardingStep.LINKEDIN_CONNECTED: has_linkedin_session(user_id),
+        OnboardingStep.LINKEDIN_CONNECTED: linkedin_connected(user_id),
         OnboardingStep.VOICE_SET: voice_set,
         OnboardingStep.FIRST_POST_APPROVED: has_post_with_status(
             user_id, (PostStatus.APPROVED, PostStatus.SCHEDULED, PostStatus.POSTED)),
@@ -211,18 +255,29 @@ def _track_step(user_id: int, step: "OnboardingStep", started_at: Optional[datet
         log_warning("Could not track onboarding step", exc=e, user_id=user_id)
 
 
+def _for_audience(nudge: dict, trial: bool) -> dict:
+    """A copy of `nudge`, with the trial wording swapped in for a trial account (issue #2375)."""
+    picked = dict(nudge)
+    if trial:
+        picked.update(_TRIAL_NUDGE_COPY.get(picked["key"], {}))
+    picked["trial"] = trial
+    return picked
+
+
 def select_nudge(steps: dict, started_at: Optional[datetime] = None,
                  trial_ends_at: Optional[datetime] = None, sent_keys=(),
                  last_sent_at: Optional[datetime] = None,
                  now: Optional[datetime] = None,
-                 story_bank_count: Optional[int] = None) -> Optional[dict]:
+                 story_bank_count: Optional[int] = None,
+                 trial: bool = False) -> Optional[dict]:
     """The next-best nudge for a stalled user, or None when there's nothing worth sending.
 
     Rules: activated users are never nudged; each nudge sends at most once (`sent_keys`); at most one
     nudge per NUDGE_COOLDOWN_HOURS (`last_sent_at`); a step nudge only fires once its grace period
     has elapsed since `started_at`; the earliest incomplete step wins, then the story-bank seeding
     nudge, and the trial-ending nudge is the fallback once the blocking step has already been
-    nudged.
+    nudged. `trial` picks the copy, never the nudge: a trial account gets the same nudge with
+    wording that promises no automated engagement (issue #2375).
     """
     now = now or datetime.now()
     if steps.get(OnboardingStep.ACTIVATED):
@@ -237,7 +292,7 @@ def select_nudge(steps: dict, started_at: Optional[datetime] = None,
         if steps.get(nudge["step"]):
             continue  # step done — check the next one in the checklist
         if age_hours >= nudge["after_hours"] and nudge["key"] not in sent:
-            return dict(nudge)
+            return _for_audience(nudge, trial)
         # A step that is incomplete but still inside its grace period blocks the later step nudges
         # (they'd be premature), but not the time-critical trial warning below.
         break
@@ -246,12 +301,12 @@ def select_nudge(steps: dict, started_at: Optional[datetime] = None,
     if (story_bank_count is not None and steps.get(OnboardingStep.VOICE_SET)
             and story_bank_count < STORY_BANK_TARGET_ENTRIES
             and NUDGE_STORY_BANK not in sent and age_hours >= STORY_BANK_AFTER_HOURS):
-        return dict(_STORY_BANK_NUDGE)
+        return _for_audience(_STORY_BANK_NUDGE, trial)
 
     if trial_ends_at and NUDGE_TRIAL_ENDING not in sent:
         remaining = trial_ends_at - now
         if timedelta(0) < remaining <= timedelta(days=TRIAL_ENDING_WITHIN_DAYS):
-            return dict(_TRIAL_NUDGE)
+            return _for_audience(_TRIAL_NUDGE, trial)
     return None
 
 
@@ -269,7 +324,8 @@ def next_nudge_for_user(user_id: int, state: Optional[dict] = None) -> Optional[
         story_count = None
     return select_nudge(steps, started_at=state.get("started_at"),
                         trial_ends_at=sub.get("trial_ends_at"), sent_keys=set(sent),
-                        last_sent_at=last_sent, story_bank_count=story_count)
+                        last_sent_at=last_sent, story_bank_count=story_count,
+                        trial=is_trial_subscription(sub))
 
 
 def onboarding_snapshot(user_id: int) -> dict:
@@ -301,13 +357,19 @@ def send_onboarding_nudge(user_id: int, nudge: dict) -> bool:
     it so it never sends twice. Returns True only when an email actually went out.
     """
     from cqc_lem.utilities.notifications import notify_onboarding_nudge
-    body = nudge.get("body") or ""
+    default_body = nudge.get("body") or ""
+    body = default_body
     try:
         from cqc_lem.utilities.ai.ai_helper import generate_onboarding_nudge_copy
         body = generate_onboarding_nudge_copy(user_id, nudge) or body
     except Exception as e:
         log_warning("Onboarding nudge copy generation failed — using default copy",
                     exc=e, user_id=user_id)
+    # The rewrite is told to keep the facts, but a trial email is a promise, so the check is ours.
+    if body != default_body and nudge.get("trial", True) and automated_engagement_phrases(body):
+        log_info("Onboarding nudge rewrite mentioned automated engagement on a trial account "
+                 "— using default copy", user_id=user_id, action_type="onboarding_nudge")
+        body = default_body
     if not notify_onboarding_nudge(user_id, {**nudge, "body": body}):
         return False
     record_onboarding_nudge(user_id, nudge["key"])
