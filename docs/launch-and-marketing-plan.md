@@ -36,6 +36,7 @@ re-file work that already exists. Sections A–D remain the plan of record for e
 | Auto-changelog + notify reporter (B.4) | **Shipped** | `utilities/feedback/shipped.py`, `changelog-notify` beat |
 | Onboarding/activation checklist + stalled-user nudges (A.3) | **Shipped** | `OnboardingChecklist.tsx`, `onboarding_state` (`V20260725090900__add_onboarding_state.sql`), `onboarding-nudges` beat |
 | Extended-trial endpoint + cohort slots (A.2) | **Shipped** | `POST /trial/extend`, `extend_trial_for_user`, `early_adopter_slots` / `early_adopter_grants`, `EARLY_ADOPTER_*` + `LAUNCH_PHASE` env |
+| P0 signup cap + join-the-list form (A.1) | **Shipped** | `_create_signup_account` in `api/routers/auth.py`, `trial_cohort_slot` / `count_trial_cohort_members` / `add_to_trial_waitlist`, `POST /api/auth/waitlist`, `trial_waitlist` (`V20261012130436__add_trial_waitlist.sql`), `P0_TRIAL_COHORT_CAP` env (issue #2377) |
 | Funnel instrumentation (C.5) | **Shipped** | `track_funnel_event` in `observability.py` |
 | Brand-account dogfooding (C.2) | **Partial** | `sync-brand-account` beat (`auto_sync_brand_account`); the brand user is **user 1 by convention** (issue #736, no env var required) and runs the existing content/engagement/newsletter tasks |
 | Passive-signal mining (B.1) | **Planned** | — |
@@ -58,7 +59,18 @@ outbound volume ramps only as ToS-safety and satisfaction signals hold).
 | **P2 — GA / official release** | Unlimited public | P1 exit met + GA gate (A.4) | — (continuous improvement continues via the same loop) |
 
 Phase state is a single config key (`LAUNCH_PHASE` env / Redis) read by marketing agents and the signup path so
-guardrails (caps, outbound volume, price display) switch atomically. Advancing a phase is a
+guardrails (caps, outbound volume, price display) switch atomically.
+
+**The P0 cap on the signup path (issue #2377).** While the phase resolves to P0 (an unrecognised value
+falls back to P0), a NEW account is created only while fewer than `P0_TRIAL_COHORT_CAP` (default 25)
+self-serve trial accounts exist — rows with `trial_started_at` set and `is_admin = 0`, so admins, the
+LinkedIn OAuth upsert and demo seeds never take a slot. The count and the insert run under one MySQL
+named lock (`GET_LOCK`), so the cap is hard across API workers. Past the cap the signup answers
+`{"waitlist": true}` and the SPA shows a form that takes an email address and nothing else
+(`trial_waitlist`); nothing is ever sent to it. **Fails closed:** an unreadable count, a connection
+fault or an ungranted lock all give the list form, never an account. `/auth/email/init` checks first
+so no PIN is mailed to an address that cannot get an account; the locked check at account creation is
+the binding one. Existing accounts signing in are never gated, and P1/P2 never read the counter. Advancing a phase is a
 `risk:product-decision` gate — the owner confirms the exit metrics via a Decision Comment.
 
 ### A.2 Extended trial for first adopters
