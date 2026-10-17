@@ -35,6 +35,19 @@ class TestValidators:
         p = _profile(profile_url="https://www.linkedin.com/in/jane/")
         assert "linkedin.com/in/jane" in str(p.profile_url)
 
+    def test_untitled_position_survives_dump_round_trip(self):
+        # The scraper OMITS the title key for a role it keeps only for its details, so the first
+        # build defaults it to None. get_linkedin_profile_from_url then returns model_dump(), which
+        # writes title=None explicitly, and engage_with_profile_viewer rebuilds from that dict;
+        # the stored JSON carries "title": null for model_validate_json the same way.
+        from cqc_lem.utilities.linkedin.profile import LinkedInProfile
+        p = _profile(experiences=[{"company_name": "Acme", "positions": [
+            {"details": ["Led the data team"]}]}])
+        rebuilt = LinkedInProfile(**p.model_dump())
+        reloaded = LinkedInProfile.model_validate_json(p.model_dump_json())
+        assert rebuilt.experiences[0].positions[0].title is None
+        assert reloaded.experiences[0].positions[0].title is None
+
 
 class TestProperties:
     def test_first_and_last_name(self):
