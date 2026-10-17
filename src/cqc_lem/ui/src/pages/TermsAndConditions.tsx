@@ -9,17 +9,17 @@ export default function TermsAndConditions() {
     // `Layout` when someone is. Drawing them here too gave the page two stacked `sticky top-0`
     // bars, two footers and a <main> nested inside a <main>, which is the exact defect the front
     // page was rebuilt to remove.
-    <div className="bg-gray-50">
+    <div className="lem-marketing bg-page">
       <div className="max-w-3xl mx-auto px-4 py-12">
-        <Link to="/" className="text-sm font-medium text-blue-600 hover:underline">
+        <Link to="/" className="text-sm font-medium text-accent hover:underline">
           Back to home
         </Link>
-        <h1 className="mt-6 text-3xl font-bold text-gray-900 mb-2">Terms and Conditions</h1>
-        <p className="text-sm text-gray-500 mb-8">Last updated: {year}-07-30</p>
+        <h1 className="mt-6 text-section-lg font-semibold text-fg mb-2">Terms and Conditions</h1>
+        <p className="text-sm text-fg-muted mb-8">Last updated: {year}-07-30</p>
 
-        <div className="space-y-8 text-gray-700 leading-relaxed">
+        <div className="space-y-8 text-fg leading-relaxed">
           <section>
-            <h2 className="text-xl font-semibold text-gray-900 mb-3">1. Acceptance of terms</h2>
+            <h2 className="text-xl font-semibold text-fg mb-3">1. Acceptance of terms</h2>
             <p>
               By accessing or using LinkedIn Engagement Manager (“LEM”), you agree to be bound
               by these Terms and Conditions and our Privacy Policy. If you do not agree,
@@ -28,7 +28,7 @@ export default function TermsAndConditions() {
           </section>
 
           <section>
-            <h2 className="text-xl font-semibold text-gray-900 mb-3">2. Description of service</h2>
+            <h2 className="text-xl font-semibold text-fg mb-3">2. Description of service</h2>
             <p>
               LEM is an AI-assisted tool that helps users create, schedule, and publish
               content on LinkedIn, and that automates certain engagement actions according
@@ -39,7 +39,7 @@ export default function TermsAndConditions() {
           </section>
 
           <section>
-            <h2 className="text-xl font-semibold text-gray-900 mb-3">3. LinkedIn terms and your responsibilities</h2>
+            <h2 className="text-xl font-semibold text-fg mb-3">3. LinkedIn terms and your responsibilities</h2>
             <p>
               LinkedIn’s User Agreement, Privacy Policy, and Professional Community Policies
               apply to any activity LEM performs on your behalf. You are solely responsible
@@ -56,7 +56,7 @@ export default function TermsAndConditions() {
           </section>
 
           <section>
-            <h2 className="text-xl font-semibold text-gray-900 mb-3">4. Account and security</h2>
+            <h2 className="text-xl font-semibold text-fg mb-3">4. Account and security</h2>
             <p>
               You must provide accurate account information and keep your credentials
               secure. You are responsible for all activity that occurs under your account.
@@ -65,7 +65,7 @@ export default function TermsAndConditions() {
           </section>
 
           <section>
-            <h2 className="text-xl font-semibold text-gray-900 mb-3">5. Subscription, billing, and cancellation</h2>
+            <h2 className="text-xl font-semibold text-fg mb-3">5. Subscription, billing, and cancellation</h2>
             <p>
               LEM offers subscription plans with a free trial. Billing terms are presented at
               signup. You may cancel at any time; cancellation takes effect at the end of the
@@ -74,7 +74,7 @@ export default function TermsAndConditions() {
           </section>
 
           <section>
-            <h2 className="text-xl font-semibold text-gray-900 mb-3">6. Acceptable use</h2>
+            <h2 className="text-xl font-semibold text-fg mb-3">6. Acceptable use</h2>
             <p>You agree not to use LEM to:</p>
             <ul className="list-disc pl-6 space-y-2 mt-2">
               <li>spam, harass, or send unsolicited messages at scale;</li>
@@ -86,7 +86,7 @@ export default function TermsAndConditions() {
           </section>
 
           <section>
-            <h2 className="text-xl font-semibold text-gray-900 mb-3">7. Intellectual property</h2>
+            <h2 className="text-xl font-semibold text-fg mb-3">7. Intellectual property</h2>
             <p>
               You retain ownership of content you create and publish through LEM. We grant
               you a limited, non-exclusive, non-transferable license to use the LEM software
@@ -96,7 +96,7 @@ export default function TermsAndConditions() {
           </section>
 
           <section>
-            <h2 className="text-xl font-semibold text-gray-900 mb-3">8. Limitation of liability</h2>
+            <h2 className="text-xl font-semibold text-fg mb-3">8. Limitation of liability</h2>
             <p>
               LEM is provided “as is” without warranties of any kind. To the maximum extent
               permitted by law, Christopher Queen Consulting is not liable for indirect,
@@ -106,7 +106,7 @@ export default function TermsAndConditions() {
           </section>
 
           <section>
-            <h2 className="text-xl font-semibold text-gray-900 mb-3">9. Modifications to terms</h2>
+            <h2 className="text-xl font-semibold text-fg mb-3">9. Modifications to terms</h2>
             <p>
               We may update these Terms from time to time. Material changes will be
               communicated through the application or by email. Continued use after changes
@@ -115,7 +115,7 @@ export default function TermsAndConditions() {
           </section>
 
           <section>
-            <h2 className="text-xl font-semibold text-gray-900 mb-3">10. Governing law and contact</h2>
+            <h2 className="text-xl font-semibold text-fg mb-3">10. Governing law and contact</h2>
             <p>
               These Terms are governed by the laws of the State of Texas, USA, without
               regard to conflict-of-laws principles. For questions, contact us through the
@@ -124,7 +124,7 @@ export default function TermsAndConditions() {
                 href="https://christopherqueenconsulting.com"
                 target="_blank"
                 rel="noopener noreferrer"
-                className="text-blue-600 hover:underline"
+                className="text-accent hover:underline"
               >
                 {' '}christopherqueenconsulting.com
               </a>.

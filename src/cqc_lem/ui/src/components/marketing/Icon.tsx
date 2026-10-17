@@ -68,14 +68,8 @@ export default function Icon({
  * all, and a red/green pair is invisible to the most common colour deficiency. The word rides along
  * in `sr-only` text so the meaning survives both.
  */
-export function IncludedMark({ included, onDark = false }: { included: boolean; onDark?: boolean }) {
-  const tone = included
-    ? onDark
-      ? 'text-success-300'
-      : 'text-success-700'
-    : onDark
-      ? 'text-danger-300'
-      : 'text-danger-700'
+export function IncludedMark({ included }: { included: boolean }) {
+  const tone = included ? 'text-positive' : 'text-negative'
   return (
     <span className={`shrink-0 ${tone}`}>
       <Icon name={included ? 'check' : 'cross'} className="h-5 w-5" />

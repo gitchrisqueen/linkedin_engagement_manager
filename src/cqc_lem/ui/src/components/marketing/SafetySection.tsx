@@ -43,25 +43,24 @@ export default function SafetySection() {
   return (
     <Section id="safety" analyticsName="safety" tone="dark">
       <SectionHeading
-        onDark
         eyebrow="Account safety"
         title="Nothing goes out under your name until you say so"
         lede="Most tools in this category answer this with one sentence. Here is the whole list, each one a thing you can hold us to."
       />
       <ul className="grid gap-6 md:grid-cols-2">
         {CLAIMS.map(({ icon, title, body }) => (
-          <li key={title} className="flex gap-4 rounded-card border border-ink-700 p-5">
-            <span className="mt-0.5 shrink-0 text-brand-300">
+          <li key={title} className="flex gap-4 rounded-panel border border-hairline p-5">
+            <span className="mt-0.5 shrink-0 text-accent">
               <Icon name={icon} className="h-6 w-6" />
             </span>
             <span>
-              <span className="block font-semibold text-white">{title}</span>
-              <span className="mt-2 block text-sm leading-relaxed text-brand-300">{body}</span>
+              <span className="block font-semibold text-fg">{title}</span>
+              <span className="mt-2 block text-sm leading-relaxed text-fg-muted">{body}</span>
             </span>
           </li>
         ))}
       </ul>
-      <p className="mt-10 flex items-start gap-3 rounded-card border border-warning-300 p-5 text-sm leading-relaxed text-warning-300">
+      <p className="mt-10 flex items-start gap-3 rounded-panel border border-caution p-5 text-sm leading-relaxed text-caution">
         <span className="shrink-0">
           <Icon name="shield" className="h-5 w-5" />
         </span>

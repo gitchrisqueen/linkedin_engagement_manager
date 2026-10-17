@@ -85,16 +85,16 @@ export default function FeatureNarrative() {
                 the panel column's min-content width becomes the page's, and a phone lays the whole
                 front page out wider than the screen and zooms out to fit. */}
             <div className={`min-w-0 ${index % 2 === 1 ? 'lg:order-2' : ''}`.trim()}>
-              <p className="text-sm font-semibold uppercase tracking-wide text-brand-600">
+              <p className="text-sm font-semibold uppercase tracking-wide text-accent">
                 {beat.eyebrow}
               </p>
-              <h3 className="mt-3 text-headline font-bold text-ink-900">{beat.title}</h3>
-              <p className="mt-4 leading-relaxed text-ink-600">{beat.body}</p>
+              <h3 className="mt-3 text-section font-semibold text-fg">{beat.title}</h3>
+              <p className="mt-4 leading-relaxed text-fg-muted">{beat.body}</p>
               <ul className="mt-6 space-y-3">
                 {beat.points.map((point) => (
                   <li key={point} className="flex items-start gap-3">
                     <IncludedMark included />
-                    <span className="text-ink-700">{point}</span>
+                    <span className="text-fg">{point}</span>
                   </li>
                 ))}
               </ul>
@@ -105,8 +105,8 @@ export default function FeatureNarrative() {
           </article>
         ))}
       </div>
-      <p className="mt-12 flex items-start gap-3 rounded-card border border-line-200 bg-surface-50 p-5 text-sm text-ink-700">
-        <span className="shrink-0 text-brand-600">
+      <p className="mt-12 flex items-start gap-3 rounded-panel border border-hairline bg-page p-5 text-sm text-fg">
+        <span className="shrink-0 text-accent">
           <Icon name="users" className="h-5 w-5" />
         </span>
         Occasion and milestone posts are drafted for you to paste yourself — LinkedIn&apos;s

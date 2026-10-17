@@ -11,7 +11,7 @@ export default function MarketingFooter() {
   const year = new Date().getFullYear()
 
   return (
-    <footer className="bg-ink-900 text-white">
+    <footer data-theme="dark" className="lem-marketing bg-raised text-fg">
       <div className="max-w-6xl mx-auto px-4 py-12">
         <div className="flex flex-col gap-8 md:flex-row md:items-start md:justify-between">
           <div className="max-w-sm">
@@ -23,7 +23,7 @@ export default function MarketingFooter() {
               className="h-8 w-auto"
               loading="lazy"
             />
-            <p className="mt-4 text-sm leading-relaxed text-brand-300">
+            <p className="mt-4 text-sm leading-relaxed text-fg-muted">
               LinkedIn posts in your voice, published only when you approve them, plus engagement
               suggestions you send yourself.
             </p>
@@ -36,20 +36,20 @@ export default function MarketingFooter() {
             <ul className="flex flex-col gap-3">
               {NAV_ANCHORS.map(({ href, label }) => (
                 <li key={href}>
-                  <NavAnchor href={href} className="text-white hover:text-brand-300 transition-colors">
+                  <NavAnchor href={href} className="text-fg hover:text-accent transition-colors">
                     {label}
                   </NavAnchor>
                 </li>
               ))}
               <li>
-                <Link to="/privacy-policy" className="text-white hover:text-brand-300 transition-colors">
+                <Link to="/privacy-policy" className="text-fg hover:text-accent transition-colors">
                   Privacy Policy
                 </Link>
               </li>
               <li>
                 <Link
                   to="/terms-and-conditions"
-                  className="text-white hover:text-brand-300 transition-colors"
+                  className="text-fg hover:text-accent transition-colors"
                 >
                   Terms and Conditions
                 </Link>
@@ -57,7 +57,7 @@ export default function MarketingFooter() {
             </ul>
           </div>
         </div>
-        <div className="mt-10 border-t border-ink-700 pt-6 space-y-2 text-brand-300">
+        <div className="mt-10 border-t border-hairline pt-6 space-y-2 text-fg-muted">
           <LegalDisclaimer />
           <p className="text-xs">
             © {year} Christopher Queen Consulting LLC. All rights reserved.

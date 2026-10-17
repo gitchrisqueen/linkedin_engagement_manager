@@ -63,22 +63,22 @@ function FaqItem({ question, answer }: { question: string; answer: string }) {
   const panelId = useId()
 
   return (
-    <div className="rounded-card border border-line-200 bg-white overflow-hidden">
+    <div className="rounded-panel border border-hairline bg-raised overflow-hidden">
       <h3>
         <button
           type="button"
           onClick={() => setOpen(!open)}
           aria-expanded={open}
           aria-controls={panelId}
-          className="w-full min-h-11 flex justify-between items-center gap-4 px-5 py-4 text-left font-medium text-ink-900 hover:bg-surface-50 transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-600"
+          className="w-full min-h-11 flex justify-between items-center gap-4 px-5 py-4 text-left font-medium text-fg hover:bg-page transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
         >
           <span>{question}</span>
-          <span aria-hidden="true" className="text-brand-600 text-lg leading-none">
+          <span aria-hidden="true" className="text-accent text-lg leading-none">
             {open ? '−' : '+'}
           </span>
         </button>
       </h3>
-      <div id={panelId} hidden={!open} className="px-5 pb-4 text-sm text-ink-600 leading-relaxed">
+      <div id={panelId} hidden={!open} className="px-5 pb-4 text-sm text-fg-muted leading-relaxed">
         {answer}
       </div>
     </div>
@@ -105,9 +105,9 @@ export default function FAQ() {
   }, [])
 
   return (
-    <section id="faq" className="py-16 sm:py-20 px-4 bg-surface-50">
+    <section id="faq" className="py-16 sm:py-20 px-4 bg-page">
       <div className="max-w-3xl mx-auto">
-        <h2 className="text-headline sm:text-display font-bold text-center text-ink-900 mb-12">
+        <h2 className="text-section sm:text-section-lg font-semibold text-fg mb-12">
           Frequently asked questions
         </h2>
         <div className="space-y-3">

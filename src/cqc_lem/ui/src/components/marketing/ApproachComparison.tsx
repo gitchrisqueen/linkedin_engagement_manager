@@ -25,7 +25,7 @@ const ROWS: { capability: string; cells: [Cell, Cell, Cell] }[] = [
 ]
 
 function CellValue({ value }: { value: Cell }) {
-  if (typeof value === 'string') return <span className="text-sm text-ink-600">{value}</span>
+  if (typeof value === 'string') return <span className="text-sm text-fg-muted">{value}</span>
   return <IncludedMark included={value} />
 }
 
@@ -38,18 +38,18 @@ export default function ApproachComparison() {
         lede="Doing it by hand works — it just costs an hour a day. A general writer solves the smaller half of the problem."
       />
       <TableScroll label="How LEM compares with doing it by hand and with a general AI writer">
-        <table className="w-full border-collapse bg-white text-left">
+        <table className="w-full border-collapse bg-raised text-left">
           <caption className="sr-only">
             Capabilities compared across three approaches: doing it by hand, a general AI writer, and
             LEM.
           </caption>
           <thead>
-            <tr className="border-b border-line-300">
-              <th scope="col" className="p-4 text-sm font-semibold text-ink-900">
+            <tr className="border-b border-hairline">
+              <th scope="col" className="p-4 text-sm font-semibold text-fg">
                 Capability
               </th>
               {COLUMNS.map((column) => (
-                <th key={column} scope="col" className="p-4 text-sm font-semibold text-ink-900">
+                <th key={column} scope="col" className="p-4 text-sm font-semibold text-fg">
                   {column}
                 </th>
               ))}
@@ -57,8 +57,8 @@ export default function ApproachComparison() {
           </thead>
           <tbody>
             {ROWS.map((row) => (
-              <tr key={row.capability} className="border-b border-line-200">
-                <th scope="row" className="p-4 text-sm font-medium text-ink-900">
+              <tr key={row.capability} className="border-b border-hairline">
+                <th scope="row" className="p-4 text-sm font-medium text-fg">
                   {row.capability}
                 </th>
                 {row.cells.map((cell, index) => (

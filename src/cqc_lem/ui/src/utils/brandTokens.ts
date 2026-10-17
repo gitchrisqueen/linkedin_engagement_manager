@@ -127,7 +127,10 @@ export function pairRatio(pair: Pick<ApprovedPair, 'fg' | 'bg'>): number {
   return contrastRatio(TOKENS[pair.fg], TOKENS[pair.bg])
 }
 
-/** The brand pack's semantic tokens (brand/lem/DESIGN.md), as `.lem-marketing` declares them. */
+/**
+ * The brand pack's semantic tokens (brand/lem/DESIGN.md), as `.lem-marketing` declares them.
+ * positive/negative/caution reuse the -700 (light) and -300 (dark) steps of TOKENS.
+ */
 export const PACK_THEMES = {
   light: {
     bg: '#F9F9F9',
@@ -138,6 +141,9 @@ export const PACK_THEMES = {
     'on-primary': '#FFFFFF',
     hairline: '#D7DCE1',
     'field-border': '#7A8590',
+    positive: '#0B6B3A',
+    negative: '#A32014',
+    caution: '#8A5A00',
   },
   dark: {
     bg: '#111A22',
@@ -148,6 +154,9 @@ export const PACK_THEMES = {
     'on-primary': '#111A22',
     hairline: '#33414D',
     'field-border': '#7B8894',
+    positive: '#7FD3A5',
+    negative: '#F5A79B',
+    caution: '#F0C46A',
   },
 } as const
 
@@ -164,4 +173,12 @@ export const PACK_PAIRS: { fg: PackToken; bg: PackToken; role: ContrastRole; usa
   { fg: 'on-primary', bg: 'primary', role: 'body', usage: 'primary button label' },
   { fg: 'field-border', bg: 'bg', role: 'large', usage: 'control boundary on the ground' },
   { fg: 'field-border', bg: 'surface', role: 'large', usage: 'control boundary on a raised band' },
+  { fg: 'positive', bg: 'bg', role: 'body', usage: 'the included mark and its label' },
+  { fg: 'positive', bg: 'surface', role: 'body', usage: 'the included mark on a raised band' },
+  { fg: 'negative', bg: 'bg', role: 'body', usage: 'the not-included mark and its label' },
+  { fg: 'negative', bg: 'surface', role: 'body', usage: 'the not-included mark on a raised band' },
+  { fg: 'caution', bg: 'bg', role: 'body', usage: 'the limits-of-automation caveat' },
+  { fg: 'caution', bg: 'surface', role: 'body', usage: 'the caveat on a raised band' },
+  { fg: 'on-primary', bg: 'positive', role: 'body', usage: 'Approved status pill' },
+  { fg: 'on-primary', bg: 'caution', role: 'body', usage: 'Pending review status pill' },
 ]

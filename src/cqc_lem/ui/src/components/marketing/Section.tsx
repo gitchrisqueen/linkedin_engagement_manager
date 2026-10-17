@@ -8,10 +8,10 @@ import { useSectionViewed } from '../../hooks/useSectionViewed'
 // `<main>`), the inner measure, and the `landing_section_viewed` event.
 
 const TONES = {
-  white: 'bg-white text-ink-700',
-  tinted: 'bg-surface-50 text-ink-700',
-  brand: 'bg-brand-50 text-ink-700',
-  dark: 'bg-ink-900 text-white',
+  white: 'bg-raised text-fg',
+  tinted: 'bg-page text-fg',
+  brand: 'bg-page text-fg',
+  dark: 'bg-raised text-fg',
 } as const
 
 export type SectionTone = keyof typeof TONES
@@ -39,8 +39,9 @@ export default function Section({
     <section
       id={id}
       ref={ref}
+      {...(tone === 'dark' ? { 'data-theme': 'dark' } : {})}
       data-section={analyticsName ?? id}
-      className={`${TONES[tone]} px-4 py-16 sm:py-20 ${className}`.trim()}
+      className={`${tone === 'dark' ? 'lem-marketing ' : ''}${TONES[tone]} px-4 py-16 sm:py-20 ${className}`.trim()}
     >
       <div className={`${width} mx-auto`}>{children}</div>
     </section>
@@ -52,13 +53,11 @@ export function SectionHeading({
   eyebrow,
   title,
   lede,
-  onDark = false,
-  align = 'center',
+  align = 'left',
 }: {
   eyebrow?: string
   title: string
   lede?: ReactNode
-  onDark?: boolean
   align?: 'center' | 'left'
 }) {
   const alignment = align === 'center' ? 'text-center mx-auto' : 'text-left'
@@ -66,20 +65,18 @@ export function SectionHeading({
     <div className={`${alignment} max-w-3xl mb-12`}>
       {eyebrow && (
         <p
-          className={`text-sm font-semibold uppercase tracking-wide mb-3 ${
-            onDark ? 'text-brand-300' : 'text-brand-600'
-          }`}
+          className="text-sm font-semibold mb-3 text-fg-muted"
         >
           {eyebrow}
         </p>
       )}
       <h2
-        className={`text-headline sm:text-display font-bold ${onDark ? 'text-white' : 'text-ink-900'}`}
+        className="text-section sm:text-section-lg font-semibold text-fg"
       >
         {title}
       </h2>
       {lede && (
-        <p className={`mt-4 text-lg leading-relaxed ${onDark ? 'text-brand-300' : 'text-ink-600'}`}>
+        <p className="mt-4 text-lg leading-relaxed text-fg-muted">
           {lede}
         </p>
       )}

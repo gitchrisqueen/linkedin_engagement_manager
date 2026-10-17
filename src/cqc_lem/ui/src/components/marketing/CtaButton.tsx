@@ -10,24 +10,22 @@ import { EVENTS, capture } from '../../utils/analytics'
 // 2. A CTA event that does not say WHICH section fired it cannot tell you which section earned the
 //    click. `section` is required for the same reason.
 
-export type CtaVariant = 'primary' | 'secondary' | 'ghost' | 'onDark'
+export type CtaVariant = 'primary' | 'secondary' | 'ghost'
 
-// The focus ring colour is per variant, not shared: `outline-offset` puts the ring on the SURROUNDING
-// surface, and brand-600 on charcoal measures 1.83:1 — an invisible focus ring on the two dark
-// bands. The dark variant rings in white instead.
+// Every variant draws with the pack tokens, so the dark bands (which pin the dark token set on their
+// own subtree) get the lifted blue and a visible focus ring without a variant of their own.
 const VARIANTS: Record<CtaVariant, string> = {
-  primary: 'bg-brand-600 text-white hover:bg-brand-700 shadow-card focus-visible:outline-brand-600',
+  primary: 'bg-accent text-on-accent hover:bg-accent/90 shadow-panel focus-visible:outline-accent',
   secondary:
-    'border border-line-300 bg-white text-ink-900 hover:border-brand-600 hover:text-brand-700 focus-visible:outline-brand-600',
+    'border border-hairline bg-raised text-fg hover:border-accent hover:text-accent focus-visible:outline-accent',
   ghost:
-    'border border-brand-600 text-brand-600 hover:bg-brand-50 hover:text-brand-700 focus-visible:outline-brand-600',
-  onDark: 'bg-white text-brand-700 hover:bg-brand-50 focus-visible:outline-white',
+    'border border-accent text-accent hover:bg-page hover:text-accent focus-visible:outline-accent',
 }
 
 // 44px is the tap-target floor (WCAG 2.5.5 / the mobile invariant in issue #894). py-3 + text-base
 // clears it; a smaller CTA on this page is a bug, so the height is not a prop.
 const BASE =
-  'inline-flex items-center justify-center gap-2 min-h-11 rounded-lg px-6 py-3 text-base font-semibold ' +
+  'inline-flex items-center justify-center gap-2 min-h-11 rounded-control px-6 py-3 text-base font-semibold ' +
   'transition-colors focus-visible:outline-2 focus-visible:outline-offset-2'
 
 export default function CtaButton({

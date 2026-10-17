@@ -37,12 +37,12 @@ export default function ProblemSection() {
       />
       <div className="grid gap-6 md:grid-cols-2">
         {PROBLEMS.map(({ icon, title, body }) => (
-          <div key={title} className="rounded-card border border-line-200 bg-surface-50 p-6">
-            <span className="inline-flex h-10 w-10 items-center justify-center rounded-lg bg-white text-brand-600">
+          <div key={title} className="rounded-panel border border-hairline bg-page p-6">
+            <span className="inline-flex h-10 w-10 items-center justify-center rounded-lg bg-raised text-accent">
               <Icon name={icon} className="h-5 w-5" />
             </span>
-            <h3 className="mt-4 text-title font-semibold text-ink-900">{title}</h3>
-            <p className="mt-2 leading-relaxed text-ink-600">{body}</p>
+            <h3 className="mt-4 text-title font-semibold text-fg">{title}</h3>
+            <p className="mt-2 leading-relaxed text-fg-muted">{body}</p>
           </div>
         ))}
       </div>
