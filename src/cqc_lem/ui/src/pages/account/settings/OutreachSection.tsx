@@ -58,7 +58,7 @@ export default function OutreachSection() {
             {CATCHUP_EVENTS.map((ev) => {
               const selected = selectedEvents.includes(ev.key)
               return (
-                <label key={ev.key} className="flex items-center gap-1.5 text-sm text-gray-600">
+                <label key={ev.key} className="flex items-center gap-1.5 text-sm text-fg-muted">
                   <input type="checkbox" checked={selected}
                     onChange={() => setEng({
                       catchup_event_types: selected

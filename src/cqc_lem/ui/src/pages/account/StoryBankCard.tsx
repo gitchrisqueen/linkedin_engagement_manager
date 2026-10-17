@@ -99,16 +99,16 @@ export default function StoryBankCard() {
   const filled = entries.filter((e) => e.body.trim() && e.active).length
 
   return (
-    <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 space-y-4"
+    <div className="bg-raised rounded-panel shadow-panel border border-hairline p-6 space-y-4"
          data-testid="story-bank">
-      <h2 className="text-base font-semibold text-gray-700">Story Bank</h2>
-      <p className="text-xs text-gray-500">
+      <h2 className="text-base font-semibold text-fg">Story Bank</h2>
+      <p className="text-xs text-fg-muted">
         Your voice tells LEM how you <span className="italic">sound</span>. This tells it what you've
         actually <span className="italic">done</span>. Each post is anchored to one entry, and no
         number, client or anecdote outside this bank is ever written about you — with an empty bank
         LEM writes industry observations instead of inventing a story.
       </p>
-      <p className="text-xs text-gray-500" data-testid="story-bank-progress">
+      <p className="text-xs text-fg-muted" data-testid="story-bank-progress">
         {filled} of {target} entries.{' '}
         {filled < target
           ? 'Aim for 5–10: a real number, a client win, a mistake, an opinion you hold.'
@@ -118,11 +118,11 @@ export default function StoryBankCard() {
       <div className="space-y-3">
         {entries.map((e, idx) => (
           <div key={e.id ?? `new-${idx}`}
-               className="border border-gray-200 rounded-lg p-3 space-y-2">
+               className="border border-hairline rounded-panel p-3 space-y-2">
             <div className="flex flex-wrap items-center gap-2">
               <select value={e.kind} aria-label="Kind"
                 onChange={(ev) => update(idx, { kind: ev.target.value as StoryKind })}
-                className="border border-gray-300 rounded-lg px-2 py-1 text-sm">
+                className="border border-field rounded-control px-2 py-1 text-sm">
                 {STORY_KINDS.map((k) => (
                   <option key={k.key} value={k.key} title={k.hint}>{k.label}</option>
                 ))}
@@ -130,29 +130,29 @@ export default function StoryBankCard() {
               <input type="text" value={e.title ?? ''} maxLength={255}
                 onChange={(ev) => update(idx, { title: ev.target.value })}
                 placeholder="Short label (optional)" aria-label="Title"
-                className="flex-1 min-w-40 border border-gray-300 rounded-lg px-3 py-1 text-sm" />
-              <label className="flex items-center gap-1 text-xs text-gray-500">
+                className="flex-1 min-w-40 border border-field rounded-control px-3 py-1 text-sm" />
+              <label className="flex items-center gap-1 text-xs text-fg-muted">
                 When
                 <input type="date" value={e.happened_at ?? ''} aria-label="When it happened"
                   onChange={(ev) => update(idx, { happened_at: ev.target.value || null })}
-                  className="border border-gray-300 rounded px-2 py-1" />
+                  className="border border-field rounded-control px-2 py-1" />
               </label>
-              <label className="flex items-center gap-1 text-xs text-gray-500">
+              <label className="flex items-center gap-1 text-xs text-fg-muted">
                 <input type="checkbox" checked={e.active} aria-label="Active"
                   onChange={(ev) => update(idx, { active: ev.target.checked })} />
                 On
               </label>
               <button type="button" onClick={() => removeRow(idx)}
                 aria-label={`Remove ${e.title || 'entry'}`} title="Remove entry"
-                className="text-red-500 hover:text-red-600">×</button>
+                className="text-danger hover:text-danger">×</button>
             </div>
             <textarea value={e.body} rows={3} maxLength={5000}
               onChange={(ev) => update(idx, { body: ev.target.value })}
               aria-label="What actually happened"
               placeholder="What actually happened — the real numbers, names, dates and outcome. Write it how you'd tell a colleague."
-              {...maskProps('w-full border border-gray-300 rounded-lg px-3 py-2 text-sm')} />
+              {...maskProps('w-full border border-field rounded-panel px-3 py-2 text-sm')} />
             {typeof e.used_count === 'number' && e.used_count > 0 && (
-              <p className="text-[11px] text-gray-400">
+              <p className="text-xs text-fg-muted">
                 Used in {e.used_count} post{e.used_count === 1 ? '' : 's'} — LEM rotates to your
                 least-used entries first.
               </p>
@@ -162,12 +162,12 @@ export default function StoryBankCard() {
       </div>
 
       <button type="button" onClick={addRow}
-        className="text-xs text-blue-600 font-medium hover:text-blue-700">+ Add entry</button>
+        className="text-xs text-accent font-medium hover:text-accent">+ Add entry</button>
 
-      {msg && <p className={`text-sm font-medium ${msg.ok ? 'text-green-600' : 'text-red-600'}`}>{msg.text}</p>}
+      {msg && <p className={`text-sm font-medium ${msg.ok ? 'text-success' : 'text-danger'}`}>{msg.text}</p>}
       <button type="button" onClick={() => saveMutation.mutate(undefined, sectionSaveCallbacks('story-bank'))}
         disabled={saveMutation.isPending}
-        className="w-full bg-blue-600 text-white py-2 rounded-lg text-sm font-semibold hover:bg-blue-700 disabled:opacity-50 transition-colors">
+        className="w-full bg-accent text-white py-2 rounded-panel text-sm font-semibold hover:bg-accent/90 disabled:opacity-50 transition-colors">
         {saveMutation.isPending ? 'Saving…' : 'Save Story Bank'}
       </button>
     </div>

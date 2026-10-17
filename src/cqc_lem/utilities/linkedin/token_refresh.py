@@ -243,3 +243,25 @@ def resolve_token_status(user_id: int, auto_refresh: bool = True) -> dict:
         "refresh_attempted": refresh_attempted,
         "refresh_succeeded": refresh_succeeded,
     }
+
+
+def has_oauth_token(user_id: int) -> Optional[bool]:
+    """Whether this user has a LinkedIn OAuth token stored, expired or not (issue #2375).
+
+    Read off `resolve_token_status` without renewing anything. A trial account connects by OAuth
+    only, so a stored token means it HAS connected; an expired one is the authorization email's
+    to report, never a reason to tell the user they are not connected. Three-valued on purpose:
+    the "not connected" email is only honest when the answer is a definite no.
+
+    Args:
+        user_id: The user whose stored token is read.
+
+    Returns:
+        True when a token is stored, False when none is, None when the state cannot be read.
+    """
+    try:
+        status = resolve_token_status(user_id, auto_refresh=False)
+    except Exception as e:
+        log_warning("Could not read LinkedIn token state", exc=e, user_id=user_id)
+        return None
+    return bool(status.get("connected"))

@@ -1,5 +1,6 @@
 """Unit tests for FastAPI billing and auth endpoints in cqc_lem.api.main."""
 
+from contextlib import nullcontext
 from unittest.mock import patch
 
 import pytest
@@ -25,7 +26,12 @@ def _auth_hardening_side_effects():
          patch(f"{_AUTH}.record_auth_event", return_value=True), \
          patch(f"{_AUTH}.mark_email_verified", return_value=True), \
          patch(f"{_AUTH}.get_pin_lockout", return_value=None), \
-         patch(f"{_AUTH}.get_user_public_uid", return_value="pub-uid-1"):
+         patch(f"{_AUTH}.get_user_public_uid", return_value="pub-uid-1"), \
+         patch(f"{_AUTH}.count_trial_cohort_members", return_value=0), \
+         patch(f"{_AUTH}.trial_cohort_slot", side_effect=lambda cap: nullcontext(True)):
+        # Issue #2377: a NEW address in P0 now reads the trial cohort counter. These tests are about
+        # the signup flow itself, so the cohort is pinned open; the cap has its own suite
+        # (tests/unit/api/test_trial_cohort_cap.py).
         yield
 
 

@@ -67,8 +67,8 @@ describe('CatchupTouches — default view', () => {
 
     const chips = ['ALL', 'PENDING', 'APPROVED', 'SENDING', 'SENT', 'SKIPPED', 'FAILED', 'CANCELED']
     const rendered = chips.map((c) => screen.getByRole('button', { name: c }))
-    expect(rendered[0].className).toContain('bg-blue-600')
-    expect(rendered.slice(1).every((b) => !b.className.includes('bg-blue-600'))).toBe(true)
+    expect(rendered[0].className).toContain('bg-accent')
+    expect(rendered.slice(1).every((b) => !b.className.split(' ').includes('bg-accent'))).toBe(true)
   })
 })
 

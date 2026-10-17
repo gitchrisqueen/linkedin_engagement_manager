@@ -16,9 +16,9 @@ interface FaqEntry {
 const FALLBACK_ENTRIES: FaqEntry[] = [
   {
     id: -1,
-    question: 'What does the automation actually do?',
+    question: 'What does LEM actually do?',
     answer:
-      'LEM writes and schedules your LinkedIn content, then engages for you: it comments on relevant posts in your feed, replies to comments on your own posts, seeds a first comment under what you publish, and sends appreciation and follow-up DMs. Every action follows the targeting rules, tone and per-day caps you set, and posts go through a preview/approval step before anything is published.',
+      "LEM writes and schedules your LinkedIn posts in your voice and publishes each one through LinkedIn's API only after you approve it. For engagement it suggests comments on relevant posts in your feed, replies to comments on your own posts, and appreciation and follow-up DMs; you review them and send the ones you want yourself. LEM does not comment, reply or message on your behalf.",
   },
   {
     id: -2,
@@ -28,31 +28,31 @@ const FALLBACK_ENTRIES: FaqEntry[] = [
     answer:
       `Every plan starts with a ${TRIAL_DAYS}-day free trial — no credit card required. ` +
       `${paidPricingSentence()} ` +
-      'The trial gives you the full product so you can evaluate content generation, scheduling and engagement automation before you pay.',
+      'The trial lets you evaluate content generation, scheduling and engagement suggestions before you pay.',
   },
   {
     id: -3,
     question: "Is this against LinkedIn's Terms of Service?",
     answer:
-      "LinkedIn's User Agreement restricts automated tools, so LEM is built to act like you, not like a bot: it works from your own logged-in session, keeps human-like pacing with per-day caps, and never mass-messages, scrapes profiles in bulk, or resells LinkedIn data. Content is approval-gated by default, so you decide what gets posted. You are responsible for your own account, and you can pause automation or reduce caps at any time.",
+      "LinkedIn's User Agreement restricts automated tools, so LEM keeps you in the loop: it publishes only the posts you approve, through LinkedIn's API, and you connect with LinkedIn sign-in rather than a password. It does not comment, reply or message on your behalf, and it never mass-messages, scrapes profiles in bulk, or resells LinkedIn data. You are responsible for your own account.",
   },
   {
     id: -4,
     question: 'What happens to my data and my LinkedIn credentials?',
     answer:
-      "Your credentials and session cookies are stored encrypted and used only to run the automation you configured — we never sell or share your data, and we don't use your content to train public models. Generated posts, comments and DMs stay in your account, and deleting your account removes them.",
+      "LEM never asks for your LinkedIn password or session cookie. The sign-in tokens LinkedIn issues are stored encrypted and used only to publish the posts you approve and to read your own account's data — we never sell or share your data, and we don't use your content to train public models. Generated posts and suggestions stay in your account, and deleting your account removes them.",
   },
   {
     id: -5,
     question: 'How does the AI match my voice?',
     answer:
-      'LEM builds a voice profile from your existing LinkedIn posts and profile plus the tone, style, emoji and hashtag preferences you set on the Account page. Every post, comment and DM is generated against that profile and your focus topics, and you can edit or reject anything in the preview step — those edits feed back into how future drafts read.',
+      'LEM builds a voice profile from your existing LinkedIn posts and profile plus the tone, style, emoji and hashtag preferences you set on the Account page. Every post and suggestion is generated against that profile and your focus topics, and you can edit or reject anything before it is published or sent — those edits feed back into how future drafts read.',
   },
   {
     id: -6,
     question: 'Can I cancel anytime?',
     answer:
-      'Yes. There are no long-term contracts and no cancellation fees — cancel whenever you like and your account stays active through the end of the current billing period. You can also pause the automation without cancelling if you just need a break.',
+      'Yes. There are no long-term contracts and no cancellation fees — cancel whenever you like and your account stays active through the end of the current billing period. You can also pause LEM without cancelling if you just need a break.',
   },
 ]
 
@@ -63,22 +63,22 @@ function FaqItem({ question, answer }: { question: string; answer: string }) {
   const panelId = useId()
 
   return (
-    <div className="rounded-card border border-line-200 bg-white overflow-hidden">
+    <div className="rounded-panel border border-hairline bg-raised overflow-hidden">
       <h3>
         <button
           type="button"
           onClick={() => setOpen(!open)}
           aria-expanded={open}
           aria-controls={panelId}
-          className="w-full min-h-11 flex justify-between items-center gap-4 px-5 py-4 text-left font-medium text-ink-900 hover:bg-surface-50 transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-600"
+          className="w-full min-h-11 flex justify-between items-center gap-4 px-5 py-4 text-left font-medium text-fg hover:bg-page transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
         >
           <span>{question}</span>
-          <span aria-hidden="true" className="text-brand-600 text-lg leading-none">
+          <span aria-hidden="true" className="text-accent text-lg leading-none">
             {open ? '−' : '+'}
           </span>
         </button>
       </h3>
-      <div id={panelId} hidden={!open} className="px-5 pb-4 text-sm text-ink-600 leading-relaxed">
+      <div id={panelId} hidden={!open} className="px-5 pb-4 text-sm text-fg-muted leading-relaxed">
         {answer}
       </div>
     </div>
@@ -105,9 +105,9 @@ export default function FAQ() {
   }, [])
 
   return (
-    <section id="faq" className="py-16 sm:py-20 px-4 bg-surface-50">
+    <section id="faq" className="py-16 sm:py-20 px-4 bg-page">
       <div className="max-w-3xl mx-auto">
-        <h2 className="text-headline sm:text-display font-bold text-center text-ink-900 mb-12">
+        <h2 className="text-section sm:text-section-lg font-semibold text-fg mb-12">
           Frequently asked questions
         </h2>
         <div className="space-y-3">

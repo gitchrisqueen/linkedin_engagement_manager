@@ -42,9 +42,9 @@ export default function StrongFactorPrompt() {
     <div
       role="status"
       data-testid="strong-factor-prompt"
-      className="mb-4 border border-amber-300 bg-amber-50 rounded-lg px-4 py-3 flex flex-col sm:flex-row sm:items-center gap-2"
+      className="mb-4 border border-warning/50 bg-warning/5 rounded-panel px-4 py-3 flex flex-col sm:flex-row sm:items-center gap-2"
     >
-      <p className="text-sm text-amber-900 flex-1">
+      <p className="text-sm text-warning flex-1">
         <span className="font-semibold">Add two-factor sign-in.</span>{' '}
         {overdue
           ? 'From your next sign-in, an emailed code alone will no longer get you in — you will be asked to set this up first.'
@@ -53,7 +53,7 @@ export default function StrongFactorPrompt() {
       <div className="flex items-center gap-3 shrink-0">
         <Link
           to="/account"
-          className="bg-amber-600 text-white px-3 py-1.5 rounded-lg text-xs font-semibold hover:bg-amber-700 whitespace-nowrap"
+          className="bg-accent text-on-accent px-3 py-1.5 rounded-control text-xs font-semibold hover:bg-accent/90 whitespace-nowrap"
         >
           Set it up
         </Link>
@@ -63,7 +63,7 @@ export default function StrongFactorPrompt() {
             localStorage.setItem(DISMISS_KEY, notice)
             setDismissedNotice(notice)
           }}
-          className="text-xs font-semibold text-amber-900 hover:underline whitespace-nowrap"
+          className="text-xs font-semibold text-warning hover:underline whitespace-nowrap"
         >
           Not now
         </button>

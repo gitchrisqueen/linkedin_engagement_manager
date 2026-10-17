@@ -1,8 +1,8 @@
 import { describe, expect, it, vi, afterEach } from 'vitest'
-import { cleanup, fireEvent, render, screen } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
 import FeedbackWidget from './FeedbackWidget'
-import FloatingDock, { FLOATING_DOCK_ID } from './FloatingDock'
+import FloatingDock, { FLOATING_DOCK_ID, OPEN_FEEDBACK_EVENT } from './FloatingDock'
 import { SettingsSaveProvider, SaveAllBar } from '../pages/account/SettingsSaveContext'
 import { useRegisterSaveSection } from '../pages/account/settingsSave'
 
@@ -118,5 +118,22 @@ describe('FloatingDock (issue #596)', () => {
     // The open panel is a sibling in the stack, not an overlay drawn on top of the bar.
     expect(panel.contains(saveAll)).toBe(false)
     expect(panel.className).not.toContain('fixed')
+  })
+})
+
+describe('Feedback launcher below md', () => {
+  it('is hidden below md, where the app menu carries it instead', () => {
+    harness()
+    const launcher = screen.getByRole('button', { name: 'Feedback / Report a bug' })
+    expect(launcher.className).toContain('hidden')
+    expect(launcher.className).toContain('md:inline-flex')
+  })
+
+  it('opens its panel when the menu row dispatches the open event', () => {
+    harness()
+    act(() => {
+      window.dispatchEvent(new Event(OPEN_FEEDBACK_EVENT))
+    })
+    screen.getByRole('heading', { name: 'Feedback / Report a bug' })
   })
 })

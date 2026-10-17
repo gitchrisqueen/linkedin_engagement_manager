@@ -45,14 +45,14 @@ export default function TutorialVideos() {
   if (!enabled || videos.length === 0) return null
 
   return (
-    <section id="tutorials" className="py-16 px-4 bg-white">
+    <section id="tutorials" className="py-16 px-4 bg-raised">
       <div className="max-w-5xl mx-auto">
-        <h2 className="text-headline sm:text-display font-bold text-center text-ink-900 mb-12">See it in action</h2>
+        <h2 className="text-section sm:text-section-lg font-semibold text-fg mb-12">See it in action</h2>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
           {videos.map((video) => (
-            <div key={video.flow} className="rounded-card border border-line-200 shadow-card overflow-hidden">
+            <div key={video.flow} className="rounded-panel border border-hairline shadow-panel overflow-hidden">
               <video
-                className="w-full bg-black"
+                className="w-full bg-fg"
                 controls
                 preload="none"
                 poster={video.thumbnail_url ?? undefined}
@@ -63,16 +63,16 @@ export default function TutorialVideos() {
                 )}
               </video>
               <div className="p-5">
-                <h3 className="font-bold text-ink-900 mb-1">{video.title}</h3>
+                <h3 className="font-semibold text-fg mb-1">{video.title}</h3>
                 {video.description && (
-                  <p className="text-sm text-ink-600 leading-relaxed line-clamp-3">{video.description}</p>
+                  <p className="text-sm text-fg-muted leading-relaxed line-clamp-3">{video.description}</p>
                 )}
                 {video.youtube_url && (
                   <a
                     href={video.youtube_url}
                     target="_blank"
                     rel="noreferrer"
-                    className="inline-block mt-3 text-sm font-medium text-brand-600 hover:underline"
+                    className="inline-block mt-3 text-sm font-medium text-accent hover:underline"
                   >
                     Watch on YouTube →
                   </a>

@@ -2096,15 +2096,17 @@ def auto_sync_brand_account():
 
 @shared_task.task
 def auto_notify_missing_linkedin_session():
-    """Email active users who have no validated LinkedIn session cookie, prompting them
-    to connect — automation can't run without one. Throttled per-user inside
+    """Email active users who have not connected LinkedIn, prompting them to connect. That
+    means no session cookie, or for a trial no usable OAuth token. Throttled per-user inside
     notify_linkedin_session, so this can run daily without spamming.
     """
+    from cqc_lem.utilities.onboarding import linkedin_connected
     users = get_active_user_ids()
     notified = 0
     for user_id in users:
         try:
-            if not has_linkedin_session(user_id):
+            # A trial connects by OAuth only, so for a trial a usable token counts (issue #2375).
+            if not linkedin_connected(user_id):
                 if notify_linkedin_session(user_id, revalidation=False):
                     notified += 1
         except Exception as e:

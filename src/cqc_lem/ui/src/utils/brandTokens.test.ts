@@ -2,7 +2,11 @@ import { describe, expect, it } from 'vitest'
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import {
+  STATUS_TOKENS,
+  tint,
   APPROVED_PAIRS,
+  PACK_PAIRS,
+  PACK_THEMES,
   BRAND_SOURCE,
   THRESHOLDS,
   TOKENS,
@@ -114,5 +118,57 @@ describe('contrast contract (WCAG 2.1 AA)', () => {
   it('keeps a focus ring visible on both light surfaces', () => {
     expect(pairRatio({ fg: 'brand-600', bg: 'white' })).toBeGreaterThanOrEqual(3)
     expect(pairRatio({ fg: 'brand-600', bg: 'surface-50' })).toBeGreaterThanOrEqual(3)
+  })
+})
+
+describe('brand pack tokens (brand/lem/DESIGN.md)', () => {
+  function packBlock(selector: string): string {
+    const start = indexCss.indexOf(`${selector} {`)
+    expect(start, `index.css must declare ${selector}`).toBeGreaterThan(-1)
+    return indexCss.slice(start, indexCss.indexOf('}', start))
+  }
+
+  const blocks = {
+    light: [packBlock('.lem-marketing')],
+    dark: [
+      packBlock(".lem-marketing[data-theme='dark']"),
+      packBlock(".lem-marketing:not([data-theme='light'])"),
+    ],
+  }
+
+  it.each(['light', 'dark'] as const)('keeps every %s value identical to PACK_THEMES', (theme) => {
+    for (const block of blocks[theme]) {
+      for (const [name, hex] of Object.entries(PACK_THEMES[theme])) {
+        const match = block.match(new RegExp(`--lem-${name}:\\s*(#[0-9A-Fa-f]{6})`))
+        expect(match, `--lem-${name} missing from the ${theme} block`).not.toBeNull()
+        expect(match![1].toUpperCase(), `--lem-${name} (${theme}) drifted`).toBe(hex.toUpperCase())
+      }
+    }
+  })
+
+  it.each(['light', 'dark'] as const)('clears the threshold on every pack pair in %s', (theme) => {
+    const t = PACK_THEMES[theme]
+    const failures = PACK_PAIRS.filter(
+      (p) => contrastRatio(t[p.fg], t[p.bg]) < THRESHOLDS[p.role],
+    ).map((p) => `${p.fg} on ${p.bg} (${p.usage}) = ${contrastRatio(t[p.fg], t[p.bg]).toFixed(2)}:1`)
+    expect(failures).toEqual([])
+  })
+})
+
+describe('status tokens (proposed for brand/lem/DESIGN.md)', () => {
+  const root = indexCss.slice(indexCss.indexOf(':root {'), indexCss.indexOf('}', indexCss.indexOf(':root {')))
+
+  it.each(Object.entries(STATUS_TOKENS))('declares --lem-%s on :root as %s', (name, hex) => {
+    const match = root.match(new RegExp(`--lem-${name}:\\s*(#[0-9A-Fa-f]{6})`))
+    expect(match, `--lem-${name} missing from :root`).not.toBeNull()
+    expect(match![1].toUpperCase()).toBe(hex.toUpperCase())
+  })
+
+  it.each(Object.entries(STATUS_TOKENS))('keeps %s readable everywhere it is drawn', (_name, hex) => {
+    const light = PACK_THEMES.light
+    expect(contrastRatio(hex, light.bg)).toBeGreaterThanOrEqual(THRESHOLDS.body)
+    expect(contrastRatio(hex, light.surface)).toBeGreaterThanOrEqual(THRESHOLDS.body)
+    expect(contrastRatio(hex, tint(hex, 0.1))).toBeGreaterThanOrEqual(THRESHOLDS.body)
+    expect(contrastRatio('#FFFFFF', hex)).toBeGreaterThanOrEqual(THRESHOLDS.body)
   })
 })

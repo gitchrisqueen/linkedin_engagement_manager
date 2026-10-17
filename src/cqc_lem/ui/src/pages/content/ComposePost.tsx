@@ -379,23 +379,23 @@ export default function ComposePost({ onNavigateTab }: { onNavigateTab?: (tab: s
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
       <div className="space-y-4">
         {!email && (
-          <div className="bg-red-50 border border-red-200 rounded-lg px-4 py-3 text-sm text-red-700">
+          <div className="bg-danger/5 border border-danger/25 rounded-panel px-4 py-3 text-sm text-danger">
             No account email set. Please{' '}
-            <Link to="/account" className="font-semibold underline hover:text-red-900">
+            <Link to="/account" className="font-semibold underline hover:text-danger">
               go to Account settings
             </Link>{' '}
             to configure your email before scheduling posts.
           </div>
         )}
 
-        <div className="bg-blue-50 border border-blue-200 rounded-lg px-4 py-2 text-xs text-blue-700">
+        <div className="bg-accent/5 border border-accent/25 rounded-panel px-4 py-2 text-xs text-accent">
           Times are in your profile timezone: <span className="font-semibold">{userTimezone}</span>
         </div>
 
-        <form onSubmit={handleSubmit} className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 space-y-4">
+        <form onSubmit={handleSubmit} className="bg-raised rounded-panel shadow-panel border border-hairline p-6 space-y-4">
           {/* Post type selector */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Post Type</label>
+            <label className="block text-sm font-medium text-fg mb-1">Post Type</label>
             <div className="flex gap-2 flex-wrap">
               {POST_TYPES.map((t) => (
                 <button
@@ -404,8 +404,8 @@ export default function ComposePost({ onNavigateTab }: { onNavigateTab?: (tab: s
                   onClick={() => setPostType(t)}
                   className={`px-3 py-1.5 rounded-full text-xs font-semibold border transition-colors ${
                     postType === t
-                      ? 'bg-blue-600 text-white border-blue-600'
-                      : 'bg-white text-gray-600 border-gray-300 hover:border-blue-400'
+                      ? 'bg-accent text-white border-accent'
+                      : 'bg-raised text-fg-muted border-field hover:border-accent/50'
                   }`}
                 >
                   {t}
@@ -417,10 +417,10 @@ export default function ComposePost({ onNavigateTab }: { onNavigateTab?: (tab: s
           {/* Content — caption for all types */}
           <div>
             <div className="flex justify-between mb-1">
-              <label className="text-sm font-medium text-gray-700">
+              <label className="text-sm font-medium text-fg">
                 {postType === 'CAROUSEL' ? 'Caption / Intro Text' : 'Post Content'}
               </label>
-              <span className={`text-xs ${content.length > MAX_CHARS ? 'text-red-500' : 'text-gray-400'}`}>
+              <span className={`text-xs ${content.length > MAX_CHARS ? 'text-danger' : 'text-fg-muted'}`}>
                 {content.length} / {MAX_CHARS}
               </span>
             </div>
@@ -429,7 +429,7 @@ export default function ComposePost({ onNavigateTab }: { onNavigateTab?: (tab: s
               onChange={(e) => setContent(e.target.value)}
               rows={postType === 'CAROUSEL' ? 3 : 8}
               maxLength={MAX_CHARS}
-              {...maskProps('w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none')}
+              {...maskProps('w-full border border-field rounded-panel px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent resize-none')}
               placeholder={postType === 'CAROUSEL' ? 'Optional intro text for the carousel post… (auto-filled after generation)' : 'What would you like to share?'}
             />
           </div>
@@ -437,22 +437,22 @@ export default function ComposePost({ onNavigateTab }: { onNavigateTab?: (tab: s
           {/* VIDEO: video URL field */}
           {postType === 'VIDEO' && (
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Video URL</label>
+              <label className="block text-sm font-medium text-fg mb-1">Video URL</label>
               <input
                 type="url"
                 value={videoUrl}
                 onChange={(e) => setVideoUrl(e.target.value)}
-                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full border border-field rounded-control px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent"
                 placeholder="https://example.com/video.mp4"
               />
-              <p className="mt-1 text-xs text-gray-400">Direct URL to the video file that will be uploaded to LinkedIn.</p>
+              <p className="mt-1 text-xs text-fg-muted">Direct URL to the video file that will be uploaded to LinkedIn.</p>
             </div>
           )}
 
           {/* VIDEO: quality tier (premium tiers spend video credits when LEM generates the video) */}
           {postType === 'VIDEO' && (
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Video Quality</label>
+              <label className="block text-sm font-medium text-fg mb-1">Video Quality</label>
               <div className="space-y-2">
                 {[
                   { key: 'standard' as const, label: 'Standard', desc: 'Included free with your plan', cost: 0 },
@@ -463,8 +463,8 @@ export default function ComposePost({ onNavigateTab }: { onNavigateTab?: (tab: s
                   return (
                     <label
                       key={opt.key}
-                      className={`flex items-center gap-3 border rounded-lg px-3 py-2 cursor-pointer transition-colors ${
-                        videoQuality === opt.key ? 'border-blue-500 bg-blue-50' : 'border-gray-200'
+                      className={`flex items-center gap-3 border rounded-panel px-3 py-2 cursor-pointer transition-colors ${
+                        videoQuality === opt.key ? 'border-accent bg-accent/5' : 'border-hairline'
                       } ${!affordable ? 'opacity-50' : ''}`}
                     >
                       <input
@@ -476,24 +476,24 @@ export default function ComposePost({ onNavigateTab }: { onNavigateTab?: (tab: s
                         onChange={() => setVideoQuality(opt.key)}
                       />
                       <div className="flex-1">
-                        <p className="text-sm font-medium text-gray-800">
+                        <p className="text-sm font-medium text-fg">
                           {opt.label}
                           {opt.cost > 0 && (
-                            <span className="ml-2 text-xs text-blue-700">
+                            <span className="ml-2 text-xs text-accent">
                               {opt.cost} credit{opt.cost > 1 ? 's' : ''}
                             </span>
                           )}
                         </p>
-                        <p className="text-xs text-gray-500">{opt.desc}</p>
+                        <p className="text-xs text-fg-muted">{opt.desc}</p>
                       </div>
                     </label>
                   )
                 })}
               </div>
-              <p className="mt-1 text-xs text-gray-400">
+              <p className="mt-1 text-xs text-fg-muted">
                 You have <span className="font-semibold">{videoCredits}</span> premium video credit
                 {videoCredits === 1 ? '' : 's'}.{' '}
-                <a href="/account" className="text-blue-600 hover:underline">Buy more</a>
+                <a href="/account" className="text-accent hover:underline">Buy more</a>
               </p>
             </div>
           )}
@@ -503,20 +503,20 @@ export default function ComposePost({ onNavigateTab }: { onNavigateTab?: (tab: s
               put one on a post you wrote yourself. */}
           {postType === 'TEXT' && (
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Image <span className="font-normal text-gray-400">(optional)</span>
+              <label className="block text-sm font-medium text-fg mb-1">
+                Image <span className="font-normal text-fg-muted">(optional)</span>
               </label>
               {imageUrl && (
                 <div className="mb-2 flex items-start gap-3">
                   <img
                     src={imageUrl}
                     alt="Post image"
-                    className="w-28 h-28 object-cover rounded-lg border border-gray-200"
+                    className="w-28 h-28 object-cover rounded-panel border border-hairline"
                   />
                   <button
                     type="button"
                     onClick={() => { setImageUrl(null); setImageError(null) }}
-                    className="text-xs text-red-500 hover:text-red-700 font-semibold underline"
+                    className="text-xs text-danger hover:text-danger font-semibold underline"
                   >
                     Remove image
                   </button>
@@ -533,20 +533,20 @@ export default function ComposePost({ onNavigateTab }: { onNavigateTab?: (tab: s
                     const file = e.target.files?.[0]
                     if (file) handleUploadImage(file)
                   }}
-                  className="text-xs text-gray-600 file:mr-2 file:py-1.5 file:px-3 file:rounded-lg file:border file:border-gray-300 file:text-xs file:font-semibold file:bg-white hover:file:border-blue-400"
+                  className="text-xs text-fg-muted file:mr-2 file:py-1.5 file:px-3 file:rounded-panel file:border file:border-hairline file:text-xs file:font-semibold file:bg-raised hover:file:border-accent/50"
                 />
                 <button
                   type="button"
                   onClick={handleGenerateImage}
                   disabled={imageBusy !== null}
-                  className="bg-indigo-600 text-white px-3 py-1.5 rounded-lg text-xs font-semibold hover:bg-indigo-700 disabled:opacity-50 transition-colors"
+                  className="bg-accent text-white px-3 py-1.5 rounded-control text-xs font-semibold hover:bg-accent/90 disabled:opacity-50 transition-colors"
                 >
                   {imageBusy === 'generate' ? 'Generating image…' : 'Generate with AI'}
                 </button>
               </div>
-              {imageBusy === 'upload' && <p className="mt-1 text-xs text-gray-500">Uploading…</p>}
-              {imageError && <p className="mt-1 text-xs text-red-600 font-medium">{imageError}</p>}
-              <p className="mt-1 text-xs text-gray-400">
+              {imageBusy === 'upload' && <p className="mt-1 text-xs text-fg-muted">Uploading…</p>}
+              {imageError && <p className="mt-1 text-xs text-danger font-medium">{imageError}</p>}
+              <p className="mt-1 text-xs text-fg-muted">
                 PNG or JPG, at least 400×400. AI generation draws the image from what you wrote.
               </p>
             </div>
@@ -556,16 +556,16 @@ export default function ComposePost({ onNavigateTab }: { onNavigateTab?: (tab: s
           {postType === 'CAROUSEL' && (
             <div className="space-y-4">
               {/* Mode tabs */}
-              <div className="flex gap-1 bg-gray-100 rounded-lg p-1 w-fit">
+              <div className="flex gap-1 bg-page rounded-panel p-1 w-fit">
                 {(['ai', 'manual'] as const).map((m) => (
                   <button
                     key={m}
                     type="button"
                     onClick={() => setCarouselMode(m)}
-                    className={`px-3 py-1 rounded-md text-xs font-semibold transition-colors ${
+                    className={`px-3 py-1 rounded-control text-xs font-semibold transition-colors ${
                       carouselMode === m
-                        ? 'bg-white text-blue-700 shadow-sm'
-                        : 'text-gray-500 hover:text-gray-700'
+                        ? 'bg-raised text-accent shadow-panel'
+                        : 'text-fg-muted hover:text-fg'
                     }`}
                   >
                     {m === 'ai' ? 'AI Generate' : 'Manual Slides'}
@@ -574,24 +574,24 @@ export default function ComposePost({ onNavigateTab }: { onNavigateTab?: (tab: s
               </div>
 
               {carouselMode === 'ai' ? (
-                <div className="space-y-4 border border-blue-100 rounded-lg p-4 bg-blue-50">
+                <div className="space-y-4 border border-accent/25 rounded-panel p-4 bg-accent/5">
                   {/* Stage picker */}
                   <div>
-                    <label className="block text-xs font-semibold text-gray-600 mb-2">Content Stage</label>
+                    <label className="block text-xs font-semibold text-fg-muted mb-2">Content Stage</label>
                     <div className="grid grid-cols-2 gap-2">
                       {CAROUSEL_STAGES.map((s) => (
                         <button
                           key={s.value}
                           type="button"
                           onClick={() => setSelectedStage(s.value)}
-                          className={`text-left px-3 py-2 rounded-lg border text-xs transition-colors ${
+                          className={`text-left px-3 py-2 rounded-panel border text-xs transition-colors ${
                             selectedStage === s.value
-                              ? 'bg-blue-600 text-white border-blue-600'
-                              : 'bg-white text-gray-700 border-gray-200 hover:border-blue-300'
+                              ? 'bg-accent text-white border-accent'
+                              : 'bg-raised text-fg border-hairline hover:border-accent/50'
                           }`}
                         >
                           <div className="font-semibold">{s.label}</div>
-                          <div className={`mt-0.5 ${selectedStage === s.value ? 'text-blue-100' : 'text-gray-400'}`}>
+                          <div className={`mt-0.5 ${selectedStage === s.value ? 'text-on-accent' : 'text-fg-muted'}`}>
                             {s.hint}
                           </div>
                         </button>
@@ -602,8 +602,8 @@ export default function ComposePost({ onNavigateTab }: { onNavigateTab?: (tab: s
                   {/* Template picker */}
                   {templates.length > 0 && (
                     <div>
-                      <label className="block text-xs font-semibold text-gray-600 mb-2">
-                        Visual Template <span className="font-normal text-gray-400">(optional — auto-picked if blank)</span>
+                      <label className="block text-xs font-semibold text-fg-muted mb-2">
+                        Visual Template <span className="font-normal text-fg-muted">(optional — auto-picked if blank)</span>
                       </label>
                       <div className="space-y-1.5">
                         {templates.map((t) => (
@@ -611,14 +611,14 @@ export default function ComposePost({ onNavigateTab }: { onNavigateTab?: (tab: s
                             key={t.key}
                             type="button"
                             onClick={() => setSelectedTemplate(selectedTemplate === t.key ? '' : t.key)}
-                            className={`w-full text-left px-3 py-2 rounded-lg border text-xs transition-colors ${
+                            className={`w-full text-left px-3 py-2 rounded-panel border text-xs transition-colors ${
                               selectedTemplate === t.key
-                                ? 'bg-indigo-600 text-white border-indigo-600'
-                                : 'bg-white text-gray-700 border-gray-200 hover:border-indigo-300'
+                                ? 'bg-accent text-white border-accent'
+                                : 'bg-raised text-fg border-hairline hover:border-accent/50'
                             }`}
                           >
                             <span className="font-semibold">{t.label}</span>
-                            <span className={`ml-2 ${selectedTemplate === t.key ? 'text-indigo-200' : 'text-gray-400'}`}>
+                            <span className={`ml-2 ${selectedTemplate === t.key ? 'text-on-accent' : 'text-fg-muted'}`}>
                               {t.description}
                             </span>
                           </button>
@@ -632,7 +632,7 @@ export default function ComposePost({ onNavigateTab }: { onNavigateTab?: (tab: s
                     type="button"
                     onClick={handleGenerateSlides}
                     disabled={generatingSlides}
-                    className="w-full bg-indigo-600 text-white py-2 rounded-lg text-sm font-semibold hover:bg-indigo-700 disabled:opacity-50 transition-colors flex items-center justify-center gap-2"
+                    className="w-full bg-accent text-white py-2 rounded-panel text-sm font-semibold hover:bg-accent/90 disabled:opacity-50 transition-colors flex items-center justify-center gap-2"
                   >
                     {generatingSlides ? (
                       <>
@@ -648,12 +648,12 @@ export default function ComposePost({ onNavigateTab }: { onNavigateTab?: (tab: s
                   </button>
 
                   {generateError && (
-                    <p className="text-xs text-red-600 font-medium">{generateError}</p>
+                    <p className="text-xs text-danger font-medium">{generateError}</p>
                   )}
 
                   {generatedSlideUrls.length > 0 && (
                     <div className="space-y-2">
-                      <p className="text-xs font-semibold text-green-700">
+                      <p className="text-xs font-semibold text-success">
                         {generatedSlideUrls.length} slides generated
                       </p>
                       <div className="flex flex-wrap gap-2">
@@ -663,37 +663,37 @@ export default function ComposePost({ onNavigateTab }: { onNavigateTab?: (tab: s
                             href={url}
                             target="_blank"
                             rel="noreferrer"
-                            className="text-xs text-blue-600 underline hover:text-blue-800"
+                            className="text-xs text-accent underline hover:text-accent"
                           >
                             Slide {i + 1}
                           </a>
                         ))}
                       </div>
-                      <p className="text-xs text-gray-400">Click each link to preview the slide image. Not happy? Click Generate again to regenerate.</p>
+                      <p className="text-xs text-fg-muted">Click each link to preview the slide image. Not happy? Click Generate again to regenerate.</p>
                     </div>
                   )}
                 </div>
               ) : (
                 /* Manual slide builder */
                 <div className="space-y-3">
-                  <label className="block text-sm font-medium text-gray-700">
-                    Slides <span className="text-gray-400 font-normal text-xs">(images auto-fetched from Pexels at post time)</span>
+                  <label className="block text-sm font-medium text-fg">
+                    Slides <span className="text-fg-muted font-normal text-xs">(images auto-fetched from Pexels at post time)</span>
                   </label>
                   {slides.map((slide, idx) => (
                     <div key={idx} className="flex gap-2 items-start">
-                      <span className="mt-2 text-xs text-gray-400 font-medium w-5 shrink-0">{idx + 1}.</span>
+                      <span className="mt-2 text-xs text-fg-muted font-medium w-5 shrink-0">{idx + 1}.</span>
                       <textarea
                         rows={2}
                         value={slide}
                         onChange={(e) => updateSlide(idx, e.target.value)}
-                        {...maskProps('flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none')}
+                        {...maskProps('flex-1 border border-field rounded-panel px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent resize-none')}
                         placeholder={`Slide ${idx + 1} text…`}
                       />
                       {slides.length > 1 && (
                         <button
                           type="button"
                           onClick={() => removeSlide(idx)}
-                          className="mt-1.5 text-red-400 hover:text-red-600 text-xs font-semibold px-2 py-1 rounded border border-red-200 hover:border-red-400 transition-colors"
+                          className="mt-1.5 text-danger hover:text-danger text-xs font-semibold px-2 py-1 rounded-control border border-danger/25 hover:border-danger/50 transition-colors"
                         >
                           Remove
                         </button>
@@ -703,7 +703,7 @@ export default function ComposePost({ onNavigateTab }: { onNavigateTab?: (tab: s
                   <button
                     type="button"
                     onClick={addSlide}
-                    className="text-sm text-blue-600 font-semibold hover:text-blue-800 transition-colors"
+                    className="text-sm text-accent font-semibold hover:text-accent transition-colors"
                   >
                     + Add Slide
                   </button>
@@ -714,18 +714,18 @@ export default function ComposePost({ onNavigateTab }: { onNavigateTab?: (tab: s
 
           {/* Avatar toggle — only for image/video posts */}
           {postType !== 'TEXT' && (
-            <div className="flex items-center justify-between border border-gray-200 rounded-lg px-4 py-3 bg-gray-50">
+            <div className="flex items-center justify-between border border-hairline rounded-panel px-4 py-3 bg-page">
               <div>
-                <p className="text-sm font-medium text-gray-700">Include my avatar</p>
+                <p className="text-sm font-medium text-fg">Include my avatar</p>
                 {hasActiveAvatar ? (
-                  <p className="text-xs text-gray-500">
+                  <p className="text-xs text-fg-muted">
                     Uses <span className="font-mono font-semibold">{activeAvatar?.trigger_word}</span> in the image prompt
                     {useAvatar === null && ' · following your Avatars settings'}
                   </p>
                 ) : (
-                  <p className="text-xs text-gray-400">
+                  <p className="text-xs text-fg-muted">
                     No active avatar.{' '}
-                    <Link to="/avatars" className="text-blue-600 underline hover:text-blue-800">
+                    <Link to="/avatars" className="text-accent underline hover:text-accent">
                       Train one on the Avatars page.
                     </Link>
                   </p>
@@ -739,16 +739,16 @@ export default function ComposePost({ onNavigateTab }: { onNavigateTab?: (tab: s
                   disabled={!hasActiveAvatar}
                   onChange={(e) => setUseAvatar(e.target.checked)}
                 />
-                <div className="w-10 h-5 bg-gray-200 peer-focus:ring-2 peer-focus:ring-blue-400 rounded-full peer peer-checked:bg-blue-600 peer-disabled:opacity-40 transition-colors after:content-[''] after:absolute after:top-0.5 after:left-0.5 after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:after:translate-x-5" />
+                <div className="w-10 h-5 bg-hairline peer-focus:ring-2 peer-focus:ring-accent rounded-full peer peer-checked:bg-accent peer-disabled:opacity-40 transition-colors after:content-[''] after:absolute after:top-0.5 after:left-0.5 after:bg-raised after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:after:translate-x-5" />
               </label>
             </div>
           )}
 
           {/* Schedule date/time */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+            <label className="block text-sm font-medium text-fg mb-1">
               Schedule Date &amp; Time{' '}
-              <span className="font-normal text-gray-400">
+              <span className="font-normal text-fg-muted">
                 ({timezoneResolved ? userTimezone : 'loading your timezone…'})
               </span>
             </label>
@@ -757,17 +757,17 @@ export default function ComposePost({ onNavigateTab }: { onNavigateTab?: (tab: s
               value={scheduledAt}
               disabled={!timezoneResolved}
               onChange={(e) => setScheduledAt(e.target.value)}
-              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100"
+              className="w-full border border-field rounded-control px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent disabled:bg-page"
             />
             {bestTimeSuggestion && (
-              <div className="mt-2 bg-blue-50 border border-blue-200 rounded-lg px-3 py-2 flex items-center justify-between gap-2">
-                <p className="text-xs text-blue-700">
+              <div className="mt-2 bg-accent/5 border border-accent/25 rounded-panel px-3 py-2 flex items-center justify-between gap-2">
+                <p className="text-xs text-accent">
                   Best time to post on <strong>{bestTimeSuggestion.dayName}</strong>: <strong>{bestTimeSuggestion.display}</strong>
                 </p>
                 <button
                   type="button"
                   onClick={applyBestTime}
-                  className="text-xs text-blue-700 font-semibold underline hover:text-blue-900 whitespace-nowrap"
+                  className="text-xs text-accent font-semibold underline hover:text-accent whitespace-nowrap"
                 >
                   Use this time
                 </button>
@@ -776,11 +776,11 @@ export default function ComposePost({ onNavigateTab }: { onNavigateTab?: (tab: s
           </div>
 
           {result && (
-            <p className={`text-sm font-medium ${result.ok ? 'text-green-600' : 'text-red-600'}`}>
+            <p className={`text-sm font-medium ${result.ok ? 'text-success' : 'text-danger'}`}>
               {result.msg}
               {result.ok && onNavigateTab && (
                 <button type="button" onClick={() => onNavigateTab('review')}
-                  className="ml-2 font-semibold text-blue-600 hover:underline">
+                  className="ml-2 font-semibold text-accent hover:underline">
                   View in Review &rarr;
                 </button>
               )}
@@ -792,14 +792,14 @@ export default function ComposePost({ onNavigateTab }: { onNavigateTab?: (tab: s
               type="button"
               onClick={(e) => handleSubmit(e, 'pending')}
               disabled={submitting || content.length > MAX_CHARS}
-              className="bg-gray-100 text-gray-700 py-2 rounded-lg text-sm font-semibold hover:bg-gray-200 disabled:opacity-50 transition-colors"
+              className="bg-page text-fg py-2 rounded-panel text-sm font-semibold hover:bg-hairline disabled:opacity-50 transition-colors"
             >
               {submitting ? 'Saving…' : 'Save Draft'}
             </button>
             <button
               type="submit"
               disabled={submitting || content.length > MAX_CHARS}
-              className="bg-blue-600 text-white py-2 rounded-lg text-sm font-semibold hover:bg-blue-700 disabled:opacity-50 transition-colors"
+              className="bg-accent text-white py-2 rounded-panel text-sm font-semibold hover:bg-accent/90 disabled:opacity-50 transition-colors"
             >
               {submitting ? 'Scheduling…' : 'Approve & Schedule'}
             </button>
@@ -811,37 +811,37 @@ export default function ComposePost({ onNavigateTab }: { onNavigateTab?: (tab: s
             and you paste it in. Keep these rare: real launches and real credentials only. */}
         <form
           onSubmit={handleDraftOccasion}
-          className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 space-y-3"
+          className="bg-raised rounded-panel shadow-panel border border-hairline p-4 space-y-3"
         >
           <div>
-            <h3 className="text-sm font-semibold text-gray-700">Celebrate an occasion</h3>
-            <p className="text-xs text-gray-500 mt-0.5">
+            <h3 className="text-sm font-semibold text-fg">Celebrate an occasion</h3>
+            <p className="text-xs text-fg-muted mt-0.5">
               LEM drafts it; you publish it from LinkedIn's own occasion composer (Start a post →
               More → Celebrate an occasion). Best kept to real events — about one a month.
             </p>
           </div>
 
           <div>
-            <label htmlFor="occasion-type" className="block text-xs font-medium text-gray-600 mb-1">
+            <label htmlFor="occasion-type" className="block text-xs font-medium text-fg-muted mb-1">
               Occasion
             </label>
             <select
               id="occasion-type"
               value={occasionType}
               onChange={(e) => setOccasionType(e.target.value as OccasionType)}
-              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full border border-field rounded-control px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent"
             >
               {OCCASION_TYPES.map((o) => (
                 <option key={o.value} value={o.value}>{o.label}</option>
               ))}
             </select>
-            <p className="mt-1 text-xs text-gray-400">
+            <p className="mt-1 text-xs text-fg-muted">
               {OCCASION_TYPES.find((o) => o.value === occasionType)?.hint}
             </p>
           </div>
 
           <div>
-            <label htmlFor="occasion-text" className="block text-xs font-medium text-gray-600 mb-1">
+            <label htmlFor="occasion-text" className="block text-xs font-medium text-fg-muted mb-1">
               What happened?
             </label>
             <textarea
@@ -850,19 +850,19 @@ export default function ComposePost({ onNavigateTab }: { onNavigateTab?: (tab: s
               value={occasionText}
               onChange={(e) => setOccasionText(e.target.value)}
               placeholder={OCCASION_TYPES.find((o) => o.value === occasionType)?.placeholder}
-              {...maskProps('w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none')}
+              {...maskProps('w-full border border-field rounded-panel px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent resize-none')}
             />
-            <p className="mt-1 text-xs text-gray-400">
+            <p className="mt-1 text-xs text-fg-muted">
               These are the only facts the draft may state — anything you leave out, it leaves out.
             </p>
           </div>
 
           {occasionResult && (
-            <p className={`text-sm font-medium ${occasionResult.ok ? 'text-green-600' : 'text-red-600'}`}>
+            <p className={`text-sm font-medium ${occasionResult.ok ? 'text-success' : 'text-danger'}`}>
               {occasionResult.msg}
               {occasionResult.ok && onNavigateTab && (
                 <button type="button" onClick={() => onNavigateTab('review')}
-                  className="ml-2 font-semibold text-blue-600 hover:underline">
+                  className="ml-2 font-semibold text-accent hover:underline">
                   View in Review &rarr;
                 </button>
               )}
@@ -872,7 +872,7 @@ export default function ComposePost({ onNavigateTab }: { onNavigateTab?: (tab: s
           <button
             type="submit"
             disabled={occasionBusy || !sessionToken}
-            className="w-full bg-amber-600 text-white py-2 rounded-lg text-sm font-semibold hover:bg-amber-700 disabled:opacity-50 transition-colors"
+            className="w-full bg-accent text-on-accent py-2 rounded-panel text-sm font-semibold hover:bg-accent/90 disabled:opacity-50 transition-colors"
           >
             {occasionBusy ? 'Drafting…' : 'Draft occasion post'}
           </button>
@@ -880,7 +880,7 @@ export default function ComposePost({ onNavigateTab }: { onNavigateTab?: (tab: s
       </div>
 
       <div className="space-y-4">
-        <h2 className="text-xl font-semibold text-gray-700">Preview</h2>
+        <h2 className="text-xl font-semibold text-fg">Preview</h2>
         <LinkedInPostPreview
           content={previewContent}
           author={email.split('@')[0] || 'You'}
@@ -898,22 +898,22 @@ export default function ComposePost({ onNavigateTab }: { onNavigateTab?: (tab: s
           <TopicAuthorityMeter content={content} focusTopics={focusTopics} />
         )}
         {postType === 'CAROUSEL' && generatedSlideUrls.length > 0 && (
-          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
-            <p className="text-sm font-semibold text-gray-700 mb-3">Slide Previews</p>
+          <div className="bg-raised rounded-panel shadow-panel border border-hairline p-4">
+            <p className="text-sm font-semibold text-fg mb-3">Slide Previews</p>
             <div className="grid grid-cols-2 gap-3">
               {generatedSlideUrls.slice(0, 4).map((url, i) => (
                 <a key={i} href={url} target="_blank" rel="noreferrer" className="block">
                   <img
                     src={url}
                     alt={`Slide ${i + 1}`}
-                    className="w-full rounded-lg border border-gray-200 hover:opacity-90 transition-opacity"
+                    className="w-full rounded-panel border border-hairline hover:opacity-90 transition-opacity"
                     onError={(e) => { (e.target as HTMLImageElement).style.display = 'none' }}
                   />
                 </a>
               ))}
             </div>
             {generatedSlideUrls.length > 4 && (
-              <p className="text-xs text-gray-400 mt-2">+{generatedSlideUrls.length - 4} more slides</p>
+              <p className="text-xs text-fg-muted mt-2">+{generatedSlideUrls.length - 4} more slides</p>
             )}
           </div>
         )}

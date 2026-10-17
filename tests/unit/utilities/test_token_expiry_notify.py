@@ -23,9 +23,11 @@ class TestNotifyLinkedInTokenExpiring:
         client = _redis()
         with patch(f"{_RATE}.shared_redis_client", return_value=client), \
              patch(f"{_MOD}.get_user_email", return_value="u@e.com"), \
+             patch(f"{_MOD}.get_user_subscription_info",
+                   return_value={"subscription_status": "active"}), \
              patch(f"{_EMAIL}.send_linkedin_token_expiring_email", return_value=True) as send:
             assert notify_linkedin_token_expiring(7, 5, "2026-09-01T00:00:00+00:00") is True
-        send.assert_called_once_with("u@e.com", 5, "2026-09-01T00:00:00+00:00")
+        send.assert_called_once_with("u@e.com", 5, "2026-09-01T00:00:00+00:00", trial=False)
         key, value = client.set.call_args[0]
         assert key == "lem:linkedin_token_expiry_email:7"
         assert client.set.call_args[1] == {"nx": True, "ex": 7 * 86400}

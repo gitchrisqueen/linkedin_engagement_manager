@@ -39,12 +39,12 @@ const SOURCE_LABELS: Record<string, string> = {
 }
 
 const STATUS_COLORS: Record<string, string> = {
-  pending: 'bg-yellow-100 text-yellow-700',
-  approved: 'bg-green-100 text-green-700',
-  sending: 'bg-purple-100 text-purple-700',
-  sent: 'bg-blue-100 text-blue-700',
-  failed: 'bg-red-100 text-red-700',
-  canceled: 'bg-gray-100 text-gray-500',
+  pending: 'bg-warning/10 text-warning',
+  approved: 'bg-success/10 text-success',
+  sending: 'bg-accent/10 text-accent',
+  sent: 'bg-accent/10 text-accent',
+  failed: 'bg-danger/10 text-danger',
+  canceled: 'bg-page text-fg-muted',
 }
 
 const STATUSES = ['ALL', 'pending', 'approved', 'sending', 'sent', 'failed', 'canceled']
@@ -128,19 +128,19 @@ export default function ConnectionRequests({ userTimezone }: { userTimezone: str
 
   return (
     <div className="space-y-4">
-      {msg && <p className={`text-sm font-medium ${msg.ok ? 'text-green-600' : 'text-red-600'}`}>{msg.text}</p>}
+      {msg && <p className={`text-sm font-medium ${msg.ok ? 'text-success' : 'text-danger'}`}>{msg.text}</p>}
 
       {/* New connection-request target */}
-      <div className="bg-white rounded-lg border border-gray-200 shadow-sm p-5 space-y-3">
-        <h3 className="font-semibold text-gray-700">Add a connection target</h3>
-        <p className="text-xs text-gray-500">
+      <div className="bg-raised rounded-panel border border-hairline shadow-panel p-5 space-y-3">
+        <h3 className="font-semibold text-fg">Add a connection target</h3>
+        <p className="text-xs text-fg-muted">
           Add an ICP-fit prospect to invite. New targets follow your account's Connection approval mode
           (Account → Connection approval): <strong>auto-approve</strong> queues them for a slow,
           daily-capped drip immediately, while <strong>pre-review</strong> holds them here as drafts for
           you to approve first. Sends honor your combined Max invites/day cap and pause automatically
           when LinkedIn throttles. This is not volume prospecting.
         </p>
-        <p className="text-xs text-gray-500">
+        <p className="text-xs text-fg-muted">
           <strong>Recipient email</strong> is optional and almost always left blank. For a few
           profiles LinkedIn refuses the invite until you confirm their email address. LEM never
           guesses one and never fills one in from anything it already knows — it is only ever the
@@ -149,21 +149,21 @@ export default function ConnectionRequests({ userTimezone }: { userTimezone: str
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <input type="url" value={url} onChange={(e) => setUrl(e.target.value)} maxLength={512}
             placeholder="Profile URL (https://www.linkedin.com/in/…)"
-            className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" />
+            className="w-full border border-field rounded-control px-3 py-2 text-sm" />
           <input type="text" value={name} onChange={(e) => setName(e.target.value)} maxLength={255}
             placeholder="Name (optional)"
-            className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" />
+            className="w-full border border-field rounded-control px-3 py-2 text-sm" />
         </div>
         <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} maxLength={255}
           aria-label="Recipient email (optional)"
           placeholder="Recipient email (optional — only used if LinkedIn asks to verify you know them)"
-          {...maskProps('w-full border border-gray-300 rounded-lg px-3 py-2 text-sm')} />
+          {...maskProps('w-full border border-field rounded-panel px-3 py-2 text-sm')} />
         <textarea value={note} onChange={(e) => setNote(e.target.value)} rows={2} maxLength={NOTE_MAX}
           placeholder="Connection note (optional, ≤300 chars)"
-          {...maskProps('w-full border border-gray-300 rounded-lg px-3 py-2 text-sm')} />
+          {...maskProps('w-full border border-field rounded-panel px-3 py-2 text-sm')} />
         <div className="flex flex-wrap items-center gap-3">
           <button onClick={() => createMutation.mutate()} disabled={!canSubmit || createMutation.isPending}
-            className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-semibold hover:bg-blue-700 disabled:opacity-50">
+            className="px-4 py-2 bg-accent text-white rounded-control text-sm font-semibold hover:bg-accent/90 disabled:opacity-50">
             {createMutation.isPending ? 'Adding…' : 'Add target'}
           </button>
         </div>
@@ -174,31 +174,31 @@ export default function ConnectionRequests({ userTimezone }: { userTimezone: str
         {STATUSES.map((s) => (
           <button key={s} onClick={() => setFilter(s)}
             className={`px-3 py-1.5 rounded-full text-xs font-semibold transition-colors ${
-              filter === s ? 'bg-blue-600 text-white' : 'bg-white text-gray-600 border border-gray-300 hover:border-blue-400'
+              filter === s ? 'bg-accent text-white' : 'bg-raised text-fg-muted border border-field hover:border-accent/50'
             }`}>
             {s.toUpperCase()}
           </button>
         ))}
       </div>
 
-      {isLoading && <p className="text-gray-400 text-sm">Loading connection requests…</p>}
+      {isLoading && <p className="text-fg-muted text-sm">Loading connection requests…</p>}
       {!isLoading && requests.length === 0 && (
-        <div className="text-center py-10 bg-white rounded-lg border border-gray-200 text-sm text-gray-500">
+        <div className="text-center py-10 bg-raised rounded-panel border border-hairline text-sm text-fg-muted">
           No connection requests yet.
         </div>
       )}
 
       <div className="space-y-3">
         {requests.map((req) => (
-          <div key={req.id} className="bg-white rounded-lg border border-gray-200 p-4">
+          <div key={req.id} className="bg-raised rounded-panel border border-hairline p-4">
             <div className="flex items-center justify-between gap-2 mb-1">
               <a href={req.recipient_profile_url} target="_blank" rel="noopener noreferrer"
-                className="text-sm font-medium text-blue-700 truncate hover:underline">
+                className="text-sm font-medium text-accent truncate hover:underline">
                 {req.recipient_name || req.recipient_profile_url}
               </a>
               <div className="flex items-center gap-2 shrink-0">
-                <span className="text-xs text-gray-400">{formatInTimezone(req.created_at, userTimezone)}</span>
-                <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${STATUS_COLORS[req.status] ?? 'bg-gray-100 text-gray-600'}`}>
+                <span className="text-xs text-fg-muted">{formatInTimezone(req.created_at, userTimezone)}</span>
+                <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${STATUS_COLORS[req.status] ?? 'bg-page text-fg-muted'}`}>
                   {req.status.toUpperCase()}
                 </span>
               </div>
@@ -206,25 +206,25 @@ export default function ConnectionRequests({ userTimezone }: { userTimezone: str
             {(req.source || req.reasons) && (
               <div className="flex flex-wrap items-center gap-2 mb-1">
                 {req.source && (
-                  <span className="px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-700 text-xs font-medium">
+                  <span className="px-2 py-0.5 rounded-full bg-accent/5 text-accent text-xs font-medium">
                     {SOURCE_LABELS[req.source] ?? req.source}
                   </span>
                 )}
                 {req.icp_score != null ? (
-                  <span className="text-xs text-gray-500">ICP fit {req.icp_score}/100</span>
+                  <span className="text-xs text-fg-muted">ICP fit {req.icp_score}/100</span>
                 ) : (
-                  req.source && <span className="text-xs text-gray-400">ICP fit unverified</span>
+                  req.source && <span className="text-xs text-fg-muted">ICP fit unverified</span>
                 )}
-                {req.reasons && <span className="text-xs text-gray-500 truncate">· {req.reasons}</span>}
+                {req.reasons && <span className="text-xs text-fg-muted truncate">· {req.reasons}</span>}
               </div>
             )}
             {req.status === 'failed' && (
-              <p className="text-xs text-red-600 mb-1">
+              <p className="text-xs text-danger mb-1">
                 {req.failure_reason ? `Why it failed: ${req.failure_reason}. ` : ''}
                 LEM never automatically retries a failed invite — click Retry below to send it again.
               </p>
             )}
-            {req.message && <p className="text-sm text-gray-700 whitespace-pre-wrap line-clamp-3">{req.message}</p>}
+            {req.message && <p className="text-sm text-fg whitespace-pre-wrap line-clamp-3">{req.message}</p>}
             {/* Email attach (issue #1836). Only on rows that can still be dispatched — LEM clears a
                 stored address once a row goes terminal, so offering it on a sent/canceled row would
                 promise something that cannot happen. */}
@@ -235,26 +235,26 @@ export default function ConnectionRequests({ userTimezone }: { userTimezone: str
                     <input type="email" value={rowEmail} onChange={(e) => setRowEmail(e.target.value)}
                       maxLength={255} aria-label={`Recipient email for ${req.recipient_name || req.recipient_profile_url}`}
                       placeholder="name@company.com"
-                      {...maskProps('flex-1 min-w-[12rem] border border-gray-300 rounded px-2 py-1 text-xs')} />
+                      {...maskProps('flex-1 min-w-[12rem] border border-field rounded-control px-2 py-1 text-xs')} />
                     <button onClick={() => emailMutation.mutate({ id: req.id, email: rowEmail.trim() })}
                       disabled={!rowEmail.trim() || emailMutation.isPending}
-                      className="px-3 py-1 bg-blue-600 text-white rounded text-xs font-semibold hover:bg-blue-700 disabled:opacity-50">
+                      className="px-3 py-1 bg-accent text-white rounded-control text-xs font-semibold hover:bg-accent/90 disabled:opacity-50">
                       Save email
                     </button>
                     <button onClick={() => { setEmailRowId(null); setRowEmail('') }}
-                      className="px-3 py-1 border border-gray-300 text-gray-600 rounded text-xs font-semibold hover:bg-gray-50">
+                      className="px-3 py-1 border border-field text-fg-muted rounded-control text-xs font-semibold hover:bg-page">
                       Cancel
                     </button>
                   </div>
                 ) : (
                   <div className="flex flex-wrap items-center gap-2">
                     {req.has_recipient_email && (
-                      <span className="px-2 py-0.5 rounded-full bg-gray-100 text-gray-600 text-xs font-medium">
+                      <span className="px-2 py-0.5 rounded-full bg-page text-fg-muted text-xs font-medium">
                         Email on file
                       </span>
                     )}
                     <button onClick={() => { setEmailRowId(req.id); setRowEmail('') }}
-                      className="text-xs font-semibold text-blue-700 hover:underline">
+                      className="text-xs font-semibold text-accent hover:underline">
                       {req.has_recipient_email ? 'Replace email' : 'Add email'}
                     </button>
                   </div>
@@ -266,21 +266,21 @@ export default function ConnectionRequests({ userTimezone }: { userTimezone: str
                 {req.status === 'pending' && (
                   <button onClick={() => actionMutation.mutate({ id: req.id, action: 'approve' })}
                     disabled={actionMutation.isPending}
-                    className="px-3 py-1 bg-green-600 text-white rounded text-xs font-semibold hover:bg-green-700 disabled:opacity-50">
+                    className="px-3 py-1 bg-accent text-on-accent rounded-control text-xs font-semibold hover:bg-accent/90 disabled:opacity-50">
                     Approve
                   </button>
                 )}
                 {req.status === 'failed' && (
                   <button onClick={() => actionMutation.mutate({ id: req.id, action: 'retry' })}
                     disabled={actionMutation.isPending}
-                    className="px-3 py-1 bg-green-600 text-white rounded text-xs font-semibold hover:bg-green-700 disabled:opacity-50">
+                    className="px-3 py-1 bg-accent text-on-accent rounded-control text-xs font-semibold hover:bg-accent/90 disabled:opacity-50">
                     Retry
                   </button>
                 )}
                 {req.status !== 'failed' && (
                   <button onClick={() => actionMutation.mutate({ id: req.id, action: 'cancel' })}
                     disabled={actionMutation.isPending}
-                    className="px-3 py-1 border border-gray-300 text-gray-600 rounded text-xs font-semibold hover:bg-gray-50 disabled:opacity-50">
+                    className="px-3 py-1 border border-field text-fg-muted rounded-control text-xs font-semibold hover:bg-page disabled:opacity-50">
                     Cancel
                   </button>
                 )}

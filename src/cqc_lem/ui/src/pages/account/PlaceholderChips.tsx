@@ -12,7 +12,7 @@ export default function PlaceholderChips({ placeholders }: { placeholders: Place
   const lastField = useRef<HTMLInputElement | HTMLTextAreaElement | null>(null)
 
   useEffect(() => {
-    cardRef.current = rootRef.current?.closest('.bg-white') as HTMLElement | null
+    cardRef.current = rootRef.current?.closest('.bg-raised') as HTMLElement | null
     const onFocusIn = (e: FocusEvent) => {
       const t = e.target as HTMLElement
       if (!t || !cardRef.current?.contains(t)) return
@@ -48,7 +48,7 @@ export default function PlaceholderChips({ placeholders }: { placeholders: Place
           // preventDefault on mousedown keeps the field focused so selectionStart is valid on click
           onMouseDown={(e) => e.preventDefault()}
           onClick={() => insert(p.token)}
-          className="inline-flex items-center gap-1 bg-gray-100 hover:bg-blue-100 text-gray-700 hover:text-blue-700 border border-gray-200 rounded-full px-2 py-0.5 text-xs font-mono transition-colors"
+          className="inline-flex items-center gap-1 bg-page hover:bg-accent/10 text-fg hover:text-accent border border-hairline rounded-full px-2 py-0.5 text-xs font-mono transition-colors"
         >
           {p.token}
         </button>

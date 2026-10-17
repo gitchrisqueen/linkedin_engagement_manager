@@ -74,9 +74,11 @@ describe('Best Times to Post — avg engagement is a percentage only when it is 
     })
     harness(<Dashboard />)
 
+    // The rate and the post count are two spans (no middle dot), so each is read on its own.
     await waitFor(() =>
-      expect(screen.getByText(/avg engagement rate 6\.12% · 4 post\(s\)/)).toBeDefined(),
+      expect(screen.getByText(/^avg engagement rate$/).textContent).toBe('avg engagement rate 6.12%'),
     )
+    screen.getByText('4 post(s)')
     expect(screen.queryByText(/0\.0612/)).toBeNull()
   })
 
@@ -91,8 +93,9 @@ describe('Best Times to Post — avg engagement is a percentage only when it is 
     })
     harness(<Dashboard />)
 
-    const row = await waitFor(() => screen.getByText(/avg engagement 12\.5 · 3 post\(s\)/))
-    expect(row.textContent).not.toContain('%')
+    const row = await waitFor(() => screen.getByText(/^avg engagement$/))
+    expect(row.textContent).toBe('avg engagement 12.5')
+    screen.getByText('3 post(s)')
     expect(screen.queryByText(/avg engagement rate/)).toBeNull()
   })
 
@@ -105,7 +108,8 @@ describe('Best Times to Post — avg engagement is a percentage only when it is 
     })
     harness(<Dashboard />)
 
-    await waitFor(() => expect(screen.getByText(/avg engagement 9 · 3 post\(s\)/)).toBeDefined())
+    await waitFor(() => expect(screen.getByText(/^avg engagement$/).textContent).toBe('avg engagement 9'))
+    screen.getByText('3 post(s)')
     expect(screen.queryByText(/900\.00%/)).toBeNull()
   })
 })

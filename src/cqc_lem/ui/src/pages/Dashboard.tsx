@@ -1,4 +1,5 @@
 import { useQuery } from '@tanstack/react-query'
+import Icon, { type IconName } from '../components/marketing/Icon'
 import { Link } from 'react-router-dom'
 import api from '../api/client'
 import type { ApiEnvelope, GetDetail } from '../api/types'
@@ -225,8 +226,8 @@ function formatDelta(d: AudienceDelta | null | undefined): string {
 }
 
 function deltaColor(d: AudienceDelta | null | undefined): string {
-  if (!d || d.delta === 0) return 'text-gray-800'
-  return d.delta > 0 ? 'text-green-600' : 'text-red-600'
+  if (!d || d.delta === 0) return 'text-fg'
+  return d.delta > 0 ? 'text-success' : 'text-danger'
 }
 
 // The baseline is the newest capture on or BEFORE the window edge, so after a run of failed
@@ -243,36 +244,52 @@ type DashboardStats = GetDetail<'/api/dashboard/stats/'>
 type PlannedTasks = GetDetail<'/api/dashboard/planned-tasks/'>
 type ActivityEntry = GetDetail<'/api/activity/'>[number]
 
-const ACTION_ICONS: Record<string, string> = {
-  post: '📝',
-  comment: '💬',
-  reply: '↩️',
-  dm: '✉️',
-  engaged: '👍',
-  invite: '🤝',
-  follow: '➕',
-  group_comment: '👥',
+const ACTION_ICONS: Record<string, IconName> = {
+  post: 'pen',
+  comment: 'chat',
+  reply: 'reply',
+  dm: 'mail',
+  engaged: 'thumbsUp',
+  invite: 'userPlus',
+  follow: 'plus',
+  group_comment: 'users',
 }
 
-const KIND_ICONS: Record<string, string> = {
-  Post: '📝',
-  DM: '✉️',
-  Newsletter: '📰',
+const KIND_ICONS: Record<string, IconName> = {
+  Post: 'pen',
+  DM: 'chat',
+  Newsletter: 'users',
 }
 
 const STATUS_COLORS: Record<string, string> = {
-  APPROVED: 'bg-green-100 text-green-700',
-  PENDING: 'bg-yellow-100 text-yellow-700',
-  SCHEDULED: 'bg-blue-100 text-blue-700',
-  POSTED: 'bg-purple-100 text-purple-700',
-  PLANNING: 'bg-gray-100 text-gray-600',
+  APPROVED: 'bg-success/10 text-success',
+  PENDING: 'bg-warning/10 text-warning',
+  SCHEDULED: 'bg-accent/10 text-accent',
+  POSTED: 'bg-accent/10 text-accent',
+  PLANNING: 'bg-page text-fg-muted',
 }
 
-function StatCard({ label, value, color }: { label: string; value: number; color: string }) {
+// One tile carries the page: the count waiting on the user, filled primary and linking to the
+// review queue. The other two are quiet numbers on the hairline.
+function StatCard({ label, value, to }: { label: string; value: number; to?: string }) {
+  if (to) {
+    return (
+      <Link
+        to={to}
+        className="group block rounded-panel bg-accent p-5 text-on-accent shadow-panel transition-colors hover:bg-accent/90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+      >
+        <p className="text-section-lg font-semibold tabular-nums">{value}</p>
+        <p className="mt-1 flex items-center gap-2 text-sm font-medium">
+          {label}
+          <Icon name="arrowRight" className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
+        </p>
+      </Link>
+    )
+  }
   return (
-    <div className={`bg-white rounded-lg p-5 border-l-4 ${color} shadow-sm`}>
-      <p className="text-2xl font-bold text-gray-800">{value}</p>
-      <p className="text-sm text-gray-500 mt-1">{label}</p>
+    <div className="rounded-panel border border-hairline bg-raised p-5">
+      <p className="text-section-lg font-semibold tabular-nums text-fg">{value}</p>
+      <p className="mt-1 text-sm text-fg-muted">{label}</p>
     </div>
   )
 }
@@ -417,17 +434,17 @@ export default function Dashboard() {
       {/* Title plus both CTAs need ~390px of one line — more than a 375px phone has, so the row
           wraps instead of pushing "Review Posts" off the screen (issue #894). */}
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <h1 className="text-2xl font-bold text-gray-800">Dashboard</h1>
+        <h1 className="text-section lg:text-section-lg font-semibold text-fg">Dashboard</h1>
         <div className="flex flex-wrap gap-2">
           <Link
             to="/content"
-            className="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-blue-700 transition-colors"
+            className="min-h-11 inline-flex items-center border border-field bg-raised text-fg px-4 rounded-control text-sm font-semibold hover:bg-page transition-colors"
           >
             + Schedule Post
           </Link>
           <Link
             to="/content?tab=review"
-            className="border border-gray-300 text-gray-600 px-4 py-2 rounded-lg text-sm font-semibold hover:bg-gray-50 transition-colors"
+            className="min-h-11 inline-flex items-center px-2 text-sm font-semibold text-accent hover:underline"
           >
             Review Posts
           </Link>
@@ -439,9 +456,9 @@ export default function Dashboard() {
 
       {/* Stats */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <StatCard label="Scheduled this week" value={stats.scheduled_this_week} color="border-blue-500" />
-        <StatCard label="Pending review" value={stats.pending_review} color="border-yellow-500" />
-        <StatCard label="Total posted" value={stats.posted_total} color="border-green-500" />
+        <StatCard label="Pending review" value={stats.pending_review} to="/content?tab=review" />
+        <StatCard label="Scheduled this week" value={stats.scheduled_this_week} />
+        <StatCard label="Total posted" value={stats.posted_total} />
       </div>
 
       {/* Live stats (PostHog Endpoints, #654) — renders nothing until provisioned/configured */}
@@ -449,14 +466,14 @@ export default function Dashboard() {
 
       {/* Audience growth — follower/profile-view telemetry next to the activity that drove it (#627) */}
       {sessionToken && (
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 space-y-6">
+        <div className="bg-raised rounded-panel shadow-panel border border-hairline p-6 space-y-6">
           <div className="flex items-baseline justify-between">
-            <h2 className="text-lg font-semibold text-gray-700">Audience Growth</h2>
-            <span className="text-xs text-gray-400">Last {audience?.days ?? 90} days</span>
+            <h2 className="text-xl font-semibold text-fg">Audience Growth</h2>
+            <span className="text-xs text-fg-muted">Last {audience?.days ?? 90} days</span>
           </div>
 
           {!hasAudience ? (
-            <p className="text-sm text-gray-400 py-4 text-center">
+            <p className="text-sm text-fg-muted py-4 text-center">
               Gathering data — follower and profile-view tracking captures once a night from your
               LinkedIn session.
             </p>
@@ -464,31 +481,31 @@ export default function Dashboard() {
             <>
               <div className="grid grid-cols-2 sm:grid-cols-5 gap-4">
                 <div>
-                  <p className="text-2xl font-bold text-gray-800">
+                  <p className="text-section font-semibold tabular-nums text-fg">
                     {audience?.follower_count != null ? compactNumber(audience.follower_count) : '—'}
                   </p>
-                  <p className="text-xs text-gray-500 mt-0.5">Followers</p>
+                  <p className="text-xs text-fg-muted mt-0.5">Followers</p>
                 </div>
                 {['7', '30'].map((w) => (
                   <div key={w}>
-                    <p className={`text-2xl font-bold ${deltaColor(audience?.deltas?.[w])}`}>
+                    <p className={`text-section font-semibold tabular-nums ${deltaColor(audience?.deltas?.[w])}`}>
                       {formatDelta(audience?.deltas?.[w])}
                     </p>
-                    <p className="text-xs text-gray-500 mt-0.5">{w}-day change</p>
-                    <p className="text-[10px] text-gray-400">{deltaSince(audience?.deltas?.[w])}</p>
+                    <p className="text-xs text-fg-muted mt-0.5">{w}-day change</p>
+                    <p className="text-xs text-fg-muted">{deltaSince(audience?.deltas?.[w])}</p>
                   </div>
                 ))}
                 <div>
-                  <p className="text-2xl font-bold text-gray-800">
+                  <p className="text-section font-semibold tabular-nums text-fg">
                     {audience?.profile_views != null ? compactNumber(audience.profile_views) : '—'}
                   </p>
-                  <p className="text-xs text-gray-500 mt-0.5">Profile views</p>
+                  <p className="text-xs text-fg-muted mt-0.5">Profile views</p>
                 </div>
                 <div>
-                  <p className="text-2xl font-bold text-gray-800">
+                  <p className="text-section font-semibold tabular-nums text-fg">
                     {audience?.connection_count != null ? compactNumber(audience.connection_count) : '—'}
                   </p>
-                  <p className="text-xs text-gray-500 mt-0.5">Connections</p>
+                  <p className="text-xs text-fg-muted mt-0.5">Connections</p>
                 </div>
               </div>
 
@@ -511,7 +528,7 @@ export default function Dashboard() {
                   emptyMessage="No automation activity in this window."
                 />
               </div>
-              <p className="text-xs text-gray-400">
+              <p className="text-xs text-fg-muted">
                 Profile views and search appearances come from LinkedIn's own analytics surface — a
                 blank means the capture couldn't read that number, not that it was zero.
               </p>
@@ -522,16 +539,16 @@ export default function Dashboard() {
 
       {/* Engagement analytics — trends, leaderboards, and per-post drill-down from post_stats (#395) */}
       {sessionToken && (
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 space-y-6">
+        <div className="bg-raised rounded-panel shadow-panel border border-hairline p-6 space-y-6">
           <div className="flex items-baseline justify-between">
-            <h2 className="text-lg font-semibold text-gray-700">Engagement Analytics</h2>
-            <span className="text-xs text-gray-400">Last {analyticsDays} days</span>
+            <h2 className="text-xl font-semibold text-fg">Engagement Analytics</h2>
+            <span className="text-xs text-fg-muted">Last {analyticsDays} days</span>
           </div>
 
           {/* Coverage (#809) — the panel only measures posts whose LinkedIn numbers were captured, so
               say so explicitly rather than letting a partial window read as missing analytics. */}
           {coverage && (
-            <p className="text-xs text-gray-500 -mt-4" data-testid="analytics-coverage">
+            <p className="text-xs text-fg-muted -mt-4" data-testid="analytics-coverage">
               {coverageSummary(coverage, analyticsDays)}
             </p>
           )}
@@ -540,12 +557,12 @@ export default function Dashboard() {
           {mix && mix.total > 0 && (
             <div>
               <div className="flex items-baseline justify-between mb-2">
-                <h3 className="text-sm font-semibold text-gray-700">
-                  Content mix <span className="font-normal text-gray-400">(target 70/20/10)</span>
+                <h3 className="text-sm font-semibold text-fg">
+                  Content mix <span className="font-normal text-fg-muted">(target 70/20/10)</span>
                 </h3>
                 <span
                   className={`text-xs px-2 py-0.5 rounded-full ${
-                    mix.compliant ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'
+                    mix.compliant ? 'bg-success/10 text-success' : 'bg-warning/10 text-warning'
                   }`}
                 >
                   {mix.compliant
@@ -556,15 +573,15 @@ export default function Dashboard() {
               <div className="grid grid-cols-3 gap-4">
                 {['value', 'authority', 'promo'].map((k) => (
                   <div key={k}>
-                    <p className="text-2xl font-bold text-gray-800">{formatPct(mix.ratios[k])}</p>
-                    <p className="text-xs text-gray-500 mt-0.5">
+                    <p className="text-section font-semibold tabular-nums text-fg">{formatPct(mix.ratios[k])}</p>
+                    <p className="text-xs text-fg-muted mt-0.5">
                       {MIX_LABELS[k]} — {mix.counts[k] ?? 0} of {mix.total}
                     </p>
-                    <p className="text-xs text-gray-400">target {formatPct(mix.target[k])}</p>
+                    <p className="text-xs text-fg-muted">target {formatPct(mix.target[k])}</p>
                   </div>
                 ))}
               </div>
-              <p className="text-xs text-gray-400 mt-2">
+              <p className="text-xs text-fg-muted mt-2">
                 One soft-promo post per {mix.promo_every_n} planned posts, case-study shaped with an
                 artifact CTA — never a meeting ask. Measured across the {mix.total} planned post(s)
                 in the last {analyticsDays} days — the plan includes drafts and scheduled posts, so
@@ -579,19 +596,19 @@ export default function Dashboard() {
           {commentQuality && commentQuality.sample_size > 0 && (
             <div>
               <div className="flex items-baseline justify-between mb-2">
-                <h3 className="text-sm font-semibold text-gray-700">
+                <h3 className="text-sm font-semibold text-fg">
                   Comment outcomes{' '}
-                  <span className="font-normal text-gray-400">
+                  <span className="font-normal text-fg-muted">
                     ({commentQuality.checked} checked, {commentQuality.skipped} not found)
                   </span>
                 </h3>
                 <span
                   className={`text-xs px-2 py-0.5 rounded-full ${
                     commentQuality.hold.active || commentQuality.verdict.status === 'hold'
-                      ? 'bg-red-100 text-red-700'
+                      ? 'bg-danger/10 text-danger'
                       : commentQuality.verdict.status === 'watch'
-                        ? 'bg-yellow-100 text-yellow-700'
-                        : 'bg-green-100 text-green-700'
+                        ? 'bg-warning/10 text-warning'
+                        : 'bg-success/10 text-success'
                   }`}
                 >
                   {commentQuality.hold.active ? 'Commenting held' : commentQuality.verdict.status}
@@ -599,29 +616,29 @@ export default function Dashboard() {
               </div>
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
                 <div>
-                  <p className="text-2xl font-bold text-gray-800">
+                  <p className="text-section font-semibold tabular-nums text-fg">
                     {formatPct(commentQuality.author_reply_rate)}
                   </p>
-                  <p className="text-xs text-gray-500 mt-0.5">Author replied</p>
+                  <p className="text-xs text-fg-muted mt-0.5">Author replied</p>
                 </div>
                 <div>
-                  <p className="text-2xl font-bold text-gray-800">{formatPct(commentQuality.reply_rate)}</p>
-                  <p className="text-xs text-gray-500 mt-0.5">Earned any reply</p>
+                  <p className="text-section font-semibold tabular-nums text-fg">{formatPct(commentQuality.reply_rate)}</p>
+                  <p className="text-xs text-fg-muted mt-0.5">Earned any reply</p>
                 </div>
                 <div>
-                  <p className="text-2xl font-bold text-gray-800">{formatPct(commentQuality.like_rate)}</p>
-                  <p className="text-xs text-gray-500 mt-0.5">Earned a like</p>
+                  <p className="text-section font-semibold tabular-nums text-fg">{formatPct(commentQuality.like_rate)}</p>
+                  <p className="text-xs text-fg-muted mt-0.5">Earned a like</p>
                 </div>
                 <div>
-                  <p className="text-2xl font-bold text-gray-800">
+                  <p className="text-section font-semibold tabular-nums text-fg">
                     {formatPct(commentQuality.demotion_rate)}
                   </p>
-                  <p className="text-xs text-gray-500 mt-0.5">
+                  <p className="text-xs text-fg-muted mt-0.5">
                     Demoted ({commentQuality.visibility_sample} readable)
                   </p>
                 </div>
               </div>
-              <p className="text-xs text-gray-400 mt-2">
+              <p className="text-xs text-fg-muted mt-2">
                 {commentQuality.hold.active
                   ? `Feed commenting is paused: ${commentQuality.hold.reason ?? 'comment quality'}.`
                   : commentQuality.verdict.reason}{' '}
@@ -637,17 +654,17 @@ export default function Dashboard() {
           {contentQuality && contentQuality.current.items > 0 && (
             <div>
               <div className="flex items-baseline justify-between mb-2">
-                <h3 className="text-sm font-semibold text-gray-700">
+                <h3 className="text-sm font-semibold text-fg">
                   Content quality{' '}
-                  <span className="font-normal text-gray-400">
+                  <span className="font-normal text-fg-muted">
                     ({contentQuality.current.items} pieces scored, last {contentQuality.days} days)
                   </span>
                 </h3>
                 <span
                   className={`text-xs px-2 py-0.5 rounded-full ${
                     contentQuality.alerts.length > 0
-                      ? 'bg-red-100 text-red-700'
-                      : 'bg-green-100 text-green-700'
+                      ? 'bg-danger/10 text-danger'
+                      : 'bg-success/10 text-success'
                   }`}
                 >
                   {contentQuality.alerts.length > 0
@@ -657,61 +674,61 @@ export default function Dashboard() {
               </div>
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
                 <div>
-                  <p className="text-2xl font-bold text-gray-800">
+                  <p className="text-section font-semibold tabular-nums text-fg">
                     {formatScore(contentQuality.current.slop_score_avg)}
                   </p>
-                  <p className="text-xs text-gray-500 mt-0.5">
+                  <p className="text-xs text-fg-muted mt-0.5">
                     AI-slop score ({contentQuality.current.slop_sample} linted)
                   </p>
-                  <p className="text-[10px] text-gray-400">
+                  <p className="text-xs text-fg-muted">
                     {formatQualityDelta(contentQuality.deltas.slop_score_avg)}
                   </p>
                 </div>
                 <div>
-                  <p className="text-2xl font-bold text-gray-800">
+                  <p className="text-section font-semibold tabular-nums text-fg">
                     {formatScore(contentQuality.current.similarity_avg)}
                   </p>
-                  <p className="text-xs text-gray-500 mt-0.5">
+                  <p className="text-xs text-fg-muted mt-0.5">
                     Self-similarity ({contentQuality.current.similarity_sample} compared)
                   </p>
-                  <p className="text-[10px] text-gray-400">
+                  <p className="text-xs text-fg-muted">
                     {formatQualityDelta(contentQuality.deltas.similarity_avg)}
                   </p>
                 </div>
                 <div>
-                  <p className="text-2xl font-bold text-gray-800">
+                  <p className="text-section font-semibold tabular-nums text-fg">
                     {formatScore(contentQuality.current.authenticity_avg, 0)}
                   </p>
-                  <p className="text-xs text-gray-500 mt-0.5">
+                  <p className="text-xs text-fg-muted mt-0.5">
                     Authenticity ({contentQuality.current.authenticity_sample} posts)
                   </p>
-                  <p className="text-[10px] text-gray-400">
+                  <p className="text-xs text-fg-muted">
                     {formatQualityDelta(contentQuality.deltas.authenticity_avg, 1)}
                   </p>
                 </div>
                 <div>
-                  <p className="text-2xl font-bold text-gray-800">
+                  <p className="text-section font-semibold tabular-nums text-fg">
                     {contentQuality.current.engagement_rate == null
                       ? '—'
                       : `${(contentQuality.current.engagement_rate * 100).toFixed(2)}%`}
                   </p>
-                  <p className="text-xs text-gray-500 mt-0.5">
+                  <p className="text-xs text-fg-muted mt-0.5">
                     Engagement / impression ({contentQuality.current.engagement_rate_sample} posts)
                   </p>
-                  <p className="text-[10px] text-gray-400">
+                  <p className="text-xs text-fg-muted">
                     Hook within {contentQuality.current.hook_budget} chars:{' '}
                     {formatPct(contentQuality.current.hook_budget_rate)}
                   </p>
                 </div>
               </div>
               {contentQuality.alerts.length > 0 ? (
-                <ul className="text-xs text-red-600 mt-2 space-y-0.5">
+                <ul className="text-xs text-danger mt-2 space-y-0.5">
                   {contentQuality.alerts.map((a) => (
                     <li key={a.name}>• {a.reason}</li>
                   ))}
                 </ul>
               ) : (
-                <p className="text-xs text-gray-400 mt-2">
+                <p className="text-xs text-fg-muted mt-2">
                   Scored nightly across posts, comments and newsletter editions. A lower AI-slop score
                   and a lower self-similarity are better; both are compared against your own previous
                   period, so a prompt or model change that degrades the writing shows up here.
@@ -721,7 +738,7 @@ export default function Dashboard() {
           )}
 
           {!hasAnalytics ? (
-            <p className="text-sm text-gray-400 py-4 text-center">
+            <p className="text-sm text-fg-muted py-4 text-center">
               Gathering data — engagement analytics appear once your posted content has captured
               stats.
               {coverage &&
@@ -734,22 +751,22 @@ export default function Dashboard() {
               {/* KPI row */}
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
                 <div>
-                  <p className="text-2xl font-bold text-gray-800">{perPost.length}</p>
-                  <p className="text-xs text-gray-500 mt-0.5">Posts measured</p>
+                  <p className="text-section font-semibold tabular-nums text-fg">{perPost.length}</p>
+                  <p className="text-xs text-fg-muted mt-0.5">Posts measured</p>
                 </div>
                 <div>
-                  <p className="text-2xl font-bold text-gray-800">{compactNumber(totalImpressions)}</p>
-                  <p className="text-xs text-gray-500 mt-0.5">Impressions</p>
+                  <p className="text-section font-semibold tabular-nums text-fg">{compactNumber(totalImpressions)}</p>
+                  <p className="text-xs text-fg-muted mt-0.5">Impressions</p>
                 </div>
                 <div>
-                  <p className="text-2xl font-bold text-gray-800">{compactNumber(totalEngagement)}</p>
-                  <p className="text-xs text-gray-500 mt-0.5">Engagement (weighted)</p>
+                  <p className="text-section font-semibold tabular-nums text-fg">{compactNumber(totalEngagement)}</p>
+                  <p className="text-xs text-fg-muted mt-0.5">Engagement (weighted)</p>
                 </div>
                 <div>
-                  <p className="text-2xl font-bold text-gray-800">
+                  <p className="text-section font-semibold tabular-nums text-fg">
                     {overallRate != null ? formatRate(overallRate) : '—'}
                   </p>
-                  <p className="text-xs text-gray-500 mt-0.5">Engagement rate</p>
+                  <p className="text-xs text-fg-muted mt-0.5">Engagement rate</p>
                 </div>
               </div>
 
@@ -788,19 +805,19 @@ export default function Dashboard() {
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Planned Tasks — upcoming posts queue */}
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-5">
+        <div className="bg-raised rounded-panel shadow-panel border border-hairline p-5">
           <div className="flex items-center justify-between mb-4">
-            <h2 className="text-lg font-semibold text-gray-700">Planned Tasks</h2>
-            <Link to="/content?tab=review" className="text-xs text-blue-600 hover:underline">
+            <h2 className="text-xl font-semibold text-fg">Planned Tasks</h2>
+            <Link to="/content?tab=review" className="text-xs text-accent hover:underline">
               Manage all
             </Link>
           </div>
           {upcoming.length === 0 ? (
             <div className="text-center py-6">
-              <p className="text-sm text-gray-400">No upcoming tasks scheduled.</p>
+              <p className="text-sm text-fg-muted">No upcoming tasks scheduled.</p>
               <Link
                 to="/content?tab=review"
-                className="text-xs text-blue-600 hover:underline mt-1 inline-block"
+                className="text-xs text-accent hover:underline mt-1 inline-block"
               >
                 Generate weekly content →
               </Link>
@@ -810,23 +827,25 @@ export default function Dashboard() {
               {upcoming.map((task) => (
                 <li
                   key={`${task.kind}-${task.id}`}
-                  className="flex items-start gap-3 p-3 rounded-lg bg-gray-50 hover:bg-gray-100 transition-colors"
+                  className="flex items-start gap-3 p-3 rounded-panel bg-page hover:bg-accent/5 transition-colors"
                 >
-                  <div className="mt-0.5 text-lg flex-shrink-0">{KIND_ICONS[task.kind] ?? '🔔'}</div>
+                  <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-control bg-raised text-accent" aria-hidden="true">
+                    <Icon name={KIND_ICONS[task.kind] ?? 'clock'} className="h-4 w-4" />
+                  </span>
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 mb-0.5">
-                      <span className="text-xs font-semibold uppercase tracking-wide text-gray-500">
+                      <span className="text-xs font-semibold text-fg-muted">
                         {task.kind}
                       </span>
-                      <span className="text-xs text-gray-400">
+                      <span className="text-xs text-fg-muted">
                         {formatInTimezone(task.scheduled_time, userTimezone)}
                       </span>
                     </div>
-                    <p className="text-sm text-gray-700 line-clamp-2">{task.title}</p>
+                    <p className="text-sm text-fg line-clamp-2">{task.title}</p>
                   </div>
                   <span
                     className={`flex-shrink-0 px-2 py-0.5 rounded-full text-xs font-medium ${
-                      STATUS_COLORS[task.status.toUpperCase()] ?? 'bg-gray-100 text-gray-600'
+                      STATUS_COLORS[task.status.toUpperCase()] ?? 'bg-page text-fg-muted'
                     }`}
                   >
                     {task.status}
@@ -840,10 +859,10 @@ export default function Dashboard() {
         {/* Activity Feed — what has happened */}
         {/* h-full fills the grid row (as tall as the Planned Tasks sibling); the viewport cap keeps
             a long feed from growing the row past the screen, so it inner-scrolls instead. */}
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-5 flex flex-col h-full max-h-[calc(100vh-8rem)]">
-          <h2 className="text-lg font-semibold text-gray-700 mb-4">Activity Feed</h2>
+        <div className="bg-raised rounded-panel shadow-panel border border-hairline p-5 flex flex-col h-full max-h-[calc(100vh-8rem)]">
+          <h2 className="text-xl font-semibold text-fg mb-4">Activity Feed</h2>
           {activity.length === 0 ? (
-            <p className="text-sm text-gray-400 text-center py-6">
+            <p className="text-sm text-fg-muted text-center py-6">
               No activity yet. Posts, comments, DMs, and replies will appear here.
             </p>
           ) : (
@@ -861,35 +880,34 @@ export default function Dashboard() {
                   {activity.map((entry) => (
                     <li
                       key={entry.id}
-                      className="flex items-start gap-3 py-2 border-b border-gray-100 last:border-0"
+                      className="flex items-start gap-3 py-2 border-b border-hairline last:border-0"
                     >
-                      <span className="text-base mt-0.5 flex-shrink-0">
-                        {ACTION_ICONS[entry.action_type] ?? '🔔'}
-                      </span>
+                      {/* Decorative: the action type is spelled out right beside it. */}
+                      <Icon name={ACTION_ICONS[entry.action_type] ?? 'bell'} className="h-5 w-5 mt-0.5 flex-shrink-0 text-fg-muted" />
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2">
-                          <span className="text-xs font-semibold text-gray-700 capitalize">
+                          <span className="text-xs font-semibold text-fg capitalize">
                             {entry.action_type}
                           </span>
                           <span
                             className={`text-xs px-1.5 py-0.5 rounded-full font-medium ${
                               entry.result === 'success'
-                                ? 'bg-green-100 text-green-700'
-                                : 'bg-red-100 text-red-600'
+                                ? 'bg-success/10 text-success'
+                                : 'bg-danger/10 text-danger'
                             }`}
                           >
                             {entry.result}
                           </span>
                         </div>
                         {entry.message && (
-                          <p className="text-xs text-gray-500 mt-0.5 line-clamp-1">{entry.message}</p>
+                          <p className="text-xs text-fg-muted mt-0.5 line-clamp-1">{entry.message}</p>
                         )}
                         {isHttpUrl(entry.post_url) ? (
                           <a
                             href={entry.post_url}
                             target="_blank"
                             rel="noopener noreferrer"
-                            className="text-xs text-blue-500 hover:underline truncate block"
+                            className="text-xs text-accent hover:underline truncate block"
                           >
                             {entry.post_url}
                           </a>
@@ -901,13 +919,13 @@ export default function Dashboard() {
                             target="_blank"
                             rel="noopener noreferrer"
                             title="View your LinkedIn comments"
-                            className="text-xs text-blue-500 hover:underline truncate block"
+                            className="text-xs text-accent hover:underline truncate block"
                           >
                             View your LinkedIn comments
                           </a>
                         ) : null}
                       </div>
-                      <span className="text-xs text-gray-400 flex-shrink-0 whitespace-nowrap">
+                      <span className="text-xs text-fg-muted flex-shrink-0 whitespace-nowrap">
                         {formatInTimezone(entry.created_at, userTimezone)}
                       </span>
                     </li>
@@ -919,7 +937,7 @@ export default function Dashboard() {
                   aria-hidden="true"
                   className="pointer-events-none absolute inset-x-0 bottom-0 flex justify-center items-end h-10 bg-gradient-to-t from-white via-white/85 to-transparent"
                 >
-                  <span className="text-[10px] font-medium uppercase tracking-wide text-gray-400">
+                  <span className="text-xs font-medium text-fg-muted">
                     Scroll for more ↓
                   </span>
                 </div>
@@ -931,28 +949,31 @@ export default function Dashboard() {
 
       {/* Best times to post (data-driven) */}
       {postStats && (
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 space-y-3">
-          <h2 className="text-base font-semibold text-gray-700">Your Best Times to Post</h2>
+        <div className="bg-raised rounded-panel shadow-panel border border-hairline p-6 space-y-3">
+          <h2 className="text-base font-semibold text-fg">Your Best Times to Post</h2>
           {postStats.recommendations.length > 0 ? (
             <>
-              <p className="text-xs text-gray-500">
+              <p className="text-xs text-fg-muted">
                 Learned from your own post engagement — scheduling leans toward these. Times are in{' '}
                 {bestTimesTimezone} ({timezoneAbbreviation(bestTimesTimezone)}).
               </p>
-              <ul className="text-sm text-gray-700 space-y-1">
+              <ul className="text-sm text-fg space-y-1">
                 {postStats.recommendations.map((r, i) => (
                   <li key={i} className="flex justify-between">
                     <span>{r.weekday} @ {formatHour12(r.hour)}</span>
-                    <span className="text-gray-400 tabular-nums">
-                      {r.metric === ENGAGEMENT_RATE_METRIC ? 'avg engagement rate' : 'avg engagement'}{' '}
-                      {formatEngagementMetric(r.avg_engagement, r.metric)} · {r.sample} post(s)
+                    <span className="flex gap-4 tabular-nums">
+                      <span className="text-fg-muted">
+                        {r.metric === ENGAGEMENT_RATE_METRIC ? 'avg engagement rate' : 'avg engagement'}{' '}
+                        <span className="text-fg">{formatEngagementMetric(r.avg_engagement, r.metric)}</span>
+                      </span>
+                      <span className="text-fg-muted">{r.sample} post(s)</span>
                     </span>
                   </li>
                 ))}
               </ul>
             </>
           ) : (
-            <p className="text-xs text-gray-500">Gathering data — recommendations appear after a few posts have engagement stats (currently {postStats.sample_size}).</p>
+            <p className="text-xs text-fg-muted">Gathering data — recommendations appear after a few posts have engagement stats (currently {postStats.sample_size}).</p>
           )}
         </div>
       )}

@@ -1,4 +1,3 @@
-import Icon, { type IconName } from './Icon'
 import Section from './Section'
 
 // What replaced the fabricated stat strip (issue #1300).
@@ -8,24 +7,20 @@ import Section from './Section'
 // which caps the current launch phase at 25 users. Every line here is MECHANISM proof: a thing the
 // product does, verifiable by using it and traceable to a file. No counts, because we do not have
 // counts worth showing yet, and saying so is cheaper than being caught.
-const PROOF: { icon: IconName; title: string; body: string }[] = [
+const PROOF: { title: string; body: string }[] = [
   {
-    icon: 'shield',
-    title: 'Approval before anything ships',
-    body: 'Posts preview before they publish and generated DMs land as drafts.',
+    title: 'Posts wait for your approval',
+    body: 'Each generated post is published through LinkedIn’s API only after you approve it.',
   },
   {
-    icon: 'gauge',
-    title: 'Caps you set, not caps we chose',
-    body: 'Comments, DMs and invites each stop at your own per-day number.',
+    title: 'Engagement you send yourself',
+    body: 'Comments, replies and DMs arrive as suggestions. You decide which ones to send.',
   },
   {
-    icon: 'clock',
-    title: 'One pacing engine, not a loop',
-    body: 'Every delay is drawn per user, action and day, and persisted so a retry never re-rolls it.',
+    title: 'LinkedIn sign-in only',
+    body: 'You connect with LinkedIn sign-in. LEM never asks for your LinkedIn password or a cookie.',
   },
   {
-    icon: 'lock',
     title: 'Credentials encrypted at rest',
     body: 'AES-256-GCM per user and column, with passkey or TOTP step-up on the writes that matter.',
   },
@@ -34,22 +29,18 @@ const PROOF: { icon: IconName; title: string; body: string }[] = [
 export default function ProofStrip() {
   return (
     <Section analyticsName="proof" tone="tinted" className="py-12 sm:py-14">
-      <p className="text-center text-sm font-semibold uppercase tracking-wide text-brand-600">
+      <p className="max-w-measure text-sm font-semibold text-fg-muted">
         Early access — we are onboarding a small first cohort
       </p>
-      <p className="mx-auto mt-3 max-w-2xl text-center text-ink-600">
+      <p className="mt-2 max-w-2xl text-fg-muted">
         No user-count banner here yet. What we can show you is what the product actually does.
       </p>
-      <ul className="mt-10 grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
-        {PROOF.map(({ icon, title, body }) => (
-          <li key={title} className="flex gap-3">
-            <span className="mt-0.5 shrink-0 text-brand-600">
-              <Icon name={icon} className="h-6 w-6" />
-            </span>
-            <span>
-              <span className="block font-semibold text-ink-900">{title}</span>
-              <span className="mt-1 block text-sm leading-relaxed text-ink-600">{body}</span>
-            </span>
+      {/* Plain statements on hairline rules, not a row of icon cards (design pass, 86e3rnp9a). */}
+      <ul className="mt-8 grid gap-x-12 sm:grid-cols-2">
+        {PROOF.map(({ title, body }) => (
+          <li key={title} className="border-t border-hairline py-5">
+            <span className="block font-semibold text-fg">{title}</span>
+            <span className="mt-1 block max-w-measure leading-relaxed text-fg-muted">{body}</span>
           </li>
         ))}
       </ul>

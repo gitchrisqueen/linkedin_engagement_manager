@@ -98,16 +98,16 @@ export function useStepUp() {
   }
 
   const modal = methods === null ? null : (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4">
-      <div className="bg-white rounded-xl shadow-xl w-full max-w-sm p-6 max-h-viewport overflow-y-auto" role="dialog"
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-fg/50 px-4">
+      <div className="bg-raised rounded-panel shadow-xl w-full max-w-sm p-6 max-h-viewport overflow-y-auto" role="dialog"
            aria-modal="true" aria-label="Confirm it's you">
-        <h3 className="text-lg font-bold text-gray-800 mb-1">Confirm it's you</h3>
-        <p className="text-sm text-gray-500 mb-4">
+        <h3 className="text-xl font-semibold text-fg mb-1">Confirm it's you</h3>
+        <p className="text-sm text-fg-muted mb-4">
           This change touches your LinkedIn credentials, so it needs one more check.
         </p>
 
         {methods.length === 0 && (
-          <p className="text-sm text-red-600 mb-4">
+          <p className="text-sm text-danger mb-4">
             None of your enrolled factors can be used from this browser. Add an authenticator app
             in Security, or sign in again with a passkey.
           </p>
@@ -118,7 +118,7 @@ export function useStepUp() {
             type="button"
             onClick={() => verify('passkey')}
             disabled={busy}
-            className="w-full bg-blue-600 text-white py-2.5 rounded-lg text-sm font-semibold hover:bg-blue-700 disabled:opacity-50 mb-3"
+            className="w-full bg-accent text-white py-2.5 rounded-panel text-sm font-semibold hover:bg-accent/90 disabled:opacity-50 mb-3"
           >
             Use your passkey
           </button>
@@ -134,24 +134,24 @@ export function useStepUp() {
               value={code}
               onChange={(e) => setCode(e.target.value.replace(/\D/g, ''))}
               placeholder="6-digit code"
-              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm text-center tracking-widest font-mono"
+              className="w-full border border-field rounded-control px-3 py-2 text-sm text-center font-mono"
             />
             <button
               type="button"
               onClick={() => verify('totp')}
               disabled={busy || code.trim().length !== 6}
-              className="w-full bg-gray-800 text-white py-2.5 rounded-lg text-sm font-semibold hover:bg-gray-900 disabled:opacity-50"
+              className="w-full bg-fg text-white py-2.5 rounded-panel text-sm font-semibold hover:bg-fg disabled:opacity-50"
             >
               {busy ? 'Checking…' : 'Confirm'}
             </button>
           </div>
         )}
 
-        {error && <p className="text-xs text-red-600 mb-2">{error}</p>}
+        {error && <p className="text-xs text-danger mb-2">{error}</p>}
         <button
           type="button"
           onClick={() => close(false)}
-          className="w-full text-xs text-gray-500 hover:text-gray-700"
+          className="w-full text-xs text-fg-muted hover:text-fg"
         >
           Cancel
         </button>

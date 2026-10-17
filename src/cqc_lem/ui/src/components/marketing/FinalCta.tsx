@@ -11,24 +11,25 @@ export default function FinalCta() {
 
   return (
     <Section analyticsName="final_cta" tone="dark" width="max-w-3xl" className="text-center">
-      <h2 className="text-headline sm:text-display font-bold text-white">
+      <h2 className="text-section sm:text-section-lg font-semibold text-fg">
         Start with a month of posts you can actually approve
       </h2>
-      <p className="mx-auto mt-4 max-w-xl text-lg leading-relaxed text-brand-300">
-        Connect your session, set your caps, and see the first plan before you decide anything.
+      <p className="mx-auto mt-4 max-w-xl text-lg leading-relaxed text-fg-muted">
+        Sign in with LinkedIn, set your voice and topics, and see the first plan before you decide
+        anything.
       </p>
       <div className="mt-8 flex justify-center">
         <CtaButton
           section="final_cta"
           cta="final_trial"
           label="Start free trial from the closing section"
-          variant="onDark"
+          variant="primary"
           onClick={openLoginModal}
         >
           Start free trial
         </CtaButton>
       </div>
-      <p className="mt-4 text-sm text-brand-300">
+      <p className="mx-auto mt-4 max-w-measure text-sm text-fg-muted">
         {TRIAL_DAYS}-day free trial. No credit card. Cancel any time.
       </p>
     </Section>

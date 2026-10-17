@@ -13,10 +13,10 @@ const TIER_LABELS: Record<string, string> = Object.fromEntries(
 )
 
 const TIER_COLORS: Record<string, string> = {
-  free_trial: 'bg-gray-100 text-gray-700',
-  starter: 'bg-blue-100 text-blue-800',
-  professional: 'bg-purple-100 text-purple-800',
-  enterprise: 'bg-yellow-100 text-yellow-800',
+  free_trial: 'bg-page text-fg',
+  starter: 'bg-accent/10 text-accent',
+  professional: 'bg-accent/10 text-accent',
+  enterprise: 'bg-warning/10 text-warning',
 }
 
 const DAY_MS = 1000 * 60 * 60 * 24
@@ -119,8 +119,8 @@ export default function SubscriptionCard() {
   return (
     <SettingsCard>
       <div className="flex items-center justify-between">
-        <h2 className="text-base font-semibold text-gray-700">
-          Subscription <span className="text-red-500">*</span>
+        <h2 className="text-base font-semibold text-fg">
+          Subscription <span className="text-danger">*</span>
         </h2>
         <span className={`text-xs font-semibold px-2.5 py-1 rounded-full ${TIER_COLORS[tier] ?? TIER_COLORS.free_trial}`}>
           {TIER_LABELS[tier] ?? tier}
@@ -131,7 +131,7 @@ export default function SubscriptionCard() {
         <div
           role="status"
           data-testid="trial-expired-notice"
-          className="rounded-lg p-3 text-sm bg-red-50 text-red-800 border border-red-200"
+          className="rounded-panel p-3 text-sm bg-danger/5 text-danger border border-danger/25"
         >
           Your free trial has expired. New posts are no longer generated or published — upgrade to
           keep using LEM.
@@ -139,19 +139,19 @@ export default function SubscriptionCard() {
       )}
 
       {isOnTrial && !trialEnded && trialDays !== null && (
-        <div className={`rounded-lg p-3 text-sm ${trialDays <= 3 ? 'bg-red-50 text-red-800 border border-red-200' : 'bg-yellow-50 text-yellow-800 border border-yellow-200'}`}>
+        <div className={`rounded-panel p-3 text-sm ${trialDays <= 3 ? 'bg-danger/5 text-danger border border-danger/25' : 'bg-warning/5 text-warning border border-warning/25'}`}>
           {`Free trial: ${trialDays} day${trialDays === 1 ? '' : 's'} remaining.`}
         </div>
       )}
 
       {isPaidPlan && (
-        <p className="text-sm text-green-700">Your subscription is active.</p>
+        <p className="text-sm text-success">Your subscription is active.</p>
       )}
 
       {/* Upgrade options — shown to trial users without a paid plan */}
       {!isPaidPlan && hasStripeCustomer && (
         <div className="space-y-2">
-          <p className="text-xs text-gray-500 font-medium uppercase tracking-wide">Upgrade your plan</p>
+          <p className="text-xs text-fg-muted font-medium">Upgrade your plan</p>
           {/* Labels above read every tier (a subscriber on a hidden one still sees its name); the
               offer reads only the shown ones (issue #2370 pricing test). */}
           <div className={`grid gap-2 ${SHOWN_PAID_PLANS.length > 1 ? 'grid-cols-3' : 'grid-cols-1'}`}>
@@ -160,25 +160,25 @@ export default function SubscriptionCard() {
                 key={plan.tier}
                 onClick={() => checkoutMutation.mutate(plan.tier)}
                 disabled={checkoutMutation.isPending}
-                className={`flex flex-col items-center rounded-lg p-3 transition-colors disabled:opacity-50 text-center ${
+                className={`flex flex-col items-center rounded-panel p-3 transition-colors disabled:opacity-50 text-center ${
                   plan.tier === intendedTier
-                    ? 'border-2 border-blue-500 bg-blue-50'
-                    : 'border border-blue-200 hover:bg-blue-50'
+                    ? 'border-2 border-accent bg-accent/5'
+                    : 'border border-accent/25 hover:bg-accent/5'
                 }`}
               >
-                <span className="text-sm font-semibold text-blue-800">{plan.label}</span>
-                <span className="text-xs text-gray-500">{monthlyPriceLabel(plan)}</span>
+                <span className="text-sm font-semibold text-accent">{plan.label}</span>
+                <span className="text-xs text-fg-muted">{monthlyPriceLabel(plan)}</span>
                 {plan.tier === intendedTier && (
-                  <span className="text-[10px] font-medium text-blue-700">the plan you picked</span>
+                  <span className="text-xs font-medium text-accent">the plan you picked</span>
                 )}
               </button>
             ))}
           </div>
           {checkoutMutation.isPending && (
-            <p className="text-xs text-blue-600">Redirecting to checkout…</p>
+            <p className="text-xs text-accent">Redirecting to checkout…</p>
           )}
           {checkoutMsg && (
-            <p className={`text-sm font-medium ${checkoutMsg.ok ? 'text-green-600' : 'text-red-600'}`}>
+            <p className={`text-sm font-medium ${checkoutMsg.ok ? 'text-success' : 'text-danger'}`}>
               {checkoutMsg.text}
             </p>
           )}
@@ -190,18 +190,18 @@ export default function SubscriptionCard() {
         <button
           onClick={() => portalMutation.mutate()}
           disabled={portalMutation.isPending}
-          className="text-sm text-blue-600 hover:underline disabled:opacity-50"
+          className="text-sm text-accent hover:underline disabled:opacity-50"
         >
           Manage billing →
         </button>
       )}
 
       {portalMsg && (
-        <p className="text-sm font-medium text-red-600">{portalMsg}</p>
+        <p className="text-sm font-medium text-danger">{portalMsg}</p>
       )}
 
       {!hasStripeCustomer && (
-        <p className="text-xs text-gray-400">
+        <p className="text-xs text-fg-muted">
           Billing not yet configured for your account. Contact support if you need help.
         </p>
       )}
