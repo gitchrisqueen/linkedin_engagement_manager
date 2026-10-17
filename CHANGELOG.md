@@ -1,5 +1,29 @@
 # Changelog
 
+## [0.198.0](https://github.com/christopherqueenconsulting/linkedin_engagement_manager/compare/v0.197.0...v0.198.0) (2026-10-17)
+
+
+### Features
+
+* **engagement:** suggest-only engagement mode for trial accounts (closes [#2367](https://github.com/christopherqueenconsulting/linkedin_engagement_manager/issues/2367)) ([#2386](https://github.com/christopherqueenconsulting/linkedin_engagement_manager/issues/2386)) ([2756e6b](https://github.com/christopherqueenconsulting/linkedin_engagement_manager/commit/2756e6bb89eed06ccabb2bc493a59cc7d1dc0120))
+* **pricing:** show the trial and the recommended plan during the pricing test (closes [#2370](https://github.com/christopherqueenconsulting/linkedin_engagement_manager/issues/2370)) ([#2412](https://github.com/christopherqueenconsulting/linkedin_engagement_manager/issues/2412)) ([3e4e260](https://github.com/christopherqueenconsulting/linkedin_engagement_manager/commit/3e4e26063f29d800fa933489a41a205c564076d3))
+* **ui:** move DailyAiLimitNotice, DemoBadge and the waitlist form onto brand tokens ([df6d3d8](https://github.com/christopherqueenconsulting/linkedin_engagement_manager/commit/df6d3d87da5bbdb2fa8134c3df9f1cd6753ff74e))
+* **ui:** move DailyAiLimitNotice, DemoBadge and the waitlist form onto brand tokens (closes [#2448](https://github.com/christopherqueenconsulting/linkedin_engagement_manager/issues/2448)) ([#2450](https://github.com/christopherqueenconsulting/linkedin_engagement_manager/issues/2450)) ([df6d3d8](https://github.com/christopherqueenconsulting/linkedin_engagement_manager/commit/df6d3d87da5bbdb2fa8134c3df9f1cd6753ff74e))
+
+
+### Bug Fixes
+
+* **margin:** exclude internal (is_admin) accounts from MRR and margin (closes [#2453](https://github.com/christopherqueenconsulting/linkedin_engagement_manager/issues/2453)) ([#2454](https://github.com/christopherqueenconsulting/linkedin_engagement_manager/issues/2454)) ([da0a00c](https://github.com/christopherqueenconsulting/linkedin_engagement_manager/commit/da0a00cfec2d0639779fdf224bb3e6e51a3e8fac))
+* **margin:** price internal (is_admin) accounts at $0 MRR and skip them in the cost ceiling ([da0a00c](https://github.com/christopherqueenconsulting/linkedin_engagement_manager/commit/da0a00cfec2d0639779fdf224bb3e6e51a3e8fac)), closes [#2453](https://github.com/christopherqueenconsulting/linkedin_engagement_manager/issues/2453)
+* **profile:** accept a position with no title so the profile-viewer touch completes ([#2451](https://github.com/christopherqueenconsulting/linkedin_engagement_manager/issues/2451)) ([0f778bb](https://github.com/christopherqueenconsulting/linkedin_engagement_manager/commit/0f778bb2fc36b29769045e9daaea15a40aa6476f))
+
+
+### Documentation
+
+* **connections:** record the owner's adjacent-author decision for the 14-day candidate check (closes [#2169](https://github.com/christopherqueenconsulting/linkedin_engagement_manager/issues/2169)) ([b4e18a1](https://github.com/christopherqueenconsulting/linkedin_engagement_manager/commit/b4e18a186e5d671a1380eb29afd217b29dcae891))
+* **connections:** record the owner's adjacent-author decision for the candidate check (closes [#2169](https://github.com/christopherqueenconsulting/linkedin_engagement_manager/issues/2169)) ([#2457](https://github.com/christopherqueenconsulting/linkedin_engagement_manager/issues/2457)) ([b4e18a1](https://github.com/christopherqueenconsulting/linkedin_engagement_manager/commit/b4e18a186e5d671a1380eb29afd217b29dcae891))
+* **curated-sources:** record the 2026-10-07 member-token reshare result ([#2452](https://github.com/christopherqueenconsulting/linkedin_engagement_manager/issues/2452)) ([af16c37](https://github.com/christopherqueenconsulting/linkedin_engagement_manager/commit/af16c37dcc1c90ddf8f8a94bb40d89d579c0123e))
+
 ## [0.197.0](https://github.com/christopherqueenconsulting/linkedin_engagement_manager/compare/v0.196.1...v0.197.0) (2026-10-17)
 
 
