@@ -244,15 +244,15 @@ type DashboardStats = GetDetail<'/api/dashboard/stats/'>
 type PlannedTasks = GetDetail<'/api/dashboard/planned-tasks/'>
 type ActivityEntry = GetDetail<'/api/activity/'>[number]
 
-const ACTION_ICONS: Record<string, string> = {
-  post: '📝',
-  comment: '💬',
-  reply: '↩️',
-  dm: '✉️',
-  engaged: '👍',
-  invite: '🤝',
-  follow: '➕',
-  group_comment: '👥',
+const ACTION_ICONS: Record<string, IconName> = {
+  post: 'pen',
+  comment: 'chat',
+  reply: 'reply',
+  dm: 'mail',
+  engaged: 'thumbsUp',
+  invite: 'userPlus',
+  follow: 'plus',
+  group_comment: 'users',
 }
 
 const KIND_ICONS: Record<string, IconName> = {
@@ -882,9 +882,8 @@ export default function Dashboard() {
                       key={entry.id}
                       className="flex items-start gap-3 py-2 border-b border-hairline last:border-0"
                     >
-                      <span className="text-base mt-0.5 flex-shrink-0">
-                        {ACTION_ICONS[entry.action_type] ?? '🔔'}
-                      </span>
+                      {/* Decorative: the action type is spelled out right beside it. */}
+                      <Icon name={ACTION_ICONS[entry.action_type] ?? 'bell'} className="h-5 w-5 mt-0.5 flex-shrink-0 text-fg-muted" />
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2">
                           <span className="text-xs font-semibold text-fg capitalize">

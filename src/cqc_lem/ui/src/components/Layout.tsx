@@ -1,9 +1,10 @@
-import { Suspense } from 'react'
+import { Suspense, useEffect, useState } from 'react'
 import { NavLink, Outlet, useNavigate, useLocation } from 'react-router-dom'
 import { useAuth } from '../contexts/useAuth'
 import AccountReadinessBanner from './AccountReadinessBanner'
 import FeedbackWidget from './FeedbackWidget'
 import FloatingDock from './FloatingDock'
+import Icon from './marketing/Icon'
 import Footer from './Footer'
 import PostHogSurveyModal from './PostHogSurveyModal'
 import ShippedNotice from './ShippedNotice'
@@ -14,7 +15,7 @@ import SurveyModal from './SurveyModal'
 // Pages whose features depend on a fully set-up account — show the readiness banner here.
 const AUTOMATION_PATHS = ['/content', '/schedule', '/review', '/avatars']
 
-const navLinks = [
+const navLinks: { to: string; label: string; end?: boolean }[] = [
   { to: '/', label: 'Home', end: true },
   { to: '/account', label: 'Account' },
   { to: '/avatars', label: 'Avatars' },
@@ -42,6 +43,17 @@ export default function Layout() {
   const navigate = useNavigate()
   const location = useLocation()
   const showReadiness = !!user && AUTOMATION_PATHS.some((p) => location.pathname.startsWith(p))
+  // Below md the links live behind one menu button (the wordmark leaves no room for a row of
+  // them on a phone); it closes on Escape and on every route change.
+  // Keyed on the path it was opened on, so navigating away closes it without an effect.
+  const [menuPath, setMenuPath] = useState<string | null>(null)
+  const menuOpen = menuPath === location.pathname
+  useEffect(() => {
+    if (!menuOpen) return
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setMenuPath(null) }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [menuOpen])
 
   async function handleLogout() {
     await logout()
@@ -50,7 +62,13 @@ export default function Layout() {
 
   return (
     <div className="lem-app min-h-screen flex flex-col bg-page">
-      <nav className="bg-raised border-b border-hairline sticky top-0 z-10">
+      <a
+        href="#main"
+        className="sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-2 focus:z-20 focus:rounded-control focus:bg-raised focus:px-3 focus:py-2 focus:text-sm focus:font-semibold focus:text-fg focus:ring-2 focus:ring-accent"
+      >
+        Skip to main content
+      </a>
+      <nav aria-label="Main" className="bg-raised border-b border-hairline sticky top-0 z-10">
         <div className="box-content max-w-6xl mx-auto px-4 flex items-center gap-4 sm:gap-8 h-16">
           {/* -ml-[5px]: the artwork has 50 of 1340 px transparent on its left, about 5px here, so
               the visible mark starts on the page's left edge (same as the marketing nav). */}
@@ -63,12 +81,12 @@ export default function Layout() {
               className="-ml-[5px] h-7 w-auto"
             />
           </NavLink>
-          {/* On a phone the links no longer push the account controls off the right edge: this row
-              is the only thing allowed to shrink, and it scrolls sideways instead (issue #894). */}
+          {/* From md the links sit inline; this row is the only thing allowed to shrink, and it
+              scrolls sideways rather than push the account controls off the edge (issue #894). */}
           {user && (
             <div
               data-testid="nav-links"
-              className="flex items-center gap-5 sm:gap-7 min-w-0 overflow-x-auto scrollbar-none [mask-image:linear-gradient(to_right,#000_85%,transparent)] sm:[mask-image:none]"
+              className="hidden md:flex items-center gap-7 min-w-0 overflow-x-auto scrollbar-none"
             >
               {navLinks.map(({ to, label, end }) => (
                 <NavLink key={to} to={to} end={end} className={navLinkClass}>
@@ -85,14 +103,24 @@ export default function Layout() {
           <div className="ml-auto flex items-center gap-3 shrink-0">
             {user ? (
               <>
-                <span className="text-sm text-fg-muted hidden sm:inline">
+                <span className="text-sm text-fg-muted hidden md:inline">
                   Logged in as: <span className="font-medium text-fg">{user.email}</span>
                 </span>
                 <button
                   onClick={handleLogout}
-                  className="min-h-11 px-2 text-sm font-medium text-fg-muted hover:text-fg transition-colors"
+                  className="hidden md:inline-flex items-center min-h-11 px-2 text-sm font-medium text-fg-muted hover:text-fg transition-colors"
                 >
                   Log out
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setMenuPath(menuOpen ? null : location.pathname)}
+                  aria-expanded={menuOpen}
+                  aria-controls="app-menu"
+                  aria-label={menuOpen ? 'Close menu' : 'Menu'}
+                  className="md:hidden inline-flex h-11 w-11 items-center justify-center rounded-control border border-field text-fg hover:bg-page"
+                >
+                  <Icon name={menuOpen ? 'close' : 'menu'} className="h-5 w-5" />
                 </button>
               </>
             ) : (
@@ -105,8 +133,38 @@ export default function Layout() {
             )}
           </div>
         </div>
+        {user && menuOpen && (
+          <div id="app-menu" className="md:hidden border-t border-hairline bg-raised px-4 pb-3">
+            <p className="py-3 text-sm text-fg-muted truncate">
+              Logged in as: <span className="font-medium text-fg">{user.email}</span>
+            </p>
+            <ul className="divide-y divide-hairline border-y border-hairline">
+              {[...navLinks, ...(isAdmin ? adminNavLinks : [])].map(({ to, label, end }: { to: string; label: string; end?: boolean }) => (
+                <li key={to}>
+                  <NavLink
+                    to={to}
+                    end={end}
+                    className={({ isActive }) =>
+                      `flex min-h-11 items-center text-sm ${isActive ? 'font-semibold text-fg' : 'font-medium text-fg-muted hover:text-fg'}`
+                    }
+                  >
+                    {label}
+                  </NavLink>
+                </li>
+              ))}
+            </ul>
+            <button
+              onClick={handleLogout}
+              className="mt-2 flex min-h-11 w-full items-center text-sm font-medium text-fg-muted hover:text-fg"
+            >
+              Log out
+            </button>
+          </div>
+        )}
       </nav>
-      <main className="flex-1 w-full max-w-[74rem] mx-auto px-4 py-8 sm:py-10">
+      {/* pb-16 below sm: room for the floating feedback launcher, so it never sits on the last
+          row of a page. */}
+      <main id="main" tabIndex={-1} className="flex-1 w-full max-w-[74rem] mx-auto px-4 pt-8 pb-16 sm:py-10 focus:outline-none">
         {/* Mandatory strong-factor enrolment (issue #905). The gate REPLACES the page: a held
             session is refused everywhere but the enrolment surface, so rendering the app behind it
             would only produce 403s. The prompt is the pre-deadline half. */}

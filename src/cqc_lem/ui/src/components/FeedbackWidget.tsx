@@ -111,7 +111,7 @@ export default function FeedbackWidget() {
           ensureSessionRecorded()
           capture(EVENTS.feedbackOpened, { route: location.pathname })
         }}
-        className="bg-accent text-white text-xs font-semibold px-3.5 py-2 rounded-full shadow-lg hover:bg-accent/90 transition-colors"
+        className="bg-raised border border-field text-fg text-xs font-semibold px-3.5 py-2 rounded-control shadow-panel hover:bg-page transition-colors"
         aria-label="Feedback / Report a bug"
       >
         Feedback / Report a bug

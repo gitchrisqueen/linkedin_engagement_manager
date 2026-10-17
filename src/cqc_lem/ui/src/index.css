@@ -186,11 +186,19 @@
   .lem-marketing :where(p, li, dd, blockquote) {
     max-width: var(--container-measure);
   }
+  /* The app's prose keeps the pack measure too; a centred note stays centred in its box. */
+  .lem-app main :where(p) {
+    max-width: 75ch;
+  }
+  .lem-app main :where(p.text-center) {
+    margin-inline: auto;
+  }
 }
 
 body {
   margin: 0;
-  font-family: system-ui, 'Segoe UI', Roboto, sans-serif;
+  font-family: 'Inter', system-ui, 'Segoe UI', Roboto, sans-serif;
+  color: var(--lem-text);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   background-color: #f3f4f6;

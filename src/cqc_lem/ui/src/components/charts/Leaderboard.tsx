@@ -47,8 +47,9 @@ export default function Leaderboard({ title, subtitle, entries, emptyMessage, hu
             <li key={e.key} className="text-xs">
               <div className="flex items-baseline justify-between mb-0.5">
                 <span className="font-medium text-fg truncate pr-2">{humanize(e.key)}</span>
-                <span className="text-fg-muted tabular-nums whitespace-nowrap">
-                  {fmt(e.avg_engagement)} · {e.samples} post{e.samples === 1 ? '' : 's'}
+                <span className="flex gap-4 tabular-nums whitespace-nowrap">
+                  <span className="text-fg">{fmt(e.avg_engagement)}</span>
+                  <span className="text-fg-muted">{e.samples} post{e.samples === 1 ? '' : 's'}</span>
                 </span>
               </div>
               <div className="h-2 w-full rounded-full" style={{ backgroundColor: VIZ.gridline }}>

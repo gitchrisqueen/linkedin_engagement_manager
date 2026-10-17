@@ -130,8 +130,8 @@ export default function LineChart({ title, subtitle, points, format, valueLabel,
         .lem-viz .viz-area { fill: ${VIZ.series1}; opacity: 0.10; }
         .lem-viz .viz-dot { fill: ${VIZ.series1}; stroke: ${VIZ.surface}; stroke-width: 2; }
         .lem-viz .viz-tick { fill: ${VIZ.muted}; font-size: 13px; font-variant-numeric: tabular-nums; }
-        .lem-viz .viz-endlabel { fill: ${VIZ.textSecondary}; font-size: 12px; font-weight: 600; }
-        .lem-viz text { font-family: system-ui, -apple-system, 'Segoe UI', sans-serif; }
+        .lem-viz .viz-endlabel { fill: ${VIZ.textSecondary}; font-size: 13px; font-weight: 600; }
+        .lem-viz text { font-family: inherit; }
       `}</style>
       <div className="mb-1">
         <h3 className="text-sm font-semibold text-fg">{title}</h3>

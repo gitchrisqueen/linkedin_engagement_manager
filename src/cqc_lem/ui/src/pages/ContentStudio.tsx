@@ -24,6 +24,7 @@ import type { DateRangeFilter } from '../utils/dateRange'
 import { emptyRunExplanation, isGenerationRunning } from '../utils/generationStatus'
 import type { GenerationStatus } from '../utils/generationStatus'
 import { EVENTS, capture, maskProps, recordPostApproval } from '../utils/analytics'
+import Icon from '../components/marketing/Icon'
 
 // Consolidated content hub: compose posts, schedule DMs, manage newsletters, and review/edit
 // existing content — one page, four tabs, synced to ?tab= for deep-linking.
@@ -585,6 +586,7 @@ export default function ContentStudio() {
       <div className="flex items-center justify-between flex-wrap gap-3">
         <h1 className="text-section lg:text-section-lg font-semibold text-fg">Content Studio</h1>
         {view === 'review' && (
+          <div className="flex flex-wrap items-center gap-4">
           <button
             onClick={() => weeklyMutation.mutate()}
             disabled={generating}
@@ -592,14 +594,13 @@ export default function ContentStudio() {
           >
             {generateLabel}
           </button>
-        )}
-        {view === 'review' && (
           <button
             onClick={() => setView('posts')}
             className="border border-field bg-raised text-fg px-4 min-h-11 rounded-control text-sm font-semibold hover:bg-page transition-colors"
           >
             + Schedule a post
           </button>
+          </div>
         )}
       </div>
 
@@ -669,11 +670,16 @@ export default function ContentStudio() {
       {/* Content tabs */}
       {/* One row that scrolls sideways on a phone instead of wrapping ten tabs into two ragged
           rows; the active tab carries the same primary bar as the app nav. */}
-      <div className="flex gap-1 overflow-x-auto scrollbar-none border-b border-hairline [mask-image:linear-gradient(to_right,#000_85%,transparent)] sm:[mask-image:none]">
+      <div
+        role="group"
+        aria-label="Content views"
+        className="flex gap-1 overflow-x-auto scrollbar-none border-b border-hairline [mask-image:linear-gradient(to_right,#000_85%,transparent)] sm:[mask-image:none]"
+      >
         {VIEWS.map((v) => (
           <button
             key={v.key}
             onClick={() => setView(v.key)}
+            aria-current={view === v.key ? 'page' : undefined}
             className={`min-h-11 shrink-0 whitespace-nowrap px-3 text-sm border-b-2 -mb-px transition-colors ${
               view === v.key
                 ? 'border-accent font-semibold text-fg'
@@ -736,7 +742,7 @@ export default function ContentStudio() {
       {/* Keyword search — boolean operators supported */}
       <div>
         <div className="relative">
-          <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-fg-muted text-sm">🔍</span>
+          <Icon name="search" className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-fg-muted" />
           <input
             type="search"
             value={searchInput}
@@ -757,9 +763,9 @@ export default function ContentStudio() {
           )}
         </div>
         <p className="text-xs text-fg-muted mt-1">
-          Combine keywords with <span className="font-mono font-semibold">AND</span>,{' '}
-          <span className="font-mono font-semibold">OR</span>,{' '}
-          <span className="font-mono font-semibold">NOT</span> and parentheses; wrap phrases in "quotes".
+          Combine keywords with <span className="font-semibold">AND</span>,{' '}
+          <span className="font-semibold">OR</span>,{' '}
+          <span className="font-semibold">NOT</span> and parentheses; wrap phrases in "quotes".
         </p>
       </div>
 
@@ -989,9 +995,9 @@ export default function ContentStudio() {
                           title="Delete this post"
                           aria-label={`Delete post ${post.post_id}`}
                           onClick={(e) => { e.stopPropagation(); setConfirmDeletePost(post) }}
-                          className="text-fg-muted hover:text-danger transition-colors px-1 leading-none text-base"
+                          className="text-fg-muted hover:text-danger focus-visible:text-danger transition-colors px-1 leading-none"
                         >
-                          🗑
+                          <Icon name="trash" className="h-5 w-5" />
                         </button>
                       )}
                     </div>
