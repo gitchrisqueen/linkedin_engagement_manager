@@ -35,7 +35,7 @@ export default function ProblemSection() {
         {PROBLEMS.map(({ title, body }) => (
           <div key={title} className="border-t border-hairline py-6">
             <h3 className="text-title font-semibold text-fg">{title}</h3>
-            <p className="mt-2 max-w-[60ch] leading-relaxed text-fg-muted">{body}</p>
+            <p className="mt-2 max-w-measure leading-relaxed text-fg-muted">{body}</p>
           </div>
         ))}
       </div>

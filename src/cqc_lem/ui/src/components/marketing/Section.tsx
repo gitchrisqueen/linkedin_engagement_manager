@@ -76,7 +76,7 @@ export function SectionHeading({
         {title}
       </h2>
       {lede && (
-        <p className="mt-4 max-w-[65ch] text-lg leading-relaxed text-fg-muted">
+        <p className="mt-4 max-w-measure text-lg leading-relaxed text-fg-muted">
           {lede}
         </p>
       )}

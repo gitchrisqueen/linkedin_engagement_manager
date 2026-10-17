@@ -58,8 +58,8 @@ export default function MarketingFooter() {
           </div>
         </div>
         <div className="mt-10 border-t border-hairline pt-6 space-y-2 text-fg-muted">
-          <LegalDisclaimer className="max-w-[75ch]" />
-          <p className="max-w-[75ch] text-xs">
+          <LegalDisclaimer className="max-w-measure" />
+          <p className="max-w-measure text-xs">
             © {year} Christopher Queen Consulting LLC. All rights reserved.
             {data?.show_version && data.version ? ` · v${data.version}` : ''}
           </p>

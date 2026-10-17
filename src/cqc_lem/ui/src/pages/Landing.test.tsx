@@ -305,6 +305,18 @@ describe('accessibility (issue #1300)', () => {
     expect(region.getAttribute('tabindex')).toBe('0')
     expect(within(region).getByRole('table')).toBeTruthy()
   })
+
+  it('swaps the comparison table for one block per capability below sm', () => {
+    const { container } = renderApp()
+    const region = screen.getByRole('region', { name: /How LEM compares with doing it by hand/i })
+    expect(region.className).toContain('hidden')
+    expect(region.className).toContain('sm:block')
+    const stacked = container.querySelector('[data-section="comparison"] ul.sm\\:hidden') as HTMLElement
+    expect(stacked).not.toBeNull()
+    const rows = within(region).getAllByRole('row').length - 1
+    expect(stacked.querySelectorAll(':scope > li')).toHaveLength(rows)
+    expect(stacked.querySelectorAll('dt')).toHaveLength(rows * 3)
+  })
 })
 
 // A phone browser lays a document out at its min-content width whenever that is wider than the

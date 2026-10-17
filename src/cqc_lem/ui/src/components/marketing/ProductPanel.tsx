@@ -20,12 +20,21 @@ const STATUS_TONE: Record<string, string> = {
   Scheduled: 'bg-accent text-on-accent',
 }
 
-function Panel({ label, children }: { label: string; children: ReactNode }) {
+function Panel({
+  label,
+  children,
+  fill = false,
+}: {
+  label: string
+  children: ReactNode
+  /** Stretch to the parent's height (the hero, where the frame runs to the trial line). */
+  fill?: boolean
+}) {
   return (
     <div
       role="img"
       aria-label={label}
-      className="rounded-panel border border-hairline bg-raised shadow-panel overflow-hidden"
+      className={`rounded-panel border border-hairline bg-raised shadow-panel overflow-hidden${fill ? ' flex h-full flex-col' : ''}`}
     >
       <div aria-hidden="true" className="flex items-center gap-2 border-b border-hairline bg-page px-4 py-3">
         <span className="h-2.5 w-2.5 rounded-full bg-hairline" />
@@ -33,7 +42,7 @@ function Panel({ label, children }: { label: string; children: ReactNode }) {
         <span className="h-2.5 w-2.5 rounded-full bg-hairline" />
         <span className="ml-2 text-xs font-medium text-fg-muted">Content Studio</span>
       </div>
-      <div aria-hidden="true" className="p-4 space-y-3">
+      <div aria-hidden="true" className={fill ? 'flex flex-1 flex-col gap-3 p-4' : 'p-4 space-y-3'}>
         {children}
       </div>
     </div>
@@ -71,30 +80,33 @@ function Row({
   )
 }
 
+// A rendered row, not placeholder bars: grey bars read as a loading state, not as the product.
+// The comment and reply are illustrative sample text for the diagram, and claim nothing about LEM.
 function EngagementPane() {
   return (
     <>
-          <div className="rounded-lg border border-hairline p-3">
-            <div className="h-2 w-1/3 rounded bg-page" />
-            <div className="mt-2 space-y-1.5">
-              <div className="h-2 w-full rounded bg-page" />
-              <div className="h-2 w-4/5 rounded bg-page" />
-            </div>
-            <div className="mt-3 rounded-lg border border-accent/30 bg-page p-3">
-              <div className="flex items-center gap-2 text-xs font-semibold text-accent">
-                <Icon name="chat" className="h-4 w-4" />
-                Suggested comment, in your voice
-              </div>
-              <div className="mt-2 space-y-1.5">
-                <div className="h-2 w-full rounded bg-accent/15" />
-                <div className="h-2 w-2/3 rounded bg-accent/15" />
-              </div>
-            </div>
+      <div className="rounded-lg border border-hairline px-3 py-3">
+        <div className="flex items-start justify-between gap-3">
+          <span className="text-sm font-medium text-fg">Founder, B2B agency</span>
+          <span className="shrink-0 rounded-full border border-hairline px-2 py-0.5 text-xs text-fg-muted">
+            Review
+          </span>
+        </div>
+        <p className="mt-1 text-xs text-fg-muted">How do you decide which ideas become a carousel?</p>
+        <div className="mt-3 rounded-lg border border-accent/30 bg-page p-3">
+          <div className="flex items-center gap-2 text-xs font-semibold text-accent">
+            <Icon name="chat" className="h-4 w-4" />
+            Suggested comment, in your voice
           </div>
-          <div className="flex items-center gap-2 text-xs text-fg-muted">
-            <Icon name="check" className="h-4 w-4 text-accent" />
-            You review it and send it yourself
-          </div>
+          <p className="mt-2 text-sm text-fg">
+            When the idea has steps. A single point reads better as a short text post.
+          </p>
+        </div>
+      </div>
+      <div className="flex items-center gap-2 text-xs text-fg-muted">
+        <Icon name="check" className="h-4 w-4 text-accent" />
+        You review it and send it yourself
+      </div>
     </>
   )
 }
@@ -137,8 +149,11 @@ export default function ProductPanel({ variant }: { variant: PanelVariant }) {
   // side in one frame, so the product (not a card) carries the fold.
   if (variant === 'hero') {
     return (
-      <Panel label="Diagram of LEM: the approval queue with three drafts beside a suggested comment you edit and send yourself.">
-        <div className="grid gap-4 xl:grid-cols-[3fr_2fr]">
+      <Panel
+        fill
+        label="Diagram of LEM: the approval queue with three drafts beside a suggested comment you edit and send yourself."
+      >
+        <div className="grid flex-1 content-start gap-4 xl:grid-cols-[3fr_2fr]">
           <div className="space-y-3">
             <QueueRows />
           </div>

@@ -29,7 +29,7 @@ const PROOF: { title: string; body: string }[] = [
 export default function ProofStrip() {
   return (
     <Section analyticsName="proof" tone="tinted" className="py-12 sm:py-14">
-      <p className="max-w-[65ch] text-sm font-semibold text-fg-muted">
+      <p className="max-w-measure text-sm font-semibold text-fg-muted">
         Early access — we are onboarding a small first cohort
       </p>
       <p className="mt-2 max-w-2xl text-fg-muted">
@@ -40,7 +40,7 @@ export default function ProofStrip() {
         {PROOF.map(({ title, body }) => (
           <li key={title} className="border-t border-hairline py-5">
             <span className="block font-semibold text-fg">{title}</span>
-            <span className="mt-1 block max-w-[60ch] leading-relaxed text-fg-muted">{body}</span>
+            <span className="mt-1 block max-w-measure leading-relaxed text-fg-muted">{body}</span>
           </li>
         ))}
       </ul>

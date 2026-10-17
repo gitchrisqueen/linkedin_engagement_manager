@@ -151,6 +151,19 @@
   --radius-control: 6px;
   --radius-panel: 10px;
   --shadow-panel: 0 1px 2px rgb(31 44 55 / 0.08);
+
+  /* The reading measure, about 68 characters. In em, not ch: Inter's "0" is wider than its
+     average letter, so 65ch set about 80-85 characters a line. `max-w-measure`. */
+  --container-measure: 34em;
+}
+
+/* Every prose box in the marketing tree stops at the measure, including short lines like
+   "Last updated" whose box would otherwise run the full container. In the base layer so a
+   narrower max-w-* utility still wins. */
+@layer base {
+  .lem-marketing :where(p, li, dd, blockquote) {
+    max-width: var(--container-measure);
+  }
 }
 
 body {

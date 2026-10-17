@@ -105,7 +105,7 @@ export default function FeatureNarrative() {
           </article>
         ))}
       </div>
-      <p className="mt-12 flex max-w-[75ch] items-start gap-3 rounded-panel border border-hairline bg-page p-5 text-sm text-fg">
+      <p className="mt-12 flex max-w-measure items-start gap-3 rounded-panel border border-hairline bg-page p-5 text-sm text-fg">
         <span className="shrink-0 text-accent">
           <Icon name="users" className="h-5 w-5" />
         </span>
