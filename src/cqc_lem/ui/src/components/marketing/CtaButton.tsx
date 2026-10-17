@@ -10,7 +10,7 @@ import { EVENTS, capture } from '../../utils/analytics'
 // 2. A CTA event that does not say WHICH section fired it cannot tell you which section earned the
 //    click. `section` is required for the same reason.
 
-export type CtaVariant = 'primary' | 'secondary' | 'ghost'
+export type CtaVariant = 'primary' | 'secondary' | 'ghost' | 'link'
 
 // Every variant draws with the pack tokens, so the dark bands (which pin the dark token set on their
 // own subtree) get the lifted blue and a visible focus ring without a variant of their own.
@@ -20,12 +20,16 @@ const VARIANTS: Record<CtaVariant, string> = {
     'border border-hairline bg-raised text-fg hover:border-accent hover:text-accent focus-visible:outline-accent',
   ghost:
     'border border-accent text-accent hover:bg-page hover:text-accent focus-visible:outline-accent',
+  link: 'text-accent underline-offset-4 hover:underline focus-visible:outline-accent',
 }
 
 // 44px is the tap-target floor (WCAG 2.5.5 / the mobile invariant in issue #894). py-3 + text-base
 // clears it; a smaller CTA on this page is a bug, so the height is not a prop.
+// `link` is the quiet secondary beside a primary: same 44px target, no box, so one action leads.
+// The box padding lives outside BASE so the link variant never carries a conflicting px-6.
+const BOX = 'px-6 py-3'
 const BASE =
-  'inline-flex items-center justify-center gap-2 min-h-11 rounded-control px-6 py-3 text-base font-semibold ' +
+  'inline-flex items-center justify-center gap-2 min-h-11 rounded-control text-base font-semibold ' +
   'transition-colors focus-visible:outline-2 focus-visible:outline-offset-2'
 
 export default function CtaButton({
@@ -57,7 +61,7 @@ export default function CtaButton({
         capture(EVENTS.landingCtaClicked, { cta, section })
         onClick()
       }}
-      className={`${BASE} ${VARIANTS[variant]} ${className}`.trim()}
+      className={`${BASE} ${variant === 'link' ? '' : BOX} ${VARIANTS[variant]} ${className}`.trim()}
     >
       {children ?? label}
     </button>

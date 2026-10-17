@@ -60,7 +60,7 @@ export default function SafetySection() {
           </li>
         ))}
       </ul>
-      <p className="mt-10 flex items-start gap-3 rounded-panel border border-caution p-5 text-sm leading-relaxed text-caution">
+      <p className="mt-10 flex max-w-[75ch] items-start gap-3 rounded-panel border border-field p-5 text-sm leading-relaxed text-fg">
         <span className="shrink-0">
           <Icon name="shield" className="h-5 w-5" />
         </span>

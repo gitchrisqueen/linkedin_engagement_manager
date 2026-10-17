@@ -69,7 +69,8 @@ export default function Icon({
  * in `sr-only` text so the meaning survives both.
  */
 export function IncludedMark({ included }: { included: boolean }) {
-  const tone = included ? 'text-positive' : 'text-negative'
+  // Pack tokens only: the word in sr-only text carries the meaning, so the glyph need not be red/green.
+  const tone = included ? 'text-accent' : 'text-fg-muted'
   return (
     <span className={`shrink-0 ${tone}`}>
       <Icon name={included ? 'check' : 'cross'} className="h-5 w-5" />

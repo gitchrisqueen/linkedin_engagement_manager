@@ -76,9 +76,7 @@
    pass. The values live in custom properties rather than @theme so one class can flip them:
    `.lem-marketing` follows the visitor's colour scheme, and `data-theme` on it pins one.
    `utils/brandTokens.ts` (PACK_THEMES) mirrors every value below, and its test holds the pairs.
-   Dark `primary` is the pack's lifted blue: brand-600 is still never a foreground on charcoal.
-   positive/negative/caution are not pack colours: they map the existing -700 (light) and -300
-   (dark) semantic steps above onto the theme, so a mark keeps its contrast on either ground. */
+   Dark `primary` is the pack's lifted blue: brand-600 is still never a foreground on charcoal. */
 .lem-marketing {
   --lem-bg: #f9f9f9;
   --lem-surface: #ffffff;
@@ -88,11 +86,16 @@
   --lem-on-primary: #ffffff;
   --lem-hairline: #d7dce1;
   --lem-field-border: #7a8590;
-  --lem-positive: #0b6b3a;
-  --lem-negative: #a32014;
-  --lem-caution: #8a5a00;
   color-scheme: light;
   font-family: 'Inter', system-ui, 'Segoe UI', Roboto, sans-serif;
+}
+
+/* The pack's body size: 16px on phone, 17px from the desktop breakpoint. Set on <body> while the
+   marketing tree is mounted (`:has`), so unclassed copy inherits it and the app is untouched. */
+@media (min-width: 64rem) {
+  body:has(.lem-marketing) {
+    font-size: 1.0625rem;
+  }
 }
 
 .lem-marketing[data-theme='dark'] {
@@ -104,9 +107,6 @@
   --lem-on-primary: #111a22;
   --lem-hairline: #33414d;
   --lem-field-border: #7b8894;
-  --lem-positive: #7fd3a5;
-  --lem-negative: #f5a79b;
-  --lem-caution: #f0c46a;
   color-scheme: dark;
 }
 
@@ -120,9 +120,6 @@
     --lem-on-primary: #111a22;
     --lem-hairline: #33414d;
     --lem-field-border: #7b8894;
-    --lem-positive: #7fd3a5;
-    --lem-negative: #f5a79b;
-    --lem-caution: #f0c46a;
     color-scheme: dark;
   }
 }
@@ -136,9 +133,6 @@
   --color-on-accent: var(--lem-on-primary);
   --color-hairline: var(--lem-hairline);
   --color-field: var(--lem-field-border);
-  --color-positive: var(--lem-positive);
-  --color-negative: var(--lem-negative);
-  --color-caution: var(--lem-caution);
 
   /* The pack's 1.25 scale (13 16 20 25 31 39 49): hero H1 39/49, section titles 25/31. */
   --text-hero: 2.4375rem;

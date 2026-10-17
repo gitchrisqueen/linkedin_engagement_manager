@@ -74,7 +74,7 @@ export default function PricingSection() {
             </li>
           ))}
         </ul>
-        <p className="mt-5 text-sm text-fg-muted">
+        <p className="mt-5 max-w-[65ch] text-sm text-fg-muted">
           Plans differ by price today, not by feature — there is no capability locked behind a higher
           tier. If that changes, this section changes with it.
         </p>

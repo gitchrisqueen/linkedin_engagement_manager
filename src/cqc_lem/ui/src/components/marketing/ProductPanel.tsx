@@ -12,9 +12,11 @@ import Icon from './Icon'
 // Everything here is decorative to a screen reader — the surrounding copy already says what the
 // panel shows — so the wrapper is labelled once and the innards are hidden.
 
+// Status reads from the pack's tokens only: settled states are filled primary, the one that waits on
+// you is an outline in muted text. No status hue outside DESIGN.md (design pass, 86e3rnp9a).
 const STATUS_TONE: Record<string, string> = {
-  Approved: 'bg-positive text-on-accent',
-  'Pending review': 'bg-caution text-on-accent',
+  Approved: 'bg-accent text-on-accent',
+  'Pending review': 'border border-hairline text-fg-muted',
   Scheduled: 'bg-accent text-on-accent',
 }
 
@@ -38,15 +40,29 @@ function Panel({ label, children }: { label: string; children: ReactNode }) {
   )
 }
 
-function Row({ title, status, meta }: { title: string; status: keyof typeof STATUS_TONE; meta: string }) {
+function Row({
+  title,
+  status,
+  archetype,
+  stage,
+}: {
+  title: string
+  status: keyof typeof STATUS_TONE
+  archetype: string
+  stage: string
+}) {
+  // Titles wrap rather than truncate: at 390px an ellipsis hid half of every title.
   return (
-    <div className="flex items-center gap-3 rounded-lg border border-hairline px-3 py-3">
+    <div className="flex items-start gap-3 rounded-lg border border-hairline px-3 py-3">
       <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-page text-accent">
         <Icon name="pen" className="h-4 w-4" />
       </span>
       <span className="min-w-0 flex-1">
-        <span className="block truncate text-sm font-medium text-fg">{title}</span>
-        <span className="block text-xs text-fg-muted">{meta}</span>
+        <span className="block text-sm font-medium text-fg">{title}</span>
+        <span className="mt-1 flex flex-wrap items-center gap-2 text-xs text-fg-muted">
+          {archetype}
+          <span className="rounded-full border border-hairline px-2 py-0.5">{stage}</span>
+        </span>
       </span>
       <span className={`shrink-0 rounded-full px-2.5 py-1 text-xs font-semibold ${STATUS_TONE[status]}`}>
         {status}
@@ -55,7 +71,45 @@ function Row({ title, status, meta }: { title: string; status: keyof typeof STAT
   )
 }
 
-export type PanelVariant = 'queue' | 'schedule' | 'engagement' | 'measure'
+function EngagementPane() {
+  return (
+    <>
+          <div className="rounded-lg border border-hairline p-3">
+            <div className="h-2 w-1/3 rounded bg-page" />
+            <div className="mt-2 space-y-1.5">
+              <div className="h-2 w-full rounded bg-page" />
+              <div className="h-2 w-4/5 rounded bg-page" />
+            </div>
+            <div className="mt-3 rounded-lg border border-accent/30 bg-page p-3">
+              <div className="flex items-center gap-2 text-xs font-semibold text-accent">
+                <Icon name="chat" className="h-4 w-4" />
+                Suggested comment, in your voice
+              </div>
+              <div className="mt-2 space-y-1.5">
+                <div className="h-2 w-full rounded bg-accent/15" />
+                <div className="h-2 w-2/3 rounded bg-accent/15" />
+              </div>
+            </div>
+          </div>
+          <div className="flex items-center gap-2 text-xs text-fg-muted">
+            <Icon name="check" className="h-4 w-4 text-accent" />
+            You review it and send it yourself
+          </div>
+    </>
+  )
+}
+
+function QueueRows() {
+  return (
+    <>
+      <Row title="Why most LinkedIn advice fails consultants" status="Pending review" archetype="Thought leadership" stage="awareness" />
+      <Row title="What we changed after last quarter" status="Approved" archetype="Personal story" stage="consideration" />
+      <Row title="A 3-slide breakdown of the offer" status="Scheduled" archetype="Carousel" stage="decision" />
+    </>
+  )
+}
+
+export type PanelVariant = 'hero' | 'queue' | 'schedule' | 'engagement' | 'measure'
 
 export default function ProductPanel({ variant }: { variant: PanelVariant }) {
   if (variant === 'schedule') {
@@ -79,30 +133,31 @@ export default function ProductPanel({ variant }: { variant: PanelVariant }) {
     )
   }
 
+  // The hero's one bold element: the approval queue and the suggestion you send yourself, side by
+  // side in one frame, so the product (not a card) carries the fold.
+  if (variant === 'hero') {
+    return (
+      <Panel label="Diagram of LEM: the approval queue with three drafts beside a suggested comment you edit and send yourself.">
+        <div className="grid gap-4 xl:grid-cols-[3fr_2fr]">
+          <div className="space-y-3">
+            <QueueRows />
+          </div>
+          <div className="space-y-3">
+            <EngagementPane />
+          </div>
+        </div>
+        <div className="flex items-center gap-2 rounded-lg bg-page px-3 py-2 text-xs text-fg">
+          <Icon name="shield" className="h-4 w-4 text-accent" />
+          Posts publish only after you approve them
+        </div>
+      </Panel>
+    )
+  }
+
   if (variant === 'engagement') {
     return (
       <Panel label="Diagram of a LEM comment suggestion under a targeted post, for you to edit and send yourself.">
-        <div className="rounded-lg border border-hairline p-3">
-          <div className="h-2 w-1/3 rounded bg-page" />
-          <div className="mt-2 space-y-1.5">
-            <div className="h-2 w-full rounded bg-page" />
-            <div className="h-2 w-4/5 rounded bg-page" />
-          </div>
-          <div className="mt-3 rounded-lg border border-accent/30 bg-page p-3">
-            <div className="flex items-center gap-2 text-xs font-semibold text-accent">
-              <Icon name="chat" className="h-4 w-4" />
-              Suggested comment, in your voice
-            </div>
-            <div className="mt-2 space-y-1.5">
-              <div className="h-2 w-full rounded bg-accent/15" />
-              <div className="h-2 w-2/3 rounded bg-accent/15" />
-            </div>
-          </div>
-        </div>
-        <div className="flex items-center gap-2 text-xs text-fg-muted">
-          <Icon name="check" className="h-4 w-4 text-accent" />
-          You review it and send it yourself
-        </div>
+        <EngagementPane />
       </Panel>
     )
   }
@@ -125,9 +180,7 @@ export default function ProductPanel({ variant }: { variant: PanelVariant }) {
 
   return (
     <Panel label="Diagram of the LEM approval queue: three drafts, one approved, one waiting for review and one scheduled.">
-      <Row title="Why most LinkedIn advice fails consultants" status="Pending review" meta="Thought leadership · awareness" />
-      <Row title="What we changed after last quarter" status="Approved" meta="Personal story · consideration" />
-      <Row title="A 3-slide breakdown of the offer" status="Scheduled" meta="Carousel · decision" />
+      <QueueRows />
       <div className="flex items-center gap-2 rounded-lg bg-page px-3 py-2 text-xs text-fg">
         <Icon name="shield" className="h-4 w-4 text-accent" />
         Posts publish only after you approve them
