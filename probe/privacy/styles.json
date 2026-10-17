@@ -1,0 +1,69 @@
+{
+ "1440x900-light": {
+  "colors": [
+   "#054db1",
+   "#1f2c37",
+   "#33414d",
+   "#5b6670",
+   "#a3aeb8",
+   "#e8edf2",
+   "#f9f9f9",
+   "#ffffff",
+   "oklab(0.999994 0.0000455678 0.0000200868 / 0.95)"
+  ],
+  "font_families": [
+   "Inter"
+  ],
+  "body_font_px": 17,
+  "longest_paragraph_chars_est": 68
+ },
+ "1440x900-dark": {
+  "colors": [
+   "#111a22",
+   "#1f2c37",
+   "#33414d",
+   "#7fb0ff",
+   "#a3aeb8",
+   "#e8edf2",
+   "oklab(0.286273 -0.0116019 -0.0243032 / 0.95)"
+  ],
+  "font_families": [
+   "Inter"
+  ],
+  "body_font_px": 17,
+  "longest_paragraph_chars_est": 68
+ },
+ "390x844-light": {
+  "colors": [
+   "#054db1",
+   "#1f2c37",
+   "#33414d",
+   "#5b6670",
+   "#a3aeb8",
+   "#e8edf2",
+   "#f9f9f9",
+   "oklab(0.999994 0.0000455678 0.0000200868 / 0.95)"
+  ],
+  "font_families": [
+   "Inter"
+  ],
+  "body_font_px": 16,
+  "longest_paragraph_chars_est": 60
+ },
+ "390x844-dark": {
+  "colors": [
+   "#111a22",
+   "#1f2c37",
+   "#33414d",
+   "#7fb0ff",
+   "#a3aeb8",
+   "#e8edf2",
+   "oklab(0.286273 -0.0116019 -0.0243032 / 0.95)"
+  ],
+  "font_families": [
+   "Inter"
+  ],
+  "body_font_px": 16,
+  "longest_paragraph_chars_est": 60
+ }
+}
