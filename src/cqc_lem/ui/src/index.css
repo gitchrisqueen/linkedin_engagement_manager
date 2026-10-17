@@ -1,5 +1,15 @@
 @import "tailwindcss";
 
+/* Inter, self-hosted (OFL-1.1, rsms/inter v4.1 web/InterVariable.woff2; licence beside the file).
+   Imported through Vite so it ships hashed under /assets with the rest of the build. */
+@font-face {
+  font-family: 'Inter';
+  src: url('./assets/fonts/InterVariable.woff2') format('woff2');
+  font-weight: 100 900;
+  font-style: normal;
+  font-display: swap;
+}
+
 /* The ONE place brand colour is defined (issue #1300). The four source values come from the
    owner-authored package in `logo/06 Color Palette/LEM_Brand_Palette.txt` (PR #1294); everything
    else here is derived from them and contrast-checked. `utils/brandTokens.ts` mirrors these hexes
@@ -77,6 +87,7 @@
   --lem-hairline: #d7dce1;
   --lem-field-border: #7a8590;
   color-scheme: light;
+  font-family: 'Inter', system-ui, 'Segoe UI', Roboto, sans-serif;
 }
 
 .lem-marketing[data-theme='dark'] {
