@@ -1,15 +1,16 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { ReactNode } from 'react'
-import { cleanup, render, screen } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import SubscriptionCard from './SubscriptionCard'
 
 const get = vi.fn()
+const post = vi.fn()
 
 vi.mock('../../api/client', () => ({
   default: {
     get: (...args: unknown[]) => get(...args),
-    post: vi.fn(),
+    post: (...args: unknown[]) => post(...args),
   },
 }))
 vi.mock('../../contexts/useAuth', () => ({ useAuth: () => ({ sessionToken: 'tok' }) }))
@@ -42,7 +43,10 @@ function harness(ui: ReactNode) {
 
 const iso = (offsetMs: number) => new Date(Date.now() + offsetMs).toISOString()
 
-beforeEach(() => get.mockReset())
+beforeEach(() => {
+  get.mockReset()
+  post.mockReset()
+})
 afterEach(() => {
   cleanup()
   vi.clearAllMocks()
@@ -89,5 +93,37 @@ describe('SubscriptionCard trial-expiry notice', () => {
     // Wait for the settings to land, so the absence below is measured on a loaded card.
     await screen.findByText(loaded)
     expect(screen.queryByTestId('trial-expired-notice')).toBeNull()
+  })
+})
+
+// Issue #2370: the account checkout selector offers the recommended plan only during the pricing
+// test. The trial is the state this card upgrades FROM, so it is not a purchasable option here.
+// A subscriber already on a hidden tier still sees that tier's name.
+describe('SubscriptionCard upgrade options during the pricing test (issue #2370)', () => {
+  it('offers exactly the recommended plan, at its unchanged price', async () => {
+    get.mockResolvedValue(settings({ status: 'trial', tier: 'free_trial', trial_ends_at: null }))
+    harness(<SubscriptionCard />)
+    const heading = await screen.findByText('Upgrade your plan')
+    const offer = heading.parentElement as HTMLElement
+    const buttons = Array.from(offer.querySelectorAll('button'))
+    expect(buttons.map((b) => b.textContent)).toEqual(['Professional$79/mo'])
+    expect(offer.textContent).not.toMatch(/Starter|Enterprise|\$29|\$199/)
+  })
+
+  it('checks out the recommended tier id', async () => {
+    get.mockResolvedValue(settings({ status: 'trial', tier: 'free_trial', trial_ends_at: null }))
+    post.mockResolvedValue({ data: { detail: { checkout_url: null, upgraded: true } } })
+    harness(<SubscriptionCard />)
+    fireEvent.click(await screen.findByRole('button', { name: /Professional/ }))
+    await waitFor(() => expect(post).toHaveBeenCalled())
+    expect(post.mock.calls[0][0]).toBe('/billing/create-checkout-session')
+    expect(post.mock.calls[0][1]).toMatchObject({ tier: 'professional' })
+  })
+
+  it('still names a hidden tier for a subscriber already on it', async () => {
+    get.mockResolvedValue(settings({ status: 'active', tier: 'starter', trial_ends_at: null }))
+    harness(<SubscriptionCard />)
+    expect(await screen.findByText('Starter')).toBeTruthy()
+    expect(screen.queryByText('Upgrade your plan')).toBeNull()
   })
 })

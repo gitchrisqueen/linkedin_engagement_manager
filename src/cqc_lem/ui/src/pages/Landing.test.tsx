@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { act, cleanup, render, screen, waitFor, within } from '@testing-library/react'
 import type { ReactNode } from 'react'
 import App from '../App'
+import { SHOWN_PLANS } from '../constants/plans'
 
 // The front page had no test at all before issue #1300 — 59 test files under `ui/src` and zero on
 // the one surface a prospect sees before signing up. These render the WHOLE logged-out route tree
@@ -390,7 +391,8 @@ describe('landing analytics (issue #1300)', () => {
   it('names every pricing button with its visible text (WCAG 2.5.3)', () => {
     const { container } = renderApp()
     const buttons = [...container.querySelectorAll('[data-section="pricing"] button')]
-    expect(buttons.length).toBe(4)
+    // One button per plan the pricing section shows (issue #2370 pricing test: trial + recommended).
+    expect(buttons.length).toBe(SHOWN_PLANS.length)
     for (const button of buttons) {
       const visible = (button.textContent ?? '').trim()
       expect(button.getAttribute('aria-label') ?? '', visible).toContain(visible)
