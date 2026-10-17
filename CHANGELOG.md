@@ -1,5 +1,27 @@
 # Changelog
 
+## [0.197.0](https://github.com/christopherqueenconsulting/linkedin_engagement_manager/compare/v0.196.1...v0.197.0) (2026-10-17)
+
+
+### Features
+
+* **signup:** cap the P0 trial cohort at 25 with a join-the-list form (closes [#2377](https://github.com/christopherqueenconsulting/linkedin_engagement_manager/issues/2377)) ([#2410](https://github.com/christopherqueenconsulting/linkedin_engagement_manager/issues/2410)) ([7ef66e8](https://github.com/christopherqueenconsulting/linkedin_engagement_manager/commit/7ef66e8ab9a44b44ceca2619db454f0d737f90a0))
+* **signup:** P0 trial cohort cap with a join-the-list form ([7ef66e8](https://github.com/christopherqueenconsulting/linkedin_engagement_manager/commit/7ef66e8ab9a44b44ceca2619db454f0d737f90a0)), closes [#2377](https://github.com/christopherqueenconsulting/linkedin_engagement_manager/issues/2377)
+* **ui:** brand pack design pass for the signed-in app ([#2445](https://github.com/christopherqueenconsulting/linkedin_engagement_manager/issues/2445)) ([97daf76](https://github.com/christopherqueenconsulting/linkedin_engagement_manager/commit/97daf768d86820de8c202f866b9822cd66948b8d))
+* **ui:** homepage and legal pages on the brand pack (design pass 1) ([#2443](https://github.com/christopherqueenconsulting/linkedin_engagement_manager/issues/2443)) ([1a82d02](https://github.com/christopherqueenconsulting/linkedin_engagement_manager/commit/1a82d02d0027e76e3a72427da611cd40c3c648c7))
+
+
+### Bug Fixes
+
+* **dms:** record per-route probe evidence for the follow-up thread ladder (refs [#2325](https://github.com/christopherqueenconsulting/linkedin_engagement_manager/issues/2325)) ([#2415](https://github.com/christopherqueenconsulting/linkedin_engagement_manager/issues/2415)) ([129d77c](https://github.com/christopherqueenconsulting/linkedin_engagement_manager/commit/129d77c871ed21267cae32924161ab4684b97abb))
+* **email:** trial-facing emails no longer promise automated engagement (closes [#2375](https://github.com/christopherqueenconsulting/linkedin_engagement_manager/issues/2375)) ([#2411](https://github.com/christopherqueenconsulting/linkedin_engagement_manager/issues/2411)) ([2f29e25](https://github.com/christopherqueenconsulting/linkedin_engagement_manager/commit/2f29e250de8c76fc532af5022e50a93c8712cea7))
+* **landing:** align landing copy with the free-trial scope (copy half of [#2366](https://github.com/christopherqueenconsulting/linkedin_engagement_manager/issues/2366)) ([#2382](https://github.com/christopherqueenconsulting/linkedin_engagement_manager/issues/2382)) ([24e7beb](https://github.com/christopherqueenconsulting/linkedin_engagement_manager/commit/24e7beb3bfe0609d49b06d82ae1bfb6e538a2d95))
+
+
+### Documentation
+
+* **brand:** LEM brand pack (draft for brand-owner review) ([#2441](https://github.com/christopherqueenconsulting/linkedin_engagement_manager/issues/2441)) ([d882941](https://github.com/christopherqueenconsulting/linkedin_engagement_manager/commit/d8829414474e96eab9a7e6611dfd8af8bb3818a6))
+
 ## [0.196.1](https://github.com/christopherqueenconsulting/linkedin_engagement_manager/compare/v0.196.0...v0.196.1) (2026-10-17)
 
 
