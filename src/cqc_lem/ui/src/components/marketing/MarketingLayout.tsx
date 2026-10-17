@@ -11,7 +11,7 @@ import MarketingNav from './MarketingNav'
 // reads as having left the site.
 export default function MarketingLayout() {
   return (
-    <div className="min-h-screen flex flex-col bg-white">
+    <div className="lem-marketing min-h-screen flex flex-col bg-page text-fg">
       {/* The keyboard user's way past the nav. Visually hidden until it takes focus. */}
       <a
         href="#main"

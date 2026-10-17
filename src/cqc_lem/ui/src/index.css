@@ -61,6 +61,65 @@
   --shadow-card: 0 1px 2px rgb(31 44 55 / 0.06), 0 8px 24px rgb(31 44 55 / 0.06);
 }
 
+/* The brand pack's semantic tokens (brand/lem/DESIGN.md, approved 2026-10-16), light and dark.
+   The marketing tree draws with these; the app tree keeps the @theme steps above until its own
+   pass. The values live in custom properties rather than @theme so one class can flip them:
+   `.lem-marketing` follows the visitor's colour scheme, and `data-theme` on it pins one.
+   `utils/brandTokens.ts` (PACK_THEMES) mirrors every value below, and its test holds the pairs.
+   Dark `primary` is the pack's lifted blue: brand-600 is still never a foreground on charcoal. */
+.lem-marketing {
+  --lem-bg: #f9f9f9;
+  --lem-surface: #ffffff;
+  --lem-text: #1f2c37;
+  --lem-muted: #5b6670;
+  --lem-primary: #054db1;
+  --lem-on-primary: #ffffff;
+  --lem-hairline: #d7dce1;
+  --lem-field-border: #7a8590;
+  color-scheme: light;
+}
+
+.lem-marketing[data-theme='dark'] {
+  --lem-bg: #111a22;
+  --lem-surface: #1f2c37;
+  --lem-text: #e8edf2;
+  --lem-muted: #a3aeb8;
+  --lem-primary: #7fb0ff;
+  --lem-on-primary: #111a22;
+  --lem-hairline: #33414d;
+  --lem-field-border: #7b8894;
+  color-scheme: dark;
+}
+
+@media (prefers-color-scheme: dark) {
+  .lem-marketing:not([data-theme='light']) {
+    --lem-bg: #111a22;
+    --lem-surface: #1f2c37;
+    --lem-text: #e8edf2;
+    --lem-muted: #a3aeb8;
+    --lem-primary: #7fb0ff;
+    --lem-on-primary: #111a22;
+    --lem-hairline: #33414d;
+    --lem-field-border: #7b8894;
+    color-scheme: dark;
+  }
+}
+
+@theme inline {
+  --color-page: var(--lem-bg);
+  --color-raised: var(--lem-surface);
+  --color-fg: var(--lem-text);
+  --color-fg-muted: var(--lem-muted);
+  --color-accent: var(--lem-primary);
+  --color-on-accent: var(--lem-on-primary);
+  --color-hairline: var(--lem-hairline);
+  --color-field: var(--lem-field-border);
+
+  --radius-control: 6px;
+  --radius-panel: 10px;
+  --shadow-panel: 0 1px 2px rgb(31 44 55 / 0.08);
+}
+
 body {
   margin: 0;
   font-family: system-ui, 'Segoe UI', Roboto, sans-serif;
