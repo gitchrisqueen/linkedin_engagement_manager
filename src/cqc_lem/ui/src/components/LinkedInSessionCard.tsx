@@ -130,7 +130,7 @@ export default function LinkedInSessionCard({
           </div>
           <a
             href="/api/extension/linkedin-connect.zip"
-            className="shrink-0 bg-accent text-white px-3 py-2 rounded-lg text-xs font-semibold hover:bg-accent/90 transition-colors"
+            className="shrink-0 bg-accent text-white px-3 py-2 rounded-control text-xs font-semibold hover:bg-accent/90 transition-colors"
           >
             Download extension
           </a>
@@ -184,7 +184,7 @@ export default function LinkedInSessionCard({
           type="password"
           value={liAt}
           onChange={(e) => setLiAt(e.target.value)}
-          className="w-full border border-field rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent"
+          className="w-full border border-field rounded-control px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent"
           placeholder="paste your LinkedIn li_at cookie value"
           autoComplete="off"
         />

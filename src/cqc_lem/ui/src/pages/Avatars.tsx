@@ -237,7 +237,7 @@ export default function Avatars() {
 
   return (
     <div className="max-w-4xl mx-auto px-4 py-8 space-y-10">
-      <h1 className="text-2xl font-bold text-fg">My Avatars</h1>
+      <h1 className="text-section lg:text-section-lg font-semibold text-fg">My Avatars</h1>
 
       {/* Credit balance + usage */}
       <div
@@ -263,20 +263,20 @@ export default function Avatars() {
 
       {/* Guardrails */}
       <section data-testid="avatar-guardrails">
-        <h2 className="text-lg font-semibold text-fg mb-1">Where your avatar may be used</h2>
+        <h2 className="text-xl font-semibold text-fg mb-1">Where your avatar may be used</h2>
         <p className="text-sm text-fg-muted mb-4">
           Off by default. Your avatar is only used on the content types you switch on here, and only
           after you have approved its preview images. Posts you compose can override this per post.
         </p>
 
-        <div className="border border-hairline rounded-xl divide-y divide-hairline bg-raised">
+        <div className="border border-hairline rounded-panel divide-y divide-hairline bg-raised">
           <label className="flex items-start gap-3 px-5 py-4 cursor-pointer">
             <input
               type="checkbox"
               checked={avatarOff}
               onChange={(e) => prefsMutation.mutate({ avatar_disabled: e.target.checked })}
               data-testid="avatar-disabled-toggle"
-              className="mt-0.5 h-4 w-4 rounded border-field text-danger focus:ring-danger"
+              className="mt-0.5 h-4 w-4 rounded-control border-field text-danger focus:ring-danger"
             />
             <span>
               <span className="block text-sm font-semibold text-fg">Don’t use my avatar</span>
@@ -297,7 +297,7 @@ export default function Avatars() {
                 checked={!!prefs?.[g.key]}
                 onChange={(e) => prefsMutation.mutate({ [g.key]: e.target.checked })}
                 data-testid={`avatar-toggle-${g.key}`}
-                className="mt-0.5 h-4 w-4 rounded border-field text-accent focus:ring-accent"
+                className="mt-0.5 h-4 w-4 rounded-control border-field text-accent focus:ring-accent"
               />
               <span>
                 <span className="block text-sm font-medium text-fg">{g.label}</span>
@@ -310,7 +310,7 @@ export default function Avatars() {
 
       {/* Pricing */}
       <section>
-        <h2 className="text-lg font-semibold text-fg mb-4">Buy Training Credits</h2>
+        <h2 className="text-xl font-semibold text-fg mb-4">Buy Training Credits</h2>
         <p className="text-sm text-fg-muted mb-5">
           Each credit lets you train one personalized AI avatar using your photos on Replicate's
           FLUX.1 model. Training takes ~2 minutes.
@@ -328,7 +328,7 @@ export default function Avatars() {
                   {pkg.badge}
                 </span>
               )}
-              <span className="text-2xl font-bold text-fg">{pkg.price}</span>
+              <span className="text-section font-semibold tabular-nums text-fg">{pkg.price}</span>
               <span className="text-sm font-medium text-fg">{pkg.label}</span>
               {pkg.savings && (
                 <span className="text-xs text-success font-semibold">{pkg.savings}</span>

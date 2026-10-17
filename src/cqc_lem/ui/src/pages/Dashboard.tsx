@@ -1,4 +1,5 @@
 import { useQuery } from '@tanstack/react-query'
+import Icon, { type IconName } from '../components/marketing/Icon'
 import { Link } from 'react-router-dom'
 import api from '../api/client'
 import type { ApiEnvelope, GetDetail } from '../api/types'
@@ -254,10 +255,10 @@ const ACTION_ICONS: Record<string, string> = {
   group_comment: '👥',
 }
 
-const KIND_ICONS: Record<string, string> = {
-  Post: '📝',
-  DM: '✉️',
-  Newsletter: '📰',
+const KIND_ICONS: Record<string, IconName> = {
+  Post: 'pen',
+  DM: 'chat',
+  Newsletter: 'users',
 }
 
 const STATUS_COLORS: Record<string, string> = {
@@ -268,11 +269,27 @@ const STATUS_COLORS: Record<string, string> = {
   PLANNING: 'bg-page text-fg-muted',
 }
 
-function StatCard({ label, value, color }: { label: string; value: number; color: string }) {
+// One tile carries the page: the count waiting on the user, filled primary and linking to the
+// review queue. The other two are quiet numbers on the hairline.
+function StatCard({ label, value, to }: { label: string; value: number; to?: string }) {
+  if (to) {
+    return (
+      <Link
+        to={to}
+        className="group block rounded-panel bg-accent p-5 text-on-accent shadow-panel transition-colors hover:bg-accent/90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+      >
+        <p className="text-section-lg font-semibold tabular-nums">{value}</p>
+        <p className="mt-1 flex items-center gap-2 text-sm font-medium">
+          {label}
+          <Icon name="arrowRight" className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
+        </p>
+      </Link>
+    )
+  }
   return (
-    <div className={`bg-raised rounded-lg p-5 border-l-4 ${color} shadow-sm`}>
-      <p className="text-2xl font-bold text-fg">{value}</p>
-      <p className="text-sm text-fg-muted mt-1">{label}</p>
+    <div className="rounded-panel border border-hairline bg-raised p-5">
+      <p className="text-section-lg font-semibold tabular-nums text-fg">{value}</p>
+      <p className="mt-1 text-sm text-fg-muted">{label}</p>
     </div>
   )
 }
@@ -417,17 +434,17 @@ export default function Dashboard() {
       {/* Title plus both CTAs need ~390px of one line — more than a 375px phone has, so the row
           wraps instead of pushing "Review Posts" off the screen (issue #894). */}
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <h1 className="text-2xl font-bold text-fg">Dashboard</h1>
+        <h1 className="text-section font-semibold tabular-nums text-fg">Dashboard</h1>
         <div className="flex flex-wrap gap-2">
           <Link
             to="/content"
-            className="bg-accent text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-accent/90 transition-colors"
+            className="min-h-11 inline-flex items-center border border-field bg-raised text-fg px-4 rounded-control text-sm font-semibold hover:bg-page transition-colors"
           >
             + Schedule Post
           </Link>
           <Link
             to="/content?tab=review"
-            className="border border-hairline text-fg-muted px-4 py-2 rounded-lg text-sm font-semibold hover:bg-page transition-colors"
+            className="min-h-11 inline-flex items-center px-2 text-sm font-semibold text-accent hover:underline"
           >
             Review Posts
           </Link>
@@ -439,9 +456,9 @@ export default function Dashboard() {
 
       {/* Stats */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <StatCard label="Scheduled this week" value={stats.scheduled_this_week} color="border-accent" />
-        <StatCard label="Pending review" value={stats.pending_review} color="border-warning" />
-        <StatCard label="Total posted" value={stats.posted_total} color="border-success" />
+        <StatCard label="Pending review" value={stats.pending_review} to="/content?tab=review" />
+        <StatCard label="Scheduled this week" value={stats.scheduled_this_week} />
+        <StatCard label="Total posted" value={stats.posted_total} />
       </div>
 
       {/* Live stats (PostHog Endpoints, #654) — renders nothing until provisioned/configured */}
@@ -464,14 +481,14 @@ export default function Dashboard() {
             <>
               <div className="grid grid-cols-2 sm:grid-cols-5 gap-4">
                 <div>
-                  <p className="text-2xl font-bold text-fg">
+                  <p className="text-section font-semibold tabular-nums text-fg">
                     {audience?.follower_count != null ? compactNumber(audience.follower_count) : '—'}
                   </p>
                   <p className="text-xs text-fg-muted mt-0.5">Followers</p>
                 </div>
                 {['7', '30'].map((w) => (
                   <div key={w}>
-                    <p className={`text-2xl font-bold ${deltaColor(audience?.deltas?.[w])}`}>
+                    <p className={`text-section font-semibold tabular-nums ${deltaColor(audience?.deltas?.[w])}`}>
                       {formatDelta(audience?.deltas?.[w])}
                     </p>
                     <p className="text-xs text-fg-muted mt-0.5">{w}-day change</p>
@@ -479,13 +496,13 @@ export default function Dashboard() {
                   </div>
                 ))}
                 <div>
-                  <p className="text-2xl font-bold text-fg">
+                  <p className="text-section font-semibold tabular-nums text-fg">
                     {audience?.profile_views != null ? compactNumber(audience.profile_views) : '—'}
                   </p>
                   <p className="text-xs text-fg-muted mt-0.5">Profile views</p>
                 </div>
                 <div>
-                  <p className="text-2xl font-bold text-fg">
+                  <p className="text-section font-semibold tabular-nums text-fg">
                     {audience?.connection_count != null ? compactNumber(audience.connection_count) : '—'}
                   </p>
                   <p className="text-xs text-fg-muted mt-0.5">Connections</p>
@@ -556,7 +573,7 @@ export default function Dashboard() {
               <div className="grid grid-cols-3 gap-4">
                 {['value', 'authority', 'promo'].map((k) => (
                   <div key={k}>
-                    <p className="text-2xl font-bold text-fg">{formatPct(mix.ratios[k])}</p>
+                    <p className="text-section font-semibold tabular-nums text-fg">{formatPct(mix.ratios[k])}</p>
                     <p className="text-xs text-fg-muted mt-0.5">
                       {MIX_LABELS[k]} — {mix.counts[k] ?? 0} of {mix.total}
                     </p>
@@ -599,21 +616,21 @@ export default function Dashboard() {
               </div>
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
                 <div>
-                  <p className="text-2xl font-bold text-fg">
+                  <p className="text-section font-semibold tabular-nums text-fg">
                     {formatPct(commentQuality.author_reply_rate)}
                   </p>
                   <p className="text-xs text-fg-muted mt-0.5">Author replied</p>
                 </div>
                 <div>
-                  <p className="text-2xl font-bold text-fg">{formatPct(commentQuality.reply_rate)}</p>
+                  <p className="text-section font-semibold tabular-nums text-fg">{formatPct(commentQuality.reply_rate)}</p>
                   <p className="text-xs text-fg-muted mt-0.5">Earned any reply</p>
                 </div>
                 <div>
-                  <p className="text-2xl font-bold text-fg">{formatPct(commentQuality.like_rate)}</p>
+                  <p className="text-section font-semibold tabular-nums text-fg">{formatPct(commentQuality.like_rate)}</p>
                   <p className="text-xs text-fg-muted mt-0.5">Earned a like</p>
                 </div>
                 <div>
-                  <p className="text-2xl font-bold text-fg">
+                  <p className="text-section font-semibold tabular-nums text-fg">
                     {formatPct(commentQuality.demotion_rate)}
                   </p>
                   <p className="text-xs text-fg-muted mt-0.5">
@@ -657,7 +674,7 @@ export default function Dashboard() {
               </div>
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
                 <div>
-                  <p className="text-2xl font-bold text-fg">
+                  <p className="text-section font-semibold tabular-nums text-fg">
                     {formatScore(contentQuality.current.slop_score_avg)}
                   </p>
                   <p className="text-xs text-fg-muted mt-0.5">
@@ -668,7 +685,7 @@ export default function Dashboard() {
                   </p>
                 </div>
                 <div>
-                  <p className="text-2xl font-bold text-fg">
+                  <p className="text-section font-semibold tabular-nums text-fg">
                     {formatScore(contentQuality.current.similarity_avg)}
                   </p>
                   <p className="text-xs text-fg-muted mt-0.5">
@@ -679,7 +696,7 @@ export default function Dashboard() {
                   </p>
                 </div>
                 <div>
-                  <p className="text-2xl font-bold text-fg">
+                  <p className="text-section font-semibold tabular-nums text-fg">
                     {formatScore(contentQuality.current.authenticity_avg, 0)}
                   </p>
                   <p className="text-xs text-fg-muted mt-0.5">
@@ -690,7 +707,7 @@ export default function Dashboard() {
                   </p>
                 </div>
                 <div>
-                  <p className="text-2xl font-bold text-fg">
+                  <p className="text-section font-semibold tabular-nums text-fg">
                     {contentQuality.current.engagement_rate == null
                       ? '—'
                       : `${(contentQuality.current.engagement_rate * 100).toFixed(2)}%`}
@@ -734,19 +751,19 @@ export default function Dashboard() {
               {/* KPI row */}
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
                 <div>
-                  <p className="text-2xl font-bold text-fg">{perPost.length}</p>
+                  <p className="text-section font-semibold tabular-nums text-fg">{perPost.length}</p>
                   <p className="text-xs text-fg-muted mt-0.5">Posts measured</p>
                 </div>
                 <div>
-                  <p className="text-2xl font-bold text-fg">{compactNumber(totalImpressions)}</p>
+                  <p className="text-section font-semibold tabular-nums text-fg">{compactNumber(totalImpressions)}</p>
                   <p className="text-xs text-fg-muted mt-0.5">Impressions</p>
                 </div>
                 <div>
-                  <p className="text-2xl font-bold text-fg">{compactNumber(totalEngagement)}</p>
+                  <p className="text-section font-semibold tabular-nums text-fg">{compactNumber(totalEngagement)}</p>
                   <p className="text-xs text-fg-muted mt-0.5">Engagement (weighted)</p>
                 </div>
                 <div>
-                  <p className="text-2xl font-bold text-fg">
+                  <p className="text-section font-semibold tabular-nums text-fg">
                     {overallRate != null ? formatRate(overallRate) : '—'}
                   </p>
                   <p className="text-xs text-fg-muted mt-0.5">Engagement rate</p>
@@ -788,9 +805,9 @@ export default function Dashboard() {
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Planned Tasks — upcoming posts queue */}
-        <div className="bg-raised rounded-lg shadow-sm border border-hairline p-5">
+        <div className="bg-raised rounded-panel shadow-panel border border-hairline p-5">
           <div className="flex items-center justify-between mb-4">
-            <h2 className="text-lg font-semibold text-fg">Planned Tasks</h2>
+            <h2 className="text-xl font-semibold text-fg">Planned Tasks</h2>
             <Link to="/content?tab=review" className="text-xs text-accent hover:underline">
               Manage all
             </Link>
@@ -810,12 +827,14 @@ export default function Dashboard() {
               {upcoming.map((task) => (
                 <li
                   key={`${task.kind}-${task.id}`}
-                  className="flex items-start gap-3 p-3 rounded-lg bg-page hover:bg-page transition-colors"
+                  className="flex items-start gap-3 p-3 rounded-lg bg-page hover:bg-accent/5 transition-colors"
                 >
-                  <div className="mt-0.5 text-lg flex-shrink-0">{KIND_ICONS[task.kind] ?? '🔔'}</div>
+                  <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-control bg-raised text-accent" aria-hidden="true">
+                    <Icon name={KIND_ICONS[task.kind] ?? 'clock'} className="h-4 w-4" />
+                  </span>
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 mb-0.5">
-                      <span className="text-xs font-semibold uppercase tracking-wide text-fg-muted">
+                      <span className="text-xs font-semibold text-fg-muted">
                         {task.kind}
                       </span>
                       <span className="text-xs text-fg-muted">
@@ -840,8 +859,8 @@ export default function Dashboard() {
         {/* Activity Feed — what has happened */}
         {/* h-full fills the grid row (as tall as the Planned Tasks sibling); the viewport cap keeps
             a long feed from growing the row past the screen, so it inner-scrolls instead. */}
-        <div className="bg-raised rounded-lg shadow-sm border border-hairline p-5 flex flex-col h-full max-h-[calc(100vh-8rem)]">
-          <h2 className="text-lg font-semibold text-fg mb-4">Activity Feed</h2>
+        <div className="bg-raised rounded-panel shadow-panel border border-hairline p-5 flex flex-col h-full max-h-[calc(100vh-8rem)]">
+          <h2 className="text-xl font-semibold text-fg mb-4">Activity Feed</h2>
           {activity.length === 0 ? (
             <p className="text-sm text-fg-muted text-center py-6">
               No activity yet. Posts, comments, DMs, and replies will appear here.
@@ -919,7 +938,7 @@ export default function Dashboard() {
                   aria-hidden="true"
                   className="pointer-events-none absolute inset-x-0 bottom-0 flex justify-center items-end h-10 bg-gradient-to-t from-white via-white/85 to-transparent"
                 >
-                  <span className="text-xs font-medium uppercase tracking-wide text-fg-muted">
+                  <span className="text-xs font-medium text-fg-muted">
                     Scroll for more ↓
                   </span>
                 </div>

@@ -583,7 +583,7 @@ export default function ContentStudio() {
     <div className="space-y-4">
       {/* Header */}
       <div className="flex items-center justify-between flex-wrap gap-3">
-        <h1 className="text-2xl font-bold text-fg">Content Studio</h1>
+        <h1 className="text-section font-semibold tabular-nums text-fg">Content Studio</h1>
         {view === 'review' && (
           <button
             onClick={() => weeklyMutation.mutate()}
@@ -741,7 +741,7 @@ export default function ContentStudio() {
             onChange={(e) => setSearchInput(e.target.value)}
             placeholder='Search posts… e.g.  ai AND "case study" NOT hiring'
             aria-label="Search posts by keyword"
-            className="w-full border border-field rounded-lg pl-9 pr-8 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent"
+            className="w-full border border-field rounded-control pl-9 pr-8 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent"
           />
           {searchInput && (
             <button
@@ -768,7 +768,7 @@ export default function ContentStudio() {
           <select
             value={filterPostType}
             onChange={(e) => { setFilterPostType(e.target.value as PostTypeFilter); setPage(1); setSelectedIds(new Set()) }}
-            className="border border-field rounded-lg px-2 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-accent"
+            className="border border-field rounded-control px-2 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-accent"
           >
             {POST_TYPE_FILTERS.map((t) => (
               <option key={t.value} value={t.value}>{t.label}</option>
@@ -781,7 +781,7 @@ export default function ContentStudio() {
             value={dateRange}
             onChange={(e) => { setDateRange(e.target.value as DateRangeFilter); setPage(1); setSelectedIds(new Set()) }}
             aria-label="Date range preset"
-            className="border border-field rounded-lg px-2 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-accent"
+            className="border border-field rounded-control px-2 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-accent"
           >
             {DATE_RANGE_FILTERS.map((d) => (
               <option key={d.value} value={d.value}>{d.label}</option>
@@ -795,7 +795,7 @@ export default function ContentStudio() {
               value={customStartDate}
               onChange={(e) => { setCustomStartDate(e.target.value); setPage(1); setSelectedIds(new Set()) }}
               aria-label="Custom start date"
-              className="border border-field rounded-lg px-2 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-accent"
+              className="border border-field rounded-control px-2 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-accent"
             />
             <span>to</span>
             <input
@@ -803,7 +803,7 @@ export default function ContentStudio() {
               value={customEndDate}
               onChange={(e) => { setCustomEndDate(e.target.value); setPage(1); setSelectedIds(new Set()) }}
               aria-label="Custom end date"
-              className="border border-field rounded-lg px-2 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-accent"
+              className="border border-field rounded-control px-2 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-accent"
             />
           </div>
         )}
@@ -812,7 +812,7 @@ export default function ContentStudio() {
           <select
             value={sortBy}
             onChange={(e) => { setSortBy(e.target.value as SortBy); resetPage() }}
-            className="border border-field rounded-lg px-2 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-accent"
+            className="border border-field rounded-control px-2 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-accent"
           >
             {SORT_BY_OPTIONS.map((o) => (
               <option key={o.value} value={o.value}>{o.label}</option>
@@ -821,7 +821,7 @@ export default function ContentStudio() {
         </label>
         <button
           onClick={() => { setSortOrder((o) => (o === 'asc' ? 'desc' : 'asc')); resetPage() }}
-          className="flex items-center gap-1 text-fg-muted border border-field rounded-lg px-3 py-1.5 hover:border-accent/50 transition-colors text-xs font-medium"
+          className="flex items-center gap-1 text-fg-muted border border-field rounded-control px-3 py-1.5 hover:border-accent/50 transition-colors text-xs font-medium"
         >
           {sortBy === 'scheduled_time'
             ? (sortOrder === 'asc' ? '↑ Oldest first' : '↓ Newest first')
@@ -854,7 +854,7 @@ export default function ContentStudio() {
             <select
               value={bulkStatus}
               onChange={(e) => setBulkStatus(e.target.value)}
-              className="border border-field rounded px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-accent"
+              className="border border-field rounded-control px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-accent"
             >
               {['pending', 'approved', 'scheduled', 'posted', 'rejected'].map((s) => (
                 <option key={s} value={s}>{s.toUpperCase()}</option>
@@ -863,7 +863,7 @@ export default function ContentStudio() {
             <button
               onClick={() => bulkUpdateMutation.mutate({ post_ids: Array.from(selectedIds), status: bulkStatus })}
               disabled={bulkUpdateMutation.isPending}
-              className="bg-accent text-white px-3 py-1 rounded text-xs font-semibold hover:bg-accent/90 disabled:opacity-50"
+              className="bg-accent text-white px-3 py-1 rounded-control text-xs font-semibold hover:bg-accent/90 disabled:opacity-50"
             >
               Apply Status
             </button>
@@ -875,7 +875,7 @@ export default function ContentStudio() {
               value={bulkDate}
               onChange={(e) => setBulkDate(e.target.value)}
               aria-label={`Bulk schedule date and time (${timezoneLabel})`}
-              className="border border-field rounded px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-accent"
+              className="border border-field rounded-control px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-accent"
             />
             <span className="text-xs text-fg-muted">{timezoneLabel}</span>
             <button
@@ -890,7 +890,7 @@ export default function ContentStudio() {
                 })
               }}
               disabled={!bulkDate || !timezoneResolved || bulkUpdateMutation.isPending}
-              className="bg-accent text-white px-3 py-1 rounded text-xs font-semibold hover:bg-accent/90 disabled:opacity-50"
+              className="bg-accent text-white px-3 py-1 rounded-control text-xs font-semibold hover:bg-accent/90 disabled:opacity-50"
             >
               Apply Date
             </button>
@@ -899,7 +899,7 @@ export default function ContentStudio() {
           <button
             onClick={() => bulkDeleteMutation.mutate(Array.from(selectedIds))}
             disabled={bulkDeleteMutation.isPending}
-            className="ml-auto bg-danger text-white px-3 py-1 rounded text-xs font-semibold hover:bg-danger/90 disabled:opacity-50"
+            className="ml-auto bg-danger text-white px-3 py-1 rounded-control text-xs font-semibold hover:bg-danger/90 disabled:opacity-50"
           >
             {bulkDeleteMutation.isPending ? 'Deleting…' : 'Delete Selected'}
           </button>
@@ -917,14 +917,14 @@ export default function ContentStudio() {
                 type="checkbox"
                 checked={allOnPageSelected}
                 onChange={toggleSelectAll}
-                className="rounded border-field text-accent focus:ring-accent"
+                className="rounded-control border-field text-accent focus:ring-accent"
               />
               Select all on this page
             </label>
           )}
 
           {posts.length === 0 && !isLoading && (
-            <div className="flex flex-col items-center text-center py-12 px-4 bg-raised rounded-lg border border-hairline">
+            <div className="flex flex-col items-center text-center py-12 px-4 bg-raised rounded-panel border border-hairline">
               <div className="text-4xl mb-4">📅</div>
               <p className="text-fg-muted text-sm mb-6 max-w-xs">
                 {hasActiveFilters
@@ -934,7 +934,7 @@ export default function ContentStudio() {
               {hasActiveFilters ? (
                 <button
                   onClick={clearFilters}
-                  className="border border-field text-fg-muted px-5 py-2 rounded-lg text-sm font-semibold hover:bg-page transition-colors"
+                  className="border border-field text-fg-muted px-5 py-2 rounded-control text-sm font-semibold hover:bg-page transition-colors"
                 >
                   Clear filters
                 </button>
@@ -942,7 +942,7 @@ export default function ContentStudio() {
                 <button
                   onClick={() => weeklyMutation.mutate()}
                   disabled={generating}
-                  className="bg-success text-white px-6 py-2.5 rounded-lg text-sm font-semibold hover:bg-success/90 disabled:opacity-50 transition-colors"
+                  className="bg-success text-white px-6 py-2.5 rounded-control text-sm font-semibold hover:bg-success/90 disabled:opacity-50 transition-colors"
                 >
                   {generateLabel}
                 </button>
@@ -964,7 +964,7 @@ export default function ContentStudio() {
                   checked={selectedIds.has(post.post_id)}
                   onChange={(e) => { e.stopPropagation(); toggleSelect(post.post_id) }}
                   onClick={(e) => e.stopPropagation()}
-                  className="mt-1 rounded border-field text-accent focus:ring-accent shrink-0"
+                  className="mt-1 rounded-control border-field text-accent focus:ring-accent shrink-0"
                 />
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center justify-between mb-1 gap-2">
@@ -972,7 +972,7 @@ export default function ContentStudio() {
                       {formatInTimezone(post.scheduled_time, userTimezone)}
                     </span>
                     <div className="flex items-center gap-1.5 shrink-0">
-                      <span className="text-xs text-fg-muted uppercase">{post.post_type}</span>
+                      <span className="text-xs text-fg-muted">{post.post_type}</span>
                       {post.manual_publish && post.status !== 'posted' && (
                         <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-warning/10 text-warning">
                           POST NATIVELY
@@ -1455,7 +1455,7 @@ export default function ContentStudio() {
               <button
                 onClick={() => setConfirmDeletePost(null)}
                 disabled={deleteMutation.isPending}
-                className="px-4 py-2 border border-field rounded-lg text-sm text-fg-muted hover:bg-page disabled:opacity-50"
+                className="px-4 py-2 border border-field rounded-lg text-sm text-fg-muted hover:bg-accent/5 disabled:opacity-50"
               >
                 Cancel
               </button>

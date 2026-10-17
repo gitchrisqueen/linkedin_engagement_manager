@@ -101,7 +101,7 @@ export function SectionCard({
   title, blurb, children,
 }: { title: string; blurb?: string; children: ReactNode }) {
   return (
-    <div className="bg-raised rounded-lg shadow-sm border border-hairline p-6 space-y-5">
+    <div className="bg-raised rounded-panel shadow-panel border border-hairline p-6 space-y-5">
       <div>
         <h2 className="text-base font-semibold text-fg">{title}</h2>
         {blurb && <p className="text-xs text-fg-muted mt-0.5">{blurb}</p>}

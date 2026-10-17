@@ -36,7 +36,7 @@ export default function NewVersionNotice() {
       <button
         type="button"
         onClick={() => window.location.reload()}
-        className="mt-3 px-3 py-1.5 text-sm font-medium rounded-md bg-warning text-white hover:bg-warning/90"
+        className="mt-3 px-3 py-1.5 text-sm font-medium rounded-control bg-warning text-white hover:bg-warning/90"
       >
         Refresh now
       </button>

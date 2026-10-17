@@ -97,7 +97,7 @@ export default function ContentProfileCard() {
   }
 
   return (
-    <form onSubmit={handleSave} className="bg-raised rounded-lg shadow-sm border border-hairline p-6 space-y-4">
+    <form onSubmit={handleSave} className="bg-raised rounded-panel shadow-panel border border-hairline p-6 space-y-4">
       <h2 className="text-base font-semibold text-fg">Content &amp; Profile</h2>
 
       <div>
@@ -114,7 +114,7 @@ export default function ContentProfileCard() {
           type="url"
           value={blogUrl}
           onChange={(e) => setBlogEdit(e.target.value)}
-          className="w-full border border-field rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent"
+          className="w-full border border-field rounded-control px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent"
           placeholder="https://yourblog.com"
         />
       </div>
@@ -125,7 +125,7 @@ export default function ContentProfileCard() {
           type="url"
           value={sitemapUrl}
           onChange={(e) => setSitemapEdit(e.target.value)}
-          className="w-full border border-field rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent"
+          className="w-full border border-field rounded-control px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent"
           placeholder="https://yourblog.com/sitemap.xml"
         />
         <p className="text-xs text-fg-muted mt-1">Used by AI to generate content ideas from your existing posts.</p>

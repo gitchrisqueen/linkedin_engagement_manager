@@ -10,7 +10,7 @@ export default function PresetPicker() {
   const active = detectPreset(eng, catchupAllowed)
 
   return (
-    <div className="bg-raised rounded-lg shadow-sm border border-hairline p-6 space-y-4">
+    <div className="bg-raised rounded-panel shadow-panel border border-hairline p-6 space-y-4">
       <div>
         <h2 className="text-base font-semibold text-fg">Activity level</h2>
         <p className="text-xs text-fg-muted mt-0.5">

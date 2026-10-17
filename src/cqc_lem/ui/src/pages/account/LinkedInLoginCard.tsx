@@ -98,7 +98,7 @@ export default function LinkedInLoginCard() {
       {stepUpModal}
       {/* LinkedIn connection — hidden when connected and token healthy */}
       {showLinkedInSection && (
-        <div className="bg-raised rounded-lg shadow-sm border border-hairline p-6 space-y-4">
+        <div className="bg-raised rounded-panel shadow-panel border border-hairline p-6 space-y-4">
           <h2 className="text-base font-semibold text-fg">
             LinkedIn Connection <span className="text-danger">*</span>
             <span className="ml-2 text-xs font-semibold text-danger bg-danger/5 px-2 py-0.5 rounded">
@@ -156,7 +156,7 @@ export default function LinkedInLoginCard() {
       )}
 
       {showHealthyCountdown && (
-        <div className="bg-raised rounded-lg shadow-sm border border-hairline px-6 py-4 flex items-center justify-between gap-3">
+        <div className="bg-raised rounded-panel shadow-panel border border-hairline px-6 py-4 flex items-center justify-between gap-3">
           <div className="flex items-center gap-3 min-w-0">
             <div className="w-3 h-3 rounded-full flex-shrink-0 bg-success" />
             <span className="text-sm text-fg-muted truncate">
@@ -210,7 +210,7 @@ export default function LinkedInLoginCard() {
                 type={showLiPassword ? 'text' : 'password'}
                 value={liPassword}
                 onChange={(e) => setLiPassword(e.target.value)}
-                className="w-full border border-field rounded-lg px-3 py-2 text-sm pr-16 focus:outline-none focus:ring-2 focus:ring-accent"
+                className="w-full border border-field rounded-control px-3 py-2 text-sm pr-16 focus:outline-none focus:ring-2 focus:ring-accent"
                 placeholder="Enter your LinkedIn password"
                 autoComplete="new-password"
               />

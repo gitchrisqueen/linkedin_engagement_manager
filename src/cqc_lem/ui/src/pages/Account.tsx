@@ -42,7 +42,7 @@ export default function Account() {
 
   return (
     <div className="max-w-5xl space-y-6">
-      <h1 className="text-2xl font-bold text-fg">Settings</h1>
+      <h1 className="text-section lg:text-section-lg font-semibold text-fg">Settings</h1>
 
       {oauthMsg && (
         <p className={`text-sm font-medium ${oauthMsg.ok ? 'text-success' : 'text-danger'}`}>

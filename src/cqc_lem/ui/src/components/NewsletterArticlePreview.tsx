@@ -14,7 +14,7 @@ export default function NewsletterArticlePreview({
   author = 'Your Name',
 }: NewsletterArticlePreviewProps) {
   return (
-    <div className="bg-raised rounded-lg border border-hairline shadow-sm max-w-lg font-sans overflow-hidden">
+    <div className="bg-raised rounded-panel border border-hairline shadow-panel max-w-lg font-sans overflow-hidden">
       {/* Byline */}
       <div className="flex items-center gap-3 px-5 pt-5">
         <div className="w-10 h-10 rounded-full bg-accent flex items-center justify-center text-white font-bold flex-shrink-0">
@@ -28,7 +28,7 @@ export default function NewsletterArticlePreview({
 
       {/* Title + subtitle */}
       <div className="px-5 pt-4">
-        <h1 className="text-xl font-bold text-fg leading-snug">
+        <h1 className="text-xl font-semibold text-fg leading-snug">
           {title || <span className="text-fg-muted">Untitled edition</span>}
         </h1>
         {subtitle && <p className="text-sm text-fg-muted mt-1">{subtitle}</p>}

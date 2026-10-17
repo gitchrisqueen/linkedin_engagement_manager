@@ -53,7 +53,7 @@ export default function StrongFactorPrompt() {
       <div className="flex items-center gap-3 shrink-0">
         <Link
           to="/account"
-          className="bg-warning text-white px-3 py-1.5 rounded-lg text-xs font-semibold hover:bg-warning/90 whitespace-nowrap"
+          className="bg-warning text-white px-3 py-1.5 rounded-control text-xs font-semibold hover:bg-warning/90 whitespace-nowrap"
         >
           Set it up
         </Link>

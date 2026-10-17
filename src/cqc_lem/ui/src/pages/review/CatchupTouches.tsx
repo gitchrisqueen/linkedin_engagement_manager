@@ -143,7 +143,7 @@ export default function CatchupTouches({ userTimezone }: { userTimezone: string 
     <div className="space-y-4">
       {msg && <p className={`text-sm font-medium ${msg.ok ? 'text-success' : 'text-danger'}`}>{msg.text}</p>}
 
-      <div className="bg-raised rounded-lg border border-hairline shadow-sm p-5 space-y-1">
+      <div className="bg-raised rounded-panel border border-hairline shadow-panel p-5 space-y-1">
         <h3 className="font-semibold text-fg">Catch-up congratulations</h3>
         <p className="text-xs text-fg-muted">
           LEM scans your LinkedIn Catch-up feed daily for network milestones — new jobs, promotions,
@@ -300,7 +300,7 @@ export default function CatchupTouches({ userTimezone }: { userTimezone: string 
                     )}
                     <button onClick={() => actionMutation.mutate({ id: t.id, action: 'cancel' })}
                       disabled={actionMutation.isPending}
-                      className="px-3 py-1 border border-field text-fg-muted rounded text-xs font-semibold hover:bg-page disabled:opacity-50">
+                      className="px-3 py-1 border border-field text-fg-muted rounded-control text-xs font-semibold hover:bg-page disabled:opacity-50">
                       Cancel
                     </button>
                   </div>

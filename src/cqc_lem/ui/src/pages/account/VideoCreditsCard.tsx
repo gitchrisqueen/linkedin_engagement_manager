@@ -40,7 +40,7 @@ export default function VideoCreditsCard() {
     <SettingsCard
       title="Premium Video Credits"
       headerRight={
-        <span className="text-2xl font-bold text-accent" data-testid="video-credit-balance">{videoCredits}</span>
+        <span className="text-section font-semibold tabular-nums text-accent" data-testid="video-credit-balance">{videoCredits}</span>
       }
     >
       <p className="text-sm text-fg-muted">

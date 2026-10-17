@@ -131,7 +131,7 @@ export default function ScheduledDMs(
       {msg && <p className={`text-sm font-medium ${msg.ok ? 'text-success' : 'text-danger'}`}>{msg.text}</p>}
 
       {/* New scheduled DM */}
-      <div className="bg-raised rounded-lg border border-hairline shadow-sm p-5 space-y-3">
+      <div className="bg-raised rounded-panel border border-hairline shadow-panel p-5 space-y-3">
         <h3 className="font-semibold text-fg">Schedule a DM</h3>
         <p className="text-xs text-fg-muted">
           Draft a 1:1 message to a connection and send it at a chosen time. Must be a 1st-degree
@@ -140,10 +140,10 @@ export default function ScheduledDMs(
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <input type="url" value={url} onChange={(e) => setUrl(e.target.value)} maxLength={512}
             placeholder="Recipient profile URL (https://www.linkedin.com/in/…)"
-            className="w-full border border-field rounded-lg px-3 py-2 text-sm" />
+            className="w-full border border-field rounded-control px-3 py-2 text-sm" />
           <input type="text" value={name} onChange={(e) => setName(e.target.value)} maxLength={255}
             placeholder="Recipient name (optional)"
-            className="w-full border border-field rounded-lg px-3 py-2 text-sm" />
+            className="w-full border border-field rounded-control px-3 py-2 text-sm" />
         </div>
         <textarea value={body} onChange={(e) => setBody(e.target.value)} rows={3} maxLength={MSG_MAX}
           placeholder="Your message…"
@@ -151,15 +151,15 @@ export default function ScheduledDMs(
         <div className="flex flex-wrap items-center gap-3">
           <label className="flex items-center gap-2 text-xs text-fg-muted">
             <input type="datetime-local" value={when} onChange={(e) => setWhen(e.target.value)}
-              className="border border-field rounded-lg px-3 py-2 text-sm" />
+              className="border border-field rounded-control px-3 py-2 text-sm" />
             {timezoneResolved ? userTimezone : 'loading your timezone…'}
           </label>
           <button onClick={() => submit('pending')} disabled={!canSubmit || createMutation.isPending}
-            className="px-4 py-2 border border-field rounded-lg text-sm text-fg hover:bg-page disabled:opacity-50">
+            className="px-4 py-2 border border-field rounded-control text-sm text-fg hover:bg-page disabled:opacity-50">
             Save draft
           </button>
           <button onClick={() => submit('approved')} disabled={!canSubmit || createMutation.isPending}
-            className="px-4 py-2 bg-accent text-white rounded-lg text-sm font-semibold hover:bg-accent/90 disabled:opacity-50">
+            className="px-4 py-2 bg-accent text-white rounded-control text-sm font-semibold hover:bg-accent/90 disabled:opacity-50">
             {createMutation.isPending ? 'Scheduling…' : 'Approve & schedule'}
           </button>
         </div>
@@ -179,14 +179,14 @@ export default function ScheduledDMs(
 
       {isLoading && <p className="text-fg-muted text-sm">Loading scheduled DMs…</p>}
       {!isLoading && dms.length === 0 && (
-        <div className="text-center py-10 bg-raised rounded-lg border border-hairline text-sm text-fg-muted">
+        <div className="text-center py-10 bg-raised rounded-panel border border-hairline text-sm text-fg-muted">
           No scheduled DMs yet.
         </div>
       )}
 
       <div className="space-y-3">
         {dms.map((dm) => (
-          <div key={dm.id} className="bg-raised rounded-lg border border-hairline p-4">
+          <div key={dm.id} className="bg-raised rounded-panel border border-hairline p-4">
             <div className="flex items-center justify-between gap-2 mb-1">
               <a href={dm.recipient_profile_url} target="_blank" rel="noopener noreferrer"
                 className="text-sm font-medium text-accent truncate hover:underline">
@@ -210,13 +210,13 @@ export default function ScheduledDMs(
                 {dm.status === 'pending' && (
                   <button onClick={() => actionMutation.mutate({ id: dm.id, action: 'approve' })}
                     disabled={actionMutation.isPending}
-                    className="px-3 py-1 bg-success text-white rounded text-xs font-semibold hover:bg-success/90 disabled:opacity-50">
+                    className="px-3 py-1 bg-success text-white rounded-control text-xs font-semibold hover:bg-success/90 disabled:opacity-50">
                     Approve
                   </button>
                 )}
                 <button onClick={() => actionMutation.mutate({ id: dm.id, action: 'cancel' })}
                   disabled={actionMutation.isPending}
-                  className="px-3 py-1 border border-field text-fg-muted rounded text-xs font-semibold hover:bg-page disabled:opacity-50">
+                  className="px-3 py-1 border border-field text-fg-muted rounded-control text-xs font-semibold hover:bg-page disabled:opacity-50">
                   Cancel
                 </button>
               </div>

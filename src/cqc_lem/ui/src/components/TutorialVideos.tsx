@@ -63,7 +63,7 @@ export default function TutorialVideos() {
                 )}
               </video>
               <div className="p-5">
-                <h3 className="font-bold text-fg mb-1">{video.title}</h3>
+                <h3 className="font-semibold text-fg mb-1">{video.title}</h3>
                 {video.description && (
                   <p className="text-sm text-fg-muted leading-relaxed line-clamp-3">{video.description}</p>
                 )}

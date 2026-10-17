@@ -66,7 +66,7 @@ export default function CompanyPageCard() {
           type="url"
           value={companyPage}
           onChange={(e) => setCompanyPageEdit(e.target.value)}
-          className="w-full border border-field rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent"
+          className="w-full border border-field rounded-control px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent"
           placeholder="https://www.linkedin.com/company/your-company/"
         />
       </div>

@@ -132,7 +132,7 @@ export default function SubscriptionCard() {
       {/* Upgrade options — shown to trial users without a paid plan */}
       {!isPaidPlan && hasStripeCustomer && (
         <div className="space-y-2">
-          <p className="text-xs text-fg-muted font-medium uppercase tracking-wide">Upgrade your plan</p>
+          <p className="text-xs text-fg-muted font-medium">Upgrade your plan</p>
           <div className="grid grid-cols-3 gap-2">
             {PAID_PLANS.map((plan) => (
               <button

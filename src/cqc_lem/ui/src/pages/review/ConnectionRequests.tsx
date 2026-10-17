@@ -149,10 +149,10 @@ export default function ConnectionRequests({ userTimezone }: { userTimezone: str
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <input type="url" value={url} onChange={(e) => setUrl(e.target.value)} maxLength={512}
             placeholder="Profile URL (https://www.linkedin.com/in/…)"
-            className="w-full border border-field rounded-lg px-3 py-2 text-sm" />
+            className="w-full border border-field rounded-control px-3 py-2 text-sm" />
           <input type="text" value={name} onChange={(e) => setName(e.target.value)} maxLength={255}
             placeholder="Name (optional)"
-            className="w-full border border-field rounded-lg px-3 py-2 text-sm" />
+            className="w-full border border-field rounded-control px-3 py-2 text-sm" />
         </div>
         <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} maxLength={255}
           aria-label="Recipient email (optional)"
@@ -163,7 +163,7 @@ export default function ConnectionRequests({ userTimezone }: { userTimezone: str
           {...maskProps('w-full border border-field rounded-lg px-3 py-2 text-sm')} />
         <div className="flex flex-wrap items-center gap-3">
           <button onClick={() => createMutation.mutate()} disabled={!canSubmit || createMutation.isPending}
-            className="px-4 py-2 bg-accent text-white rounded-lg text-sm font-semibold hover:bg-accent/90 disabled:opacity-50">
+            className="px-4 py-2 bg-accent text-white rounded-control text-sm font-semibold hover:bg-accent/90 disabled:opacity-50">
             {createMutation.isPending ? 'Adding…' : 'Add target'}
           </button>
         </div>
@@ -183,14 +183,14 @@ export default function ConnectionRequests({ userTimezone }: { userTimezone: str
 
       {isLoading && <p className="text-fg-muted text-sm">Loading connection requests…</p>}
       {!isLoading && requests.length === 0 && (
-        <div className="text-center py-10 bg-raised rounded-lg border border-hairline text-sm text-fg-muted">
+        <div className="text-center py-10 bg-raised rounded-panel border border-hairline text-sm text-fg-muted">
           No connection requests yet.
         </div>
       )}
 
       <div className="space-y-3">
         {requests.map((req) => (
-          <div key={req.id} className="bg-raised rounded-lg border border-hairline p-4">
+          <div key={req.id} className="bg-raised rounded-panel border border-hairline p-4">
             <div className="flex items-center justify-between gap-2 mb-1">
               <a href={req.recipient_profile_url} target="_blank" rel="noopener noreferrer"
                 className="text-sm font-medium text-accent truncate hover:underline">
@@ -238,11 +238,11 @@ export default function ConnectionRequests({ userTimezone }: { userTimezone: str
                       {...maskProps('flex-1 min-w-[12rem] border border-field rounded px-2 py-1 text-xs')} />
                     <button onClick={() => emailMutation.mutate({ id: req.id, email: rowEmail.trim() })}
                       disabled={!rowEmail.trim() || emailMutation.isPending}
-                      className="px-3 py-1 bg-accent text-white rounded text-xs font-semibold hover:bg-accent/90 disabled:opacity-50">
+                      className="px-3 py-1 bg-accent text-white rounded-control text-xs font-semibold hover:bg-accent/90 disabled:opacity-50">
                       Save email
                     </button>
                     <button onClick={() => { setEmailRowId(null); setRowEmail('') }}
-                      className="px-3 py-1 border border-field text-fg-muted rounded text-xs font-semibold hover:bg-page">
+                      className="px-3 py-1 border border-field text-fg-muted rounded-control text-xs font-semibold hover:bg-page">
                       Cancel
                     </button>
                   </div>
@@ -266,21 +266,21 @@ export default function ConnectionRequests({ userTimezone }: { userTimezone: str
                 {req.status === 'pending' && (
                   <button onClick={() => actionMutation.mutate({ id: req.id, action: 'approve' })}
                     disabled={actionMutation.isPending}
-                    className="px-3 py-1 bg-success text-white rounded text-xs font-semibold hover:bg-success/90 disabled:opacity-50">
+                    className="px-3 py-1 bg-success text-white rounded-control text-xs font-semibold hover:bg-success/90 disabled:opacity-50">
                     Approve
                   </button>
                 )}
                 {req.status === 'failed' && (
                   <button onClick={() => actionMutation.mutate({ id: req.id, action: 'retry' })}
                     disabled={actionMutation.isPending}
-                    className="px-3 py-1 bg-success text-white rounded text-xs font-semibold hover:bg-success/90 disabled:opacity-50">
+                    className="px-3 py-1 bg-success text-white rounded-control text-xs font-semibold hover:bg-success/90 disabled:opacity-50">
                     Retry
                   </button>
                 )}
                 {req.status !== 'failed' && (
                   <button onClick={() => actionMutation.mutate({ id: req.id, action: 'cancel' })}
                     disabled={actionMutation.isPending}
-                    className="px-3 py-1 border border-field text-fg-muted rounded text-xs font-semibold hover:bg-page disabled:opacity-50">
+                    className="px-3 py-1 border border-field text-fg-muted rounded-control text-xs font-semibold hover:bg-page disabled:opacity-50">
                     Cancel
                   </button>
                 )}

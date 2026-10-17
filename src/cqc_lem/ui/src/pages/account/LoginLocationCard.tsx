@@ -92,14 +92,14 @@ export default function LoginLocationCard() {
           value={locCity}
           onChange={(e) => setLocCity(e.target.value)}
           placeholder="City"
-          className="border border-field rounded-lg px-3 py-2 text-sm sm:col-span-1"
+          className="border border-field rounded-control px-3 py-2 text-sm sm:col-span-1"
         />
         <input
           type="text"
           value={locState}
           onChange={(e) => setLocState(e.target.value)}
           placeholder="State / region"
-          className="border border-field rounded-lg px-3 py-2 text-sm sm:col-span-1"
+          className="border border-field rounded-control px-3 py-2 text-sm sm:col-span-1"
         />
         <input
           type="text"
@@ -107,7 +107,7 @@ export default function LoginLocationCard() {
           onChange={(e) => setLocCountry(e.target.value)}
           placeholder="Country (ISO-2)"
           maxLength={2}
-          className="border border-field rounded-lg px-3 py-2 text-sm uppercase sm:col-span-1"
+          className="border border-field rounded-control px-3 py-2 text-sm sm:col-span-1"
         />
       </div>
       <button

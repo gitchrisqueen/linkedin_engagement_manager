@@ -47,7 +47,7 @@ export default function PostHogSurveyModal() {
 
   return (
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-fg/40 p-4">
-      <div className="relative w-full max-w-md max-h-viewport overflow-y-auto bg-raised border border-hairline rounded-xl shadow-xl p-5">
+      <div className="relative w-full max-w-md max-h-viewport overflow-y-auto bg-raised border border-hairline rounded-panel shadow-xl p-5">
         <button
           onClick={dismiss}
           className="absolute top-2 right-3 text-fg-muted hover:text-fg-muted text-xl leading-none"
@@ -58,7 +58,7 @@ export default function PostHogSurveyModal() {
 
         {done ? (
           <div className="pt-2">
-            <h2 className="text-sm font-bold text-fg mb-1">Thanks 🙏</h2>
+            <h2 className="text-sm font-semibold text-fg mb-1">Thanks 🙏</h2>
             <p className="text-xs text-fg-muted mb-4">That goes straight to the team.</p>
             <button
               onClick={dismiss}
@@ -69,7 +69,7 @@ export default function PostHogSurveyModal() {
           </div>
         ) : (
           <div className="space-y-3 pt-1">
-            <h2 className="text-sm font-bold text-fg">{rating.question}</h2>
+            <h2 className="text-sm font-semibold text-fg">{rating.question}</h2>
 
             <div
               className="flex flex-wrap gap-1"
@@ -108,7 +108,7 @@ export default function PostHogSurveyModal() {
                 onChange={(e) => setComment(e.target.value)}
                 aria-label={open.question}
                 placeholder={open.question}
-                className="w-full border border-field rounded-lg px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-accent"
+                className="w-full border border-field rounded-control px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-accent"
               />
             )}
 

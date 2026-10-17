@@ -148,7 +148,7 @@ export default function SettingsHub() {
                     className={s.key === active ? 'space-y-6' : 'hidden'}
                   >
                     <div>
-                      <h2 className="text-lg font-bold text-fg">{s.label}</h2>
+                      <h2 className="text-xl font-semibold text-fg">{s.label}</h2>
                       <p className="text-sm text-fg-muted">{s.blurb}</p>
                     </div>
                     <SectionBody section={s.key} />

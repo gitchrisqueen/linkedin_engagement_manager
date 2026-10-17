@@ -54,7 +54,7 @@ export default function ShippedNotice() {
       <div className="flex items-start gap-2">
         <span aria-hidden="true">🎉</span>
         <div className="flex-1">
-          <h2 className="text-sm font-bold text-fg">You asked, we shipped</h2>
+          <h2 className="text-sm font-semibold text-fg">You asked, we shipped</h2>
           <p className="text-xs text-fg-muted mt-0.5">{line}</p>
 
           {done ? (
@@ -68,13 +68,13 @@ export default function ShippedNotice() {
                 onChange={(e) => setComment(e.target.value)}
                 aria-label="What's still wrong?"
                 placeholder="What's still wrong?"
-                className="w-full border border-field rounded-lg px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-accent"
+                className="w-full border border-field rounded-control px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-accent"
               />
               <button
                 type="button"
                 disabled={loading}
                 onClick={() => ack(false, comment)}
-                className="bg-accent text-white px-3 py-1.5 rounded-lg text-xs font-semibold hover:bg-accent/90 disabled:opacity-50 transition-colors"
+                className="bg-accent text-white px-3 py-1.5 rounded-control text-xs font-semibold hover:bg-accent/90 disabled:opacity-50 transition-colors"
               >
                 {loading ? 'Sending…' : 'Send'}
               </button>
@@ -94,7 +94,7 @@ export default function ShippedNotice() {
                 type="button"
                 disabled={loading}
                 onClick={() => setShowComment(true)}
-                className="border border-field bg-raised text-fg-muted px-2.5 py-1 rounded-lg text-xs font-semibold hover:border-accent/50 disabled:opacity-50 transition-colors"
+                className="border border-field bg-raised text-fg-muted px-2.5 py-1 rounded-control text-xs font-semibold hover:border-accent/50 disabled:opacity-50 transition-colors"
               >
                 Not yet
               </button>

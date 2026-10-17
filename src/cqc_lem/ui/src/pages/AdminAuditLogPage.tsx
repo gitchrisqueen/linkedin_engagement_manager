@@ -66,7 +66,7 @@ export default function AdminAuditLogPage() {
   return (
     <div className="max-w-5xl space-y-6">
       <div>
-        <h1 className="text-2xl font-bold text-fg">Audit log</h1>
+        <h1 className="text-section font-semibold tabular-nums text-fg">Audit log</h1>
         <p className="text-sm text-fg-muted">
           Every admin role, disable/enable and subscription-grant change — who did it, and to whom.
         </p>
@@ -107,7 +107,7 @@ export default function AdminAuditLogPage() {
             </thead>
             <tbody className="divide-y divide-hairline">
               {items.map((item) => (
-                <tr key={item.id} className="hover:bg-page">
+                <tr key={item.id} className="hover:bg-accent/5">
                   <td className="px-4 py-3 text-fg-muted">{when(item.created_at)}</td>
                   <td className="px-4 py-3">{EVENT_LABELS[item.event] ?? item.event}</td>
                   <td className="px-4 py-3">

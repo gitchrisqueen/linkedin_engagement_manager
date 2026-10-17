@@ -45,7 +45,7 @@ export default function LeadMagnetCard() {
   if (!leadMagnet) return null
 
   return (
-    <div className="bg-raised rounded-lg shadow-sm border border-hairline p-6 space-y-4">
+    <div className="bg-raised rounded-panel shadow-panel border border-hairline p-6 space-y-4">
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-base font-semibold text-fg">Comment → DM Lead Magnet</h2>
@@ -59,7 +59,7 @@ export default function LeadMagnetCard() {
             <label className="block text-sm font-medium text-fg mb-1">Trigger keyword</label>
             <input type="text" value={leadMagnet.keyword || ''} onChange={(e) => setLm({ keyword: e.target.value })}
               maxLength={FIELD_LIMITS.lm_keyword}
-              placeholder="e.g. GUIDE" className="w-full border border-field rounded-lg px-3 py-2 text-sm" />
+              placeholder="e.g. GUIDE" className="w-full border border-field rounded-control px-3 py-2 text-sm" />
           </div>
           <div>
             <label className="block text-sm font-medium text-fg mb-1">DM message (may include your link)</label>

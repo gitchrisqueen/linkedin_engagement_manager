@@ -125,7 +125,7 @@ export default function FeedbackWidget() {
     // The width clamp is not the whole story on a phone: this form is ~350px tall and the dock
     // grows it UPWARDS off the top of a landscape screen (worse with the keyboard open, which
     // autoFocus guarantees), so it needs the same height cap the modals wear (issue #894).
-    <div className="relative w-[22rem] max-w-[calc(100vw-2rem)] max-h-viewport overflow-y-auto bg-raised border border-hairline rounded-xl shadow-xl p-4">
+    <div className="relative w-[22rem] max-w-[calc(100vw-2rem)] max-h-viewport overflow-y-auto bg-raised border border-hairline rounded-panel shadow-xl p-4">
       <button
         onClick={close}
         className="absolute top-2 right-3 text-fg-muted hover:text-fg-muted text-xl leading-none"
@@ -136,7 +136,7 @@ export default function FeedbackWidget() {
 
       {sent ? (
         <div className="pt-2">
-          <h2 className="text-sm font-bold text-fg mb-1">Thanks — got it 🙏</h2>
+          <h2 className="text-sm font-semibold text-fg mb-1">Thanks — got it 🙏</h2>
           <p className="text-xs text-fg-muted mb-4">
             Your notes go straight to the team along with the page you were on.
           </p>
@@ -149,12 +149,12 @@ export default function FeedbackWidget() {
         </div>
       ) : (
         <form onSubmit={handleSubmit} className="space-y-3 pt-1">
-          <h2 className="text-sm font-bold text-fg">Feedback / Report a bug</h2>
+          <h2 className="text-sm font-semibold text-fg">Feedback / Report a bug</h2>
           <select
             value={typeHint}
             onChange={(e) => setTypeHint(e.target.value)}
             aria-label="Feedback type"
-            className="w-full border border-field rounded-lg px-2 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-accent"
+            className="w-full border border-field rounded-control px-2 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-accent"
           >
             {TYPE_HINTS.map((t) => (
               <option key={t.value} value={t.value}>{t.label}</option>
@@ -169,7 +169,7 @@ export default function FeedbackWidget() {
             onChange={(e) => setBody(e.target.value)}
             aria-label="What happened?"
             placeholder="What happened, or what would you change?"
-            className="w-full border border-field rounded-lg px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-accent"
+            className="w-full border border-field rounded-control px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-accent"
           />
           <label className="block text-xs text-fg-muted">
             Screenshot (optional)

@@ -32,7 +32,7 @@ export default function PostHogStatsPanel() {
           <p className="text-xs text-fg-muted mb-1">This week — posts</p>
           {posts.available && latestPosts ? (
             <>
-              <p className="text-2xl font-bold text-fg">{numeric(latestPosts.posts_measured) ?? 0}</p>
+              <p className="text-section font-semibold tabular-nums text-fg">{numeric(latestPosts.posts_measured) ?? 0}</p>
               <p className="text-xs text-fg-muted">
                 {numeric(latestPosts.median_engagement_rate) != null
                   ? `${formatRate(numeric(latestPosts.median_engagement_rate)!)} median engagement`
@@ -47,7 +47,7 @@ export default function PostHogStatsPanel() {
           <p className="text-xs text-fg-muted mb-1">This week — comments</p>
           {comments.available && latestComments ? (
             <>
-              <p className="text-2xl font-bold text-fg">{numeric(latestComments.comments_measured) ?? 0}</p>
+              <p className="text-section font-semibold tabular-nums text-fg">{numeric(latestComments.comments_measured) ?? 0}</p>
               <p className="text-xs text-fg-muted">
                 {numeric(latestComments.author_reply_pct) != null
                   ? `${latestComments.author_reply_pct}% author replies`

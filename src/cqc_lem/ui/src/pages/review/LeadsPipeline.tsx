@@ -102,7 +102,7 @@ export default function LeadsPipeline({ userTimezone }: { userTimezone: string }
     <div className="space-y-4">
       {msg && <p className={`text-sm font-medium ${msg.ok ? 'text-success' : 'text-danger'}`}>{msg.text}</p>}
 
-      <div className="bg-raised rounded-lg border border-hairline shadow-sm p-5">
+      <div className="bg-raised rounded-panel border border-hairline shadow-panel p-5">
         <div className="flex items-start justify-between gap-3">
           <div>
             <h3 className="font-semibold text-fg">
@@ -130,7 +130,7 @@ export default function LeadsPipeline({ userTimezone }: { userTimezone: string }
 
       {isLoading && <p className="text-fg-muted text-sm">Loading your pipeline…</p>}
       {!isLoading && leads.length === 0 && (
-        <div className="text-center py-10 bg-raised rounded-lg border border-hairline text-sm text-fg-muted">
+        <div className="text-center py-10 bg-raised rounded-panel border border-hairline text-sm text-fg-muted">
           No scored leads yet — they appear once people engage with your posts, or right after the
           nightly re-score.
         </div>
@@ -149,7 +149,7 @@ export default function LeadsPipeline({ userTimezone }: { userTimezone: string }
             </div>
 
             {leads.filter((l) => stageOf(l) === stage).map((l) => (
-              <div key={l.id} className={`bg-raised rounded-lg border border-hairline p-4 space-y-2 ${l.dismissed ? 'opacity-60' : ''}`}>
+              <div key={l.id} className={`bg-raised rounded-panel border border-hairline p-4 space-y-2 ${l.dismissed ? 'opacity-60' : ''}`}>
                 <div className="flex items-center justify-between gap-2">
                   {l.person_profile_url ? (
                     <a href={l.person_profile_url} target="_blank" rel="noopener noreferrer"
@@ -188,7 +188,7 @@ export default function LeadsPipeline({ userTimezone }: { userTimezone: string }
                   <select
                     value={stageOf(l)}
                     onChange={(e) => updateMutation.mutate({ id: l.id, stage: e.target.value })}
-                    className="border border-field rounded px-2 py-1 text-xs"
+                    className="border border-field rounded-control px-2 py-1 text-xs"
                   >
                     {STAGES.map((s) => (
                       <option key={s} value={s}>{STAGE_LABELS[s]}</option>
@@ -203,7 +203,7 @@ export default function LeadsPipeline({ userTimezone }: { userTimezone: string }
                   <button
                     onClick={() => updateMutation.mutate({ id: l.id, action: l.dismissed ? 'restore' : 'dismiss' })}
                     disabled={updateMutation.isPending}
-                    className="px-2 py-1 border border-field text-fg-muted rounded text-xs font-semibold hover:bg-page disabled:opacity-50">
+                    className="px-2 py-1 border border-field text-fg-muted rounded-control text-xs font-semibold hover:bg-page disabled:opacity-50">
                     {l.dismissed ? 'Restore' : 'Remove'}
                   </button>
                 </div>

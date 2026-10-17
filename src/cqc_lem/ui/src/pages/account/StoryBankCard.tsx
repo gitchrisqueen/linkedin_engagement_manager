@@ -122,7 +122,7 @@ export default function StoryBankCard() {
             <div className="flex flex-wrap items-center gap-2">
               <select value={e.kind} aria-label="Kind"
                 onChange={(ev) => update(idx, { kind: ev.target.value as StoryKind })}
-                className="border border-field rounded-lg px-2 py-1 text-sm">
+                className="border border-field rounded-control px-2 py-1 text-sm">
                 {STORY_KINDS.map((k) => (
                   <option key={k.key} value={k.key} title={k.hint}>{k.label}</option>
                 ))}
@@ -130,12 +130,12 @@ export default function StoryBankCard() {
               <input type="text" value={e.title ?? ''} maxLength={255}
                 onChange={(ev) => update(idx, { title: ev.target.value })}
                 placeholder="Short label (optional)" aria-label="Title"
-                className="flex-1 min-w-40 border border-field rounded-lg px-3 py-1 text-sm" />
+                className="flex-1 min-w-40 border border-field rounded-control px-3 py-1 text-sm" />
               <label className="flex items-center gap-1 text-xs text-fg-muted">
                 When
                 <input type="date" value={e.happened_at ?? ''} aria-label="When it happened"
                   onChange={(ev) => update(idx, { happened_at: ev.target.value || null })}
-                  className="border border-field rounded px-2 py-1" />
+                  className="border border-field rounded-control px-2 py-1" />
               </label>
               <label className="flex items-center gap-1 text-xs text-fg-muted">
                 <input type="checkbox" checked={e.active} aria-label="Active"

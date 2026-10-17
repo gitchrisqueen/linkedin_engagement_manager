@@ -539,7 +539,7 @@ export default function ComposePost({ onNavigateTab }: { onNavigateTab?: (tab: s
                   type="button"
                   onClick={handleGenerateImage}
                   disabled={imageBusy !== null}
-                  className="bg-accent text-white px-3 py-1.5 rounded-lg text-xs font-semibold hover:bg-accent/90 disabled:opacity-50 transition-colors"
+                  className="bg-accent text-white px-3 py-1.5 rounded-control text-xs font-semibold hover:bg-accent/90 disabled:opacity-50 transition-colors"
                 >
                   {imageBusy === 'generate' ? 'Generating image…' : 'Generate with AI'}
                 </button>
@@ -757,7 +757,7 @@ export default function ComposePost({ onNavigateTab }: { onNavigateTab?: (tab: s
               value={scheduledAt}
               disabled={!timezoneResolved}
               onChange={(e) => setScheduledAt(e.target.value)}
-              className="w-full border border-field rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent disabled:bg-page"
+              className="w-full border border-field rounded-control px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent disabled:bg-page"
             />
             {bestTimeSuggestion && (
               <div className="mt-2 bg-accent/5 border border-accent/25 rounded-lg px-3 py-2 flex items-center justify-between gap-2">
@@ -829,7 +829,7 @@ export default function ComposePost({ onNavigateTab }: { onNavigateTab?: (tab: s
               id="occasion-type"
               value={occasionType}
               onChange={(e) => setOccasionType(e.target.value as OccasionType)}
-              className="w-full border border-field rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent"
+              className="w-full border border-field rounded-control px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent"
             >
               {OCCASION_TYPES.map((o) => (
                 <option key={o.value} value={o.value}>{o.label}</option>
@@ -898,7 +898,7 @@ export default function ComposePost({ onNavigateTab }: { onNavigateTab?: (tab: s
           <TopicAuthorityMeter content={content} focusTopics={focusTopics} />
         )}
         {postType === 'CAROUSEL' && generatedSlideUrls.length > 0 && (
-          <div className="bg-raised rounded-lg shadow-sm border border-hairline p-4">
+          <div className="bg-raised rounded-panel shadow-panel border border-hairline p-4">
             <p className="text-sm font-semibold text-fg mb-3">Slide Previews</p>
             <div className="grid grid-cols-2 gap-3">
               {generatedSlideUrls.slice(0, 4).map((url, i) => (

@@ -85,7 +85,7 @@ export default function DmTemplatesCard() {
   if (!seeded) return null
 
   return (
-    <div className="bg-raised rounded-lg shadow-sm border border-hairline p-6 space-y-4">
+    <div className="bg-raised rounded-panel shadow-panel border border-hairline p-6 space-y-4">
       <h2 className="text-base font-semibold text-fg">DM Templates</h2>
       <p className="text-xs text-fg-muted">
         Blank uses the built-in default. Add follow-up steps to message again after a delay — the
@@ -111,7 +111,7 @@ export default function DmTemplatesCard() {
                       after
                       <input type="number" min={1} value={t.delay_hours}
                         onChange={(e) => updateTemplate(ev.key, t.step, { delay_hours: Number(e.target.value) })}
-                        className="mx-1 w-16 border border-field rounded px-1 py-0.5" />
+                        className="mx-1 w-16 border border-field rounded-control px-1 py-0.5" />
                       h
                     </label>
                   )}

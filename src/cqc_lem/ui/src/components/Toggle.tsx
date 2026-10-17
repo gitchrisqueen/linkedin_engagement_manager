@@ -8,7 +8,7 @@ export default function Toggle({ on, onClick, ariaLabel }: { on: boolean; onClic
       role="switch"
       aria-checked={on}
     >
-      <span className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-raised shadow ring-0 transition duration-200 ease-in-out ${on ? 'translate-x-5' : 'translate-x-0'}`} />
+      <span className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-raised shadow-panel ring-0 transition duration-200 ease-in-out ${on ? 'translate-x-5' : 'translate-x-0'}`} />
     </button>
   )
 }

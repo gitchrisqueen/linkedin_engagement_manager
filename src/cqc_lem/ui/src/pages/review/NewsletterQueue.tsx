@@ -274,7 +274,7 @@ export default function NewsletterQueue(
 
   if (editions.length === 0) {
     return (
-      <div className="flex flex-col items-center text-center py-12 px-4 bg-raised rounded-lg border border-hairline">
+      <div className="flex flex-col items-center text-center py-12 px-4 bg-raised rounded-panel border border-hairline">
         <div className="text-4xl mb-4">📰</div>
         <p className="text-fg-muted text-sm mb-2 max-w-sm">No newsletter drafts queued yet.</p>
         <p className="text-fg-muted text-xs max-w-sm">
@@ -332,12 +332,12 @@ export default function NewsletterQueue(
             {(e.format || e.hook_style) && (
               <div className="flex flex-wrap gap-1 mt-1.5">
                 {e.format && (
-                  <span className="px-1.5 py-0.5 rounded bg-accent/5 text-accent text-xs font-medium uppercase tracking-wide">
+                  <span className="px-1.5 py-0.5 rounded bg-accent/5 text-accent text-xs font-medium">
                     {prettyKey(e.format)}
                   </span>
                 )}
                 {e.hook_style && (
-                  <span className="px-1.5 py-0.5 rounded bg-accent/5 text-accent text-xs font-medium uppercase tracking-wide">
+                  <span className="px-1.5 py-0.5 rounded bg-accent/5 text-accent text-xs font-medium">
                     {prettyKey(e.hook_style)} hook
                   </span>
                 )}
@@ -350,7 +350,7 @@ export default function NewsletterQueue(
       {/* Editor + preview */}
       {draftEdit && (
         <div className="sticky top-4 self-start space-y-4 max-h-[calc(100vh-2rem)] overflow-y-auto">
-          <div className="bg-raised rounded-lg border border-hairline shadow-sm p-5 space-y-3">
+          <div className="bg-raised rounded-panel border border-hairline shadow-panel p-5 space-y-3">
             <div>
               <h3 className="text-sm font-semibold text-fg">
                 Review draft{' '}
@@ -458,7 +458,7 @@ export default function NewsletterQueue(
                   onChange={(e) => setCoverGuidance(e.target.value)} rows={2}
                   placeholder="Describe what the cover should show or avoid (e.g. brighter colors, no text, a specific scene). Leave blank for the AI's own take."
                   disabled={busy || coverBusy}
-                  className="w-full border border-field rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent disabled:opacity-50" />
+                  className="w-full border border-field rounded-control px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent disabled:opacity-50" />
               </div>
               <div className="grid grid-cols-2 gap-2">
                 <button type="button" onClick={() => coverFileRef.current?.click()} disabled={busy || coverBusy}
@@ -477,7 +477,7 @@ export default function NewsletterQueue(
                 <select id="cover-avatar-choice" value={coverAvatarChoice}
                   onChange={(e) => setCoverAvatarChoice(e.target.value as 'auto' | 'with' | 'without')}
                   disabled={busy || coverBusy}
-                  className="text-xs border border-hairline rounded-md px-2 py-1 text-fg bg-raised">
+                  className="text-xs border border-field rounded-control px-2 py-1 text-fg bg-raised">
                   <option value="auto">Auto — when the edition is about me</option>
                   <option value="with">Include me</option>
                   <option value="without">Never in this cover</option>
@@ -512,7 +512,7 @@ export default function NewsletterQueue(
               <textarea value={guidance} onChange={(e) => setGuidance(e.target.value)} rows={2}
                 placeholder="What should change and why? You can name a format (e.g. case study, listicle, contrarian). Leave blank for a fresh, distinct take. To guide the cover image instead, use Image guidance above."
                 disabled={busy}
-                className="w-full border border-field rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent disabled:opacity-50" />
+                className="w-full border border-field rounded-control px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent disabled:opacity-50" />
               <button type="button" onClick={() => regenerateMutation.mutate()} disabled={busy}
                 className="w-full bg-accent text-white py-2 rounded-lg text-sm font-semibold hover:bg-accent/90 disabled:opacity-50 transition-colors">
                 {regenerating ? 'Regenerating…' : 'Re-generate'}

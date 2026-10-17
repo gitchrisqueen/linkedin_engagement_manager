@@ -55,7 +55,7 @@ export default function AffiliateNotice() {
         type="button"
         onClick={dismiss}
         disabled={acknowledge.isPending}
-        className="mt-3 px-4 py-2 rounded-md bg-accent text-white text-sm font-semibold hover:bg-accent/90 disabled:opacity-50"
+        className="mt-3 px-4 py-2 rounded-control bg-accent text-white text-sm font-semibold hover:bg-accent/90 disabled:opacity-50"
       >
         Got it
       </button>

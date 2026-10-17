@@ -76,12 +76,12 @@ function SubscriptionGrantForm({ userId, sessionToken }: { userId: number; sessi
           max={365}
           value={days}
           onChange={(e) => setDays(e.target.value)}
-          className="w-20 text-sm border border-field rounded px-2 py-1"
+          className="w-20 text-sm border border-field rounded-control px-2 py-1"
         />
         <button
           onClick={() => valid && grant.mutate({ userId, days: days_n, sessionToken })}
           disabled={!valid || grant.isPending}
-          className="text-xs bg-accent text-white px-2.5 py-1 rounded hover:bg-accent/90 disabled:opacity-50"
+          className="text-xs bg-accent text-white px-2.5 py-1 rounded-control hover:bg-accent/90 disabled:opacity-50"
         >
           {grant.isPending ? 'Working…' : 'Grant'}
         </button>
@@ -195,7 +195,7 @@ export default function AdminUsersPage() {
   return (
     <div className="max-w-6xl space-y-6">
       <div>
-        <h1 className="text-2xl font-bold text-fg">User management</h1>
+        <h1 className="text-section font-semibold tabular-nums text-fg">User management</h1>
         <p className="text-sm text-fg-muted">
           Every account, who can administer LEM, and whether their automation runs. Subscription
           state comes from billing (a grant is a one-time comp, not an override), and preferences
@@ -278,7 +278,7 @@ export default function AdminUsersPage() {
             <tbody className="divide-y divide-hairline">
               {items.map((item) => (
                 <Fragment key={item.id}>
-                  <tr className="hover:bg-page align-top">
+                  <tr className="hover:bg-accent/5 align-top">
                     <td className="px-4 py-3">
                       <button
                         onClick={() => setOpenId(openId === item.id ? null : item.id)}

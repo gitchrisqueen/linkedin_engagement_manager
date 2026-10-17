@@ -59,7 +59,7 @@ export default function NewsletterCard() {
   if (!newsletter) return null
 
   return (
-    <div className="bg-raised rounded-lg shadow-sm border border-hairline p-6 space-y-4">
+    <div className="bg-raised rounded-panel shadow-panel border border-hairline p-6 space-y-4">
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-base font-semibold text-fg">LinkedIn Newsletter</h2>
@@ -76,12 +76,12 @@ export default function NewsletterCard() {
               <label className="block text-sm font-medium text-fg mb-1">Title</label>
               <input type="text" value={newsletter.title || ''} onChange={(e) => setNl({ title: e.target.value })}
                 maxLength={FIELD_LIMITS.nl_title}
-                placeholder="e.g. The Growth Brief" className="w-full border border-field rounded-lg px-3 py-2 text-sm" />
+                placeholder="e.g. The Growth Brief" className="w-full border border-field rounded-control px-3 py-2 text-sm" />
             </div>
             <div>
               <label className="block text-sm font-medium text-fg mb-1">Cadence</label>
               <select value={newsletter.cadence} onChange={(e) => setNl({ cadence: e.target.value })}
-                className="w-full border border-field rounded-lg px-3 py-2 text-sm">
+                className="w-full border border-field rounded-control px-3 py-2 text-sm">
                 <option value="weekly">Weekly (recommended)</option>
                 <option value="biweekly">Bi-weekly</option>
                 <option value="monthly">Monthly</option>
@@ -92,7 +92,7 @@ export default function NewsletterCard() {
             <div>
               <label className="block text-sm font-medium text-fg mb-1">Publish day</label>
               <select value={newsletter.publish_day} onChange={(e) => setNl({ publish_day: Number(e.target.value) })}
-                className="w-full border border-field rounded-lg px-3 py-2 text-sm">
+                className="w-full border border-field rounded-control px-3 py-2 text-sm">
                 {WEEKDAYS.map((d, i) => (
                   <option key={i} value={i}>{d}</option>
                 ))}
@@ -101,7 +101,7 @@ export default function NewsletterCard() {
             <div>
               <label className="block text-sm font-medium text-fg mb-1">Publish hour (your time)</label>
               <select value={newsletter.publish_hour} onChange={(e) => setNl({ publish_hour: Number(e.target.value) })}
-                className="w-full border border-field rounded-lg px-3 py-2 text-sm">
+                className="w-full border border-field rounded-control px-3 py-2 text-sm">
                 {Array.from({ length: 24 }, (_, h) => (
                   <option key={h} value={h}>{formatHour12(h)}</option>
                 ))}
@@ -112,7 +112,7 @@ export default function NewsletterCard() {
             <label className="block text-sm font-medium text-fg mb-1">Topic / theme</label>
             <input type="text" value={newsletter.topic || ''} onChange={(e) => setNl({ topic: e.target.value })}
               maxLength={FIELD_LIMITS.nl_topic}
-              placeholder="What each edition should focus on" className="w-full border border-field rounded-lg px-3 py-2 text-sm" />
+              placeholder="What each edition should focus on" className="w-full border border-field rounded-control px-3 py-2 text-sm" />
           </div>
 
           {/* Plan-ahead controls: keep several drafts queued, generated early, so reviews never feel rushed. */}
@@ -120,7 +120,7 @@ export default function NewsletterCard() {
             <div>
               <label className="block text-sm font-medium text-fg mb-1">Draft newsletters to keep ready</label>
               <select value={newsletter.max_queued_drafts} onChange={(e) => setNl({ max_queued_drafts: Number(e.target.value) })}
-                className="w-full border border-field rounded-lg px-3 py-2 text-sm">
+                className="w-full border border-field rounded-control px-3 py-2 text-sm">
                 {Array.from({ length: 10 }, (_, i) => i + 1).map((n) => (
                   <option key={n} value={n}>{n}</option>
                 ))}
@@ -210,7 +210,7 @@ export default function NewsletterCard() {
                 <label className="block text-sm font-medium text-fg mb-1">Max invites per run</label>
                 <input type="number" min={0} max={500} value={newsletter.max_invites_per_run}
                   onChange={(e) => setNl({ max_invites_per_run: Number(e.target.value) })}
-                  className="w-full border border-field rounded-lg px-3 py-2 text-sm" />
+                  className="w-full border border-field rounded-control px-3 py-2 text-sm" />
                 <p className="text-xs text-fg-muted mt-1">Hard cap on connections invited each run (0–500).</p>
               </div>
             )}

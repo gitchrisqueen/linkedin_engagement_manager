@@ -77,7 +77,7 @@ export default function LinkedInSignInStatusCard() {
   return (
     <div
       data-testid="linkedin-signin-status"
-      className={`bg-raised rounded-lg shadow-sm border ${tone.box} p-6 space-y-3`}
+      className={`bg-raised rounded-panel shadow-panel border ${tone.box} p-6 space-y-3`}
     >
       <div className="flex items-center gap-3">
         <div className={`w-3 h-3 rounded-full flex-shrink-0 ${tone.dot}`} />

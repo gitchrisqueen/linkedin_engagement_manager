@@ -174,7 +174,7 @@ export default function LoginModal() {
 
         {step === 'email' && (
           <>
-            <h2 className="text-xl font-bold text-fg mb-1">Sign in / Sign up</h2>
+            <h2 className="text-xl font-semibold text-fg mb-1">Sign in / Sign up</h2>
             <p className="text-sm text-fg-muted mb-6">
               Enter your email and we'll send you a 6-digit code to continue.
             </p>
@@ -188,7 +188,7 @@ export default function LoginModal() {
                 >
                   Sign in with a passkey
                 </button>
-                <p className="text-xs uppercase tracking-wide text-fg-muted text-center mb-4">or</p>
+                <p className="text-xs text-fg-muted text-center mb-4">or</p>
               </>
             )}
             <form onSubmit={handleEmailSubmit} className="space-y-4">
@@ -233,7 +233,7 @@ export default function LoginModal() {
                 value={pin}
                 onChange={(e) => setPin(e.target.value.replace(/\D/g, ''))}
                 placeholder="123456"
-                className="w-full border border-field rounded-lg px-3 py-2 text-sm text-center tracking-widest font-mono text-lg focus:outline-none focus:ring-2 focus:ring-accent"
+                className="w-full border border-field rounded-lg px-3 py-2 text-sm text-center font-mono text-lg focus:outline-none focus:ring-2 focus:ring-accent"
               />
               {error && <p className="text-xs text-danger">{error}</p>}
               <button
@@ -271,7 +271,7 @@ export default function LoginModal() {
                 >
                   Use your passkey
                 </button>
-                <p className="text-xs uppercase tracking-wide text-fg-muted text-center mb-4">or</p>
+                <p className="text-xs text-fg-muted text-center mb-4">or</p>
               </>
             )}
             <form onSubmit={handleSecondFactorSubmit} className="space-y-4">
@@ -283,7 +283,7 @@ export default function LoginModal() {
                 value={factorCode}
                 onChange={(e) => setFactorCode(e.target.value)}
                 placeholder={factorMethod === 'totp' ? '123456' : 'ABCD234XYZ'}
-                className="w-full border border-field rounded-lg px-3 py-2 text-sm text-center tracking-widest font-mono text-lg focus:outline-none focus:ring-2 focus:ring-accent"
+                className="w-full border border-field rounded-control px-3 py-2 text-sm text-center font-mono text-lg focus:outline-none focus:ring-2 focus:ring-accent"
               />
               {error && <p className="text-xs text-danger">{error}</p>}
               <button

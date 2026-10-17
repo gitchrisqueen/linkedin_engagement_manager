@@ -97,7 +97,7 @@ export default function SurveyModal() {
 
   return (
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-fg/40 p-4">
-      <div className="relative w-full max-w-md max-h-viewport overflow-y-auto bg-raised border border-hairline rounded-xl shadow-xl p-5">
+      <div className="relative w-full max-w-md max-h-viewport overflow-y-auto bg-raised border border-hairline rounded-panel shadow-xl p-5">
         <button
           onClick={dismiss}
           className="absolute top-2 right-3 text-fg-muted hover:text-fg-muted text-xl leading-none"
@@ -108,7 +108,7 @@ export default function SurveyModal() {
 
         {done ? (
           <div className="pt-2">
-            <h2 className="text-sm font-bold text-fg mb-1">Thanks 🙏</h2>
+            <h2 className="text-sm font-semibold text-fg mb-1">Thanks 🙏</h2>
             <p className="text-xs text-fg-muted mb-4">{done}</p>
             <button
               onClick={() => setClosed(true)}
@@ -119,7 +119,7 @@ export default function SurveyModal() {
           </div>
         ) : isReview ? (
           <div className="space-y-3 pt-1">
-            <h2 className="text-sm font-bold text-fg">
+            <h2 className="text-sm font-semibold text-fg">
               {showReview ? 'Turn that into a review?' : survey.headline}
             </h2>
             <p className="text-xs text-fg-muted">
@@ -154,7 +154,7 @@ export default function SurveyModal() {
               onChange={(e) => setImprovement(e.target.value)}
               aria-label="What would make this a 10?"
               placeholder="What would make this a 10?"
-              className="w-full border border-field rounded-lg px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-accent"
+              className="w-full border border-field rounded-control px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-accent"
             />
             <textarea
               rows={3}
@@ -163,7 +163,7 @@ export default function SurveyModal() {
               onChange={(e) => setTestimonial(e.target.value)}
               aria-label="Your review"
               placeholder="Your review, in your words (optional)"
-              className="w-full border border-field rounded-lg px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-accent"
+              className="w-full border border-field rounded-control px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-accent"
             />
             <label className="flex items-start gap-2 text-xs text-fg-muted">
               <input
@@ -187,7 +187,7 @@ export default function SurveyModal() {
           </div>
         ) : (
           <div className="space-y-3 pt-1">
-            <h2 className="text-sm font-bold text-fg">{survey.headline}</h2>
+            <h2 className="text-sm font-semibold text-fg">{survey.headline}</h2>
             <p className="text-xs text-fg-muted">{survey.body}</p>
 
             <div className="flex flex-wrap gap-1" role="group" aria-label="Score 0 to 10">
@@ -220,7 +220,7 @@ export default function SurveyModal() {
               onChange={(e) => setWhy(e.target.value)}
               aria-label="Why that score?"
               placeholder="What's the main reason for your score?"
-              className="w-full border border-field rounded-lg px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-accent"
+              className="w-full border border-field rounded-control px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-accent"
             />
 
             {error && <p className="text-xs text-danger">{error}</p>}

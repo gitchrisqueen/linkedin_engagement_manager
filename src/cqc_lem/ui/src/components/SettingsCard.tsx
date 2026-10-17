@@ -16,7 +16,7 @@ export default function SettingsCard({
 }) {
   const hasHeader = !!title || !!subtitle || !!headerRight
   return (
-    <div className={`bg-raised rounded-lg shadow-sm border border-hairline p-6 space-y-4 ${className}`}>
+    <div className={`bg-raised rounded-panel shadow-panel border border-hairline p-6 space-y-4 ${className}`}>
       {hasHeader && (
         <div className="flex items-center justify-between">
           <div>

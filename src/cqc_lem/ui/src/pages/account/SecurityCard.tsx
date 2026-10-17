@@ -245,7 +245,7 @@ export default function SecurityCard() {
             onChange={(e) => setAgentLabel(e.target.value)}
             maxLength={120}
             placeholder="Headless agent"
-            className="flex-1 border border-field rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent"
+            className="flex-1 border border-field rounded-control px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent"
           />
           <input
             type="number"
@@ -254,13 +254,13 @@ export default function SecurityCard() {
             onChange={(e) => setAgentTtlDays(Number(e.target.value))}
             min={1}
             max={365}
-            className="w-full sm:w-28 border border-field rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent"
+            className="w-full sm:w-28 border border-field rounded-control px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent"
           />
           <button
             type="button"
             onClick={() => mintAgentToken.mutate()}
             disabled={mintAgentToken.isPending}
-            className="bg-accent text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-accent/90 disabled:opacity-50 whitespace-nowrap"
+            className="bg-accent text-white px-4 py-2 rounded-control text-sm font-semibold hover:bg-accent/90 disabled:opacity-50 whitespace-nowrap"
           >
             {mintAgentToken.isPending ? 'Creating…' : 'Create agent token'}
           </button>

@@ -99,9 +99,9 @@ export function useStepUp() {
 
   const modal = methods === null ? null : (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-fg/50 px-4">
-      <div className="bg-raised rounded-xl shadow-xl w-full max-w-sm p-6 max-h-viewport overflow-y-auto" role="dialog"
+      <div className="bg-raised rounded-panel shadow-xl w-full max-w-sm p-6 max-h-viewport overflow-y-auto" role="dialog"
            aria-modal="true" aria-label="Confirm it's you">
-        <h3 className="text-lg font-bold text-fg mb-1">Confirm it's you</h3>
+        <h3 className="text-xl font-semibold text-fg mb-1">Confirm it's you</h3>
         <p className="text-sm text-fg-muted mb-4">
           This change touches your LinkedIn credentials, so it needs one more check.
         </p>
@@ -134,7 +134,7 @@ export function useStepUp() {
               value={code}
               onChange={(e) => setCode(e.target.value.replace(/\D/g, ''))}
               placeholder="6-digit code"
-              className="w-full border border-field rounded-lg px-3 py-2 text-sm text-center tracking-widest font-mono"
+              className="w-full border border-field rounded-lg px-3 py-2 text-sm text-center font-mono"
             />
             <button
               type="button"

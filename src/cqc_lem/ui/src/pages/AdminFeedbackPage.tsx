@@ -113,7 +113,7 @@ export default function AdminFeedbackPage() {
     <div className="max-w-5xl space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-fg">Feedback triage</h1>
+          <h1 className="text-section font-semibold tabular-nums text-fg">Feedback triage</h1>
           <p className="text-sm text-fg-muted">
             Approve feedback for the auto-work pipeline or dismiss it. Only feedback from admin users is auto-triaged without review.
           </p>
@@ -193,7 +193,7 @@ export default function AdminFeedbackPage() {
             </thead>
             <tbody className="divide-y divide-hairline">
               {items.map((item) => (
-                <tr key={item.id} className="hover:bg-page">
+                <tr key={item.id} className="hover:bg-accent/5">
                   <td className="px-4 py-3 text-fg-muted">{item.id}</td>
                   <td className="px-4 py-3">{SOURCE_LABELS[item.source] ?? item.source}</td>
                   <td className="px-4 py-3">

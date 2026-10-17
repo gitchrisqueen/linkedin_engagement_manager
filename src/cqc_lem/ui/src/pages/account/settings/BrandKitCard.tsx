@@ -31,7 +31,7 @@ export default function BrandKitCard() {
                 <div className="flex items-center gap-2">
                   <input type="color" value={swatch} aria-label={`${label} colour picker`}
                     onChange={(e) => update({ [key]: e.target.value } as Partial<BrandKit>)}
-                    className="h-9 w-10 shrink-0 cursor-pointer rounded border border-hairline bg-raised p-0.5" />
+                    className="h-9 w-10 shrink-0 cursor-pointer rounded-control border border-field bg-raised p-0.5" />
                   <input type="text" value={value} maxLength={7} placeholder="#rrggbb"
                     aria-label={`${label} hex`}
                     onChange={(e) => update({ [key]: e.target.value.trim() } as Partial<BrandKit>)}

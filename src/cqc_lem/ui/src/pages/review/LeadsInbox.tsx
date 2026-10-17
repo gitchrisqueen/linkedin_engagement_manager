@@ -85,7 +85,7 @@ export default function LeadsInbox({ userTimezone }: { userTimezone: string }) {
     <div className="space-y-4">
       {msg && <p className={`text-sm font-medium ${msg.ok ? 'text-success' : 'text-danger'}`}>{msg.text}</p>}
 
-      <div className="bg-raised rounded-lg border border-hairline shadow-sm p-5">
+      <div className="bg-raised rounded-panel border border-hairline shadow-panel p-5">
         <h3 className="font-semibold text-fg">
           Leads inbox{data?.new_count ? ` — ${data.new_count} waiting` : ''}
         </h3>
@@ -109,14 +109,14 @@ export default function LeadsInbox({ userTimezone }: { userTimezone: string }) {
 
       {isLoading && <p className="text-fg-muted text-sm">Loading leads…</p>}
       {!isLoading && signals.length === 0 && (
-        <div className="text-center py-10 bg-raised rounded-lg border border-hairline text-sm text-fg-muted">
+        <div className="text-center py-10 bg-raised rounded-panel border border-hairline text-sm text-fg-muted">
           No leads here yet — they show up when someone asks about your work.
         </div>
       )}
 
       <div className="space-y-3">
         {signals.map((s) => (
-          <div key={s.id} className="bg-raised rounded-lg border border-hairline p-4 space-y-2">
+          <div key={s.id} className="bg-raised rounded-panel border border-hairline p-4 space-y-2">
             <div className="flex items-center justify-between gap-2">
               {s.person_profile_url ? (
                 <a href={s.person_profile_url} target="_blank" rel="noopener noreferrer"
@@ -165,18 +165,18 @@ export default function LeadsInbox({ userTimezone }: { userTimezone: string }) {
                   <button
                     onClick={() => actionMutation.mutate({ id: s.id, action: 'approve', draft_response: draftFor(s) })}
                     disabled={actionMutation.isPending || !draftFor(s).trim()}
-                    className="px-3 py-1 bg-success text-white rounded text-xs font-semibold hover:bg-success/90 disabled:opacity-50">
+                    className="px-3 py-1 bg-success text-white rounded-control text-xs font-semibold hover:bg-success/90 disabled:opacity-50">
                     Approve &amp; send
                   </button>
                   <button
                     onClick={() => actionMutation.mutate({ id: s.id, draft_response: draftFor(s) })}
                     disabled={actionMutation.isPending || !draftFor(s).trim()}
-                    className="px-3 py-1 border border-field text-fg rounded text-xs font-semibold hover:bg-page disabled:opacity-50">
+                    className="px-3 py-1 border border-field text-fg rounded-control text-xs font-semibold hover:bg-page disabled:opacity-50">
                     Save draft
                   </button>
                   <button onClick={() => actionMutation.mutate({ id: s.id, action: 'dismiss' })}
                     disabled={actionMutation.isPending}
-                    className="px-3 py-1 border border-field text-fg-muted rounded text-xs font-semibold hover:bg-page disabled:opacity-50">
+                    className="px-3 py-1 border border-field text-fg-muted rounded-control text-xs font-semibold hover:bg-page disabled:opacity-50">
                     Dismiss
                   </button>
                 </div>
