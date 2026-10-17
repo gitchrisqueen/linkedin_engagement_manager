@@ -132,6 +132,44 @@ class TestRateLimitedLoginDefersInsteadOfEscalating:
         m["errored"].assert_not_called()
 
 
+class TestTabCrashWarnsInsteadOfFilingAnError:
+    """Issue #2421: the message-thread reader now re-raises a crashed tab instead of swallowing it.
+
+    Here that is an expected transient — one escalating WARNING — never the lane's `DM send failed`
+    `$exception`. Any other fault still reaches `log_error`.
+    """
+
+    @staticmethod
+    def _send_raising(exc):
+        from cqc_lem.app.engagement import outreach as ra
+        with patch(f"{_OUT}.get_user_password_pair_by_id", return_value=("e", "p")), \
+             patch(f"{_OUT}.get_driver_wait_pair", return_value=(MagicMock(), MagicMock())), \
+             patch(f"{_OUT}.login_to_linkedin"), \
+             patch(f"{_OUT}.open_addressed_composer", side_effect=exc), \
+             patch(f"{_OUT}.insert_new_log") as logged, \
+             patch(f"{_OUT}.record_action"), \
+             patch(f"{_OUT}.quit_gracefully") as quit_driver, \
+             patch(f"{_OUT}.log_error") as errored, \
+             patch("cqc_lem.utilities.selenium_util.log_warning") as crash_warned:
+            result = ra.send_dm_now(1, "https://www.linkedin.com/in/jane", "Congrats Jane!")
+        return result, {"log": logged, "quit": quit_driver, "errored": errored,
+                        "crash_warned": crash_warned}
+
+    def test_a_crashed_tab_warns_once_and_records_a_failure(self):
+        result, m = self._send_raising(WebDriverException("tab crashed"))
+        assert result is False
+        m["crash_warned"].assert_called_once()
+        m["errored"].assert_not_called()
+        assert m["log"].call_args.kwargs["result"] is LogResultType.FAILURE
+        m["quit"].assert_called_once()
+
+    def test_any_other_fault_is_still_an_error(self):
+        result, m = self._send_raising(WebDriverException("no such window"))
+        assert result is False
+        m["errored"].assert_called_once()
+        m["crash_warned"].assert_not_called()
+
+
 class TestOutcomeIsRecorded:
     def test_a_refused_send_is_logged_as_a_failure_not_skipped_silently(self):
         _, m = _send(composer=ComposerOpen(opened=False, reason="no_urn"))

@@ -92,7 +92,7 @@ index and the `CLAUDE.md` row that points at it, or the pointer becomes a dead e
 
 - ★ [Observability map](observability-map.md) — the per-surface invariants; the paragraph behind every row in `CLAUDE.md`'s observability table
 - ★ [Error tracking](error-tracking.md) — `$exception` → PostHog issues → GitHub issues, and the warning-escalation contract
-- ★ [LLM analytics](llm-analytics.md) — `llm_call` vs `$ai_generation`; never summed; the free-trial daily AI cap
+- ★ [LLM analytics](llm-analytics.md) — `llm_call` vs `$ai_generation`; never summed; the free-trial daily AI cap and the trial-end stop
 - ★ [KPI dashboards & alerts](kpi-dashboards.md) — alert tiles must be single-series `TrendsQuery` on string properties
 - ★ [Session replay](session-replay.md) — error-triggered plus sampled SPA recording; never set project sampling
 - ★ [PostHog advanced surface](posthog-advanced-surface.md) — CDP destinations, Workflows, Logs, Scouts/Inbox
@@ -114,6 +114,10 @@ index and the `CLAUDE.md` row that points at it, or the pointer becomes a dead e
 - [Prompt inventory](prompt-evals/inventory.md) — GENERATED: one row per call site with family, status, version and latest verdicts
 - [Prompt eval runs](prompt-evals/README.md) — GENERATED: the leaderboard, one row per prompt@version × model per run
 - [Prompt eval run — `pe-20261008-0250fe`](prompt-evals/2026-10-08-pe-20261008-0250fe.md) — archived run report
+- [Prompt eval run — `pe-20261012-b68015`](prompt-evals/2026-10-12-pe-20261012-b68015.md) — archived run report
+- [Prompt eval run — `pe-20261016-eba194`](prompt-evals/2026-10-16-pe-20261016-eba194.md) — archived run report
+- [Prompt eval run — `pe-20261016-f9bfc4`](prompt-evals/2026-10-16-pe-20261016-f9bfc4.md) — archived run report
+- [Prompt eval run — `pe-20261016-655c78`](prompt-evals/2026-10-16-pe-20261016-655c78.md) — archived run report
 - ★ [Stack watchdog & deep health](stack-watchdog.md) — the host watchdog and the `/health/deep` monitor contract
 - ★ [Production log files](production-logs.md) — `/opt/lem/logs/`, one dated file per UTC day; INFO not DEBUG; grep beats `docker logs`
 

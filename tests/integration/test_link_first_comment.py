@@ -73,6 +73,13 @@ class _FakeCursor:
             self.rowcount = 1
         elif s.startswith("SELECT email, password FROM users"):
             self._rows([self.store["users"][params[0]]], ["email", "password"])
+        elif s.startswith("SELECT subscription_status, subscription_tier, trial_started_at"):
+            # The trial-end gate (#2380) reads the subscription first; a paid account is never lapsed.
+            self._rows([{"subscription_status": "active", "subscription_tier": "professional",
+                         "trial_started_at": None, "trial_ends_at": None,
+                         "stripe_customer_id": None, "stripe_subscription_id": None}],
+                       ["subscription_status", "subscription_tier", "trial_started_at",
+                        "trial_ends_at", "stripe_customer_id", "stripe_subscription_id"])
         elif "FROM engagement_preferences" in s:
             row = self.store["prefs"].get(params[0])
             self._result = [row] if row else []

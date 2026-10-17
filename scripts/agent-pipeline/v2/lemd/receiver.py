@@ -324,9 +324,16 @@ def serve(
     """Start the receiver.
 
     Args:
-        binds: Address/port pairs to listen on. The deployment binds the docker bridge gateway
-            (reachable from the cloudflared container) and loopback (for `healthz`) — never a
-            public interface; the tunnel is the only path in.
+        binds: Address/port pairs to listen on. The deployment passes the docker bridge gateway
+            (the tunnel origin cloudflared dials) and loopback (for `healthz`). When every bind
+            shares one port, as here, this opens ONE socket on 0.0.0.0 and listens on every IPv4
+            interface, the public one included; otherwise it binds binds[0] alone and warns.
+            These addresses are not the access control. The host firewall keeps the internet out.
+            The rule in force is root-owned on the host and is NOT recorded in this repo; read it
+            as root with `ufw status numbered`. docs/stack-watchdog.md ("Tunnel origin
+            reachability") records only the OLD source-pinned rule and the outage it caused, so
+            never restore the rule quoted there. HMAC gates every POST; GET serves only an
+            unauthenticated `/healthz` (one kv write) and 404s the rest.
         db_path: Queue database. Created if absent so first boot needs no ordering with the daemon.
         secret: Webhook secret; defaults to `$LEM_WEBHOOK_SECRET`.
 
@@ -349,8 +356,8 @@ def serve(
     # used binds[0], so `--bind 172.18.0.1:8420 --bind 127.0.0.1:8420` silently listened on only
     # the first — and loopback is what the watchdog probes for /healthz, so the self-heal ladder
     # would have reported the receiver dead while it was serving the tunnel perfectly.
-    # Binding all interfaces is safe here BECAUSE ingress is firewalled to the cloudflared
-    # container alone and every request is HMAC-verified; the alternative (a thread per address)
+    # Binding all interfaces relies on the host firewall (see the serve() docstring) and on every
+    # POST being HMAC-verified; GET serves only /healthz. The alternative (a thread per address)
     # buys nothing this deployment needs.
     ports = {p for _, p in binds}
     if len(binds) > 1 and len(ports) == 1:
