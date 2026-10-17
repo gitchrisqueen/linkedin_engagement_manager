@@ -1,8 +1,9 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useLocation } from 'react-router-dom'
 import { useAuth } from '../contexts/useAuth'
 import { useAppInfo } from '../hooks/useAppInfo'
 import api from '../api/client'
+import { OPEN_FEEDBACK_EVENT } from './FloatingDock'
 import {
   EVENTS, analyticsSessionId, capture, ensureSessionRecorded, replayEnabled,
 } from '../utils/analytics'
@@ -40,6 +41,20 @@ export default function FeedbackWidget() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [sent, setSent] = useState(false)
+
+  // Someone opening this is about to describe a bug, so their session is worth the quota —
+  // ensureSessionRecorded() records it even if sampling left it out, or the replay link on the
+  // filed issue would 404 for the ~90% of sessions the sample excludes.
+  function open() {
+    setIsOpen(true)
+    ensureSessionRecorded()
+    capture(EVENTS.feedbackOpened, { route: location.pathname })
+  }
+
+  useEffect(() => {
+    window.addEventListener(OPEN_FEEDBACK_EVENT, open)
+    return () => window.removeEventListener(OPEN_FEEDBACK_EVENT, open)
+  })
 
   function close() {
     setIsOpen(false)
@@ -102,16 +117,10 @@ export default function FeedbackWidget() {
 
   if (!isOpen) {
     return (
-      // Someone opening this is about to describe a bug, so their session is worth the quota —
-      // ensureSessionRecorded() records it even if sampling left it out, or the replay link on the
-      // filed issue would 404 for the ~90% of sessions the sample excludes.
+      // Below md the launcher is a row in the app menu, so nothing floats over the page there.
       <button
-        onClick={() => {
-          setIsOpen(true)
-          ensureSessionRecorded()
-          capture(EVENTS.feedbackOpened, { route: location.pathname })
-        }}
-        className="bg-raised border border-field text-fg text-xs font-semibold px-3.5 py-2 rounded-control shadow-panel hover:bg-page transition-colors"
+        onClick={open}
+        className="hidden md:inline-flex bg-raised border border-field text-fg text-xs font-semibold px-3.5 py-2 rounded-control shadow-panel hover:bg-page transition-colors"
         aria-label="Feedback / Report a bug"
       >
         Feedback / Report a bug

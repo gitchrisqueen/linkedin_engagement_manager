@@ -3,6 +3,7 @@ import { cleanup, fireEvent, render, screen, within } from '@testing-library/rea
 import type { ReactNode } from 'react'
 import { MemoryRouter } from 'react-router-dom'
 import Layout from './Layout'
+import { OPEN_FEEDBACK_EVENT } from './FloatingDock'
 
 const auth = {
   user: { userId: 1, email: 'a-fairly-long-address@example.com' },
@@ -13,7 +14,10 @@ const auth = {
 vi.mock('../contexts/useAuth', () => ({ useAuth: () => auth }))
 vi.mock('./AccountReadinessBanner', () => ({ default: () => null }))
 vi.mock('./FeedbackWidget', () => ({ default: () => null }))
-vi.mock('./FloatingDock', () => ({ default: ({ children }: { children: ReactNode }) => <div>{children}</div> }))
+vi.mock('./FloatingDock', () => ({
+  default: ({ children }: { children: ReactNode }) => <div>{children}</div>,
+  OPEN_FEEDBACK_EVENT: 'lem:open-feedback',
+}))
 vi.mock('./Footer', () => ({ default: () => null }))
 vi.mock('./PostHogSurveyModal', () => ({ default: () => null }))
 vi.mock('./ShippedNotice', () => ({ default: () => null }))
@@ -85,6 +89,18 @@ describe('Layout menu below md', () => {
     }
     within(menu).getByRole('button', { name: 'Log out' })
     expect(screen.getByRole('button', { name: 'Close menu' }).getAttribute('aria-expanded')).toBe('true')
+  })
+
+  it('carries the feedback launcher as a row that opens the panel and closes the menu', () => {
+    harness()
+    fireEvent.click(screen.getByRole('button', { name: 'Menu' }))
+    const menu = document.getElementById('app-menu') as HTMLElement
+    const opened = vi.fn()
+    window.addEventListener(OPEN_FEEDBACK_EVENT, opened)
+    fireEvent.click(within(menu).getByRole('button', { name: 'Feedback / Report a bug' }))
+    window.removeEventListener(OPEN_FEEDBACK_EVENT, opened)
+    expect(opened).toHaveBeenCalledTimes(1)
+    expect(document.getElementById('app-menu')).toBeNull()
   })
 
   it('closes on Escape', () => {

@@ -3,7 +3,7 @@ import { NavLink, Outlet, useNavigate, useLocation } from 'react-router-dom'
 import { useAuth } from '../contexts/useAuth'
 import AccountReadinessBanner from './AccountReadinessBanner'
 import FeedbackWidget from './FeedbackWidget'
-import FloatingDock from './FloatingDock'
+import FloatingDock, { OPEN_FEEDBACK_EVENT } from './FloatingDock'
 import Icon from './marketing/Icon'
 import Footer from './Footer'
 import PostHogSurveyModal from './PostHogSurveyModal'
@@ -154,6 +154,15 @@ export default function Layout() {
               ))}
             </ul>
             <button
+              onClick={() => {
+                setMenuPath(null)
+                window.dispatchEvent(new Event(OPEN_FEEDBACK_EVENT))
+              }}
+              className="flex min-h-11 w-full items-center border-b border-hairline text-sm font-medium text-fg-muted hover:text-fg"
+            >
+              Feedback / Report a bug
+            </button>
+            <button
               onClick={handleLogout}
               className="mt-2 flex min-h-11 w-full items-center text-sm font-medium text-fg-muted hover:text-fg"
             >
@@ -162,9 +171,7 @@ export default function Layout() {
           </div>
         )}
       </nav>
-      {/* pb-16 below sm: room for the floating feedback launcher, so it never sits on the last
-          row of a page. */}
-      <main id="main" tabIndex={-1} className="flex-1 w-full max-w-[74rem] mx-auto px-4 pt-8 pb-16 sm:py-10 focus:outline-none">
+      <main id="main" tabIndex={-1} className="flex-1 w-full max-w-[74rem] mx-auto px-4 py-8 sm:py-10 focus:outline-none">
         {/* Mandatory strong-factor enrolment (issue #905). The gate REPLACES the page: a held
             session is refused everywhere but the enrolment surface, so rendering the app behind it
             would only produce 403s. The prompt is the pre-deadline half. */}

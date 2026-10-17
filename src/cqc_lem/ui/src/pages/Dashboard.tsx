@@ -961,9 +961,12 @@ export default function Dashboard() {
                 {postStats.recommendations.map((r, i) => (
                   <li key={i} className="flex justify-between">
                     <span>{r.weekday} @ {formatHour12(r.hour)}</span>
-                    <span className="text-fg-muted tabular-nums">
-                      {r.metric === ENGAGEMENT_RATE_METRIC ? 'avg engagement rate' : 'avg engagement'}{' '}
-                      {formatEngagementMetric(r.avg_engagement, r.metric)} · {r.sample} post(s)
+                    <span className="flex gap-4 tabular-nums">
+                      <span className="text-fg-muted">
+                        {r.metric === ENGAGEMENT_RATE_METRIC ? 'avg engagement rate' : 'avg engagement'}{' '}
+                        <span className="text-fg">{formatEngagementMetric(r.avg_engagement, r.metric)}</span>
+                      </span>
+                      <span className="text-fg-muted">{r.sample} post(s)</span>
                     </span>
                   </li>
                 ))}
