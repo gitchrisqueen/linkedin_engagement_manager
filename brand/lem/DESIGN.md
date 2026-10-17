@@ -22,7 +22,7 @@ colors:
     hairline: "#33414D"
     field-border: "#7B8894"
 typography:
-  display: { family: "PROPOSED: Inter Tight", weights: [600], licence: "OFL-1.1", note: "brand owner to confirm; the app uses system-ui today" }
+  display: { family: "Inter (display sizes)", weights: [600], licence: "OFL-1.1", note: "the same InterVariable file at display sizes, -0.02em tracking; Inter Tight has no official woff2, so it is not shipped" }
   body: { family: "Inter", weights: [400, 600], licence: "OFL-1.1" }
   scale: [13, 16, 20, 25, 31, 39, 49]   # px; ratio 1.25 from a 16 px body
   body_px: { desktop: 17, phone: 16 }
@@ -38,7 +38,7 @@ targets: { min_px: 44 }
 ## Rationale
 - Blue and charcoal are the approved LEM marks (the logo baselines in `logo/07 Reference`). Blue carries action and links; charcoal carries text. The light background is the official #F9F9F9, so pages sit on the same ground as the logo proof sheet.
 - Dark theme: the brand blue is too dark to read on charcoal, so the dark primary is a lifted blue (#7FB0FF) with dark text on it, and the official charcoal becomes the raised surface. Brand owner to confirm.
-- Type: the product UI uses the system stack today. The proposal is one OFL family (Inter, with Inter Tight for display) so marketing pages and the app read as one product. Brand owner to confirm or name another licensed family.
+- Type: one OFL family, Inter, self-hosted as the official variable woff2, for body and display alike (display = Inter at display sizes, weight 600, -0.02em tracking). One file serves both roles, so marketing pages and the app read as one product. The app still uses the system stack until its own design pass.
 - The one bold element on a LEM page: the product itself, in a real screenshot of the app (owned asset), not an illustration.
 
 ## Contrast (WCAG 2.2 AA; computed 2026-10-16)

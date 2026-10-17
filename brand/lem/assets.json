@@ -1,5 +1,4 @@
 [
   {"path": "logo/01 Main Brand/*", "kind": "image", "licence": "owned", "source": "LEM logo package (approved baselines, logo/05 Brand Guidelines/QA_Review.txt)"},
-  {"path": "fonts: Inter", "kind": "font", "licence": "OFL-1.1", "source": "https://github.com/rsms/inter", "note": "proposed; self-host the woff2"},
-  {"path": "fonts: Inter Tight", "kind": "font", "licence": "OFL-1.1", "source": "https://github.com/rsms/inter-gf-tight", "note": "proposed; self-host the woff2"}
+  {"path": "src/cqc_lem/ui/src/assets/fonts/InterVariable.woff2", "kind": "font", "licence": "OFL-1.1", "source": "https://github.com/rsms/inter/releases/tag/v4.1 (Inter-4.1.zip, web/InterVariable.woff2)", "sha256": "693b77d4f32ee9b8bfc995589b5fad5e99adf2832738661f5402f9978429a8e3", "licence_file": "src/cqc_lem/ui/src/assets/fonts/OFL.txt", "note": "body and display; served hashed under /assets by the Vite build"}
 ]
