@@ -27,18 +27,18 @@ export default function HowItWorks() {
       />
       <ol className="grid gap-6 md:grid-cols-3">
         {STEPS.map((step, index) => (
-          <li key={step.title} className="rounded-card border border-line-200 bg-white p-6">
+          <li key={step.title} className="rounded-panel border border-hairline bg-raised p-6">
             <span
               aria-hidden="true"
-              className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-brand-50 text-lg font-bold text-brand-600"
+              className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-page text-lg font-bold text-accent"
             >
               {index + 1}
             </span>
-            <h3 className="mt-4 text-title font-semibold text-ink-900">
+            <h3 className="mt-4 text-title font-semibold text-fg">
               <span className="sr-only">{`Step ${index + 1}: `}</span>
               {step.title}
             </h3>
-            <p className="mt-2 leading-relaxed text-ink-600">{step.body}</p>
+            <p className="mt-2 leading-relaxed text-fg-muted">{step.body}</p>
           </li>
         ))}
       </ol>

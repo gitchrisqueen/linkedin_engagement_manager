@@ -16,22 +16,23 @@ export default function Hero() {
       {/* `min-w-0` on both columns, not decoration (issue #1556): a grid item's automatic minimum
           size is its min-content width, and ProductPanel's rows hold non-wrapping (`truncate`)
           titles, so the panel column asked for 498px on a 375px phone and took the page with it. */}
-      <div className="grid items-center gap-12 lg:grid-cols-2">
-        <div className="min-w-0">
-          <h1 className="text-4xl sm:text-5xl font-bold leading-tight tracking-tight text-ink-900">
+      <div className="grid items-start gap-12 lg:grid-cols-12 lg:items-stretch">
+        <div className="min-w-0 lg:col-span-5">
+          <h1 className="text-hero font-semibold text-fg">
             Your LinkedIn content, written in your voice — published only when you approve it
           </h1>
-          <p className="mt-6 text-lg leading-relaxed text-ink-600">
+          <p className="mt-6 max-w-measure text-lg leading-relaxed text-fg-muted">
             LEM writes and schedules a month of posts in your voice and publishes each one through
             LinkedIn&apos;s API only after you approve it. It also suggests comments, replies and
             follow-ups, which you review and send yourself. You connect with LinkedIn sign-in, and
             LEM never asks for your LinkedIn password.
           </p>
-          <div className="mt-8 flex flex-col gap-3 sm:flex-row">
+          <div className="mt-8 flex flex-col items-start gap-3 sm:flex-row sm:items-center sm:gap-6">
             <CtaButton
               section="hero"
               cta="hero_trial"
               label="Start free trial from the hero"
+              className="w-full sm:w-auto"
               onClick={openLoginModal}
             >
               Start free trial
@@ -40,18 +41,19 @@ export default function Hero() {
               section="hero"
               cta="hero_how_it_works"
               label="See how it works, from the hero"
-              variant="secondary"
+              variant="link"
               onClick={() => scrollToSection('how-it-works')}
             >
               See how it works
             </CtaButton>
           </div>
-          <p className="mt-4 text-sm text-ink-500">
+          <p className="mt-4 text-sm text-fg-muted">
             {TRIAL_DAYS}-day free trial. No credit card. Cancel any time.
           </p>
         </div>
-        <div className="min-w-0 lg:pl-4">
-          <ProductPanel variant="queue" />
+        <div className="min-w-0 lg:col-span-7 lg:pt-2">
+          {/* Stretched to the copy column so the frame ends on the trial line, not 50px above it. */}
+          <ProductPanel variant="hero" />
         </div>
       </div>
     </Section>

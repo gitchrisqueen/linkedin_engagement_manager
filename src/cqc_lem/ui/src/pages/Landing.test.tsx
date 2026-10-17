@@ -305,6 +305,18 @@ describe('accessibility (issue #1300)', () => {
     expect(region.getAttribute('tabindex')).toBe('0')
     expect(within(region).getByRole('table')).toBeTruthy()
   })
+
+  it('swaps the comparison table for one block per capability below sm', () => {
+    const { container } = renderApp()
+    const region = screen.getByRole('region', { name: /How LEM compares with doing it by hand/i })
+    expect(region.className).toContain('hidden')
+    expect(region.className).toContain('sm:block')
+    const stacked = container.querySelector('[data-section="comparison"] ul.sm\\:hidden') as HTMLElement
+    expect(stacked).not.toBeNull()
+    const rows = within(region).getAllByRole('row').length - 1
+    expect(stacked.querySelectorAll(':scope > li')).toHaveLength(rows)
+    expect(stacked.querySelectorAll('dt')).toHaveLength(rows * 3)
+  })
 })
 
 // A phone browser lays a document out at its min-content width whenever that is wider than the
@@ -366,13 +378,23 @@ describe('landing analytics (issue #1300)', () => {
   it('reports which plan was chosen, and carries the intent into signup', () => {
     renderApp()
     act(() => {
-      screen.getByRole('button', { name: 'Start free trial on the Professional plan' }).click()
+      screen.getByRole('button', { name: 'Choose Professional and start the free trial' }).click()
     })
     expect(captured).toContainEqual({
       event: 'landing_plan_selected',
       properties: { tier: 'professional', price: '$79' },
     })
     expect(window.sessionStorage.getItem('lem:plan-intent')).toBe('professional')
+  })
+
+  it('names every pricing button with its visible text (WCAG 2.5.3)', () => {
+    const { container } = renderApp()
+    const buttons = [...container.querySelectorAll('[data-section="pricing"] button')]
+    expect(buttons.length).toBe(4)
+    for (const button of buttons) {
+      const visible = (button.textContent ?? '').trim()
+      expect(button.getAttribute('aria-label') ?? '', visible).toContain(visible)
+    }
   })
 
   it('reports the sections a visitor actually reached', () => {

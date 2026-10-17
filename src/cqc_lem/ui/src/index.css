@@ -1,5 +1,15 @@
 @import "tailwindcss";
 
+/* Inter, self-hosted (OFL-1.1, rsms/inter v4.1 web/InterVariable.woff2; licence beside the file).
+   Imported through Vite so it ships hashed under /assets with the rest of the build. */
+@font-face {
+  font-family: 'Inter';
+  src: url('./assets/fonts/InterVariable.woff2') format('woff2');
+  font-weight: 100 900;
+  font-style: normal;
+  font-display: swap;
+}
+
 /* The ONE place brand colour is defined (issue #1300). The four source values come from the
    owner-authored package in `logo/06 Color Palette/LEM_Brand_Palette.txt` (PR #1294); everything
    else here is derived from them and contrast-checked. `utils/brandTokens.ts` mirrors these hexes
@@ -59,6 +69,101 @@
 
   --radius-card: 0.875rem;
   --shadow-card: 0 1px 2px rgb(31 44 55 / 0.06), 0 8px 24px rgb(31 44 55 / 0.06);
+}
+
+/* The brand pack's semantic tokens (brand/lem/DESIGN.md, approved 2026-10-16), light and dark.
+   The marketing tree draws with these; the app tree keeps the @theme steps above until its own
+   pass. The values live in custom properties rather than @theme so one class can flip them:
+   `.lem-marketing` follows the visitor's colour scheme, and `data-theme` on it pins one.
+   `utils/brandTokens.ts` (PACK_THEMES) mirrors every value below, and its test holds the pairs.
+   Dark `primary` is the pack's lifted blue: brand-600 is still never a foreground on charcoal. */
+.lem-marketing {
+  --lem-bg: #f9f9f9;
+  --lem-surface: #ffffff;
+  --lem-text: #1f2c37;
+  --lem-muted: #5b6670;
+  --lem-primary: #054db1;
+  --lem-on-primary: #ffffff;
+  --lem-hairline: #d7dce1;
+  --lem-field-border: #7a8590;
+  color-scheme: light;
+  font-family: 'Inter', system-ui, 'Segoe UI', Roboto, sans-serif;
+}
+
+/* The pack's body size: 16px on phone, 17px from the desktop breakpoint. Set on <body> while the
+   marketing tree is mounted (`:has`), so unclassed copy inherits it and the app is untouched. */
+@media (min-width: 64rem) {
+  body:has(.lem-marketing) {
+    font-size: 1.0625rem;
+  }
+}
+
+.lem-marketing[data-theme='dark'] {
+  --lem-bg: #111a22;
+  --lem-surface: #1f2c37;
+  --lem-text: #e8edf2;
+  --lem-muted: #a3aeb8;
+  --lem-primary: #7fb0ff;
+  --lem-on-primary: #111a22;
+  --lem-hairline: #33414d;
+  --lem-field-border: #7b8894;
+  color-scheme: dark;
+}
+
+@media (prefers-color-scheme: dark) {
+  .lem-marketing:not([data-theme='light']) {
+    --lem-bg: #111a22;
+    --lem-surface: #1f2c37;
+    --lem-text: #e8edf2;
+    --lem-muted: #a3aeb8;
+    --lem-primary: #7fb0ff;
+    --lem-on-primary: #111a22;
+    --lem-hairline: #33414d;
+    --lem-field-border: #7b8894;
+    color-scheme: dark;
+  }
+}
+
+@theme inline {
+  --color-page: var(--lem-bg);
+  --color-raised: var(--lem-surface);
+  --color-fg: var(--lem-text);
+  --color-fg-muted: var(--lem-muted);
+  --color-accent: var(--lem-primary);
+  --color-on-accent: var(--lem-on-primary);
+  --color-hairline: var(--lem-hairline);
+  --color-field: var(--lem-field-border);
+
+  /* The pack's 1.25 scale (13 16 20 25 31 39 49): hero H1 39/49, section titles 25/31. */
+  --text-hero: 2.4375rem;
+  --text-hero--line-height: 1.1;
+  --text-hero--letter-spacing: -0.02em;
+  --text-hero-lg: 3.0625rem;
+  --text-hero-lg--line-height: 1.08;
+  --text-hero-lg--letter-spacing: -0.02em;
+  --text-section: 1.5625rem;
+  --text-section--line-height: 1.2;
+  --text-section--letter-spacing: -0.01em;
+  --text-section-lg: 1.9375rem;
+  --text-section-lg--line-height: 1.2;
+  --text-section-lg--letter-spacing: -0.01em;
+
+  --radius-control: 6px;
+  --radius-panel: 10px;
+  --shadow-panel: 0 1px 2px rgb(31 44 55 / 0.08);
+
+  /* The reading measure, about 68 characters. In em, not ch: Inter's "0" is wider than its
+     average letter, so 65ch set about 80-85 characters a line. `max-w-measure`. */
+  --container-measure: 34em;
+}
+
+/* Every prose box in the marketing tree stops at the measure, including short lines like
+   "Last updated" whose box would otherwise run the full container. In the base layer so a
+   narrower max-w-* utility still wins. */
+@layer base {
+  .lem-marketing :where(p, li, dd, blockquote) {
+    max-width: var(--container-measure);
+  }
 }
 
 body {
