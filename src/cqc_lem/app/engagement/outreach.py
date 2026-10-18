@@ -52,7 +52,7 @@ import random
 import re
 import time
 from datetime import datetime, timedelta, timezone
-from typing import List, Optional
+from typing import Callable, List, Optional
 from urllib.parse import parse_qs, unquote, urlparse
 
 from selenium.common import (
@@ -3498,10 +3498,13 @@ _FUNNEL_ENGAGER_LOOKBACK_DAYS = 14
 
 
 def _funnel_prospects_from_roster(driver, user_id: int, roster: list, my_name: str,
-                                  now: datetime) -> tuple:
+                                  now: datetime, reopen: Optional[Callable] = None) -> tuple:
     """The engagement roster (G1, issue #616) and the people commenting on its posts, each paired
     with the post that put them on our radar — the comment stage needs something to comment ON.
     Each roster author is best-effort: one unreachable profile must not lose the others.
+
+    `reopen` returns a fresh driver after quitting the dead one. It is used ONCE, when a tab
+    crashes, so the walk resumes instead of losing every remaining author (issue #2459).
 
     Returns `(prospects, counts)` — `counts` is the per-stage breakdown (`roster_authors_walked`,
     `authors_with_a_post`, `commenters_harvested`) the `outreach_funnel_scan` event needs (issue
@@ -3513,7 +3516,46 @@ def _funnel_prospects_from_roster(driver, user_id: int, roster: list, my_name: s
     authors_walked = 0
     authors_with_a_post = 0
     commenters_harvested = 0
-    for target in roster[:_MAX_ROSTER_AUTHORS_PER_FUNNEL_SCAN]:
+    reopened = False
+
+    def _recover(exc: BaseException, more_to_walk: bool = True):
+        """Fresh driver to resume on, or None when the walk must stop here."""
+        nonlocal reopened
+        if not more_to_walk and not reopened:
+            # Nothing left to resume, so a fresh session would be one more LinkedIn login for no
+            # read. Still the routine first crash, so no warning.
+            log_info(f"Browser tab crashed after {authors_walked - 1} roster author(s) with none "
+                     f"left to walk — ending outreach funnel roster sourcing", user_id=user_id,
+                     action_type="outreach_funnel")
+            return None
+        if reopen is not None and not reopened:
+            # One renderer reading profile after profile is what the node OOM-kills (#2112, #1746).
+            # A fresh session resets that, so the first crash is routine — INFO, not a warning that
+            # recurs daily on this beat into a grouped $exception (issue #2459).
+            reopened = True
+            log_info(f"Browser tab crashed after {authors_walked - 1} roster author(s) — reopening "
+                     f"the session to resume outreach funnel roster sourcing", user_id=user_id,
+                     action_type="outreach_funnel")
+            try:
+                return reopen()
+            except Exception as reopen_exc:
+                # get_current_profile already logged why the session could not open.
+                log_debug("Could not reopen the session for outreach funnel roster sourcing",
+                          exc=reopen_exc, user_id=user_id, action_type="outreach_funnel")
+                return None
+        # Crashing again on a fresh session is the anomaly. Every later author would fail on the
+        # same dead tab and warn once each (issue #2321), so stop on ONE warning and keep what was
+        # already sourced.
+        log_warning(f"Browser tab crashed after {authors_walked - 1} roster author(s) — "
+                    f"stopping outreach funnel roster sourcing", exc=exc, user_id=user_id,
+                    action_type="outreach_funnel")
+        return None
+
+    authors = roster[:_MAX_ROSTER_AUTHORS_PER_FUNNEL_SCAN]
+    i = 0
+    while i < len(authors):
+        target = authors[i]
+        i += 1
         author_url = str(target.get("profile_url") or "").strip()
         if not author_url:
             continue
@@ -3522,13 +3564,13 @@ def _funnel_prospects_from_roster(driver, user_id: int, roster: list, my_name: s
             activity = get_profile_recent_activity(driver, author_url) or []
         except Exception as e:
             if is_tab_crashed(e):
-                # The renderer died, so every later author would fail on the same dead tab and warn
-                # once each — one crash escalating into a grouped $exception from a single run
-                # (issue #2321). Stop the walk on ONE warning and keep what was already sourced.
-                log_warning(f"Browser tab crashed after {authors_walked - 1} roster author(s) — "
-                            f"stopping outreach funnel roster sourcing", exc=e, user_id=user_id,
-                            action_type="outreach_funnel")
-                break
+                driver = _recover(e)
+                if driver is None:
+                    break
+                # Nothing was read for this author, so retry it on the fresh session.
+                authors_walked -= 1
+                i -= 1
+                continue
             log_warning("Could not read a roster author's recent activity", exc=e, user_id=user_id,
                         action_type="outreach_funnel")
             continue
@@ -3551,11 +3593,12 @@ def _funnel_prospects_from_roster(driver, user_id: int, roster: list, my_name: s
             commenters = _harvest_post_commenters(driver, post["link"], author_name, now)
         except Exception as e:
             if is_tab_crashed(e):
-                # Same dead tab as above: one warning, end the walk (issue #2321).
-                log_warning(f"Browser tab crashed after {authors_walked - 1} roster author(s) — "
-                            f"stopping outreach funnel roster sourcing", exc=e, user_id=user_id,
-                            action_type="outreach_funnel")
-                break
+                # The author is already sourced; only this post's commenters are lost, so the walk
+                # resumes at the NEXT author rather than re-reading this one.
+                driver = _recover(e, more_to_walk=i < len(authors))
+                if driver is None:
+                    break
+                continue
             log_warning("Could not harvest commenters from a roster post", exc=e, user_id=user_id,
                         action_type="outreach_funnel")
             continue
@@ -3657,12 +3700,22 @@ def scan_outreach_funnel_targets(self, user_id: int, max_new: int = None):
     synthesis = None
     if roster:
         driver = None
+
+        def _reopen_session():
+            # Tracks the live driver here, so the `finally` below quits whichever one is open.
+            nonlocal driver
+            quit_gracefully(driver)
+            driver = None
+            driver, _w, _e, _p = get_current_profile(user_id=user_id,
+                                                     session_name="Outreach Funnel Sourcing")
+            return driver
+
         try:
             driver, _wait, _user_email, my_profile = get_current_profile(
                 user_id=user_id, session_name="Outreach Funnel Sourcing")
             synthesis = get_or_create_profile_synthesis(user_id, my_profile)
             roster_prospects, roster_counts = _funnel_prospects_from_roster(
-                driver, user_id, roster, my_profile.full_name, now)
+                driver, user_id, roster, my_profile.full_name, now, reopen=_reopen_session)
             prospects.extend(roster_prospects)
             counts.update(roster_counts)
         except Exception as e:
