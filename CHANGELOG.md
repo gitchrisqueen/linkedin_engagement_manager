@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.198.1](https://github.com/christopherqueenconsulting/linkedin_engagement_manager/compare/v0.198.0...v0.198.1) (2026-10-18)
+
+
+### Bug Fixes
+
+* **outreach:** reopen the session once when the funnel roster walk's tab crashes (closes [#2459](https://github.com/christopherqueenconsulting/linkedin_engagement_manager/issues/2459)) ([#2460](https://github.com/christopherqueenconsulting/linkedin_engagement_manager/issues/2460)) ([7a692bb](https://github.com/christopherqueenconsulting/linkedin_engagement_manager/commit/7a692bb7228cef4bac2568a5d9054df29955415f))
+
 ## [0.198.0](https://github.com/christopherqueenconsulting/linkedin_engagement_manager/compare/v0.197.0...v0.198.0) (2026-10-17)
 
 
