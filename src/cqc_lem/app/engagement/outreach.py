@@ -3518,9 +3518,16 @@ def _funnel_prospects_from_roster(driver, user_id: int, roster: list, my_name: s
     commenters_harvested = 0
     reopened = False
 
-    def _recover(exc: BaseException):
+    def _recover(exc: BaseException, more_to_walk: bool = True):
         """Fresh driver to resume on, or None when the walk must stop here."""
         nonlocal reopened
+        if not more_to_walk and not reopened:
+            # Nothing left to resume, so a fresh session would be one more LinkedIn login for no
+            # read. Still the routine first crash, so no warning.
+            log_info(f"Browser tab crashed after {authors_walked - 1} roster author(s) with none "
+                     f"left to walk — ending outreach funnel roster sourcing", user_id=user_id,
+                     action_type="outreach_funnel")
+            return None
         if reopen is not None and not reopened:
             # One renderer reading profile after profile is what the node OOM-kills (#2112, #1746).
             # A fresh session resets that, so the first crash is routine — INFO, not a warning that
@@ -3588,7 +3595,7 @@ def _funnel_prospects_from_roster(driver, user_id: int, roster: list, my_name: s
             if is_tab_crashed(e):
                 # The author is already sourced; only this post's commenters are lost, so the walk
                 # resumes at the NEXT author rather than re-reading this one.
-                driver = _recover(e)
+                driver = _recover(e, more_to_walk=i < len(authors))
                 if driver is None:
                     break
                 continue

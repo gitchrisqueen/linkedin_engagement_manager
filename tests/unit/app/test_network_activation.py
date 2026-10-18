@@ -507,6 +507,34 @@ class TestTabCrashEndsTheRosterWalk:
         assert drivers_read == [first, second, second]
         assert [c.args[0] for c in quit_.call_args_list] == [first, second]
 
+    def test_a_crash_on_the_last_author_does_not_reopen_a_session(self):
+        """Nothing is left to resume, so a fresh session would be a LinkedIn login for no read."""
+        from selenium.common.exceptions import WebDriverException
+
+        from cqc_lem.app.engagement import outreach as ra
+        profile = MagicMock(full_name="Me Myself")
+        with patch(f"{_OUT}.get_current_profile",
+                   return_value=(MagicMock(), None, "", profile)) as gcp, \
+             patch(f"{_OUT}.quit_gracefully"), \
+             patch("cqc_lem.utilities.linkedin.scrapper.get_profile_recent_activity",
+                   return_value=[{"link": "https://x/feed/update/1", "text": "Post body"}]), \
+             patch(f"{_OUT}._harvest_post_commenters",
+                   side_effect=WebDriverException(self._CRASH)), \
+             patch(f"{_OUT}.get_engagement_preferences", return_value=_prefs()), \
+             patch(f"{_OUT}.count_open_outreach_targets", return_value=0), \
+             patch(f"{_OUT}.get_engagement_targets", return_value=self._roster_of(1)), \
+             patch(f"{_OUT}.get_engager_candidates", return_value=[]), \
+             patch(f"{_OUT}.get_requested_person_keys", return_value=set()), \
+             patch(f"{_OUT}.get_outreach_target_by_url", return_value=None), \
+             patch(f"{_OUT}.get_or_create_profile_synthesis", return_value="voice"), \
+             patch(f"{_OUT}.generate_ai_response", return_value="A grounded comment."), \
+             patch(f"{_OUT}.insert_outreach_target", return_value=11) as insert, \
+             patch(f"{_OUT}.log_warning") as warn:
+            ra.scan_outreach_funnel_targets.run(user_id=1)
+        assert gcp.call_count == 1
+        warn.assert_not_called()
+        assert insert.call_count == 1  # the author sourced before the crash still files
+
     def test_a_session_that_cannot_reopen_stops_the_walk_without_a_warning(self):
         """get_current_profile already logged why it could not open; the engagers still file."""
         from selenium.common.exceptions import WebDriverException
