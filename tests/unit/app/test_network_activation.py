@@ -451,11 +451,87 @@ class TestTabCrashEndsTheRosterWalk:
              patch(f"{_OUT}.track_outreach_funnel_scan") as track:
             _out, insert = _scan_funnel(roster=self._roster_of(3),
                                         commenters_exc=WebDriverException(self._CRASH))
+        # The first crash reopens and moves on to the next author; the crash on the fresh session
+        # is the one warning.
         assert warn.call_count == 1
         assert "stopping outreach funnel roster sourcing" in warn.call_args.args[0]
-        assert track.call_args.args[1]["roster_authors_walked"] == 1
-        assert insert.call_count == 1
-        assert insert.call_args.kwargs["stage"] == OutreachStage.COMMENT
+        assert track.call_args.args[1]["roster_authors_walked"] == 2
+        assert insert.call_count == 2
+        assert all(c.kwargs["stage"] == OutreachStage.COMMENT for c in insert.call_args_list)
+
+    def test_one_crash_reopens_the_session_and_resumes_without_a_warning(self, caplog):
+        """A single crash reopens the session and resumes at the author it crashed on (#2459).
+
+        A crash once a day on this beat recurred into a grouped $exception; a fresh session resets
+        the renderer.
+        """
+        from selenium.common.exceptions import WebDriverException
+        post = [{"link": "https://x/feed/update/1", "text": "Post body"}]
+        caplog.set_level(logging.INFO, logger="cqc-lem")
+        with patch(f"{_OUT}.log_warning") as warn, \
+             patch(f"{_OUT}.track_outreach_funnel_scan") as track:
+            _out, insert = _scan_funnel(roster=self._roster_of(3),
+                                        activity_exc=[WebDriverException(self._CRASH), post, post,
+                                                      post])
+        warn.assert_not_called()
+        assert "reopening the session to resume" in caplog.text
+        assert track.call_args.args[1]["roster_authors_walked"] == 3
+        assert insert.call_count == 3
+
+    def test_the_crashed_session_is_quit_and_the_fresh_one_is_used(self):
+        from selenium.common.exceptions import WebDriverException
+
+        from cqc_lem.app.engagement import outreach as ra
+        first, second = MagicMock(name="first"), MagicMock(name="second")
+        drivers_read = []
+
+        def activity(driver, _url):
+            drivers_read.append(driver)
+            if len(drivers_read) == 1:
+                raise WebDriverException(self._CRASH)
+            return []
+
+        profile = MagicMock(full_name="Me Myself")
+        with patch(f"{_OUT}.get_current_profile",
+                   side_effect=[(first, None, "", profile), (second, None, "", profile)]) as gcp, \
+             patch(f"{_OUT}.quit_gracefully") as quit_, \
+             patch("cqc_lem.utilities.linkedin.scrapper.get_profile_recent_activity",
+                   side_effect=activity), \
+             patch(f"{_OUT}.get_engagement_preferences", return_value=_prefs()), \
+             patch(f"{_OUT}.count_open_outreach_targets", return_value=0), \
+             patch(f"{_OUT}.get_engagement_targets", return_value=self._roster_of(2)), \
+             patch(f"{_OUT}.get_engager_candidates", return_value=[]), \
+             patch(f"{_OUT}.get_or_create_profile_synthesis", return_value="voice"):
+            ra.scan_outreach_funnel_targets.run(user_id=1)
+        assert gcp.call_count == 2
+        assert drivers_read == [first, second, second]
+        assert [c.args[0] for c in quit_.call_args_list] == [first, second]
+
+    def test_a_session_that_cannot_reopen_stops_the_walk_without_a_warning(self):
+        """get_current_profile already logged why it could not open; the engagers still file."""
+        from selenium.common.exceptions import WebDriverException
+
+        from cqc_lem.app.engagement import outreach as ra
+        profile = MagicMock(full_name="Me Myself")
+        with patch(f"{_OUT}.get_current_profile",
+                   side_effect=[(MagicMock(), None, "", profile), RuntimeError("no slot")]), \
+             patch(f"{_OUT}.quit_gracefully"), \
+             patch("cqc_lem.utilities.linkedin.scrapper.get_profile_recent_activity",
+                   side_effect=WebDriverException(self._CRASH)), \
+             patch(f"{_OUT}.get_engagement_preferences", return_value=_prefs()), \
+             patch(f"{_OUT}.count_open_outreach_targets", return_value=0), \
+             patch(f"{_OUT}.get_engagement_targets", return_value=self._roster_of(3)), \
+             patch(f"{_OUT}.get_engager_candidates", return_value=[_engager(degree="2nd")]), \
+             patch(f"{_OUT}.get_requested_person_keys", return_value=set()), \
+             patch(f"{_OUT}.get_outreach_target_by_url", return_value=None), \
+             patch(f"{_OUT}.get_or_create_profile_synthesis", return_value="voice"), \
+             patch(f"{_OUT}.get_ai_message_refinement", return_value="Refined note"), \
+             patch(f"{_OUT}.insert_outreach_target", return_value=11) as insert, \
+             patch(f"{_OUT}.log_warning") as warn, patch(f"{_OUT}.log_debug") as debug:
+            out = ra.scan_outreach_funnel_targets.run(user_id=1)
+        warn.assert_not_called()
+        assert any("Could not reopen the session" in str(c.args[0]) for c in debug.call_args_list)
+        assert insert.call_count == 1 and "Filed 1" in out
 
     def test_a_crash_at_login_is_not_warned_a_second_time(self):
         """get_current_profile already warned where it detected the crash (#1749)."""
