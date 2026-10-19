@@ -93,9 +93,11 @@ is the same false reassurance in link form, and it costs the edition, not just a
 ## Why approved covers never reached LinkedIn (2026-10-19 grounding)
 
 Until 2026-10-19 no edition carried a cover on LinkedIn, even the ones whose cover was `approved`
-(editions 7, 8, 15 and 16). `attach_article_cover` looked for a file input or a "cover image"
-button, and the live `/article/new/` editor offers neither. Each publish logged `Article cover
-upload control not found` and went out cover-less. A cover miss never blocks a publish.
+(editions 7, 8, 15 and 16). Editions 1-4 predate covers, and 5-6 had covers still awaiting review,
+so the upload step never ran for them. For the four approved ones, `attach_article_cover` looked
+for a file input or a "cover image" button, and the live `/article/new/` editor offers neither.
+Each of those publishes logged `Article cover upload control not found` once (prod logs
+2026-08-18, 2026-08-25, 2026-10-06 13:07:23Z and 2026-10-13 13:07:15Z) and went out cover-less.
 
 The read-only article-editor probe (`scripts/linkedin_live_validation.py --article-editor-url`,
 capture `article_editor.cover_controls`) grounded the control on 2026-10-19:
@@ -107,12 +109,31 @@ capture `article_editor.cover_controls`) grounded the control on 2026-10-19:
 The trigger chain now includes that label. Just before the press, `_FILE_CHOOSER_CAPTURE_JS`
 intercepts the file-chooser request the press makes: the input is tagged `data-lem-cover-input`
 and attached to the page, `send_keys` hands it the file, and `_FILE_CHOOSER_RESTORE_JS` puts the
-original `click`/`showPicker` back. The first real check is the next scheduled publish. Grep the
-day's log for `Article cover upload control not found` (it should be absent) and look at the
-edition's page for the cover.
+original `click`/`showPicker` back.
 
-The ten editions published before the fix were backfilled by hand on LinkedIn with their stored or
-newly generated covers.
+**Checking the next publish.** The probe cannot test the upload itself, so the first real check is
+the next scheduled edition publish. The EA worker or the owner checks it on the publish day:
+
+1. First confirm the edition carries an **approved** cover. The upload step runs only for
+   `cover_image_status='approved'`. With no approved cover nothing is attempted, and none of the
+   lines below appear, so the check proves nothing.
+2. Grep `/opt/lem/logs/cqc_lem_YYYY_MM_DD.log` for the edition's publish and these four lines:
+   - `Article cover attached` (INFO): the file was handed to LinkedIn's uploader;
+   - `Article cover upload control not found`: the control drifted again;
+   - `Article cover attach failed`: a WebDriver error during the upload;
+   - `Article cover image missing on disk`: the approved file is gone from the assets volume.
+3. Open the edition's page and confirm the cover shows.
+
+**If the cover blocks Next.** A cover LinkedIn accepted can leave a crop or preview overlay that
+`_confirm_cover_dialog` does not close, and that overlay intercepts Next. The publish then logs
+`Cover upload left Next blocked; pressing Escape and retrying once`, presses Escape, and clicks a
+freshly resolved Next once more. Only if that also fails is the step reported as `article_next` and
+the edition marked `failed`. To unblock that edition, reject or remove its cover in the review
+queue, then put it back in the queue the usual way. To stop covers altogether, roll the release
+back.
+
+The ten editions already published before the fix (1-8, 15, 16) are being backfilled by hand on
+LinkedIn. Six use their stored covers and four use covers generated on 2026-10-19.
 
 ## The deterministic gate
 
@@ -455,10 +476,13 @@ per edit. Nothing generates a cover on a publish.
 
 ## Attaching at publish
 
-`attach_article_cover` writes the absolute path into the article editor's hidden
-`<input type=file>` (clicking the styled button would open an OS file chooser Selenium cannot
-drive), falling back to clicking an "Add a cover image" affordance first on variants that render
-the input lazily, then best-effort confirming a crop/preview dialog.
+`attach_article_cover` writes the absolute path into a file input of the article editor. The live
+editor has none until its **Upload from computer** button is pressed, and the press asks for an OS
+file chooser Selenium cannot drive. So the function installs `_FILE_CHOOSER_CAPTURE_JS`, presses the
+trigger, and sends the file to the input the press asked for, which is tagged
+`data-lem-cover-input`. It then restores the page and makes a best-effort click on a crop or
+preview dialog's confirm button. Variants that render a file input up front are matched directly
+(see "Why approved covers never reached LinkedIn" above).
 
 That input is **hidden by design**, which is the one thing to keep in mind when touching the
 resolver: `resolve_article_editor_step` applies its `is_displayed()` filter only when

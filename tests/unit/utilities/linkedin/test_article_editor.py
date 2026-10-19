@@ -1192,6 +1192,61 @@ class TestFillArticleEditorCover:
         assert file_input.sent == [os.path.abspath(str(image))]
         assert nxt.clicked == 1 and publish.clicked == 1
 
+    def test_an_overlay_left_by_an_attached_cover_gets_one_escape_and_one_retry(
+            self, monkeypatch, tmp_path):
+        # A cover the uploader accepted can leave a crop/preview overlay over Next. The edition
+        # must still publish: Escape, re-resolve Next, click once more.
+        image = tmp_path / "cover.png"
+        image.write_bytes(b"png")
+        dom, _title, _body, nxt, publish = self._dom()
+        driver = FakeDriver(dom)
+        self._wire(monkeypatch, driver)
+        monkeypatch.setattr(ae, "attach_article_cover", lambda *a, **k: True)
+        escapes = []
+        monkeypatch.setattr(ae, "_press_escape", lambda d: escapes.append(d))
+        calls = []
+
+        def click(d, element):
+            calls.append(element)
+            if len(calls) == 1:
+                return False  # the overlay intercepts the first Next
+            element.click()
+            return True
+
+        monkeypatch.setattr(ae, "_click_safely", click)
+        url, failed = ae.fill_article_editor(driver, MagicMock(), "T", "B",
+                                             cover_image_path=str(image))
+        assert failed is None and url == driver.current_url
+        assert escapes == [driver]
+        assert nxt.clicked == 1 and publish.clicked == 1
+
+    def test_a_blocked_next_without_an_attached_cover_is_not_retried(self, monkeypatch, tmp_path):
+        image = tmp_path / "cover.png"
+        image.write_bytes(b"png")
+        dom, *_ = self._dom()
+        driver = FakeDriver(dom)
+        self._wire(monkeypatch, driver)
+        monkeypatch.setattr(ae, "attach_article_cover", lambda *a, **k: False)
+        escapes = []
+        monkeypatch.setattr(ae, "_press_escape", lambda d: escapes.append(d))
+        monkeypatch.setattr(ae, "_click_safely", lambda d, e: False)
+        url, failed = ae.fill_article_editor(driver, MagicMock(), "T", "B",
+                                             cover_image_path=str(image))
+        assert (url, failed) == (None, ae.STEP_NEXT)
+        assert escapes == []
+
+    def test_an_attached_cover_is_logged_at_info(self, monkeypatch, tmp_path):
+        image = tmp_path / "cover.png"
+        image.write_bytes(b"png")
+        file_input = FakeElement(tag="input", attrs={"type": "file", "accept": "image/*"})
+        driver = FakeDriver({(By.CSS_SELECTOR, "input[type='file']"): [file_input]})
+        monkeypatch.setattr(ae.time, "sleep", lambda s: None)
+        self._wire(monkeypatch, driver)
+        infos = []
+        monkeypatch.setattr(ae, "log_info", lambda msg, **k: infos.append(msg))
+        assert ae.attach_article_cover(driver, MagicMock(), str(image)) is True
+        assert "Article cover attached" in infos
+
     def test_a_cover_that_cannot_attach_still_publishes(self, monkeypatch, tmp_path):
         # No file input anywhere: the cover is lost, the edition is not.
         image = tmp_path / "cover.png"
