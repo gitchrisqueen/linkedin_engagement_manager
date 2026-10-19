@@ -38,6 +38,10 @@ beautifulsoup4 = "^4.12"
 
 # --- AI / external APIs ---
 openai = ">=1.52.2,<4.0.0"
+# Content research uses the official MCP SDK's Streamable HTTP client. Also powers
+# the optional Selenium debugging server, so keep the mcp group alias below.
+mcp = ">=2.3.0,<3.0.0"
+httpx2 = ">=2.10.0,<3.0.0"
 googlenews = "^1.6.15"
 runwayml = ">=2.1,<6.0"
 replicate = "^1.0.4"
@@ -103,7 +107,7 @@ optional = true
 # Powers tools/selenium_mcp_server.py — an MCP server that drives the live
 # selenium-chrome browser (watchable via lemvnc) for interactive debugging.
 # Install with: poetry install --with mcp
-mcp = ">=1.2.0"
+mcp = ">=2.3.0,<3.0.0"
 
 [tool.poetry.group.test]
 optional = true

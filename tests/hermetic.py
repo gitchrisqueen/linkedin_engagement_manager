@@ -19,6 +19,7 @@ from typing import Any
 from unittest.mock import patch
 
 import httpx
+import httpx2
 
 _BLOCKED_URL = "http://litellm.invalid/v1/chat/completions"
 
@@ -67,6 +68,14 @@ def block_llm() -> Iterator[None]:
          patch.object(client.embeddings, "create", side_effect=_blocked_llm_call), \
          patch.object(client.images, "generate", side_effect=_blocked_llm_call), \
          patch.object(client.responses, "create", side_effect=_blocked_llm_call):
+        yield
+
+
+@contextlib.contextmanager
+def block_parallel_search() -> Iterator[None]:
+    """Refuse real HTTP transport for the anonymous research client in hermetic callers."""
+    with patch.object(httpx2.AsyncHTTPTransport, "handle_async_request",
+                      side_effect=httpx2.ConnectError("unit-test fixture: Parallel research network blocked")):
         yield
 
 
@@ -142,6 +151,6 @@ def hermetic_io() -> Iterator[None]:
     """Install every guard above at once — what prompt capture runs under outside pytest."""
     with contextlib.ExitStack() as stack:
         for guard in (block_llm, block_new_llm_clients, block_redis, block_celery_broker,
-                      block_mysql, block_selenium):
+                      block_mysql, block_selenium, block_parallel_search):
             stack.enter_context(guard())
         yield

@@ -2,14 +2,13 @@
 current, factual findings (recent stats with rough dates, real examples, trends, credible contrarian
 data) for a subject + blueprint, so writers weave specifics instead of vague claims.
 
-Routing: the direct `search_with_perplexity` helper (Perplexity's Agent API, the `fast` preset;
-Sonar Chat Completions was sunset 2026-09-27, #2255) is the PRIMARY route. The proxy alias
-`lem-research` (`client.responses.create`) is tried first only under `RESEARCH_VIA_PROXY`, default
-OFF: LiteLLM rejects the Agent API's `"truncation": ""` and 500s (see `research_via_proxy_enabled`).
-Both routes answer as a typed `output` list rather than a chat choice — `parse_agent_response` is
-the ONE reader of that shape. The direct route books its own `llm_call` spend, since no proxy is
-there to emit `$ai_generation`. Every failure path degrades to empty findings — generation NEVER
-breaks because research did.
+Routing: a fresh installation uses anonymous Parallel Search MCP excerpts. A configured
+Perplexity key or enabled RESEARCH_VIA_PROXY preserves the Perplexity route; the explicit
+CONTENT_RESEARCH_PROVIDER override selects parallel or perplexity. Perplexity's direct Agent API
+is primary within that provider; its proxy alias is tried first only under RESEARCH_VIA_PROXY.
+`parse_agent_response` remains the ONE reader for Perplexity's Agent API response shape. Direct
+Perplexity calls book their own spend. Every failure degrades to empty findings — generation
+NEVER breaks because research did, and provider errors never switch providers.
 
 COST POLICY (per-type toggles, all under the CONTENT_RESEARCH_ENABLED master switch):
 - newsletter — NEWSLETTER_RESEARCH_ENABLED, default ON. Weekly cadence; one call per edition is cheap
@@ -348,6 +347,31 @@ def _research_direct(query: str, max_sources: int) -> dict:
     return {"findings": (raw.get("answer") or "").strip(), "sources": raw.get("sources") or []}
 
 
+def research_provider() -> str:
+    """Resolve explicit selection first, preserving an existing Perplexity key or proxy choice.
+
+    Returns:
+        The configured provider, or Parallel for an unconfigured installation.
+
+    Raises:
+        ValueError: CONTENT_RESEARCH_PROVIDER names an unsupported provider.
+    """
+    selected = os.environ.get("CONTENT_RESEARCH_PROVIDER", "").strip().lower()
+    if selected:
+        if selected not in ("parallel", "perplexity"):
+            raise ValueError("CONTENT_RESEARCH_PROVIDER must be parallel or perplexity")
+        return selected
+    if os.environ.get("PERPLEXITY_API_KEY", "").strip() or research_via_proxy_enabled():
+        return "perplexity"
+    return "parallel"
+
+
+def _research_parallel(query: str, subject: str, max_sources: int) -> dict:
+    from cqc_lem.utilities.ai.parallel_search import search_parallel
+
+    return search_parallel(query, subject, max_sources)
+
+
 @llm_step("research")
 def research_topic(subject: str, content_type: str = "newsletter", blueprint: dict = None,
                    context_description: str = None, prefs: dict = None,
@@ -360,7 +384,19 @@ def research_topic(subject: str, content_type: str = "newsletter", blueprint: di
     subject = (subject or "").strip()
     if not subject or not research_enabled(content_type, user_id=user_id):
         return dict(_EMPTY)
+    try:
+        provider = research_provider()
+    except ValueError as exc:
+        log_warning("Invalid content research provider; generating without research", exc=exc)
+        return dict(_EMPTY)
     query = _build_research_query(subject, content_type, blueprint, context_description, prefs)
+    if provider == "parallel":
+        try:
+            return _research_parallel(query, subject, max_sources)
+        except Exception as exc:
+            log_warning("Content research unavailable; generating without research", exc=exc,
+                        api_provider="parallel")
+            return dict(_EMPTY)
     if proxy_route_open():
         try:
             result = _research_via_litellm(query, max_sources)
