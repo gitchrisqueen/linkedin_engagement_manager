@@ -529,6 +529,7 @@ _PROBE_CAPABILITY_SYMBOLS = {
     "occasion_composer.composer_host": "composer_host_evidence",
     "occasion_composer.occasion_word_scan": "_occasion_word_scan",
     "occasion_composer.occasion_screen": "_occasion_screen_evidence",
+    "article_editor.cover_controls": "article_cover_evidence",
 }
 
 
@@ -2462,6 +2463,82 @@ def article_editor_reading(verdict: dict) -> str:
             "— it lives in the dialog Next opens and this probe never clicks Next")
 
 
+# Walks the light DOM AND every open shadow root, because the cover upload control has never been
+# grounded (#2094 follow-up): the shipped chain in article_editor.py searches the light DOM only, so
+# an input mounted inside a shadow root would read as "not found" exactly as production logs it.
+_ARTICLE_COVER_SCAN_JS = r"""
+const want = /cover|image|photo|upload|media|banner/i;
+const out = {file_inputs: [], cover_controls: [], shadow_roots: 0};
+const seen = new Set();
+function attrs(el) {
+  const keep = ['id', 'name', 'type', 'accept', 'aria-label', 'role', 'data-testid', 'title'];
+  const o = {tag: el.tagName.toLowerCase()};
+  for (const k of keep) { const v = el.getAttribute && el.getAttribute(k); if (v) o[k] = v.slice(0, 120); }
+  const txt = (el.innerText || el.textContent || '').trim().replace(/\s+/g, ' ');
+  if (txt) o.text = txt.slice(0, 120);
+  o.displayed = !!(el.offsetWidth || el.offsetHeight || (el.getClientRects && el.getClientRects().length));
+  return o;
+}
+function walk(root, inShadow) {
+  const all = root.querySelectorAll('*');
+  for (const el of all) {
+    if (el.shadowRoot) { out.shadow_roots += 1; walk(el.shadowRoot, true); }
+    if (seen.has(el)) continue;
+    seen.add(el);
+    const tag = el.tagName.toLowerCase();
+    if (tag === 'input' && (el.getAttribute('type') || '').toLowerCase() === 'file') {
+      const o = attrs(el); o.in_shadow = inShadow; out.file_inputs.push(o); continue;
+    }
+    const clickable = tag === 'button' || tag === 'label' || el.getAttribute('role') === 'button';
+    if (!clickable) continue;
+    const label = [el.getAttribute('aria-label'), el.getAttribute('title'),
+                   (el.innerText || el.textContent || '')].join(' ');
+    if (want.test(label)) { const o = attrs(el); o.in_shadow = inShadow; out.cover_controls.push(o); }
+  }
+}
+walk(document, false);
+out.file_inputs = out.file_inputs.slice(0, 20);
+out.cover_controls = out.cover_controls.slice(0, 30);
+return out;
+"""
+
+
+def article_cover_evidence(driver) -> dict:
+    """What the editor offers for a cover image, read without clicking anything.
+
+    Reports every file input and every button/label whose own text names a cover, image, photo,
+    upload, media or banner, each flagged `in_shadow` when it lives inside a shadow root, plus
+    whether the shipped `attach_article_cover` chains resolve on the same page. A cover control the
+    page shows but the shipped chains cannot see is the drift behind "Article cover upload control
+    not found".
+    """
+    try:
+        scan = driver.execute_script(_ARTICLE_COVER_SCAN_JS) or {}
+    except Exception as e:
+        scan = {"scan_error": f"{type(e).__name__}: {e}"[:200]}
+    shipped = {}
+    try:
+        from cqc_lem.utilities.linkedin.article_editor import (
+            _COVER_INPUT_LOCATORS,
+            _COVER_TRIGGER_LOCATORS,
+        )
+
+        for key, chain in (("cover_input", _COVER_INPUT_LOCATORS),
+                           ("cover_trigger", _COVER_TRIGGER_LOCATORS)):
+            hits = []
+            for _route, strategies in chain:
+                for by, value in strategies:
+                    try:
+                        hits.append(len(driver.find_elements(by, value)))
+                    except Exception:
+                        hits.append(None)
+            shipped[key] = hits
+    except Exception as e:
+        shipped["import_error"] = f"{type(e).__name__}: {e}"[:200]
+    scan["shipped_chain_hits"] = shipped
+    return scan
+
+
 def probe_article_editor(driver, editor_url: str = "https://www.linkedin.com/article/new/",
                          sleep=time.sleep) -> dict:
     """#771/#804: open LinkedIn's article editor (read-only) and report which selector routes resolve
@@ -2487,6 +2564,7 @@ def probe_article_editor(driver, editor_url: str = "https://www.linkedin.com/art
             verdict[key]["element"] = element_evidence(resolved.element)
     verdict["url"] = getattr(driver, "current_url", editor_url)
     verdict["buttons"] = visible_button_labels(driver)
+    verdict["cover_controls"] = article_cover_evidence(driver)
     return graded(verdict, article_editor_state(verdict), article_editor_reading(verdict))
 
 
