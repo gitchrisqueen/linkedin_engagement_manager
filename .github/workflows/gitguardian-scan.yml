@@ -15,12 +15,25 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
+# Least privilege: the scan only needs to read the repo.
+permissions:
+  contents: read
+
 jobs:
   scanning:
     name: GitGuardian Scan
     runs-on: ubuntu-latest
-    # Skip Dependabot PRs — dependency updates don't contain secrets
-    if: github.actor != 'dependabot[bot]'
+    # Skip conditions:
+    #  - Dependabot PRs: dependency bumps don't introduce secrets.
+    #  - PRs from forks: GitHub withholds repo/org secrets from fork PRs, so
+    #    GITGUARDIAN_API_KEY is empty and ggshield fails with "Invalid API key".
+    #    Fork PRs are scanned instead by the GitGuardian GitHub App check run
+    #    ("GitGuardian Security Checks"), and again by this job on merge_group
+    #    before anything lands on main.
+    if: >-
+      github.actor != 'dependabot[bot]' &&
+      (github.event_name != 'pull_request' ||
+       github.event.pull_request.head.repo.full_name == github.repository)
 
     steps:
       - uses: actions/checkout@v7
