@@ -608,6 +608,16 @@ class TestMessageThreadProbe:
         assert "messaging-search" in llv.message_thread_verdict(skipped)
         assert "profile-side routes" in llv.message_thread_verdict(skipped)
 
+    def test_blind_readers_are_named_ahead_of_the_profile_side_caveat(self):
+        # Issue #2463: an editor on screen the readers could not see points at the msg-* chain, not
+        # at the profile-side controls the skip caveat would otherwise blame.
+        blind = {"opened": False, "routes_tried": ["anchor", "text_node"],
+                 "routes_skipped": ["messaging_search"], "blind_routes": ["anchor", "text_node"]}
+        assert llv.message_thread_state(blind) == llv.STATE_DRIFT
+        verdict = llv.message_thread_verdict(blind)
+        assert "anchor, text_node" in verdict and "#2463" in verdict
+        assert "profile-side routes are the finding" not in verdict
+
     def test_a_walk_that_reached_no_route_is_unknown(self):
         # Navigation failed or signed out — no route ran, so the walk grounds nothing.
         assert llv.message_thread_state({"opened": False, "routes_tried": []}) == llv.STATE_UNKNOWN
