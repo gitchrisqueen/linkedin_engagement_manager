@@ -2074,16 +2074,21 @@ def element_evidence(element) -> dict:
     return out
 
 
-def visible_button_labels(driver, limit: int = 40) -> list:
+def visible_button_labels(driver, limit: int = 40, css: Optional[str] = None) -> list:
     """Every visible button's label on the current screen.
 
     This is the EVIDENCE half of the publish verdict: 'Publish is UNKNOWN' is only believable
     alongside the list of controls that ARE on the editor screen. If a future run shows a publish
     control here, the two-screen assumption has changed and the ladder should gate on it again.
+
+    `css` widens the scan past `<button>` for a cross-check that must see the same controls a
+    resolver's own selector does (#2464).
     """
     labels = []
     try:
-        for button in driver.find_elements(By.TAG_NAME, "button"):
+        found = (driver.find_elements(By.CSS_SELECTOR, css) if css
+                 else driver.find_elements(By.TAG_NAME, "button"))
+        for button in found:
             try:
                 if not button.is_displayed():
                     continue
@@ -6685,6 +6690,9 @@ def roster_connect_verdict(reading: dict) -> str:
             "returns unknown and leaves the stored state exactly as it was")
 
 
+_CONNECT_CONTROL_CSS = "button, [role='button'], a[role='link']"
+
+
 def roster_connect_state(reading: Optional[dict]) -> str:
     """Three-state grade for one activity-page connection read (#2464).
 
@@ -6702,7 +6710,11 @@ def roster_connect_state(reading: Optional[dict]) -> str:
     labels = [str(c).lower() for c in (reading.get("owner_controls") or [])]
     if not labels:
         return STATE_UNKNOWN
-    connect = any(t.startswith("connect") or "to connect" in t for t in labels)
+    # The resolver also counts a bare, nameless "Connect" inside the owner's card, which this
+    # label-only read cannot place — so any bare one on the page means Connect may be offered.
+    bare_connect = any(" ".join(str(c).split()).lower() == "connect"
+                       for c in (reading.get("visible_controls") or []))
+    connect = bare_connect or any(t.startswith("connect") or "to connect" in t for t in labels)
     if any(t.startswith("pending") or "awaiting response" in t for t in labels):
         return STATE_DRIFT
     if not connect and any(t.startswith("message") for t in labels):
@@ -6726,7 +6738,9 @@ def probe_roster_connect(driver, profile_url: str,
     sleep(5)
     state = _resolve_connect_state(driver, profile_url)
     owner = _activity_page_owner_name(driver)
-    controls = visible_button_labels(driver)
+    # The resolver's own selector: a Connect rendered as a link is invisible to a `<button>`-only
+    # scan, and a Message beside it would then read as a drift that is not there.
+    controls = visible_button_labels(driver, css=_CONNECT_CONTROL_CSS)
     owner_key = " ".join(str(owner or "").split()).lower()
     reading = {"profile_url": profile_url,
                "activity_url": url,

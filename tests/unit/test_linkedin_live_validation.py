@@ -5359,7 +5359,12 @@ class TestRosterConnectGrade:
                             lambda d, u: connect_state)
         monkeypatch.setattr("cqc_lem.app.engagement.feed._activity_page_owner_name",
                             lambda d: owner)
-        monkeypatch.setattr(llv, "visible_button_labels", lambda d: controls)
+        def labels(_driver, **kwargs):
+            # The cross-check must see the controls the resolver's own selector sees.
+            assert kwargs.get("css") == llv._CONNECT_CONTROL_CSS
+            return controls
+
+        monkeypatch.setattr(llv, "visible_button_labels", labels)
         return llv.probe_roster_connect(MagicMock(), "https://www.linkedin.com/in/ann/",
                                         sleep=lambda _s: None)
 
@@ -5406,3 +5411,19 @@ class TestRosterConnectGrade:
 
     def test_the_grade_handles_an_empty_reading(self):
         assert llv.roster_connect_state(None) == llv.STATE_UNKNOWN
+
+    def test_message_beside_a_bare_connect_is_not_drift(self, monkeypatch):
+        # The resolver counts a nameless "Connect" inside the owner's card, so a named Message next
+        # to one is the resolver correctly reading unknown — not a missed connection.
+        assert self._probe(monkeypatch, "unknown", "Ann Lee",
+                           ["Message Ann Lee", "Connect"])["state"] == llv.STATE_OK
+
+    def test_the_label_scan_honours_a_css_selector(self):
+        driver = MagicMock()
+        link = MagicMock()
+        link.is_displayed.return_value = True
+        link.get_attribute.return_value = "Invite Ann Lee to connect"
+        driver.find_elements.return_value = [link]
+        assert llv.visible_button_labels(driver, css=llv._CONNECT_CONTROL_CSS) == [
+            "Invite Ann Lee to connect"]
+        driver.find_elements.assert_called_once_with(llv.By.CSS_SELECTOR, llv._CONNECT_CONTROL_CSS)
