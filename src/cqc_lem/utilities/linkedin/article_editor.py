@@ -34,7 +34,7 @@ from selenium.webdriver.remote.webdriver import WebDriver
 from selenium.webdriver.remote.webelement import WebElement
 from selenium.webdriver.support.wait import WebDriverWait
 
-from cqc_lem.utilities.logger import log_debug, log_warning
+from cqc_lem.utilities.logger import log_debug, log_info, log_warning
 from cqc_lem.utilities.selenium_util import find_first
 
 STEP_TITLE = "article_title"
@@ -152,6 +152,9 @@ _PUBLISH_LOCATORS: list[tuple[str, list[tuple[str, str]], str]] = [
 # input[type=file] is the last resort — it is the one the "Add a cover image" trigger renders.
 _COVER_INPUT_LOCATORS: list[tuple[str, list[tuple[str, str]]]] = [
     (ROUTE_COVER_INPUT, [
+        # The input `_FILE_CHOOSER_CAPTURE_JS` caught when the "Upload from computer" trigger asked
+        # for a file chooser — the one the live editor renders (2026-10-19 grounding run).
+        (By.CSS_SELECTOR, "input[type='file'][data-lem-cover-input]"),
         (By.XPATH, "//input[@type='file' and contains(translate(@aria-label,"
                    "'ABCDEFGHIJKLMNOPQRSTUVWXYZ','abcdefghijklmnopqrstuvwxyz'),'cover')]"),
         (By.XPATH, "//input[@type='file' and contains(translate(@name,"
@@ -172,8 +175,70 @@ _COVER_TRIGGER_LOCATORS: list[tuple[str, list[tuple[str, str]]]] = [
                    "'abcdefghijklmnopqrstuvwxyz'),'cover image')]"),
         (By.XPATH, "//*[@role='button'][contains(translate(normalize-space(),"
                    "'ABCDEFGHIJKLMNOPQRSTUVWXYZ','abcdefghijklmnopqrstuvwxyz'),'cover image')]"),
+        # The live /article/new/ editor (2026-10-19 grounding run): the cover area's only control
+        # is a light-DOM button labelled "Upload from computer", and NO file input exists until it
+        # is pressed. Matched on the exact label so a body-image control is never taken for it.
+        (By.XPATH, "//button[@aria-label='Upload from computer']"),
+        (By.XPATH, "//button[normalize-space()='Upload from computer']"),
     ]),
 ]
+
+# Pressing the trigger makes the editor call `.click()` (or `.showPicker()`) on a file input to
+# open the OS file chooser, which Selenium cannot drive. This hook, installed just before the press,
+# swallows that request instead: the input is tagged `data-lem-cover-input`, attached to the page
+# (hidden) when the editor built it detached, and `send_keys` then hands it the file. Only file
+# inputs are affected; the originals are kept on `window` so `_FILE_CHOOSER_RESTORE_JS` can undo it.
+_FILE_CHOOSER_CAPTURE_JS = """
+if (!window.__lemOrigInputClick) {
+  window.__lemOrigInputClick = HTMLInputElement.prototype.click;
+  window.__lemOrigShowPicker = HTMLInputElement.prototype.showPicker;
+  const capture = function (original) {
+    return function () {
+      if ((this.type || '').toLowerCase() === 'file') {
+        this.setAttribute('data-lem-cover-input', '1');
+        if (!this.isConnected) { this.style.display = 'none'; document.body.appendChild(this); }
+        return undefined;
+      }
+      return original ? original.apply(this, arguments) : undefined;
+    };
+  };
+  HTMLInputElement.prototype.click = capture(window.__lemOrigInputClick);
+  if (window.__lemOrigShowPicker) {
+    HTMLInputElement.prototype.showPicker = capture(window.__lemOrigShowPicker);
+  }
+}
+"""
+
+_FILE_CHOOSER_RESTORE_JS = """
+if (window.__lemOrigInputClick) {
+  HTMLInputElement.prototype.click = window.__lemOrigInputClick;
+  if (window.__lemOrigShowPicker) { HTMLInputElement.prototype.showPicker = window.__lemOrigShowPicker; }
+  delete window.__lemOrigInputClick; delete window.__lemOrigShowPicker;
+}
+"""
+
+
+def _run_quietly(driver: WebDriver, script: str) -> None:
+    """Run a page script whose failure must never block the cover step."""
+    try:
+        driver.execute_script(script)
+    except (WebDriverException, StaleElementReferenceException) as e:
+        # DEBUG, not a warning: a cover miss is already reported where it is detected, and a hook
+        # left installed only lasts until this publish's session quits.
+        log_debug("Article cover file-chooser hook script failed", error=str(e)[:200],
+                  action_type="article_editor", step=STEP_COVER)
+
+
+def _press_escape(driver: WebDriver) -> None:
+    """Send Escape to the page, best-effort — closes an overlay the cover upload left open."""
+    try:
+        from selenium.webdriver.common.action_chains import ActionChains
+        from selenium.webdriver.common.keys import Keys
+
+        ActionChains(driver).send_keys(Keys.ESCAPE).perform()
+    except Exception as e:  # noqa: BLE001 - best-effort; the caller re-checks Next either way
+        log_debug("Escape after cover upload failed", error=str(e)[:200],
+                  action_type="article_editor", step=STEP_COVER)
 
 
 class StepVerdict(str, Enum):
@@ -491,8 +556,10 @@ def attach_article_cover(driver: WebDriver, wait: WebDriverWait, image_path: str
 
     Never raises and never blocks the publish: an edition without its cover is still a published
     edition, so every failure here is a warning and the caller carries on. The upload is done by
-    writing the path into the editor's hidden ``<input type=file>`` — clicking the styled button
-    would open the OS file chooser, which Selenium cannot drive.
+    writing the path into a file input. The live editor has none until its "Upload from computer"
+    button is pressed, and that press asks for an OS file chooser Selenium cannot drive, so
+    `_FILE_CHOOSER_CAPTURE_JS` turns the request into a tagged, attached input first. A successful
+    hand-over logs ``Article cover attached`` at INFO so production records it.
     """
     if not image_path or not os.path.isfile(image_path):
         log_warning("Article cover image missing on disk", user_id=user_id,
@@ -505,11 +572,17 @@ def attach_article_cover(driver: WebDriver, wait: WebDriverWait, image_path: str
             # Some variants render the input only after the "Add a cover image" affordance is used.
             trigger = resolve_article_editor_step(driver, wait, STEP_COVER, _COVER_TRIGGER_LOCATORS,
                                                   user_id=user_id)
-            if trigger.ok and _click_safely(driver, trigger.element):
-                time.sleep(2)
-                file_input = resolve_article_editor_step(driver, wait, STEP_COVER,
-                                                         _COVER_INPUT_LOCATORS, user_id=user_id,
-                                                         visible_only=False)
+            if trigger.ok:
+                _run_quietly(driver, _FILE_CHOOSER_CAPTURE_JS)
+                try:
+                    if _click_safely(driver, trigger.element):
+                        time.sleep(2)
+                        file_input = resolve_article_editor_step(driver, wait, STEP_COVER,
+                                                                 _COVER_INPUT_LOCATORS,
+                                                                 user_id=user_id,
+                                                                 visible_only=False)
+                finally:
+                    _run_quietly(driver, _FILE_CHOOSER_RESTORE_JS)
         if not file_input.ok:
             log_warning("Article cover upload control not found", user_id=user_id,
                         action_type="article_editor", step=STEP_COVER)
@@ -517,13 +590,29 @@ def attach_article_cover(driver: WebDriver, wait: WebDriverWait, image_path: str
         file_input.element.send_keys(os.path.abspath(image_path))
         time.sleep(3)
         _confirm_cover_dialog(driver, wait, user_id=user_id)
-        log_debug("Article cover attached", user_id=user_id, action_type="article_editor",
-                  route=file_input.route)
+        log_info("Article cover attached", user_id=user_id, action_type="article_editor",
+                 route=file_input.route)
         return True
     except (WebDriverException, StaleElementReferenceException) as e:
         log_warning("Article cover attach failed", exc=e, user_id=user_id,
                     action_type="article_editor", step=STEP_COVER)
         return False
+
+
+def _retry_next_after_cover(driver: WebDriver, wait: WebDriverWait,
+                            user_id: Optional[int] = None) -> bool:
+    """One more Next after an attached cover blocked it: close the overlay, re-resolve, click.
+
+    A cover the uploader accepted can leave a crop or preview overlay that `_confirm_cover_dialog`
+    did not close, and that overlay intercepts Next. The cover is optional, the edition is not, so
+    the publish gets one Escape and one fresh Next before the step is reported failed.
+    """
+    log_warning("Cover upload left Next blocked; pressing Escape and retrying once",
+                user_id=user_id, action_type="article_editor", step=STEP_NEXT)
+    _press_escape(driver)
+    time.sleep(1)
+    retry = resolve_article_editor_step(driver, wait, STEP_NEXT, _NEXT_LOCATORS, user_id=user_id)
+    return bool(retry.ok and _click_safely(driver, retry.element))
 
 
 def fill_article_editor(
@@ -571,8 +660,9 @@ def fill_article_editor(
         return None, editor.first_missing(EDITOR_SCREEN_STEPS) or STEP_TITLE
 
     next_element = editor.next_button.element
+    cover_attached = False
     if cover_image_path:
-        attach_article_cover(driver, wait, cover_image_path, user_id=user_id)
+        cover_attached = attach_article_cover(driver, wait, cover_image_path, user_id=user_id)
         # The cover upload repaints the editor, so the Next resolved before it can be stale.
         # Re-resolving is cheap; failing to publish because of an optional cover is not.
         refreshed = resolve_article_editor_step(driver, wait, STEP_NEXT, _NEXT_LOCATORS,
@@ -580,7 +670,8 @@ def fill_article_editor(
         if refreshed.ok:
             next_element = refreshed.element
 
-    if not _click_safely(driver, next_element):
+    if not _click_safely(driver, next_element) and not (
+            cover_attached and _retry_next_after_cover(driver, wait, user_id=user_id)):
         return None, STEP_NEXT
     time.sleep(3)
 

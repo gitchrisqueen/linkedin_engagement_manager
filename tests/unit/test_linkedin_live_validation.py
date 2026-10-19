@@ -5437,3 +5437,34 @@ class TestRosterConnectGrade:
         assert llv.visible_button_labels(driver, css=llv._CONNECT_CONTROL_CSS) == [
             "Invite Ann Lee to connect"]
         driver.find_elements.assert_called_once_with(llv.By.CSS_SELECTOR, llv._CONNECT_CONTROL_CSS)
+
+
+class TestArticleCoverEvidence:
+    """The read-only cover-control capture behind the newsletter-cover grounding run."""
+
+    def test_reports_the_page_scan_and_the_shipped_chain_hits(self):
+        driver = MagicMock()
+        driver.execute_script.return_value = {
+            "file_inputs": [{"tag": "input", "type": "file", "in_shadow": True}],
+            "cover_controls": [{"tag": "button", "text": "Upload from computer", "in_shadow": True}],
+            "shadow_roots": 2,
+        }
+        driver.find_elements.return_value = []
+        reading = llv.article_cover_evidence(driver)
+        assert reading["file_inputs"][0]["in_shadow"] is True
+        assert reading["shadow_roots"] == 2
+        # Every shipped strategy is counted, so a page the scan sees but the chain does not is visible.
+        assert reading["shipped_chain_hits"]["cover_input"] == [0, 0, 0, 0, 0]
+        assert reading["shipped_chain_hits"]["cover_trigger"] == [0, 0, 0, 0, 0]
+        driver.execute_script.assert_called_once()
+
+    def test_a_script_error_is_reported_not_raised(self):
+        driver = MagicMock()
+        driver.execute_script.side_effect = WebDriverException("detached")
+        driver.find_elements.return_value = []
+        reading = llv.article_cover_evidence(driver)
+        assert reading["scan_error"].startswith("WebDriverException")
+        assert "cover_input" in reading["shipped_chain_hits"]
+
+    def test_the_capture_is_advertised_as_a_capability(self):
+        assert "article_editor.cover_controls" in llv.probe_script_reading()["capabilities"]
