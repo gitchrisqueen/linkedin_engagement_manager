@@ -5345,3 +5345,85 @@ class TestFirstDegreeReading:
 
         monkeypatch.setattr("cqc_lem.app.engagement.invites._profile_is_first_degree", boom)
         assert llv._first_degree_reading(MagicMock()) is False
+
+
+@pytest.mark.unit
+class TestRosterConnectGrade:
+    """#2464: the probe wrote the resolver's connect state into `state`, so the sweep never read
+    `ok` or `drift` off this surface — `connected` or `unknown` were the only grades it ever had.
+    """
+
+    @staticmethod
+    def _probe(monkeypatch, connect_state: str, owner: str, controls: list) -> dict:
+        monkeypatch.setattr("cqc_lem.app.engagement.feed._resolve_connect_state",
+                            lambda d, u: connect_state)
+        monkeypatch.setattr("cqc_lem.app.engagement.feed._activity_page_owner_name",
+                            lambda d: owner)
+        def labels(_driver, **kwargs):
+            # The cross-check must see the controls the resolver's own selector sees.
+            assert kwargs.get("css") == llv._CONNECT_CONTROL_CSS
+            return controls
+
+        monkeypatch.setattr(llv, "visible_button_labels", labels)
+        return llv.probe_roster_connect(MagicMock(), "https://www.linkedin.com/in/ann/",
+                                        sleep=lambda _s: None)
+
+    @pytest.mark.parametrize("connect_state", ["requested", "connected"])
+    def test_a_resolved_reading_grades_ok_and_keeps_its_own_field(self, monkeypatch, connect_state):
+        reading = self._probe(monkeypatch, connect_state, "Ann Lee", [])
+        assert reading["state"] == llv.STATE_OK
+        assert reading["connect_state"] == connect_state
+
+    def test_a_rendered_card_offering_connect_grades_ok(self, monkeypatch):
+        reading = self._probe(monkeypatch, "unknown", "Ann Lee",
+                              ["Follow Ann Lee", "Invite Ann Lee to connect", "Connect Bob"])
+        assert reading["state"] == llv.STATE_OK
+        assert reading["owner_controls"] == ["Follow Ann Lee", "Invite Ann Lee to connect"]
+        assert "right answer" in reading["verdict"]
+
+    def test_an_owner_card_with_only_follow_grades_ok(self, monkeypatch):
+        assert self._probe(monkeypatch, "unknown", "Ann Lee",
+                           ["Follow Ann  Lee"])["state"] == llv.STATE_OK
+
+    def test_a_pending_control_the_resolver_missed_is_drift(self, monkeypatch):
+        reading = self._probe(monkeypatch, "unknown", "Ann Lee",
+                              ["Pending, awaiting response from Ann Lee"])
+        assert reading["state"] == llv.STATE_DRIFT
+        assert "did not read" in reading["verdict"]
+
+    def test_a_message_control_with_no_connect_is_drift(self, monkeypatch):
+        assert self._probe(monkeypatch, "unknown", "Ann Lee",
+                           ["Message Ann Lee"])["state"] == llv.STATE_DRIFT
+
+    def test_message_beside_connect_is_not_drift(self, monkeypatch):
+        assert self._probe(monkeypatch, "unknown", "Ann Lee",
+                           ["Message Ann Lee", "Invite Ann Lee to connect"])["state"] == llv.STATE_OK
+
+    def test_no_owner_name_is_unknown(self, monkeypatch):
+        reading = self._probe(monkeypatch, "unknown", "", ["Message Ann Lee"])
+        assert reading["state"] == llv.STATE_UNKNOWN
+        assert reading["owner_controls"] == []
+        assert "unreadable" in reading["verdict"]
+
+    def test_no_owner_named_control_is_unknown(self, monkeypatch):
+        assert self._probe(monkeypatch, "unknown", "Ann Lee",
+                           ["Connect Bob", "Message Carl"])["state"] == llv.STATE_UNKNOWN
+
+    def test_the_grade_handles_an_empty_reading(self):
+        assert llv.roster_connect_state(None) == llv.STATE_UNKNOWN
+
+    def test_message_beside_a_bare_connect_is_not_drift(self, monkeypatch):
+        # The resolver counts a nameless "Connect" inside the owner's card, so a named Message next
+        # to one is the resolver correctly reading unknown — not a missed connection.
+        assert self._probe(monkeypatch, "unknown", "Ann Lee",
+                           ["Message Ann Lee", "Connect"])["state"] == llv.STATE_OK
+
+    def test_the_label_scan_honours_a_css_selector(self):
+        driver = MagicMock()
+        link = MagicMock()
+        link.is_displayed.return_value = True
+        link.get_attribute.return_value = "Invite Ann Lee to connect"
+        driver.find_elements.return_value = [link]
+        assert llv.visible_button_labels(driver, css=llv._CONNECT_CONTROL_CSS) == [
+            "Invite Ann Lee to connect"]
+        driver.find_elements.assert_called_once_with(llv.By.CSS_SELECTOR, llv._CONNECT_CONTROL_CSS)
