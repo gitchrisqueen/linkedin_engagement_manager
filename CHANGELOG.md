@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.198.2](https://github.com/christopherqueenconsulting/linkedin_engagement_manager/compare/v0.198.1...v0.198.2) (2026-10-19)
+
+
+### Bug Fixes
+
+* **dms:** let the thread readers see shadow-mounted surfaces and cross-check a page-native editor (refs [#2463](https://github.com/christopherqueenconsulting/linkedin_engagement_manager/issues/2463)) ([#2466](https://github.com/christopherqueenconsulting/linkedin_engagement_manager/issues/2466)) ([82f599d](https://github.com/christopherqueenconsulting/linkedin_engagement_manager/commit/82f599d4d978b51cf06591e5b58de12584d8a044))
+* **sdui-probe:** grade roster_connect ok/drift, not the raw connect state (closes [#2464](https://github.com/christopherqueenconsulting/linkedin_engagement_manager/issues/2464)) ([#2465](https://github.com/christopherqueenconsulting/linkedin_engagement_manager/issues/2465)) ([bf85286](https://github.com/christopherqueenconsulting/linkedin_engagement_manager/commit/bf85286eeb61548b0591f309bb0d1a8d9a035bae))
+
 ## [0.198.1](https://github.com/christopherqueenconsulting/linkedin_engagement_manager/compare/v0.198.0...v0.198.1) (2026-10-18)
 
 
