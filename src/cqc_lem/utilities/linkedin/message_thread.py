@@ -136,9 +136,24 @@ _RECIPIENT_CHROME_RE = re.compile(
     r"^(?:enter message recipients?|show suggested recipients.*|add a recipient.*|type a name.*)$",
     re.IGNORECASE)
 
-_RECIPIENT_PILL_JS = (
-    "const box=document.querySelector("
-    "\"[class*='msg-connections-typeahead__added-recipients'], [class*='msg-compose__recipients']\");"
+# Every reader below queries the document AND every open shadow root under it (issue #2463). The
+# 2026-10 sweep clicked the target's own Message anchor on a 1st-degree profile and read NOTHING:
+# same URL, no new window, zero events, no composer. That is the exact reading a surface mounted in
+# a shadow root gives a light-DOM `querySelectorAll` — the #1621 share box and the #1733 Connect
+# dialog both rendered fine where no reader could see them. So the walk is a chain, not a
+# replacement: light-DOM hits still come first, a shadow-mounted surface is simply no longer blind.
+_DEEP_ALL_JS = (
+    "const deepAll=(css)=>{const out=[];const seen=new Set();"
+    "const scan=(root,depth)=>{if(!root||depth>6)return;let hits=[];"
+    "try{hits=root.querySelectorAll(css);}catch(e){return;}"
+    "for(const el of hits){if(!seen.has(el)){seen.add(el);out.push(el);}}"
+    "let all=[];try{all=root.querySelectorAll('*');}catch(e){return;}"
+    "for(const el of all){if(el.shadowRoot)scan(el.shadowRoot,depth+1);}};"
+    "scan(document,0);return out;};")
+
+_RECIPIENT_PILL_JS = _DEEP_ALL_JS + (
+    "const box=deepAll("
+    "\"[class*='msg-connections-typeahead__added-recipients'], [class*='msg-compose__recipients']\")[0];"
     "return box ? box.innerText : null;")
 
 _MORE_LOCATORS: list[tuple[str, str]] = [
@@ -164,28 +179,42 @@ _CONVERSATION_LOCATORS: list[tuple[str, str]] = [
 # page and inside the bottom-right overlay, so they are counted document-wide; only the CONTAINER
 # tells the two surfaces apart. Whether a composer with zero events counts as an open THREAD is a
 # per-surface question — see `is_open_thread`.
-_THREAD_STATE_JS = (
-    "const events=document.querySelectorAll("
-    "'li.msg-s-message-list__event, .msg-s-event-listitem').length;"
-    "const composer=!!document.querySelector("
-    "\"div.msg-form__contenteditable, form.msg-form, [aria-label*='Write a message']\");"
-    "const overlay=!!document.querySelector("
+_THREAD_STATE_JS = _DEEP_ALL_JS + (
+    "const events=deepAll('li.msg-s-message-list__event, .msg-s-event-listitem').length;"
+    "const composer=deepAll("
+    "\"div.msg-form__contenteditable, form.msg-form, [aria-label*='Write a message']\").length>0;"
+    "const overlay=deepAll("
     "\"[class*='msg-overlay-conversation-bubble'], [class*='msg-overlay-container'], "
-    "[class*='msg-overlay-list-bubble']\");"
+    "[class*='msg-overlay-list-bubble']\").length>0;"
     "return {events: events, composer: composer, overlay: overlay};")
+
+# The PAGE-NATIVE cross-check (issue #2463): a visible message editor, named by its own label — no
+# class name, so it does not rot with the `msg-*` chain above. The thread readers key on classes; a
+# reading of zero events and no composer is only "nothing rendered" when this agrees. The minimized
+# "Messaging" bar sits on every page, so containers are never counted — only an editor whose label
+# says message, and never the messaging SEARCH box.
+_MESSAGE_EDITOR_JS = _DEEP_ALL_JS + (
+    "let editors=0, shadow=0;"
+    "for(const el of deepAll(\"[contenteditable='true'], textarea, [role='textbox']\")){"
+    "const r=el.getBoundingClientRect();if(!(r.width&&r.height))continue;"
+    "const label=[el.getAttribute('aria-label'),el.getAttribute('aria-placeholder'),"
+    "el.getAttribute('placeholder'),el.getAttribute('data-placeholder')].join(' ');"
+    "if(!/\\bmessage\\b/i.test(label)||/search/i.test(label))continue;"
+    "editors++;if(el.getRootNode()!==document)shadow++;}"
+    "return {editors: editors, shadow: shadow};")
 
 # Walk the message list backwards for the most recent group's sender name. LinkedIn tags each message
 # *group* with .msg-s-message-group__name; the outer li carries no inbound/outbound marker, so the
 # sender name is the reliable signal. Continuation bubbles have no name → scan back to the last named.
-_LAST_SENDER_JS = (
-    "const ev=[...document.querySelectorAll('li.msg-s-message-list__event, .msg-s-event-listitem')];"
+_LAST_SENDER_JS = _DEEP_ALL_JS + (
+    "const ev=deepAll('li.msg-s-message-list__event, .msg-s-event-listitem');"
     "for(let i=ev.length-1;i>=0;i--){const n=ev[i].querySelector('.msg-s-message-group__name');"
     "if(n&&n.innerText.trim())return n.innerText.trim();}return null;")
 
 # The BODY of the most recent message bubble in the open thread — the same DOM the reply detector
 # reads. Inbound-intent detection (#483) and the #485 nurture draft both ride that one read.
-_LAST_MESSAGE_JS = (
-    "const ev=[...document.querySelectorAll('li.msg-s-message-list__event, .msg-s-event-listitem')];"
+_LAST_MESSAGE_JS = _DEEP_ALL_JS + (
+    "const ev=deepAll('li.msg-s-message-list__event, .msg-s-event-listitem');"
     "for(let i=ev.length-1;i>=0;i--){const b=ev[i].querySelector('.msg-s-event-listitem__body, "
     ".msg-s-event__content');if(b&&b.innerText.trim())return b.innerText.trim();}return null;")
 
@@ -222,6 +251,9 @@ class ThreadOpen:
     degree: Optional[str] = None
     # Per-route evidence, filled only when the walk is asked to `trace` (the live probe, #2325).
     route_trace: list[dict] = field(default_factory=list)
+    # Routes after which a message editor was on screen that the thread readers could not see
+    # (`_readers_blind`, issue #2463) — selector drift, not "nobody to message".
+    blind_routes: list[str] = field(default_factory=list)
 
     def __bool__(self) -> bool:
         """True when the ladder verified an open thread."""
@@ -476,6 +508,43 @@ def thread_reading(driver: WebDriver) -> dict:
     if events or composer:
         surface = SURFACE_OVERLAY if raw.get("overlay") else SURFACE_PAGE
     return {"events": events, "composer": composer, "surface": surface}
+
+
+def message_editor_signal(driver: WebDriver) -> dict:
+    """The page-native cross-check: visible message editors on screen, and how many are shadow-mounted.
+
+    `{"editors": n, "shadow": k}`. Independent of every class the thread readers key on, so it is
+    what tells "nothing rendered" apart from "something rendered that the readers cannot see"
+    (issue #2463). Unreadable reads as zero editors — the cross-check fails toward the ladder's own
+    verdict, never toward a warning.
+    """
+    try:
+        raw = driver.execute_script(_MESSAGE_EDITOR_JS) or {}
+    except Exception as e:
+        if is_tab_crashed(e):
+            raise
+        log_debug("Could not read the page-native message-editor signal", exc=e,
+                  action_type="followup")
+        return {"editors": 0, "shadow": 0}
+    if not isinstance(raw, dict):
+        return {"editors": 0, "shadow": 0}
+    try:
+        return {"editors": int(raw.get("editors") or 0), "shadow": int(raw.get("shadow") or 0)}
+    except (TypeError, ValueError):
+        return {"editors": 0, "shadow": 0}
+
+
+def _readers_blind(driver: WebDriver, signal: dict) -> bool:
+    """Does the editor signal disagree with the thread readers?
+
+    A disagreement is a message editor on screen while `thread_reading` sees neither events nor a
+    composer: the `msg-*` chain has rotated out from under a surface that DID render. Read on the
+    window the driver is back on after a route, which is where a profile's chat overlay lives.
+    """
+    if not signal.get("editors"):
+        return False
+    reading = thread_reading(driver)
+    return not (reading["events"] or reading["composer"])
 
 
 def _wait_thread_open(driver: WebDriver, timeout: float = THREAD_RENDER_TIMEOUT_SECONDS) -> dict:
@@ -1110,7 +1179,10 @@ def open_message_thread(driver: WebDriver, wait: WebDriverWait, profile_url: str
     rotted (same reasoning as `open_addressed_composer`'s `composer_missing`, issue #1710). The
     caller (`check_dm_replied`) already turns this into `ThreadState.UNKNOWN` and skips the
     follow-up, so it is logged at DEBUG, not a WARNING that would recur into a `RecurringWarning`
-    for working refusal-to-follow-up-blind behavior (issue #1752).
+    for working refusal-to-follow-up-blind behavior (issue #1752). The one exception is a walk the
+    page contradicts (issue #2463): a route after which `message_editor_signal` finds a message
+    editor on screen that `thread_reading` cannot see is recorded in `ThreadOpen.blind_routes`, and
+    that walk warns ONCE — the readers have drifted, which is a defect, not an expected no-op.
 
     A crashed tab (`is_tab_crashed`) is the one failure the ladder does NOT absorb: it re-raises, so
     the lane ends its run once instead of every later route and poll warning on the same dead tab
@@ -1194,7 +1266,21 @@ def open_message_thread(driver: WebDriver, wait: WebDriverWait, profile_url: str
                      f"{result.events} message event(s))", user_id=user_id, action_type="followup",
                      profile_url=profile_url)
             return result
+        signal = message_editor_signal(driver)
+        blind = _readers_blind(driver, signal)
+        if blind:
+            result.blind_routes.append(route)
+        if route_trace is not None:
+            route_trace["editor_signal"] = {**signal, "readers_blind": blind}
 
+    if result.blind_routes:
+        # Zero readable items is "nothing to do" only when the page agrees (#2463). Here it did not:
+        # an editor was on screen that no thread reader could see, so this is selector drift, and
+        # the follow-up it parks is a symptom. ONE warning per walk, however many routes saw it.
+        log_warning("Message-thread readers are blind to a message editor on screen — no route "
+                    "could verify the thread", user_id=user_id, action_type="followup",
+                    profile_url=profile_url, selectors=list(result.blind_routes))
+        return result
     log_debug(f"No route opened a message thread for {profile_url}", user_id=user_id,
               action_type="followup", selectors=list(result.tried), profile_url=profile_url)
     return result

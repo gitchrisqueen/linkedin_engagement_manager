@@ -93,6 +93,8 @@ class FakeDriver:
         self.body = None
         # What the composer's recipient container renders; None means there is no container at all.
         self.recipient = None
+        # What the page-native editor signal reads; None means the script found nothing (#2463).
+        self.editors = None
         self.window_handles = [ORIGIN]
         self.current_window_handle = ORIGIN
         self.window_threads = {}
@@ -133,6 +135,8 @@ class FakeDriver:
             return self.body
         if script is mt._RECIPIENT_PILL_JS:
             return self.recipient
+        if script is mt._MESSAGE_EDITOR_JS:
+            return self.editors
         if "arguments[0].click()" in script:
             args[0].click()
             return None
@@ -1322,3 +1326,119 @@ class TestTracedWalk:
         ev = mt.candidate_evidence(_Stale(), "loc", accept=lambda el: el.get_attribute("x"))
         assert ev["aria_label_present"] is False and ev["belongs_to_target"] is False
         assert ev["href_path"] == ""
+
+
+class TestShadowAwareReaders:
+    """Issue #2463: every reader in the chain crosses open shadow roots, not just the one that missed.
+
+    The sweep clicked the target's own anchor and read nothing at all — the reading a shadow-mounted
+    surface gives a light-DOM query (#1621, #1733). Fixing one reader and leaving its siblings on
+    `document.querySelector` is the asymmetry that bit the Connect dialog three times.
+    """
+
+    @pytest.mark.parametrize("script", ["_THREAD_STATE_JS", "_LAST_SENDER_JS", "_LAST_MESSAGE_JS",
+                                        "_RECIPIENT_PILL_JS", "_MESSAGE_EDITOR_JS"])
+    def test_the_reader_walks_open_shadow_roots(self, script):
+        js = getattr(mt, script)
+        assert js.startswith(mt._DEEP_ALL_JS)
+        assert "el.shadowRoot" in js
+        # Nothing queries the light DOM alone after the walk is defined.
+        assert "document.querySelector" not in js[len(mt._DEEP_ALL_JS):]
+
+    def test_the_editor_signal_keys_on_labels_never_classes(self):
+        body = mt._MESSAGE_EDITOR_JS[len(mt._DEEP_ALL_JS):]
+        assert "class" not in body
+        assert "aria-label" in body and "search" in body
+
+
+class TestMessageEditorSignal:
+    def test_a_reading_is_parsed(self):
+        d = FakeDriver()
+        d.editors = {"editors": 1, "shadow": 1}
+        assert mt.message_editor_signal(d) == {"editors": 1, "shadow": 1}
+
+    @pytest.mark.parametrize("raw", [None, "nope", 3, {"editors": "lots"}])
+    def test_an_unreadable_signal_is_zero_editors(self, raw):
+        d = FakeDriver()
+        d.editors = raw
+        assert mt.message_editor_signal(d) == {"editors": 0, "shadow": 0}
+
+    def test_a_js_failure_is_zero_editors(self):
+        d = MagicMock()
+        d.execute_script.side_effect = WebDriverException("boom")
+        assert mt.message_editor_signal(d) == {"editors": 0, "shadow": 0}
+
+    def test_a_crashed_tab_raises(self):
+        d = MagicMock()
+        d.execute_script.side_effect = WebDriverException("tab crashed")
+        with pytest.raises(WebDriverException):
+            mt.message_editor_signal(d)
+
+
+class TestBlindReadersCrossCheck:
+    """Zero items is "nothing to do" only when the page agrees (issue #2463, #1013 invariant 3)."""
+
+    FIRST_DEGREE_SOURCE = "<main><span>1st</span></main>"
+
+    def _walk(self, driver, trace=False):
+        return mt.open_message_thread(driver, MagicMock(), PROFILE, person_name="Jane Doe",
+                                      timeout=0, skip_routes=(mt.ROUTE_MESSAGING_SEARCH,),
+                                      trace=trace)
+
+    def _renders_unreadable_editor(self, driver):
+        """The live reading: the click lands, the URL stays, and only a labelled editor is on screen."""
+        def _handler():
+            driver.editors = {"editors": 1, "shadow": 1}
+        return _handler
+
+    def test_an_editor_the_readers_cannot_see_warns_once_per_walk(self):
+        d = FakeDriver(page_source=self.FIRST_DEGREE_SOURCE + PAGE_MODEL)
+        d.dom[MAIN_ANCHOR] = [FakeElement({"href": COMPOSE_HREF},
+                                          on_click=self._renders_unreadable_editor(d))]
+        with patch.object(mt, "log_warning") as warn, patch.object(mt, "log_debug") as debug:
+            result = self._walk(d)
+        assert not result.opened
+        assert result.blind_routes[0] == mt.ROUTE_ANCHOR
+        assert warn.call_count == 1
+        assert warn.call_args.kwargs["selectors"] == result.blind_routes
+        assert not any("No route opened" in c.args[0] for c in debug.call_args_list)
+
+    def test_the_trace_carries_each_routes_editor_signal(self):
+        d = FakeDriver(page_source=self.FIRST_DEGREE_SOURCE + PAGE_MODEL)
+        d.dom[MAIN_ANCHOR] = [FakeElement({"href": COMPOSE_HREF},
+                                          on_click=self._renders_unreadable_editor(d))]
+        result = self._walk(d, trace=True)
+        anchor = next(rt for rt in result.route_trace if rt["route"] == mt.ROUTE_ANCHOR)
+        assert anchor["editor_signal"] == {"editors": 1, "shadow": 1, "readers_blind": True}
+
+    def test_the_compose_screen_is_not_blindness(self):
+        # The editor on the #1851 compose screen IS the composer the readers already see — the
+        # ladder's by-design rejection, never selector drift.
+        d = FakeDriver(page_source=self.FIRST_DEGREE_SOURCE + PAGE_MODEL)
+
+        def _compose():
+            d.thread = {"events": 0, "composer": True, "overlay": False}
+            d.editors = {"editors": 1, "shadow": 0}
+        d.dom[MAIN_ANCHOR] = [FakeElement({"href": COMPOSE_HREF}, on_click=_compose)]
+        with patch.object(mt, "log_warning") as warn:
+            result = self._walk(d, trace=True)
+        assert not result.opened and result.blind_routes == []
+        warn.assert_not_called()
+        anchor = next(rt for rt in result.route_trace if rt["route"] == mt.ROUTE_ANCHOR)
+        assert anchor["editor_signal"]["readers_blind"] is False
+
+    def test_nothing_on_screen_stays_a_debug_no_op(self):
+        d = FakeDriver(page_source=self.FIRST_DEGREE_SOURCE + PAGE_MODEL)
+        d.dom[MAIN_ANCHOR] = [FakeElement({"href": COMPOSE_HREF})]
+        with patch.object(mt, "log_warning") as warn:
+            result = self._walk(d)
+        assert not result.opened and result.blind_routes == []
+        warn.assert_not_called()
+
+    def test_a_readable_thread_never_consults_the_signal(self):
+        d = FakeDriver(page_source=self.FIRST_DEGREE_SOURCE)
+        d.dom[MAIN_ANCHOR] = [FakeElement({"href": COMPOSE_HREF}, on_click=_opens(d, events=3))]
+        with patch.object(mt, "message_editor_signal") as signal:
+            result = self._walk(d)
+        assert result.opened
+        signal.assert_not_called()

@@ -579,6 +579,42 @@ twin of the Connect hazards above, and `utilities/linkedin/message_thread.py` is
   native `button.msg-form__send-button`. The nearest real thing is the composer's "Open send
   options" control beside Send, which LEM never clicks. Left open as unconfirmed, not closed.
 
+### 2026-10 sweep: the target's own anchor is clicked and NOTHING reads back (#2463)
+
+The weekly sweep's traced walk (`--dm-thread-url`, #2325) on a verified **1st-degree** profile
+(`sameerpenakalapati`) is the first reading that separates the routes from the readers:
+
+* **The #1796 locators are still right.** `main a[href*='/messaging/compose/']` saw four anchors:
+  the target's own (text `Message`, **no `aria-label`**, shown), its hidden twin (`shown: false`), and
+  two rail strangers (`aria-label="Message Mitch Meller"`, `"Message Jason Foley"`,
+  `belongs_to_target: false`). Only the target's own was chosen, and it took the click. The
+  text-node route saw the same set; the overflow route found a shown `More` button.
+* **What the click rendered is the finding:** `url_path` still `/in/<slug>/`, `new_windows: 0`,
+  `events: 0`, `composer: false`, `surface: null`, reason `nothing_rendered`. A click that LinkedIn
+  intercepted (no navigation, no tab) and that left nothing on screen any `msg-*` reader could find.
+  That is not the #1851 compose screen (which reads `composer: true`).
+* **Readers, not routes.** Every thread reader was `document.querySelector`, which cannot cross a
+  shadow boundary — and that is exactly the reading the #1621 share box and the #1733 Connect dialog
+  gave while they were on screen. So every reader in the chain (`_THREAD_STATE_JS`,
+  `_LAST_SENDER_JS`, `_LAST_MESSAGE_JS`, `_RECIPIENT_PILL_JS`) now walks the document **and** every
+  open shadow root (`_DEEP_ALL_JS`) — a chain, not a replacement: light-DOM hits still come first.
+  The shadow mount is the leading explanation, **not yet a measurement**: the reading cannot see
+  past the readers it was taken with.
+* **The page-native cross-check** (`message_editor_signal`): a visible `[contenteditable]` /
+  `textarea` / `[role=textbox]` whose OWN label says *message* (never *search*), counted across
+  shadow roots, with how many are shadow-mounted. No class names, so it cannot rot with the `msg-*`
+  chain. Containers are never counted — the minimized "Messaging" bar is on every page. After every
+  route that fails, the ladder reads it on the window it is back on; an editor on screen while
+  `thread_reading` sees neither events nor a composer is **blind readers**, which is selector drift,
+  not "nobody to message": ONE `log_warning` per walk (`ThreadOpen.blind_routes`) instead of the
+  DEBUG exhaustion line. The probe reports it per route as `editor_signal` (`editors`, `shadow`,
+  `readers_blind`) plus `blind_routes`, and its verdict names the readers rather than the controls.
+
+The next `--dm-thread-url` reading decides it: `opened: true` (the deep readers now see the
+overlay) closes it; `blind_routes` non-empty with `shadow > 0` means the overlay is shadow-mounted
+under markup the `msg-*` classes no longer describe — re-ground the readers from that editor; zero
+editors everywhere means the click genuinely opened nothing.
+
 ## Profile experience rows: the a11y twin, not a line index (#970)
 
 `/details/experience/` renders most text **twice** — a visible `span[aria-hidden="true"]` beside a

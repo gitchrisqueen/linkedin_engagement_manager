@@ -2012,6 +2012,10 @@ def message_thread_verdict(reading: Optional[dict]) -> str:
             return ("every route that clicked landed on the empty full-page compose screen — the "
                     "shape a person with NO prior thread renders, which the ladder rejects by "
                     "design (#1851); re-probe a person with a thread before calling this drift")
+        if reading.get("blind_routes"):
+            return (f"a message editor was on screen after {', '.join(reading['blind_routes'])} "
+                    f"that the thread readers could not see (#2463) — re-ground the msg-* chain "
+                    f"from each route's `editor_signal`, not the profile-side controls")
         if reading.get("routes_skipped"):
             return ("no direct route opened a thread — the profile-side routes are the finding; the "
                     "last-resort messaging-search route was skipped (it types a name into a box)")
@@ -7005,6 +7009,8 @@ def probe_message_thread(driver, profile_url: str, person_name: str = "", self_n
                "composer": opened.composer,
                "degree": opened.degree or "unknown",
                "route_trace": list(opened.route_trace),
+               # getattr: the probe imports the DEPLOYED image's ladder, which may predate #2463.
+               "blind_routes": list(getattr(opened, "blind_routes", None) or []),
                "windows": {"before": windows_before, "after": _window_count(driver)},
                "self_name": self_name or "",
                "profile_urn": profile_urn_from_page(driver, profile_url)}

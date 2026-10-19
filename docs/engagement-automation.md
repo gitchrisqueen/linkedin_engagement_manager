@@ -806,6 +806,11 @@ The ONE way LEM opens (and reads) a 1:1 thread.
   `windows.before`/`after`. A walk whose every click reads `compose_screen_without_messages` is the
   no-prior-thread compose screen the ladder rejects by design (#1851) — the verdict names it rather
   than reading it as drift. Production walks leave `trace` off.
+- Every thread reader walks open shadow roots too, and zero items is "nothing to do" only when the
+  page agrees (#2463): after each failed route the ladder reads `message_editor_signal` (a visible
+  editor labelled *message*, class-free). An editor the readers cannot see is selector drift — ONE
+  warning per walk (`ThreadOpen.blind_routes`), and the probe reports it per route as
+  `editor_signal`. Measurements: `docs/sdui-selenium-notes.md`.
 
 ### Reading a thread and SENDING into one are different questions (issue #1030)
 
