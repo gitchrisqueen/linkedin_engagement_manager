@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.199.0](https://github.com/christopherqueenconsulting/linkedin_engagement_manager/compare/v0.198.2...v0.199.0) (2026-10-19)
+
+
+### Features
+
+* **research:** add keyless Parallel MCP grounding ([#2455](https://github.com/christopherqueenconsulting/linkedin_engagement_manager/issues/2455)) ([d957d95](https://github.com/christopherqueenconsulting/linkedin_engagement_manager/commit/d957d9581175625272517c814c58a374a4a38dff))
+
+
+### Bug Fixes
+
+* **newsletter:** attach edition covers through the editor's 'Upload from computer' control ([#2476](https://github.com/christopherqueenconsulting/linkedin_engagement_manager/issues/2476)) ([d65a5f2](https://github.com/christopherqueenconsulting/linkedin_engagement_manager/commit/d65a5f249c82b871f57af8b9af2ad9eefd5f8899))
+
 ## [0.198.2](https://github.com/christopherqueenconsulting/linkedin_engagement_manager/compare/v0.198.1...v0.198.2) (2026-10-19)
 
 
