@@ -112,7 +112,8 @@ and attached to the page, `send_keys` hands it the file, and `_FILE_CHOOSER_REST
 original `click`/`showPicker` back.
 
 **Checking the next publish.** The probe cannot test the upload itself, so the first real check is
-the next scheduled edition publish. The EA worker or the owner checks it on the publish day:
+the next scheduled edition publish. The ea-lem EA worker checks it on the publish day, and the owner
+hears the result in the worker's status report:
 
 1. First confirm the edition carries an **approved** cover. The upload step runs only for
    `cover_image_status='approved'`. With no approved cover nothing is attempted, and none of the
