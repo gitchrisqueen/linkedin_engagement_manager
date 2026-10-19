@@ -6392,7 +6392,12 @@ def feed_composer_verdict(feed: Optional[dict]) -> str:
 
 
 def group_feed_composer_state(reading: Optional[dict]) -> str:
-    """Worst-wins across the group feed and its home-feed control.
+    """The GROUP half's grade; the home-feed control explains it and never sets it.
+
+    The control exists to say whether a group drift is about groups or about the chain (see the
+    verdict). It was graded worst-wins until #2462: a group feed whose cards resolved their
+    composers filed as group drift because the HOME feed mounted none, while the verdict in the
+    same report said the group reading stood on its own. A home-feed finding is not this surface's.
 
     With no group to probe the whole reading is `unknown` on purpose: the home half alone says
     nothing about this surface, and grading it would let a home-feed finding file as a group one.
@@ -6400,8 +6405,7 @@ def group_feed_composer_state(reading: Optional[dict]) -> str:
     reading = dict(reading or {})
     if not reading.get("group_id"):
         return STATE_UNKNOWN
-    return worst_state([feed_composer_state(reading.get("group")),
-                        feed_composer_state(reading.get("home"))])
+    return feed_composer_state(reading.get("group"))
 
 
 def group_feed_composer_verdict(reading: Optional[dict]) -> str:
