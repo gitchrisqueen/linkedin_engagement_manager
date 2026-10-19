@@ -1038,6 +1038,57 @@ class TestAttachArticleCover:
         assert trigger.clicked == 1
         assert file_input.sent == [os.path.abspath(str(image))]
 
+    def test_upload_from_computer_trigger_hands_the_file_to_the_captured_input(self, monkeypatch,
+                                                                              tmp_path):
+        # The live editor (2026-10-19 grounding run) has no file input until its "Upload from
+        # computer" button is pressed, and the press asks for an OS file chooser. The capture hook
+        # must be installed BEFORE the press and removed after it, and the tagged input it catches
+        # is the one that gets the file.
+        image = tmp_path / "cover.png"
+        image.write_bytes(b"png")
+        trigger = FakeElement(tag="button", text="Upload from computer",
+                              attrs={"aria-label": "Upload from computer"})
+        captured = FakeElement(tag="input", attrs={"type": "file", "data-lem-cover-input": "1"},
+                               displayed=False)
+        dom = {(By.XPATH, "//button[@aria-label='Upload from computer']"): [trigger]}
+        driver = FakeDriver(dom)
+        monkeypatch.setattr(ae.time, "sleep", lambda s: None)
+        monkeypatch.setattr(ae, "find_first", self._find_first(driver))
+        original_click = trigger.click
+
+        def click_then_capture():
+            # The hook must already be in place when the editor reacts to the press.
+            assert any(script == ae._FILE_CHOOSER_CAPTURE_JS for script, _ in driver.scripts)
+            original_click()
+            dom[(By.CSS_SELECTOR, "input[type='file'][data-lem-cover-input]")] = [captured]
+
+        trigger.click = click_then_capture
+        assert ae.attach_article_cover(driver, MagicMock(), str(image)) is True
+        assert trigger.clicked == 1
+        assert captured.sent == [os.path.abspath(str(image))]
+        scripts = [script for script, _ in driver.scripts]
+        assert scripts.index(ae._FILE_CHOOSER_CAPTURE_JS) < scripts.index(ae._FILE_CHOOSER_RESTORE_JS)
+
+    def test_the_capture_hook_is_removed_even_when_the_press_fails(self, monkeypatch, tmp_path):
+        image = tmp_path / "cover.png"
+        image.write_bytes(b"png")
+        trigger = FakeElement(tag="button", text="Upload from computer",
+                              attrs={"aria-label": "Upload from computer"})
+        driver = FakeDriver({(By.XPATH, "//button[@aria-label='Upload from computer']"): [trigger]})
+        monkeypatch.setattr(ae.time, "sleep", lambda s: None)
+        monkeypatch.setattr(ae, "find_first", self._find_first(driver))
+        monkeypatch.setattr(ae, "_click_safely", lambda d, e: (_ for _ in ()).throw(
+            WebDriverException("detached")))
+        assert ae.attach_article_cover(driver, MagicMock(), str(image)) is False
+        scripts = [script for script, _ in driver.scripts]
+        assert ae._FILE_CHOOSER_RESTORE_JS in scripts
+
+    def test_the_capture_script_only_touches_file_inputs(self):
+        js = ae._FILE_CHOOSER_CAPTURE_JS
+        assert "toLowerCase() === 'file'" in js
+        assert "original.apply(this, arguments)" in js
+        assert "__lemOrigInputClick" in ae._FILE_CHOOSER_RESTORE_JS
+
     def test_attaches_to_an_input_that_is_hidden(self, monkeypatch, tmp_path):
         # LinkedIn styles a button over the file input, so on the real page it is NOT displayed.
         # If the resolver filtered on visibility the cover would never attach in production.

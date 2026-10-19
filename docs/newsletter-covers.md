@@ -90,6 +90,30 @@ all live on the newsletter queue (`_newsletter_queue_url`), never on the setting
 that asks for an action must land on the screen that can take it** — a CTA pointing somewhere else
 is the same false reassurance in link form, and it costs the edition, not just a click.
 
+## Why approved covers never reached LinkedIn (2026-10-19 grounding)
+
+Until 2026-10-19 no edition carried a cover on LinkedIn, even the ones whose cover was `approved`
+(editions 7, 8, 15 and 16). `attach_article_cover` looked for a file input or a "cover image"
+button, and the live `/article/new/` editor offers neither. Each publish logged `Article cover
+upload control not found` and went out cover-less. A cover miss never blocks a publish.
+
+The read-only article-editor probe (`scripts/linkedin_live_validation.py --article-editor-url`,
+capture `article_editor.cover_controls`) grounded the control on 2026-10-19:
+
+- The cover area's only control is a light-DOM button labelled **Upload from computer**. It is not
+  inside a shadow root.
+- No `<input type=file>` exists until that button is pressed.
+
+The trigger chain now includes that label. Just before the press, `_FILE_CHOOSER_CAPTURE_JS`
+intercepts the file-chooser request the press makes: the input is tagged `data-lem-cover-input`
+and attached to the page, `send_keys` hands it the file, and `_FILE_CHOOSER_RESTORE_JS` puts the
+original `click`/`showPicker` back. The first real check is the next scheduled publish. Grep the
+day's log for `Article cover upload control not found` (it should be absent) and look at the
+edition's page for the cover.
+
+The ten editions published before the fix were backfilled by hand on LinkedIn with their stored or
+newly generated covers.
+
 ## The deterministic gate
 
 Both sources pass `inspect_cover_bytes` first — this is what stops an unusable image reaching a

@@ -5454,8 +5454,8 @@ class TestArticleCoverEvidence:
         assert reading["file_inputs"][0]["in_shadow"] is True
         assert reading["shadow_roots"] == 2
         # Every shipped strategy is counted, so a page the scan sees but the chain does not is visible.
-        assert reading["shipped_chain_hits"]["cover_input"] == [0, 0, 0, 0]
-        assert reading["shipped_chain_hits"]["cover_trigger"] == [0, 0, 0]
+        assert reading["shipped_chain_hits"]["cover_input"] == [0, 0, 0, 0, 0]
+        assert reading["shipped_chain_hits"]["cover_trigger"] == [0, 0, 0, 0, 0]
         driver.execute_script.assert_called_once()
 
     def test_a_script_error_is_reported_not_raised(self):
