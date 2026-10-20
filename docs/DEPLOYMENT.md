@@ -101,6 +101,12 @@ chmod 600 .env
 Alternatively manage ingress from the repo via `cloudflared/config.yml` (see the
 header of that file) instead of the dashboard.
 
+To rotate the token: put the new value in `TUNNEL_TOKEN` in `/opt/lem/.env` (the file stays
+`deploy:deploy`, mode 600), then `cd /opt/lem && ./scripts/compose.sh up -d cloudflared`. The
+`cloudflared` container must be the compose service. A standalone container with the same name
+makes every deploy's converge fail on a name conflict (2026-10-19/20), and the stack is left
+half-updated.
+
 ### 5. GitHub repo configuration
 
 **Secrets:** `VPS_HOST`, `VPS_USER`, `VPS_SSH_KEY`, `GHCR_PAT`
@@ -303,6 +309,21 @@ cd /opt/lem
 ./scripts/rollback.sh v1.2.2      # re-up a prior tag
 ```
 
+### Deploying from the box as the owner
+
+The owner deploys from their own login, not as `deploy`, so the expected path on the box is root
+via `sudo`, using the `deploy` user's registry login:
+
+```bash
+cd /opt/lem && sudo env DOCKER_CONFIG=/home/deploy/.docker bash ./scripts/deploy.sh vX.Y.Z
+sudo chown -R deploy:deploy /opt/lem/.git
+```
+
+The `chown` matters because the script's `git fetch`/`checkout` runs as root. A root fetch can
+leave root-owned object directories under `.git/` that the `deploy` user cannot write into, so
+the next CI deploy, which runs as `deploy`, fails at its own fetch. `.env` must stay
+`deploy:deploy` 600; check it with `stat -c '%U:%G %a' /opt/lem/.env`.
+
 ## Backups
 
 Cron on the VPS:
@@ -396,7 +417,14 @@ prod overlay.
 ## Compose file layering — why editing files on disk does nothing in prod
 
 The stack is always launched with **both** compose files:
-`docker compose -f docker-compose.yml -f docker-compose.prod.yml`.
+`docker compose -f docker-compose.yml -f docker-compose.prod.yml`, plus `docker-compose.grid.yml`
+(the Selenium hub, chrome nodes and debug node) unless `SELENIUM_TOPOLOGY=standalone`.
+
+**Run every manual compose command through `./scripts/compose.sh`** (for example
+`./scripts/compose.sh up -d cloudflared`). It builds the same file list `deploy.sh` uses, from
+`scripts/lib/compose_files.sh`. A hand-typed list without the grid file makes compose treat the
+whole grid as orphans, and the next `up --remove-orphans` deletes it. On 2026-10-20 an
+`up -d cloudflared` run with base + prod only removed the hub, all nine nodes and the debug node.
 
 `docker-compose.yml` alone is the DEV config — it bind-mounts `./src:/app/src`, so local edits are
 live immediately. `docker-compose.prod.yml` overrides that bind-mount away, so in PRODUCTION every
@@ -429,7 +457,7 @@ Build a thin overlay image `FROM` the currently running release tag that only `C
 `src` files (identical deps, seconds not minutes). Then on the box:
 
 1. Set `/opt/lem/.env` → `IMAGE_TAG=<hotfix-tag>`.
-2. `cd /opt/lem && docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --no-deps --pull never <app-services>`.
+2. `cd /opt/lem && ./scripts/compose.sh up -d --no-deps --pull never <app-services>`.
 3. Keep the prior release image locally for instant rollback (`IMAGE_TAG=vX.Y.Z`).
 
 **This diverges prod from `main`** — the fix MUST still land via the normal PR → release flow, or

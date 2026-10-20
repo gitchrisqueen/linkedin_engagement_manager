@@ -7,7 +7,10 @@ ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT_DIR"
 
 TAG="${1:?Usage: rollback.sh <image-tag>}"
-COMPOSE="docker compose -f docker-compose.yml -f docker-compose.prod.yml"
+# Same file list as deploy.sh: without docker-compose.grid.yml, the `--remove-orphans` below would
+# delete the Selenium grid (scripts/lib/compose_files.sh).
+. "${ROOT_DIR}/scripts/lib/compose_files.sh"
+COMPOSE="$(lem_compose_cmd "$(lem_selenium_topology "${ROOT_DIR}/.env")")"
 
 echo "[rollback] checking out ${TAG}"
 git fetch --tags --quiet origin
