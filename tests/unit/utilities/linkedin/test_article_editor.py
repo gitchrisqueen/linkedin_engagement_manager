@@ -1405,6 +1405,29 @@ class TestFillArticleEditorCover:
         assert [m for m in logged if m.startswith("Article publish resolved via")] == [
             f"Article publish resolved via publish_text (tried ['publish_text']); after click: {url}"]
 
+    def test_the_dialog_route_is_logged_when_it_wins(self, monkeypatch):
+        dom, *_ = self._dom()
+        dom.pop((By.XPATH, "//button[normalize-space()='Publish']"))
+        dialog_publish = FakeElement(tag="div", attrs={"role": "button"})
+        dom[(By.XPATH, f"//*[@role='dialog']//*[@role='button'][{ae._PUBLISH_LABELS}]")] = [dialog_publish]
+        driver = FakeDriver(dom)
+        self._wire(monkeypatch, driver)
+        logged = []
+        monkeypatch.setattr(ae, "log_info", lambda msg, **kw: logged.append(msg))
+        url, failed = ae.fill_article_editor(driver, MagicMock(), "T", "B")
+        assert failed is None and dialog_publish.clicked == 1
+        assert any(m.startswith("Article publish resolved via publish_dialog") for m in logged)
+
+    def test_a_disabled_dialog_publish_is_never_clicked(self, monkeypatch):
+        dom, *_ = self._dom()
+        dom.pop((By.XPATH, "//button[normalize-space()='Publish']"))
+        disabled = FakeElement(tag="div", attrs={"role": "button", "aria-disabled": "true"})
+        dom[(By.XPATH, f"//*[@role='dialog']//*[@role='button'][{ae._PUBLISH_LABELS}]")] = [disabled]
+        driver = FakeDriver(dom)
+        self._wire(monkeypatch, driver)
+        url, failed = ae.fill_article_editor(driver, MagicMock(), "T", "B")
+        assert (url, failed) == (None, ae.STEP_PUBLISH) and disabled.clicked == 0
+
     def test_no_cover_never_presses_next_twice(self, monkeypatch):
         """Without a cover the old path stands: a missing Publish is reported, not retried."""
         dom, _title, _body, nxt, _publish = self._dom()
