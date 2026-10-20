@@ -215,8 +215,11 @@ def drain_workers(timeout_seconds: int = DEFAULT_DRAIN_TIMEOUT_SECONDS,
         sleep(max(1, int(poll_seconds)))
         remaining = active_task_count()
     if remaining:
-        log_warning(f"Drain timed out with {remaining} task(s) still running — they will be "
-                    "re-queued on shutdown (task_acks_late)")
+        # INFO, not WARNING (issue #2477): the deploy's 180s timeout is routinely spent in full on
+        # one long task, acks_late re-queues it, and deploy.sh logs the non-zero exit — so a
+        # warning here escalated an ordinary release into a RecurringWarning defect (cf. #917).
+        log_info(f"Drain timed out with {remaining} task(s) still running — they will be "
+                 "re-queued on shutdown (task_acks_late)")
     else:
         log_info("Celery workers drained — no tasks running")
     return remaining

@@ -189,6 +189,17 @@ class TestDrainWorkers:
         with patch(f"{_MOD}.active_task_count", return_value=3):
             assert drain_workers(timeout_seconds=0, poll_seconds=1, sleep=lambda s: None) == 3
 
+    def test_timeout_logs_info_not_warning(self):
+        # A timed-out drain is routine on a deploy (acks_late re-queues the stragglers), so it
+        # must not warn — a repeated warning escalates into a RecurringWarning defect (#2477).
+        from cqc_lem.utilities.maintenance import drain_workers
+        with patch(f"{_MOD}.active_task_count", return_value=2), \
+                patch(f"{_MOD}.log_info") as info, \
+                patch(f"{_MOD}.log_warning") as warning:
+            drain_workers(timeout_seconds=0, poll_seconds=1, sleep=lambda s: None)
+        warning.assert_not_called()
+        assert any("Drain timed out with 2 task(s)" in c.args[0] for c in info.call_args_list)
+
     def test_no_wait_when_already_idle(self):
         sleeps = []
         from cqc_lem.utilities.maintenance import drain_workers
