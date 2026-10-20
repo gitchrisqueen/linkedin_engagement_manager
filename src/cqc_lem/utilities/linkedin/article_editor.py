@@ -22,6 +22,7 @@ No class names are keyed on. Use `resolve_article_editor_step(...)` directly, or
 `find_article_editor_elements(driver, wait)` to resolve all four fields/buttons at once.
 """
 
+import json
 import os
 import time
 from dataclasses import dataclass
@@ -239,6 +240,67 @@ def _press_escape(driver: WebDriver) -> None:
     except Exception as e:  # noqa: BLE001 - best-effort; the caller re-checks Next either way
         log_debug("Escape after cover upload failed", error=str(e)[:200],
                   action_type="article_editor", step=STEP_COVER)
+
+
+# What the page shows when Publish cannot be resolved after Next: each open dialog by its label or
+# heading WITH its own buttons (Publish lives in the dialog Next opens), then the page's other
+# visible buttons. A disabled control is suffixed " [disabled]". Dialogs come first so neither the
+# page-button cap nor the message cap can drop them. Read-only: nothing is clicked or changed.
+_PUBLISH_MISS_SCAN_JS = r"""
+const vis = el => !!(el.offsetWidth || el.offsetHeight || (el.getClientRects && el.getClientRects().length));
+const label = el => {
+  const aria = (el.getAttribute('aria-label') || '').trim();
+  const text = (el.innerText || el.textContent || '').trim().replace(/\s+/g, ' ');
+  let t = (aria && text && aria !== text ? aria + ' / ' + text : (aria || text)).slice(0, 60);
+  if (el.disabled || el.getAttribute('aria-disabled') === 'true') t += ' [disabled]';
+  return t;
+};
+const btns = (root, cap) => {
+  const out = [];
+  for (const b of root.querySelectorAll('button, [role="button"]')) {
+    if (!vis(b)) continue;
+    const t = label(b);
+    if (t && !out.includes(t)) out.push(t);
+    if (out.length >= cap) break;
+  }
+  return out;
+};
+const dialogs = [];
+for (const d of document.querySelectorAll('[role="dialog"], [role="alertdialog"], dialog[open]')) {
+  if (!vis(d)) continue;
+  const h = d.querySelector('h1, h2, h3');
+  const name = ((d.getAttribute('aria-label') || '') + ' ' + (h ? h.innerText : '')).trim().slice(0, 80);
+  dialogs.push({name: name, buttons: btns(d, 12)});
+  if (dialogs.length >= 4) break;
+}
+return {dialogs: dialogs, path: location.pathname.slice(0, 80), buttons: btns(document, 20)};
+"""
+
+
+def _log_publish_miss_evidence(driver: WebDriver, publish_step: Optional["ResolvedElement"] = None,
+                               user_id: Optional[int] = None) -> None:
+    """Record what was on screen when Publish could not be resolved, best-effort; never raises.
+
+    INFO, not a warning: `resolve_article_editor_step` already warned where it detected the miss.
+    That `Selector miss: Article editor article_publish` warning also fires when an earlier route
+    found Publish DISABLED and the last route then found nothing, so the warning alone cannot say
+    which happened. This line can: `enabled` and the routes `tried` lead it, and `"enabled": false`
+    means the control was there but disabled, which no selector change fixes. The evidence goes in
+    the message text: the file log keeps no context keys, and prod forwards nothing below WARNING
+    to PostHog.
+    """
+    evidence: dict = {}
+    if publish_step is not None:
+        evidence["enabled"] = publish_step.enabled
+        evidence["route"] = publish_step.route
+        evidence["tried"] = list(publish_step.tried or [])
+    try:
+        evidence.update(driver.execute_script(_PUBLISH_MISS_SCAN_JS) or {})
+    except Exception as e:  # noqa: BLE001 - a diagnostic must never turn a reported miss into a raise
+        evidence["scan_error"] = type(e).__name__
+    log_info(f"Article publish screen at the miss (user {user_id}): "
+             f"{json.dumps(evidence, default=str)[:2000]}",
+             user_id=user_id, action_type="article_editor", step=STEP_PUBLISH)
 
 
 class StepVerdict(str, Enum):
@@ -686,6 +748,7 @@ def fill_article_editor(
     publish_step = resolve_article_editor_step(driver, wait, STEP_PUBLISH, _PUBLISH_LOCATORS,
                                              user_id=user_id)
     if not publish_step.ok:
+        _log_publish_miss_evidence(driver, publish_step, user_id=user_id)
         return None, STEP_PUBLISH
 
     if not _click_safely(driver, publish_step.element):
