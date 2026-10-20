@@ -78,6 +78,17 @@ class TestIsGridRelayError:
     def test_matches_case_insensitively(self):
         assert is_grid_relay_error(WebDriverException("FAILED TO EXECUTE REQUEST")) is True
 
+    def test_a_relay_client_with_a_shut_down_executor_matches(self):
+        """Issue #2478: the same drop, refused by the Grid's already-terminated HTTP client executor."""
+        exc = WebDriverException(
+            "Message: Task java.util.concurrent.FutureTask@31a5783a[Not completed, task = "
+            "java.util.concurrent.Executors$RunnableAdapter@3b5d134a[Wrapped task = "
+            "org.openqa.selenium.remote.http.jdk.JdkHttpClient$$Lambda/0x00007601b029ef50@359afa51]] "
+            "rejected from java.util.concurrent.ThreadPoolExecutor@6f1d2a3b[Terminated, pool size = 0]"
+        )
+        assert is_grid_relay_error(exc) is True
+        assert is_session_lost(exc) is False
+
     def test_a_lost_session_is_not_a_grid_relay_error(self):
         """The three predicates cover distinct faults — a caller that needs all three checks all three."""
         assert is_grid_relay_error(WebDriverException("Unable to find session with ID: abc")) is False

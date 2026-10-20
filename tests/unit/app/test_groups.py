@@ -978,25 +978,28 @@ class TestCommentInGroups:
         assert warned.called and not err.called
         quit_driver.assert_called_once_with(driver)
 
-    def test_a_grid_relay_error_ends_the_run_in_failure_on_what_shipped(self):
-        """Issue #1784: the Grid hub's relay to the node can drop a single command mid-walk.
+    @pytest.mark.parametrize("message", [
+        # Issue #1784: the relay dropped one command.
+        "Message: Failed to execute request (POST http://localhost:2867/session/abc/"
+        "execute/sync)\nStacktrace:\njava.io.UncheckedIOException: Failed to execute "
+        "request (POST http://localhost:2867/session/abc/execute/sync)",
+        # Issue #2478: the relay's HTTP client executor was already shut down.
+        "Message: Task java.util.concurrent.FutureTask@31a5783a[Not completed, task = "
+        "java.util.concurrent.Executors$RunnableAdapter@3b5d134a[Wrapped task = "
+        "org.openqa.selenium.remote.http.jdk.JdkHttpClient$$Lambda/0x00007601b029ef50@359afa51]] "
+        "rejected from java.util.concurrent.ThreadPoolExecutor@6f1d2a3b[Terminated, pool size = 0]",
+    ])
+    def test_a_grid_relay_error_ends_the_run_in_failure_on_what_shipped(self, message):
+        """Issues #1784/#2478: the Grid hub's relay to the node can drop a single command mid-walk.
 
-        (`java.io.UncheckedIOException: Failed to execute request (POST .../execute/sync)`). That
-        is Grid infrastructure, not an application defect — treated like a crashed tab: stop, keep
-        what already shipped, warn instead of crashing into an unhandled `$exception`.
+        That is Grid infrastructure, not an application defect — treated like a crashed tab: stop,
+        keep what already shipped, warn instead of crashing into an unhandled `$exception`.
         """
         from selenium.common import WebDriverException
 
         from cqc_lem.app.engagement.feed import auto_comment_in_groups
         driver = MagicMock()
-        driver.get.side_effect = [
-            None,
-            WebDriverException(
-                "Message: Failed to execute request (POST http://localhost:2867/session/abc/"
-                "execute/sync)\nStacktrace:\njava.io.UncheckedIOException: Failed to execute "
-                "request (POST http://localhost:2867/session/abc/execute/sync)"
-            ),
-        ]
+        driver.get.side_effect = [None, WebDriverException(message)]
         with patch(f"{_FEED}.get_enabled_group_ids", return_value=["1", "2", "3"]), \
              patch(f"{_FEED}.get_current_profile", return_value=(driver, MagicMock(), "e", MagicMock())), \
              patch(f"{_FEED}.get_engagement_preferences", return_value={}), \
