@@ -530,7 +530,7 @@ Reading the next publish run in `/opt/lem/logs/cqc_lem_YYYY_MM_DD.log`:
 | `Article publish resolved via publish_text\|publish_dialog\|publish_aria ...; after click: https://www.linkedin.com/pulse/...` | Published; the route named did it | Keep |
 | `Article publish screen at the miss` with a Publish-labelled control in `dialogs` | The selector is still wrong | Add that label/shape to `_PUBLISH_LOCATORS` |
 | `Article publish screen at the miss` with `"enabled": false` | Publish was there but disabled | Not a selector problem; do not revert |
-| `Article publish resolved via ...; after click:` a URL that is not `/pulse/` | The click did not reach an article within ~20 s | First check your LinkedIn articles list for the edition's title. If it is live, record it with step 6's `mark_edition_published` command and keep the route. Revert the route named in the line only if it is not live |
+| `Article publish resolved via ...; after click:` a URL that is not `/pulse/` | The click did not reach an article within ~20 s | First check your LinkedIn articles list for the edition's title. If it is live, record it with step 6's `mark_edition_published` command (with that edition's id) and keep the route. If it is not live and the route is `publish_dialog`, revert that route (this change). `publish_text` and `publish_aria` predate it |
 
 A run that hits the last row also writes an `Article publish screen at the miss` line right after it. When both appear for one run, the last row governs and the miss rows do not apply.
 To find a disabled Publish quickly: `grep 'Article publish screen at the miss' /opt/lem/logs/cqc_lem_YYYY_MM_DD.log | grep '"enabled": false'`.
@@ -607,10 +607,12 @@ Run as root on the box, in this order:
    - nothing at `:05`: the run was held, not failed. A 429 or pause skips it, and a rate-limit
      skip logs only at DEBUG. The row stays `approved` and is retried the next hour;
    - `Article publish screen at the miss` and `Newsletter edition publish flow did not complete`:
-     failed again. The row is `failed`, with no automatic retry. Fix the locator from the miss
+     failed again. If an `Article publish resolved via ...; after click:` line with a non-`/pulse/`
+     URL comes just before them, follow the last row of the table above first. The row is `failed`, with no automatic retry. Fix the locator from the miss
      line before resetting again.
 6. **Undo a duplicate**, if one ever goes out: delete the extra article on LinkedIn by hand, then
-   record the surviving one:
+   record the surviving one. The command is for edition 17; use the right id for another edition.
+   Recording also resets the newsletter's last-published time to now:
 
    ```bash
    sudo docker exec -i celery_worker python -c "from cqc_lem.utilities.db import mark_edition_published as m; print(m(17, '<surviving /pulse/ URL>'))"
