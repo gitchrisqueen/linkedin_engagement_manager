@@ -501,7 +501,7 @@ class TestFillArticleEditor:
         url, failed = ae.fill_article_editor(driver, wait, "title", "body")
         assert url is None
         assert failed == ae.STEP_PUBLISH
-        # Found but disabled is not a selector miss; the evidence line must say which it was.
+        # The last route's selector-miss warning cannot tell found-disabled from missing; this line must.
         evidence = [m for m in logged if m.startswith("Article publish screen at the miss")]
         assert len(evidence) == 1
         assert '"enabled": false' in evidence[0] and ae.ROUTE_PUBLISH_TEXT in evidence[0]

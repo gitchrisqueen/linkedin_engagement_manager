@@ -281,11 +281,13 @@ def _log_publish_miss_evidence(driver: WebDriver, publish_step: Optional["Resolv
                                user_id: Optional[int] = None) -> None:
     """Record what was on screen when Publish could not be resolved, best-effort; never raises.
 
-    INFO, not a warning. When no route found Publish, the miss already warned where it was
-    detected (`resolve_article_editor_step`). When a route found it DISABLED there was no selector
-    miss, and this line is the only record, so it says which: `enabled` and the routes `tried` lead
-    the line. The evidence goes in the message text: the file log keeps no context keys, and prod
-    forwards nothing below WARNING to PostHog.
+    INFO, not a warning: `resolve_article_editor_step` already warned where it detected the miss.
+    That `Selector miss: Article editor article_publish` warning also fires when an earlier route
+    found Publish DISABLED and the last route then found nothing, so the warning alone cannot say
+    which happened. This line can: `enabled` and the routes `tried` lead it, and `"enabled": false`
+    means the control was there but disabled, which no selector change fixes. The evidence goes in
+    the message text: the file log keeps no context keys, and prod forwards nothing below WARNING
+    to PostHog.
     """
     evidence: dict = {}
     if publish_step is not None:
