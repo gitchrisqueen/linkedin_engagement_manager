@@ -1094,3 +1094,18 @@ class TestEditionAlreadyPublic:
             auto_publish_edition.run(edition_id=9)
         failed.assert_not_called()
         assert err.call_args.args[0] == "Published newsletter edition 9 but could not record it"
+
+    def test_a_publish_step_miss_never_records_the_edition(self):
+        """`fill_article_editor` returns (None, article_publish) for a click that reached no article."""
+        from cqc_lem.app.engagement.newsletter import auto_publish_edition
+        edition = {"id": 9, "user_id": 1, "status": "approved", "title": "T", "subtitle": None, "body": "B"}
+        with patch(f"{_NL}.get_newsletter_edition", return_value=edition), \
+             patch(f"{_NL}.get_current_profile", return_value=(MagicMock(), MagicMock(), "e", MagicMock())), \
+             patch(f"{_NL}._fill_and_publish_article", return_value=(None, "article_publish")), \
+             patch(f"{_NL}.mark_edition_published") as mark, \
+             patch(f"{_NL}.mark_edition_failed") as failed, \
+             patch(f"{_NL}.quit_gracefully"), \
+             pytest.raises(LaneTaskFailed):
+            auto_publish_edition.run(edition_id=9)
+        mark.assert_not_called()
+        failed.assert_called_once_with(9)

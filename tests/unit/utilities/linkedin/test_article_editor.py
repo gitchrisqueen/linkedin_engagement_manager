@@ -93,7 +93,9 @@ class FakeDriver:
         self.dom = dom or {}
         self.scripts = []
         self.url = None
-        self.current_url = "https://www.linkedin.com/article/new/"
+        # Where a real publish lands (every stored edition URL has this shape). The outcome check in
+        # `fill_article_editor` requires it; tests of a click that publishes nothing set the editor URL.
+        self.current_url = "https://www.linkedin.com/pulse/test-article-christopher-queen-ab12c/?published=t"
         self.execute_script_exc = execute_script_exc
 
     def get(self, url):
@@ -180,7 +182,7 @@ class TestResolveArticleEditorStep:
         assert not result.ok
         assert result.route is None
         assert result.element is None
-        assert set(result.tried) == {ae.ROUTE_PUBLISH_TEXT, ae.ROUTE_PUBLISH_ARIA}
+        assert set(result.tried) == {ae.ROUTE_PUBLISH_TEXT, ae.ROUTE_PUBLISH_DIALOG, ae.ROUTE_PUBLISH_ARIA}
 
     def test_only_last_route_miss_carries_warn_on_miss(self, monkeypatch):
         """A single failed step must fire ONE `Selector miss:` warning, not one per route (#1925).
@@ -431,7 +433,8 @@ class TestArticleEditorVerdict:
         assert verdict["all_ok"] is False
         assert verdict["first_missing"] == ae.STEP_PUBLISH
         assert verdict["publish"]["verdict"] == ae.StepVerdict.MISSING
-        assert verdict["publish"]["tried"] == [ae.ROUTE_PUBLISH_TEXT, ae.ROUTE_PUBLISH_ARIA]
+        assert verdict["publish"]["tried"] == [ae.ROUTE_PUBLISH_TEXT, ae.ROUTE_PUBLISH_DIALOG,
+                                               ae.ROUTE_PUBLISH_ARIA]
 
 
 class TestFillArticleEditor:
@@ -1221,6 +1224,53 @@ class TestAttachArticleCover:
         assert save.clicked == 0
 
 
+class TestPublishLocators:
+    """Exact-label Publish routes (2026-10-20): never a looser text match that a click would misread."""
+
+    def _resolve(self, monkeypatch, dom):
+        driver = FakeDriver(dom)
+
+        def fake_find_first(d, w, locators, *args, **kwargs):
+            for by, value in locators:
+                matches = driver.find_elements(by, value)
+                if matches:
+                    return matches[0]
+            return None
+
+        monkeypatch.setattr(ae, "find_first", fake_find_first)
+        return ae.resolve_article_editor_step(driver, MagicMock(), ae.STEP_PUBLISH, ae._PUBLISH_LOCATORS)
+
+    def test_a_role_button_publish_inside_the_dialog_resolves(self, monkeypatch):
+        publish = FakeElement(tag="div", attrs={"role": "button"})
+        xpath = f"//*[@role='dialog']//*[@role='button'][{ae._PUBLISH_LABELS}]"
+        result = self._resolve(monkeypatch, {(By.XPATH, xpath): [publish]})
+        assert result.ok and result.route == ae.ROUTE_PUBLISH_DIALOG and result.element is publish
+
+    def test_publish_now_resolves_on_the_text_route(self, monkeypatch):
+        publish = FakeElement(tag="button")
+        result = self._resolve(monkeypatch, {(By.XPATH, "//button[normalize-space()='Publish now']"): [publish]})
+        assert result.ok and result.route == ae.ROUTE_PUBLISH_TEXT
+
+    def test_a_disabled_role_button_publish_is_not_actionable(self, monkeypatch):
+        """A div role=button with aria-disabled must read disabled, like a <button> does."""
+        publish = FakeElement(tag="div", attrs={"role": "button", "aria-disabled": "true"})
+        assert ae._is_enabled(publish) is False
+        xpath = f"//*[@role='dialog']//*[@role='button'][{ae._PUBLISH_LABELS}]"
+        result = self._resolve(monkeypatch, {(By.XPATH, xpath): [publish]})
+        assert result.ok is False and publish.clicked == 0
+
+    def test_a_plain_div_is_still_treated_as_enabled(self):
+        assert ae._is_enabled(FakeElement(tag="div")) is True
+
+    def test_text_and_dialog_routes_match_exact_labels_only(self):
+        """No starts-with/contains on text: 'Publishing settings' must never read as Publish."""
+        for route, strategies in ae._PUBLISH_LOCATORS:
+            if route == ae.ROUTE_PUBLISH_ARIA:
+                continue
+            for _by, value in strategies:
+                assert "contains(" not in value and "starts-with(" not in value, value
+
+
 class TestFillArticleEditorCover:
     def _dom(self, extra=None):
         title = FakeElement(tag="textarea", attrs={"placeholder": "Title"})
@@ -1329,6 +1379,54 @@ class TestFillArticleEditorCover:
         assert failed is None and url == driver.current_url
         assert escapes == [driver] and nxt.clicked == 2 and publish.clicked == 1
         assert any(m.startswith("Publish screen not open after Next") for m in logged)
+
+    def test_a_click_that_never_reaches_an_article_is_not_a_publish(self, monkeypatch):
+        """Success is the /pulse/ page, never the click (every stored edition URL is /pulse/)."""
+        dom, _title, _body, _nxt, publish = self._dom()
+        driver = FakeDriver(dom)
+        driver.current_url = "https://www.linkedin.com/article/new/"
+        self._wire(monkeypatch, driver)
+        logged = []
+        monkeypatch.setattr(ae, "log_info", lambda msg, **kw: logged.append(msg))
+        url, failed = ae.fill_article_editor(driver, MagicMock(), "T", "B")
+        assert (url, failed) == (None, ae.STEP_PUBLISH) and publish.clicked == 1
+        assert any(m.startswith("Article publish resolved via publish_text") and
+                   m.endswith("after click: https://www.linkedin.com/article/new/") for m in logged)
+        assert any(m.startswith("Article publish screen at the miss") for m in logged)
+
+    def test_the_winning_route_and_landing_url_are_logged(self, monkeypatch):
+        dom, *_ = self._dom()
+        driver = FakeDriver(dom)
+        self._wire(monkeypatch, driver)
+        logged = []
+        monkeypatch.setattr(ae, "log_info", lambda msg, **kw: logged.append(msg))
+        url, failed = ae.fill_article_editor(driver, MagicMock(), "T", "B")
+        assert failed is None and "/pulse/" in url
+        assert [m for m in logged if m.startswith("Article publish resolved via")] == [
+            f"Article publish resolved via publish_text (tried ['publish_text']); after click: {url}"]
+
+    def test_the_dialog_route_is_logged_when_it_wins(self, monkeypatch):
+        dom, *_ = self._dom()
+        dom.pop((By.XPATH, "//button[normalize-space()='Publish']"))
+        dialog_publish = FakeElement(tag="div", attrs={"role": "button"})
+        dom[(By.XPATH, f"//*[@role='dialog']//*[@role='button'][{ae._PUBLISH_LABELS}]")] = [dialog_publish]
+        driver = FakeDriver(dom)
+        self._wire(monkeypatch, driver)
+        logged = []
+        monkeypatch.setattr(ae, "log_info", lambda msg, **kw: logged.append(msg))
+        url, failed = ae.fill_article_editor(driver, MagicMock(), "T", "B")
+        assert failed is None and dialog_publish.clicked == 1
+        assert any(m.startswith("Article publish resolved via publish_dialog") for m in logged)
+
+    def test_a_disabled_dialog_publish_is_never_clicked(self, monkeypatch):
+        dom, *_ = self._dom()
+        dom.pop((By.XPATH, "//button[normalize-space()='Publish']"))
+        disabled = FakeElement(tag="div", attrs={"role": "button", "aria-disabled": "true"})
+        dom[(By.XPATH, f"//*[@role='dialog']//*[@role='button'][{ae._PUBLISH_LABELS}]")] = [disabled]
+        driver = FakeDriver(dom)
+        self._wire(monkeypatch, driver)
+        url, failed = ae.fill_article_editor(driver, MagicMock(), "T", "B")
+        assert (url, failed) == (None, ae.STEP_PUBLISH) and disabled.clicked == 0
 
     def test_no_cover_never_presses_next_twice(self, monkeypatch):
         """Without a cover the old path stands: a missing Publish is reported, not retried."""

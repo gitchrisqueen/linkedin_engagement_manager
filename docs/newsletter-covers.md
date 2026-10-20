@@ -512,6 +512,29 @@ Two changes follow, both judged by the outcome rather than by a click having lan
   on screen, it logs `Publish screen not open after Next with a cover attached; pressing Escape and
   Next once more`, presses Escape and the editor's Next once more, and only then judges Publish.
 
+`_PUBLISH_LOCATORS` also gains a `publish_dialog` route: Publish inside the publish dialog as a
+button, a span or a `role="button"` element, labelled exactly `Publish` or `Publish now`. A
+`role="button"` element gets the same disabled and `aria-disabled` check as a `<button>`. Text
+labels stay exact on purpose, so "Publishing settings" never reads as Publish.
+
+A click is not a publish. After the Publish click, the flow waits up to about 20 s for the page to
+reach `https://www.linkedin.com/pulse/...`. Every stored edition URL (editions 1-8, 15, 16) has
+that shape, ending `?published=t`. It always logs `Article publish resolved via <route> (tried
+[...]); after click: <url>`. If the URL is not an article page, it logs the miss evidence and
+returns `article_publish`. The edition is marked `failed`, not `published`.
+
+Reading the next publish run in `/opt/lem/logs/cqc_lem_YYYY_MM_DD.log`:
+
+| Line | Meaning | Action |
+|---|---|---|
+| `Article publish resolved via publish_text\|publish_dialog\|publish_aria ...; after click: https://www.linkedin.com/pulse/...` | Published; the route named did it | Keep |
+| `Article publish screen at the miss` with a Publish-labelled control in `dialogs` | The selector is still wrong | Add that label/shape to `_PUBLISH_LOCATORS` |
+| `Article publish screen at the miss` with `"enabled": false` | Publish was there but disabled | Not a selector problem; do not revert |
+| `Article publish resolved via ...; after click:` a URL that is not `/pulse/` | The click did not reach an article within ~20 s | First check your LinkedIn articles list for the edition's title. If it is live, record it with step 6's `mark_edition_published` command (with that edition's id) and keep the route. If it is not live and the route is `publish_dialog`, revert that route (this change). `publish_text` and `publish_aria` predate it |
+
+A run that hits the last row also writes an `Article publish screen at the miss` line right after it. When both appear for one run, the last row governs and the miss rows do not apply.
+To find a disabled Publish quickly: `grep 'Article publish screen at the miss' /opt/lem/logs/cqc_lem_YYYY_MM_DD.log | grep '"enabled": false'`.
+
 If Publish is still missing, `Article publish screen at the miss (user N): {...}` (#2483) records
 the open dialogs with their own buttons, the disabled controls and the routes tried. Fix the
 locator from that line.
@@ -519,14 +542,16 @@ locator from that line.
 ### A republished edition never goes out twice
 
 An edition reset to `approved` after a failed run goes through `auto_publish_edition` again. Most
-failures return before the Publish click, so nothing went out. Three windows can leave a live
+failures return before the Publish click, so nothing went out. Four windows can leave a live
 article that the row does not record as published:
 - a Publish click that raised after it registered (the step reports `article_publish`);
 - an exception after the click (the edition is marked `failed`);
+- a Publish click whose `/pulse/` page took longer than the ~20 s wait (the step reports
+  `article_publish`, and the edition is marked `failed`);
 - a publish whose `mark_edition_published` write failed. That one now logs `Published newsletter
   edition N but could not record it` at ERROR, and the row stays `approved`.
 
-`_edition_already_public` is the automated check for all three. Before any browser opens, it reads
+`_edition_already_public` is the automated check for all four. Before any browser opens, it reads
 the newest published edition's page logged out and compares each `/pulse/` slug in its "more
 articles" list with the edition's title. It uses the first four words on both sides, without the
 words LinkedIn drops from slugs (`_SLUG_STOPWORDS`), and requires the same author token as that
@@ -573,6 +598,8 @@ Run as root on the box, in this order:
    - `Newsletter edition 17 is already live on LinkedIn; recorded it instead of publishing again`:
      the guard found it live and recorded its URL, so nothing was published;
    - `Publish screen not open after Next with a cover attached`: the second Next fired;
+   - `Article publish resolved via ...`: which route clicked Publish and where the page landed
+     (see the table above);
    - `Published newsletter edition 17 for user 1`: done; the row now holds the URL;
    - `Published newsletter edition 17 but could not record it` (ERROR): it is live, but the row is
      still `approved`, and the next `:05` dispatches it again. Run step 4's stop now, then record
@@ -580,15 +607,22 @@ Run as root on the box, in this order:
    - nothing at `:05`: the run was held, not failed. A 429 or pause skips it, and a rate-limit
      skip logs only at DEBUG. The row stays `approved` and is retried the next hour;
    - `Article publish screen at the miss` and `Newsletter edition publish flow did not complete`:
-     failed again. The row is `failed`, with no automatic retry. Fix the locator from the miss
+     failed again. If an `Article publish resolved via ...; after click:` line with a non-`/pulse/`
+     URL comes just before them, follow the last row of the table above first. The row is `failed`, with no automatic retry. Fix the locator from the miss
      line before resetting again.
 6. **Undo a duplicate**, if one ever goes out: delete the extra article on LinkedIn by hand, then
-   record the surviving one:
+   record the surviving one. The command is for edition 17; use the right id for another edition.
+   Recording also resets the newsletter's last-published time to now:
 
    ```bash
    sudo docker exec -i celery_worker python -c "from cqc_lem.utilities.db import mark_edition_published as m; print(m(17, '<surviving /pulse/ URL>'))"
    ```
 
-**Code rollback:** redeploy the previous release with the owner deploy path in
-`docs/DEPLOYMENT.md` (`scripts/deploy.sh <previous tag>`). Do that only with edition 17 not
-`approved`; the old code has neither the second Next nor the guard.
+**Code rollback:** first choice is `git revert` of the change at fault, shipped through the normal
+release train. That leaves the republish guard and the other publish fixes in place.
+`scripts/deploy.sh <tag>` (owner path in `docs/DEPLOYMENT.md`) is only for a tag that contains
+#2485 (`git tag --contains ca386601` lists it) and does not contain the change being rolled back
+(`git tag --contains <that change's merge commit>` does not list it). If no tag passes both
+tests, for example because one release shipped them together, `git revert` is the only rollback.
+Never redeploy v0.199.1 or older while edition 17 is `approved`; those releases have neither the
+second Next nor the guard.

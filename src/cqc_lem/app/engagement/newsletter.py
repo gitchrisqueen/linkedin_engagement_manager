@@ -250,7 +250,8 @@ def _edition_already_public(user_id: int, title: str) -> "str | None":
 
     This is the only automated check on the windows where a live article is not recorded as
     published: a Publish click that raised after it registered, an exception after the click (the
-    edition is marked failed), and a publish whose `mark_edition_published` write failed.
+    edition is marked failed), a click whose /pulse/ page took longer than the ~20 s wait (also
+    marked failed), and a publish whose `mark_edition_published` write failed.
     """
     import requests
 
