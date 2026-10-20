@@ -94,11 +94,27 @@ def test_edge_credential_filter_refusal_is_no_store(api_client):
 
 
 def test_non_api_route_is_left_alone(api_client):
-    """The health probe is not `/api`.
+    """A route outside `/api` and `/health` is not this middleware's to mark.
 
     The HTML shell owns its own no-store contract, so this middleware decides for neither.
     """
-    response = api_client.get("/health")
+    response = api_client.get("/assets", params={"file_name": "no-such-file.png"},
+                              follow_redirects=False)
 
-    assert response.status_code == 200
+    assert response.status_code == 301
     assert "Cache-Control" not in response.headers
+
+
+@pytest.mark.parametrize("path", ["/health", "/health/deep"])
+def test_health_checks_are_no_store(api_client, path):
+    """A monitor must read the stack as it is now, never an edge copy.
+
+    The edge kept serving a cached `degraded` `/health/deep` after the stack had recovered
+    (2026-10-20, `age: 3267` at 12:57Z). Only the header is asserted: the deep check's body depends on a broker
+    this lane does not have.
+    """
+    with patch("cqc_lem.utilities.maintenance._inspect", side_effect=RuntimeError("no broker")):
+        response = api_client.get(path)
+
+    assert response.headers["Cache-Control"] == NO_STORE_CACHE_CONTROL
+    assert response.headers["Pragma"] == "no-cache"

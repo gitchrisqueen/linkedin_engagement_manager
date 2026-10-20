@@ -101,6 +101,26 @@ chmod 600 .env
 Alternatively manage ingress from the repo via `cloudflared/config.yml` (see the
 header of that file) instead of the dashboard.
 
+To rotate the token (all public ingress drops if the new token is wrong):
+
+1. Keep the old file: `sudo cp -p /opt/lem/.env /opt/lem/.env.bak-tunnel`.
+2. Put the new value in `TUNNEL_TOKEN` in `/opt/lem/.env`. The file stays `deploy:deploy`, mode 600.
+3. `cd /opt/lem && sudo ./scripts/compose.sh up -d cloudflared`.
+4. Check: `sudo ./scripts/compose.sh logs --tail 50 cloudflared` shows `Registered tunnel connection`,
+   and `curl -fsS https://app.<domain>/health` answers from outside the box.
+5. Rollback if step 4 fails: `sudo cp -p /opt/lem/.env.bak-tunnel /opt/lem/.env`, then re-run step 3. If the old
+   token was already revoked in Cloudflare, that restore cannot bring ingress back: copy the tunnel's
+   current token from the dashboard instead.
+6. Once step 4 passes, delete the copy (it holds the old token): `sudo rm /opt/lem/.env.bak-tunnel`.
+
+The `cloudflared` container must be the compose service. A standalone container with the same name
+makes the deploy's converge fail on a name conflict, which leaves the stack half-updated. The
+v0.199.0 deploy runs 39292341928 and 39292390153 and the v0.199.1 run 39413181285 all failed this
+way. To detect one:
+`sudo docker inspect -f '{{index .Config.Labels "com.docker.compose.project"}}' cloudflared`.
+An empty answer means it is standalone. Remove it with `sudo docker rm -f cloudflared`, then run
+step 3.
+
 ### 5. GitHub repo configuration
 
 **Secrets:** `VPS_HOST`, `VPS_USER`, `VPS_SSH_KEY`, `GHCR_PAT`
@@ -287,10 +307,10 @@ A deploy recreates the app containers, which SIGTERMs the workers. Three layers 
 Inspect or drive it by hand from the box:
 
 ```bash
-docker compose exec -T celery_worker python -m cqc_lem.utilities.maintenance status
-docker compose exec -T celery_worker python -m cqc_lem.utilities.maintenance begin --pause-seconds 900
-docker compose exec -T celery_worker python -m cqc_lem.utilities.maintenance drain --timeout 300
-docker compose exec -T celery_worker python -m cqc_lem.utilities.maintenance end
+./scripts/compose.sh exec -T celery_worker python -m cqc_lem.utilities.maintenance status
+./scripts/compose.sh exec -T celery_worker python -m cqc_lem.utilities.maintenance begin --pause-seconds 900
+./scripts/compose.sh exec -T celery_worker python -m cqc_lem.utilities.maintenance drain --timeout 300
+./scripts/compose.sh exec -T celery_worker python -m cqc_lem.utilities.maintenance end
 ```
 
 ## Manual redeploy / rollback
@@ -300,8 +320,38 @@ tag, ticking `rollback` to skip migrations. Or on the box:
 
 ```bash
 cd /opt/lem
-./scripts/rollback.sh v1.2.2      # re-up a prior tag
+./scripts/rollback.sh v1.2.2      # as deploy: re-up a prior tag
+# from the owner's login:
+sudo env DOCKER_CONFIG=/home/deploy/.docker bash ./scripts/rollback.sh v1.2.2
+sudo chown -R deploy:deploy /opt/lem/.git
 ```
+
+`rollback.sh` writes the tag into `IMAGE_TAG` in `.env`, as `deploy.sh` does. A later manual
+compose `up`, or a reboot, then stays on the rolled-back tag. It runs no health check, so check
+afterwards: `curl -fsS https://app.<domain>/health`. A tag older than `scripts/compose.sh` takes
+the wrapper off disk with it; until the next deploy, type the full list:
+`docker compose -f docker-compose.yml -f docker-compose.prod.yml -f docker-compose.grid.yml …`.
+
+### Deploying from the box as the owner
+
+The owner deploys from their own login, not as `deploy`, so the expected path on the box is root
+via `sudo`, using the `deploy` user's registry login:
+
+```bash
+cd /opt/lem && sudo ./scripts/backup.sh          # deploy.sh runs migrations and takes no backup
+sudo ls -t backups/ | grep '^db-' | head -1        # confirm a dump stamped just now exists
+sudo env DOCKER_CONFIG=/home/deploy/.docker bash ./scripts/deploy.sh vX.Y.Z
+sudo chown -R deploy:deploy /opt/lem/.git
+```
+
+From a login outside the `docker` group, every on-box command needs `sudo`, `./scripts/compose.sh`
+included. A compose command that pulls an image also needs the registry login:
+`sudo env DOCKER_CONFIG=/home/deploy/.docker ./scripts/compose.sh pull`.
+
+The `chown` matters because the script's `git fetch`/`checkout` runs as root. A root fetch can
+leave root-owned object directories under `.git/` that the `deploy` user cannot write into, so
+the next CI deploy, which runs as `deploy`, fails at its own fetch. `.env` must stay
+`deploy:deploy` 600; check it with `stat -c '%U:%G %a' /opt/lem/.env`.
 
 ## Backups
 
@@ -379,24 +429,34 @@ prod overlay.
 ## Observability
 
 - PostHog already receives `log_error`/`log_critical`; set `POSTHOG_API_KEY`.
-- Container logs: `docker compose logs -f <service>` (rotated, 20 MB × 5).
+- Container logs: `./scripts/compose.sh logs -f <service>` (rotated, 20 MB × 5).
 - Queue/tasks: `flower.<domain>`. Live browser: `vnc.<domain>`.
-- Uptime: monitor `https://app.<domain>/health`.
+- Uptime: monitor `https://app.<domain>/health`. `/health` and `/health/deep` answer
+  `Cache-Control: no-store`. Check that the edge honours it: `curl -sI https://app.<domain>/health/deep`
+  must never show `cf-cache-status: HIT`. A HIT means a Cloudflare cache rule overrides the
+  origin; purge the URL and exempt `/health*` from that rule.
 
 ## Troubleshooting
 
 | Symptom | Check |
 |---|---|
-| Deploy rolls back | `docker compose logs web_app`; `/health` not reachable |
+| Deploy rolls back | `./scripts/compose.sh logs web_app`; `/health` not reachable |
 | 401 on the SPA | dead/absent session cookie — check `SESSION_COOKIE_SECURE` matches the origin's scheme (the SPA holds no API token since #950) |
-| Migrations fail | `docker compose run --rm flyway`; inspect Flyway output |
-| Tunnel down | `docker compose logs cloudflared`; verify `TUNNEL_TOKEN` |
+| Migrations fail | `./scripts/backup.sh` first, then `./scripts/compose.sh run --rm flyway`; inspect Flyway output |
+| Tunnel down | `./scripts/compose.sh logs cloudflared`; verify `TUNNEL_TOKEN` (rotation steps under Cloudflare Tunnel) |
 | OAuth fails | `LI_REDIRECT_URL` matches the LinkedIn app + `app.<domain>` |
 
 ## Compose file layering — why editing files on disk does nothing in prod
 
 The stack is always launched with **both** compose files:
-`docker compose -f docker-compose.yml -f docker-compose.prod.yml`.
+`docker compose -f docker-compose.yml -f docker-compose.prod.yml`, plus `docker-compose.grid.yml`
+(the Selenium hub, chrome nodes and debug node) unless `SELENIUM_TOPOLOGY=standalone`.
+
+**Run every manual compose command through `./scripts/compose.sh`** (for example
+`./scripts/compose.sh up -d cloudflared`). It builds the same file list `deploy.sh` uses, from
+`scripts/lib/compose_files.sh`. A hand-typed list without the grid file makes compose treat the
+whole grid as orphans, and the next `up --remove-orphans` deletes it. On 2026-10-20 an
+`up -d cloudflared` run with base + prod only removed the hub, every chrome node and the debug node.
 
 `docker-compose.yml` alone is the DEV config — it bind-mounts `./src:/app/src`, so local edits are
 live immediately. `docker-compose.prod.yml` overrides that bind-mount away, so in PRODUCTION every
@@ -429,7 +489,7 @@ Build a thin overlay image `FROM` the currently running release tag that only `C
 `src` files (identical deps, seconds not minutes). Then on the box:
 
 1. Set `/opt/lem/.env` → `IMAGE_TAG=<hotfix-tag>`.
-2. `cd /opt/lem && docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --no-deps --pull never <app-services>`.
+2. `cd /opt/lem && ./scripts/compose.sh up -d --no-deps --pull never <app-services>`.
 3. Keep the prior release image locally for instant rollback (`IMAGE_TAG=vX.Y.Z`).
 
 **This diverges prod from `main`** — the fix MUST still land via the normal PR → release flow, or

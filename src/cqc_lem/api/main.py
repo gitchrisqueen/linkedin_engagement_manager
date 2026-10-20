@@ -295,10 +295,16 @@ async def api_cache_control_middleware(request: Request, call_next):
 
     Set on the response rather than per route: a route that forgets is exactly the case that goes
     unnoticed, and the header is only meaningful in front of a cache nothing here can see.
+
+    `/health` and `/health/deep` sit outside `/api` but get the same header. The edge cached
+    `/health/deep` too: after the 2026-10-20 outage it kept serving the `degraded` reading taken
+    during the deploy (`cf-cache-status: HIT`, `age: 3267` at 12:57Z, while the origin read
+    `healthy`). A monitor reading a cached health check reports the past.
     """
     response = await call_next(request)
     path = request.url.path
-    if path.startswith("/api/") and not _is_cacheable_api_path(path):
+    uncacheable = path.startswith("/api/") or path == "/health" or path.startswith("/health/")
+    if uncacheable and not _is_cacheable_api_path(path):
         response.headers["Cache-Control"] = NO_STORE_CACHE_CONTROL
         response.headers["Pragma"] = "no-cache"
     return response
