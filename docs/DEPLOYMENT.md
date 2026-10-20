@@ -115,8 +115,8 @@ To rotate the token (all public ingress drops if the new token is wrong):
 
 The `cloudflared` container must be the compose service. A standalone container with the same name
 makes the deploy's converge fail on a name conflict, which leaves the stack half-updated. The
-v0.199.0 deploy runs 39292341928 and 39292390153 and the v0.199.1 runs 39413181285 and
-39413208686 all failed this way. To detect one:
+v0.199.0 deploy runs 39292341928 and 39292390153 and the v0.199.1 run 39413181285 all failed this
+way. To detect one:
 `sudo docker inspect -f '{{index .Config.Labels "com.docker.compose.project"}}' cloudflared`.
 An empty answer means it is standalone. Remove it with `sudo docker rm -f cloudflared`, then run
 step 3.
