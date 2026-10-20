@@ -530,7 +530,10 @@ Reading the next publish run in `/opt/lem/logs/cqc_lem_YYYY_MM_DD.log`:
 | `Article publish resolved via publish_text\|publish_dialog\|publish_aria ...; after click: https://www.linkedin.com/pulse/...` | Published; the route named did it | Keep |
 | `Article publish screen at the miss` with a Publish-labelled control in `dialogs` | The selector is still wrong | Add that label/shape to `_PUBLISH_LOCATORS` |
 | `Article publish screen at the miss` with `"enabled": false` | Publish was there but disabled | Not a selector problem; do not revert |
-| `Article publish resolved via ...; after click:` a URL that is not `/pulse/` | The click landed on something that did not publish | Revert the route named in that line |
+| `Article publish resolved via ...; after click:` a URL that is not `/pulse/` | The click did not reach an article within ~20 s | First check your LinkedIn articles list for the edition's title. If it is live, record it with step 6's `mark_edition_published` command and keep the route. Revert the route named in the line only if it is not live |
+
+A run that hits the last row also writes an `Article publish screen at the miss` line right after it. When both appear for one run, the last row governs and the miss rows do not apply.
+To find a disabled Publish quickly: `grep 'Article publish screen at the miss' /opt/lem/logs/cqc_lem_YYYY_MM_DD.log | grep '"enabled": false'`.
 
 If Publish is still missing, `Article publish screen at the miss (user N): {...}` (#2483) records
 the open dialogs with their own buttons, the disabled controls and the routes tried. Fix the
@@ -539,14 +542,16 @@ locator from that line.
 ### A republished edition never goes out twice
 
 An edition reset to `approved` after a failed run goes through `auto_publish_edition` again. Most
-failures return before the Publish click, so nothing went out. Three windows can leave a live
+failures return before the Publish click, so nothing went out. Four windows can leave a live
 article that the row does not record as published:
 - a Publish click that raised after it registered (the step reports `article_publish`);
 - an exception after the click (the edition is marked `failed`);
+- a Publish click whose `/pulse/` page took longer than the ~20 s wait (the step reports
+  `article_publish`, and the edition is marked `failed`);
 - a publish whose `mark_edition_published` write failed. That one now logs `Published newsletter
   edition N but could not record it` at ERROR, and the row stays `approved`.
 
-`_edition_already_public` is the automated check for all three. Before any browser opens, it reads
+`_edition_already_public` is the automated check for all four. Before any browser opens, it reads
 the newest published edition's page logged out and compares each `/pulse/` slug in its "more
 articles" list with the edition's title. It uses the first four words on both sides, without the
 words LinkedIn drops from slugs (`_SLUG_STOPWORDS`), and requires the same author token as that
@@ -611,6 +616,11 @@ Run as root on the box, in this order:
    sudo docker exec -i celery_worker python -c "from cqc_lem.utilities.db import mark_edition_published as m; print(m(17, '<surviving /pulse/ URL>'))"
    ```
 
-**Code rollback:** redeploy the previous release with the owner deploy path in
-`docs/DEPLOYMENT.md` (`scripts/deploy.sh <previous tag>`). Do that only with edition 17 not
-`approved`; the old code has neither the second Next nor the guard.
+**Code rollback:** first choice is `git revert` of the change at fault, shipped through the normal
+release train. That leaves the republish guard and the other publish fixes in place.
+`scripts/deploy.sh <tag>` (owner path in `docs/DEPLOYMENT.md`) is only for a tag that contains
+#2485 (`git tag --contains ca386601` lists it) and does not contain the change being rolled back
+(`git tag --contains <that change's merge commit>` does not list it). If no tag passes both
+tests, for example because one release shipped them together, `git revert` is the only rollback.
+Never redeploy v0.199.1 or older while edition 17 is `approved`; those releases have neither the
+second Next nor the guard.
