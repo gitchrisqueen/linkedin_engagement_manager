@@ -103,12 +103,15 @@ header of that file) instead of the dashboard.
 
 To rotate the token (all public ingress drops if the new token is wrong):
 
-1. Keep the old file: `sudo cp -p /opt/lem/.env /opt/lem/.env.bak-$(date -u +%Y%m%d%H%M)`.
+1. Keep the old file: `sudo cp -p /opt/lem/.env /opt/lem/.env.bak-tunnel`.
 2. Put the new value in `TUNNEL_TOKEN` in `/opt/lem/.env`. The file stays `deploy:deploy`, mode 600.
 3. `cd /opt/lem && sudo ./scripts/compose.sh up -d cloudflared`.
 4. Check: `sudo ./scripts/compose.sh logs --tail 50 cloudflared` shows `Registered tunnel connection`,
    and `curl -fsS https://app.<domain>/health` answers from outside the box.
-5. Rollback if step 4 fails: copy the `.env.bak-*` file back over `.env` (`sudo cp -p`), then re-run step 3.
+5. Rollback if step 4 fails: `sudo cp -p /opt/lem/.env.bak-tunnel /opt/lem/.env`, then re-run step 3. If the old
+   token was already revoked in Cloudflare, that restore cannot bring ingress back: copy the tunnel's
+   current token from the dashboard instead.
+6. Once step 4 passes, delete the copy (it holds the old token): `sudo rm /opt/lem/.env.bak-tunnel`.
 
 The `cloudflared` container must be the compose service. A standalone container with the same name
 makes the deploy's converge fail on a name conflict, which leaves the stack half-updated. The
@@ -324,7 +327,10 @@ sudo chown -R deploy:deploy /opt/lem/.git
 ```
 
 `rollback.sh` writes the tag into `IMAGE_TAG` in `.env`, as `deploy.sh` does. A later manual
-compose `up`, or a reboot, then stays on the rolled-back tag.
+compose `up`, or a reboot, then stays on the rolled-back tag. It runs no health check, so check
+afterwards: `curl -fsS https://app.<domain>/health`. A tag older than `scripts/compose.sh` takes
+the wrapper off disk with it; until the next deploy, type the full list:
+`docker compose -f docker-compose.yml -f docker-compose.prod.yml -f docker-compose.grid.yml …`.
 
 ### Deploying from the box as the owner
 
@@ -333,13 +339,14 @@ via `sudo`, using the `deploy` user's registry login:
 
 ```bash
 cd /opt/lem && sudo ./scripts/backup.sh          # deploy.sh runs migrations and takes no backup
-ls -t backups/db-*.sql.gz | head -1                # confirm a dump stamped just now exists
+sudo ls -t backups/ | grep '^db-' | head -1        # confirm a dump stamped just now exists
 sudo env DOCKER_CONFIG=/home/deploy/.docker bash ./scripts/deploy.sh vX.Y.Z
 sudo chown -R deploy:deploy /opt/lem/.git
 ```
 
 From a login outside the `docker` group, every on-box command needs `sudo`, `./scripts/compose.sh`
-included.
+included. A compose command that pulls an image also needs the registry login:
+`sudo env DOCKER_CONFIG=/home/deploy/.docker ./scripts/compose.sh pull`.
 
 The `chown` matters because the script's `git fetch`/`checkout` runs as root. A root fetch can
 leave root-owned object directories under `.git/` that the `deploy` user cannot write into, so
