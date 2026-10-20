@@ -532,8 +532,9 @@ articles" list with the edition's title. It uses the first four words on both si
 words LinkedIn drops from slugs (`_SLUG_STOPWORDS`), and requires the same author token as that
 page's own slug. On a match, the edition is recorded as published with that URL and no browser
 opens. A page that is not a LinkedIn article, not a 200, or not listing its own link counts as
-unreadable, and the publish goes ahead. Every run logs one INFO line starting `Newsletter
-republish guard`: `matched a live article`, `read N article links, no match; publishing`, or
+unreadable, and the publish goes ahead. Every run that fetches the page logs one INFO line
+starting `Newsletter republish guard`. A title under four words, or no published edition yet,
+skips the fetch and logs nothing. The fetch lines are: `matched a live article`, `read N article links, no match; publishing`, or
 `could not read the article list (http S); publishing`.
 
 Checked on 2026-10-20:
@@ -558,8 +559,8 @@ Run as root on the box, in this order:
    sudo docker exec -i celery_worker python -c "from cqc_lem.utilities.db import get_newsletter_edition as g, update_newsletter_edition as u; e=g(17); print(e['status'], e['published_url'], e['scheduled_for']); assert e['user_id']==1 and e['status']=='failed' and not e['published_url']; u(17, 1, status='approved'); print('now', g(17)['status'])"
    ```
 
-4. **Stop before the next `:05`** if you change your mind. This sets it back while it is still
-   unpublished:
+4. **Stop before the task starts** (the next `:05`) if you change your mind. A run already under
+   way re-reads the row only at its start. This sets it back while it is still unpublished:
 
    ```bash
    sudo docker exec -i celery_worker python -c "from cqc_lem.utilities.db import get_newsletter_edition as g, update_newsletter_edition as u; e=g(17); assert e['status']=='approved' and not e['published_url']; u(17, 1, status='failed'); print('now', g(17)['status'])"
@@ -571,6 +572,11 @@ Run as root on the box, in this order:
      the guard found it live and recorded its URL, so nothing was published;
    - `Publish screen not open after Next with a cover attached`: the second Next fired;
    - `Published newsletter edition 17 for user 1`: done; the row now holds the URL;
+   - `Published newsletter edition 17 but could not record it` (ERROR): it is live, but the row is
+     still `approved`, and the next `:05` dispatches it again. Run step 4's stop now, then record
+     the URL with step 6;
+   - nothing at `:05`: the run was held, not failed. A 429 or pause skips it, and a rate-limit
+     skip logs only at DEBUG. The row stays `approved` and is retried the next hour;
    - `Article publish screen at the miss` and `Newsletter edition publish flow did not complete`:
      failed again. The row is `failed`, with no automatic retry. Fix the locator from the miss
      line before resetting again.
