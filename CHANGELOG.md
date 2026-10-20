@@ -1,5 +1,15 @@
 # Changelog
 
+## [0.199.2](https://github.com/christopherqueenconsulting/linkedin_engagement_manager/compare/v0.199.1...v0.199.2) (2026-10-20)
+
+
+### Bug Fixes
+
+* **deploy:** keep the Selenium grid in every compose command; no-store on /health ([#2482](https://github.com/christopherqueenconsulting/linkedin_engagement_manager/issues/2482)) ([afb62ff](https://github.com/christopherqueenconsulting/linkedin_engagement_manager/commit/afb62ffbaf5df06934b214801d27f38a6dafca31))
+* **newsletter:** log what the article page shows when Publish is not found ([#2483](https://github.com/christopherqueenconsulting/linkedin_engagement_manager/issues/2483)) ([ec3ee43](https://github.com/christopherqueenconsulting/linkedin_engagement_manager/commit/ec3ee43244e018c1ea4d0d07eaf116793d58db81))
+* **newsletter:** open the publish screen after a cover attaches; never republish a live edition ([#2485](https://github.com/christopherqueenconsulting/linkedin_engagement_manager/issues/2485)) ([ca38660](https://github.com/christopherqueenconsulting/linkedin_engagement_manager/commit/ca3866012bf694a11efc8d705342c3e6d637e4c5))
+* **newsletter:** resolve Publish inside the publish dialog, by exact label only ([#2486](https://github.com/christopherqueenconsulting/linkedin_engagement_manager/issues/2486)) ([bb8a40b](https://github.com/christopherqueenconsulting/linkedin_engagement_manager/commit/bb8a40b5a524be3841a60554fc29ce713b3b0427))
+
 ## [0.199.1](https://github.com/christopherqueenconsulting/linkedin_engagement_manager/compare/v0.199.0...v0.199.1) (2026-10-20)
 
 
