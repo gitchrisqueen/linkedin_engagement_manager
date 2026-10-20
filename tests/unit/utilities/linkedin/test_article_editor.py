@@ -606,9 +606,38 @@ class TestFillArticleEditor:
             return None
 
         monkeypatch.setattr(ae, "find_first", fake_find_first)
+        logged = []
+        monkeypatch.setattr(ae, "log_info", lambda msg, **kw: logged.append((msg, kw)))
         url, failed = ae.fill_article_editor(driver, wait, "title", "body")
         assert url is None
         assert failed == ae.STEP_PUBLISH
+        # The miss records what the page offered instead, so the next failure is fixable from the log.
+        evidence = [(msg, kw) for msg, kw in logged if msg.startswith("Article publish screen at the miss: ")]
+        assert len(evidence) == 1 and evidence[0][1]["step"] == ae.STEP_PUBLISH
+
+    def test_publish_miss_evidence_survives_a_failing_script(self, monkeypatch):
+        """A scan that throws still logs once, with the error class, and never raises."""
+        driver = MagicMock()
+        driver.execute_script.side_effect = WebDriverException("gone")
+        logged = []
+        monkeypatch.setattr(ae, "log_info", lambda msg, **kw: logged.append((msg, kw)))
+
+        ae._log_publish_miss_evidence(driver, user_id=1)
+
+        assert logged == [('Article publish screen at the miss: {"scan_error": "WebDriverException"}',
+                           {"user_id": 1, "action_type": "article_editor", "step": ae.STEP_PUBLISH})]
+
+    def test_publish_miss_evidence_names_the_visible_controls(self, monkeypatch):
+        driver = MagicMock()
+        driver.execute_script.return_value = {"path": "/article/edit/1/", "buttons": ["Next", "Done"],
+                                              "dialogs": ["Edit image"]}
+        logged = []
+        monkeypatch.setattr(ae, "log_info", lambda msg, **kw: logged.append(msg))
+
+        ae._log_publish_miss_evidence(driver)
+
+        assert logged == ['Article publish screen at the miss: {"path": "/article/edit/1/", '
+                          '"buttons": ["Next", "Done"], "dialogs": ["Edit image"]}']
 
     def test_returns_publish_when_publish_click_fails(self, monkeypatch):
         title = FakeElement(tag="textarea", attrs={"placeholder": "Title"})

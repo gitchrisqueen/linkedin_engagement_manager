@@ -22,6 +22,7 @@ No class names are keyed on. Use `resolve_article_editor_step(...)` directly, or
 `find_article_editor_elements(driver, wait)` to resolve all four fields/buttons at once.
 """
 
+import json
 import os
 import time
 from dataclasses import dataclass
@@ -239,6 +240,47 @@ def _press_escape(driver: WebDriver) -> None:
     except Exception as e:  # noqa: BLE001 - best-effort; the caller re-checks Next either way
         log_debug("Escape after cover upload failed", error=str(e)[:200],
                   action_type="article_editor", step=STEP_COVER)
+
+
+# What the page shows when Publish cannot be found after Next: the visible buttons by their own
+# label, and any open dialog by its label or heading. Edition 17 (2026-10-20) attached its cover,
+# clicked Next, then missed Publish, and nothing recorded what was on screen instead (#2482 follow-up).
+_PUBLISH_MISS_SCAN_JS = r"""
+const vis = el => !!(el.offsetWidth || el.offsetHeight || (el.getClientRects && el.getClientRects().length));
+const label = el => ((el.getAttribute('aria-label') || '') + ' ' + (el.innerText || el.textContent || ''))
+  .trim().replace(/\s+/g, ' ').slice(0, 60);
+const buttons = [];
+for (const b of document.querySelectorAll('button, [role="button"]')) {
+  if (!vis(b)) continue;
+  const t = label(b);
+  if (t && !buttons.includes(t)) buttons.push(t);
+  if (buttons.length >= 25) break;
+}
+const dialogs = [];
+for (const d of document.querySelectorAll('[role="dialog"], [role="alertdialog"], dialog[open]')) {
+  if (!vis(d)) continue;
+  const h = d.querySelector('h1, h2, h3');
+  dialogs.push(((d.getAttribute('aria-label') || '') + ' ' + (h ? h.innerText : '')).trim().slice(0, 80));
+}
+return {path: location.pathname.slice(0, 80), buttons: buttons, dialogs: dialogs.slice(0, 5)};
+"""
+
+
+def _log_publish_miss_evidence(driver: WebDriver, user_id: Optional[int] = None) -> None:
+    """Record what was on screen when Publish could not be found, best-effort.
+
+    INFO, not a warning: the miss itself already warned where it was detected
+    (`resolve_article_editor_step`). This line only says what the page offered instead, so the
+    next failure can be fixed from the log rather than by a live run. The evidence goes in the
+    message: the file log keeps only the fixed context keys, and prod forwards nothing below
+    WARNING to PostHog.
+    """
+    try:
+        evidence = driver.execute_script(_PUBLISH_MISS_SCAN_JS) or {}
+    except (WebDriverException, StaleElementReferenceException) as e:
+        evidence = {"scan_error": f"{type(e).__name__}"}
+    log_info(f"Article publish screen at the miss: {json.dumps(evidence, default=str)[:1500]}",
+             user_id=user_id, action_type="article_editor", step=STEP_PUBLISH)
 
 
 class StepVerdict(str, Enum):
@@ -686,6 +728,7 @@ def fill_article_editor(
     publish_step = resolve_article_editor_step(driver, wait, STEP_PUBLISH, _PUBLISH_LOCATORS,
                                              user_id=user_id)
     if not publish_step.ok:
+        _log_publish_miss_evidence(driver, user_id=user_id)
         return None, STEP_PUBLISH
 
     if not _click_safely(driver, publish_step.element):
