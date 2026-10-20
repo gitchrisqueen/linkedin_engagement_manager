@@ -423,3 +423,180 @@ class TestHealthDeepLinkedInSession:
         body = json.dumps(out)
         assert "4242" not in body and "example.com" not in body and "2026-10-09" not in body
         assert out["session_checked"] == 1
+
+
+class TestCeleryReadIsShortAndReused:
+    """2026-10-20: once the edge stopped caching it, every request waited the full 10 s inspect."""
+
+    def _insp(self):
+        insp = MagicMock()
+        insp.active_queues.return_value = {"w1": [{"name": "celery"}]}
+        return insp
+
+    def test_the_deep_check_uses_its_own_short_inspect_timeout(self):
+        import cqc_lem.api.main as m
+        insp = self._insp()
+        with patch("cqc_lem.utilities.maintenance._inspect", return_value=insp) as inspect:
+            assert m._health_active_queues() == {"w1": [{"name": "celery"}]}
+        inspect.assert_called_once_with(timeout=m._HEALTH_INSPECT_TIMEOUT_SECONDS)
+        assert m._HEALTH_INSPECT_TIMEOUT_SECONDS < 10
+
+    def test_a_successful_read_is_reused_within_the_window(self):
+        import cqc_lem.api.main as m
+        insp = self._insp()
+        with patch("cqc_lem.utilities.maintenance._inspect", return_value=insp) as inspect:
+            m._health_active_queues()
+            m._health_active_queues()
+        assert inspect.call_count == 1
+
+    def test_the_read_is_repeated_after_the_window(self, monkeypatch):
+        import cqc_lem.api.main as m
+        insp = self._insp()
+        later = 100.0 + m._HEALTH_QUEUES_CACHE_SECONDS + 1
+        clock = iter([100.0, 100.0, later, later])  # each miss reads the clock twice
+        monkeypatch.setattr(m.time, "monotonic", lambda: next(clock))
+        with patch("cqc_lem.utilities.maintenance._inspect", return_value=insp) as inspect:
+            m._health_active_queues()
+            m._health_active_queues()
+        assert inspect.call_count == 2
+
+    def test_a_failed_read_is_cached_for_the_window(self):
+        """A broker fault costs one attempt per window; every caller in it still reads `unknown`."""
+        import cqc_lem.api.main as m
+        with patch("cqc_lem.utilities.maintenance._inspect", side_effect=RuntimeError("down")) as inspect:
+            for _ in range(3):
+                with pytest.raises(RuntimeError):
+                    m._health_active_queues()
+        assert inspect.call_count == 1
+
+    def test_a_failure_does_not_outlive_its_window(self, monkeypatch):
+        import cqc_lem.api.main as m
+        later = 100.0 + m._HEALTH_QUEUES_CACHE_SECONDS + 1
+        clock = iter([100.0, 100.0, later, later])
+        monkeypatch.setattr(m.time, "monotonic", lambda: next(clock))
+        with patch("cqc_lem.utilities.maintenance._inspect", side_effect=[RuntimeError("down"), self._insp()]):
+            with pytest.raises(RuntimeError):
+                m._health_active_queues()
+            assert m._health_active_queues() == {"w1": [{"name": "celery"}]}
+
+    def test_the_endpoint_reads_unknown_while_a_failure_is_cached(self):
+        import cqc_lem.api.main as m
+        with patch("cqc_lem.utilities.maintenance._inspect", side_effect=RuntimeError("down")):
+            assert m.health_check_deep()["status"] == "unknown"
+            assert m.health_check_deep()["status"] == "unknown"
+
+    def test_concurrent_failures_share_one_attempt(self):
+        import threading
+        import time as _time
+
+        import cqc_lem.api.main as m
+        insp = self._insp()
+
+        def failing():
+            _time.sleep(0.2)
+            raise RuntimeError("broker down")
+
+        insp.active_queues.side_effect = failing
+        errors = []
+
+        def call():
+            try:
+                m._health_active_queues()
+            except RuntimeError as e:
+                errors.append(e)
+
+        with patch("cqc_lem.utilities.maintenance._inspect", return_value=insp) as inspect:
+            threads = [threading.Thread(target=call) for _ in range(6)]
+            for t in threads:
+                t.start()
+            for t in threads:
+                t.join()
+        assert inspect.call_count == 1 and len(errors) == 6
+
+    def test_with_the_cache_off_reads_run_in_parallel(self, monkeypatch):
+        """The rollback (cache 0) restores the old behaviour: no lock, one broadcast per request."""
+        import threading
+        import time as _time
+
+        import cqc_lem.api.main as m
+        monkeypatch.setattr(m, "_HEALTH_QUEUES_CACHE_SECONDS", 0.0)
+        insp = self._insp()
+
+        def slow():
+            _time.sleep(0.2)
+            return {"w1": [{"name": "celery"}]}
+
+        insp.active_queues.side_effect = slow
+        with patch("cqc_lem.utilities.maintenance._inspect", return_value=insp) as inspect:
+            threads = [threading.Thread(target=m._health_active_queues) for _ in range(3)]
+            started = _time.monotonic()
+            for t in threads:
+                t.start()
+            for t in threads:
+                t.join()
+            elapsed = _time.monotonic() - started
+        assert inspect.call_count == 3 and elapsed < 0.5
+
+    def test_concurrent_misses_share_one_broadcast(self):
+        """A burst against an expired cache waits on one lock and sends one broadcast."""
+        import threading
+        import time as _time
+
+        import cqc_lem.api.main as m
+        insp = self._insp()
+
+        def slow_queues():
+            _time.sleep(0.2)
+            return {"w1": [{"name": "celery"}]}
+
+        insp.active_queues.side_effect = slow_queues
+        with patch("cqc_lem.utilities.maintenance._inspect", return_value=insp) as inspect:
+            threads = [threading.Thread(target=m._health_active_queues) for _ in range(6)]
+            for t in threads:
+                t.start()
+            for t in threads:
+                t.join()
+        assert inspect.call_count == 1
+
+    @pytest.mark.parametrize("raw,expected", [("abc", 2.0), ("2s", 2.0), ("nan", 2.0), ("inf", 2.0),
+                                              ("0", 0.5), ("-3", 0.5), ("99", 10.0), ("1.5", 1.5)])
+    def test_a_bad_timeout_value_falls_back_or_clamps(self, monkeypatch, raw, expected):
+        import cqc_lem.api.main as m
+        monkeypatch.setenv("HEALTH_DEEP_INSPECT_TIMEOUT", raw)
+        assert m._health_env_seconds("HEALTH_DEEP_INSPECT_TIMEOUT", 2.0, 0.5, 10.0) == expected
+
+    def test_a_rejected_value_warns_once_with_the_name_only(self, monkeypatch):
+        import cqc_lem.api.main as m
+        monkeypatch.setenv("HEALTH_DEEP_INSPECT_TIMEOUT", "abc")
+        with patch.object(m, "log_warning") as warn:
+            assert m._health_env_seconds("HEALTH_DEEP_INSPECT_TIMEOUT", 2.0, 0.5, 10.0) == 2.0
+        warn.assert_called_once()
+        assert "HEALTH_DEEP_INSPECT_TIMEOUT" in warn.call_args.args[0] and "abc" not in warn.call_args.args[0]
+
+    def test_a_cached_failure_is_a_fresh_exception_each_time(self):
+        """Re-raising one stored instance would grow its traceback on every request."""
+        import traceback
+
+        import cqc_lem.api.main as m
+        caught = []
+        with patch("cqc_lem.utilities.maintenance._inspect", side_effect=RuntimeError("down")):
+            for _ in range(3):
+                try:
+                    m._health_active_queues()
+                except RuntimeError as e:
+                    caught.append(e)
+        assert len(caught) == 3
+        assert caught[1] is not caught[2] and caught[0] is not caught[1]
+        assert len(traceback.extract_tb(caught[1].__traceback__)) == len(
+            traceback.extract_tb(caught[2].__traceback__))
+
+    def test_one_warning_per_failed_window(self):
+        """Every request in the window reads `unknown`; only the one that broadcast warns."""
+        import cqc_lem.api.main as m
+        with patch("cqc_lem.utilities.maintenance._inspect", side_effect=RuntimeError("down")), \
+             patch.object(m, "log_warning") as warn:
+            statuses = [m.health_check_deep()["status"] for _ in range(5)]
+        assert statuses == ["unknown"] * 5
+        celery_warnings = [c for c in warn.call_args_list
+                           if "Celery control channel" in c.args[0]]
+        assert len(celery_warnings) == 1

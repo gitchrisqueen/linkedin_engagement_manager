@@ -13,8 +13,10 @@ comment above `_API_ACCESS_TOKEN_SET`. Authorisation happens in the handler, whi
 
 import io
 import json
+import math
 import os
 import re
+import threading
 import time
 import zipfile
 from contextvars import ContextVar
@@ -1438,6 +1440,70 @@ def health_check():
     return {"status": "healthy"}
 
 
+# The deep check's own Celery read. A broadcast `inspect()` waits its whole timeout for replies, so
+# the maintenance default (10 s) made every `/health/deep` take ~10 s once the edge stopped caching
+# it (2026-10-20, measured in the API container: inspect 10 s, everything else under 0.1 s). All five
+# workers answered a 1 s broadcast in the same measurement, and the status degrades only when NO
+# worker consumes, so a shorter wait drops a worker from the counts only if it cannot answer within
+# it. Each API process keeps the last read for `HEALTH_DEEP_CACHE_SECONDS`, whatever it was: replies
+# (an empty reply reads `degraded`) or a failure (re-raised, so it reads `unknown`). Requests that
+# miss the cache together wait on one lock for one broadcast, so a burst or a broker fault costs at
+# most one attempt per window. With the cache at 0 there is no lock either: every request makes its
+# own broadcast, in parallel, as before.
+def _health_env_seconds(name: str, default: float, low: float, high: float) -> float:
+    """A finite number of seconds from the env, clamped; a malformed value falls back to the default."""
+    raw = os.getenv(name)
+    if raw is None:
+        return default
+    try:
+        value = float(raw)
+    except ValueError:
+        value = float("nan")
+    if not math.isfinite(value):
+        log_warning(f"{name} is not a number of seconds; using the default", task_name="health_deep")
+        return default
+    return min(max(value, low), high)
+
+
+_HEALTH_INSPECT_TIMEOUT_SECONDS = _health_env_seconds("HEALTH_DEEP_INSPECT_TIMEOUT", 2.0, 0.5, 10.0)
+_HEALTH_QUEUES_CACHE_SECONDS = _health_env_seconds("HEALTH_DEEP_CACHE_SECONDS", 5.0, 0.0, 60.0)
+_health_queues_cache: dict = {"at": 0.0, "replies": None, "error": None}
+_health_queues_lock = threading.Lock()
+
+
+class _HealthReadCachedFailure(RuntimeError):
+    """A failed Celery read being reused within its window: a fresh exception per caller.
+
+    Re-raising the stored exception would grow its traceback by a frame pair on every request and
+    log it again each time; the request that made the failed broadcast has already logged it.
+    """
+
+
+def _read_active_queues() -> dict:
+    from cqc_lem.utilities.maintenance import _inspect
+    return _inspect(timeout=_HEALTH_INSPECT_TIMEOUT_SECONDS).active_queues() or {}
+
+
+def _health_active_queues() -> dict:
+    """`active_queues()` for the deep check: one short broadcast per window, failure included."""
+    if _HEALTH_QUEUES_CACHE_SECONDS <= 0:
+        return _read_active_queues()
+    with _health_queues_lock:
+        cached = _health_queues_cache
+        if time.monotonic() - cached["at"] < _HEALTH_QUEUES_CACHE_SECONDS:
+            if cached["error"] is not None:
+                raise _HealthReadCachedFailure(cached["error"])
+            if cached["replies"] is not None:
+                return cached["replies"]
+        try:
+            replies = _read_active_queues()
+        except Exception as e:
+            cached.update(at=time.monotonic(), replies=None, error=type(e).__name__)
+            raise
+        cached.update(at=time.monotonic(), replies=replies, error=None)
+        return replies
+
+
 @app.get("/health/deep")
 def health_check_deep():
     """Readiness of the things `/health` deliberately ignores — for external monitors.
@@ -1465,10 +1531,9 @@ def health_check_deep():
     consuming = 0
     maintenance = None
     try:
-        from cqc_lem.utilities.maintenance import _inspect
         # active_queues() reaches every worker over the broker's control channel, so a lane whose
         # container was never started simply isn't in the reply — which is the signal we want.
-        replies = _inspect().active_queues() or {}
+        replies = _health_active_queues()
         for worker, queues in replies.items():
             lanes[worker] = sorted(q.get("name", "?") for q in (queues or []))
         consuming = sum(1 for names in lanes.values() if names)
@@ -1476,6 +1541,10 @@ def health_check_deep():
             # Covers BOTH "no workers answered" and "workers answered but consume nothing".
             # They are the same outage from a monitor's point of view: no task will run.
             status = "degraded"
+    except _HealthReadCachedFailure as e:
+        # The request that made the failed broadcast already warned; one WARNING per window.
+        log_debug(f"Deep health check reusing a failed Celery read ({e})")
+        status = "unknown"
     except Exception as e:
         log_warning("Deep health check could not reach the Celery control channel", exc=e)
         status = "unknown"             # unmeasured is never "healthy"

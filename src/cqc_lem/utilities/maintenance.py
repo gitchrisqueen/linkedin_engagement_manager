@@ -72,8 +72,8 @@ def _control() -> Any:
     return app.control
 
 
-def _inspect() -> Any:
-    return _control().inspect(timeout=INSPECT_TIMEOUT_SECONDS)
+def _inspect(timeout: Optional[float] = None) -> Any:
+    return _control().inspect(timeout=INSPECT_TIMEOUT_SECONDS if timeout is None else timeout)
 
 
 def maintenance_remaining() -> int:
