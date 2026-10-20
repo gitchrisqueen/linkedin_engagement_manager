@@ -494,3 +494,101 @@ which looks exactly like "LinkedIn changed the DOM again".
 `STEP_COVER` is deliberately **not** in `EDITOR_SCREEN_STEPS` / `ALL_STEPS`: the cover is optional,
 so grading it would report `MISSING` on every cover-less publish. A cover that will not attach is a
 warning and never a `failed_step` — an edition without its cover is still a published edition.
+
+### After the cover: the publish screen must actually open (edition 17, 2026-10-20)
+
+Edition 17 was the first live run of the cover fix. The cover attached (`Article cover attached`,
+13:07:46Z), Next took its click, and then neither the edition description nor Publish resolved
+(`Selector miss: Article editor article_publish`, 13:08:35Z). The edition was marked `failed`. The
+run saved no picture of the screen. The reading that fits every line: the click after the upload
+landed on the image dialog rather than moving the editor on, so the publish screen never opened.
+
+Two changes follow, both judged by the outcome rather than by a click having landed:
+
+- `_confirm_cover_dialog` also advances an image dialog through its own **Next**, matched only
+  inside `role='dialog'`. A page-level Next is the editor's own control and is never matched there.
+  A second pass, again inside a dialog only, covers a two-step dialog (adjust, then confirm).
+- With a cover attached, `fill_article_editor` checks for an enabled Publish after Next. If none is
+  on screen, it logs `Publish screen not open after Next with a cover attached; pressing Escape and
+  Next once more`, presses Escape and the editor's Next once more, and only then judges Publish.
+
+If Publish is still missing, `Article publish screen at the miss (user N): {...}` (#2483) records
+the open dialogs with their own buttons, the disabled controls and the routes tried. Fix the
+locator from that line.
+
+### A republished edition never goes out twice
+
+An edition reset to `approved` after a failed run goes through `auto_publish_edition` again. Most
+failures return before the Publish click, so nothing went out. Three windows can leave a live
+article that the row does not record as published:
+- a Publish click that raised after it registered (the step reports `article_publish`);
+- an exception after the click (the edition is marked `failed`);
+- a publish whose `mark_edition_published` write failed. That one now logs `Published newsletter
+  edition N but could not record it` at ERROR, and the row stays `approved`.
+
+`_edition_already_public` is the automated check for all three. Before any browser opens, it reads
+the newest published edition's page logged out and compares each `/pulse/` slug in its "more
+articles" list with the edition's title. It uses the first four words on both sides, without the
+words LinkedIn drops from slugs (`_SLUG_STOPWORDS`), and requires the same author token as that
+page's own slug. On a match, the edition is recorded as published with that URL and no browser
+opens. A page that is not a LinkedIn article, not a 200, or not listing its own link counts as
+unreadable, and the publish goes ahead. Every run that fetches the page logs one INFO line
+starting `Newsletter republish guard`. A title under four words, no published edition yet, or a
+newest-edition URL that is not `https://www.linkedin.com/pulse/...` skips the fetch and logs
+nothing. The fetch lines are: `matched a live article`, `read N article links, no match; publishing`, or
+`could not read the article list (http S); publishing`.
+
+Checked on 2026-10-20:
+- every published or failed edition's title against the 11 links on edition 16's live page: all
+  10 published editions (1-8, 15, 16) match their own article, the 11th link is an article LEM did
+  not publish, and none of the 7 failed editions (9-14, 17) matches (PR #2485 has the table);
+- live from the VPS, a logged-out fetch of edition 16's page read 11 article links and matched
+  "Spot the Leak in Your LinkedIn AI Budget".
+
+#### Republishing a failed edition (edition 17, ruling 139)
+
+Run as root on the box, in this order:
+
+1. **Gate.** The fix must be live first: the edition's slot is past, so the next hourly run (`:05`)
+   dispatches it as soon as it reads `approved`. `curl -s https://lem.christopherqueenconsulting.com/api/app-info`
+   must report a version that `git tag --contains <this PR's merge commit>` lists.
+2. **Check it is not already live.** Open your LinkedIn articles list and confirm the title is
+   not there. The guard repeats this check, but the reset is yours.
+3. **Reset.** This prints the row first, which is the record to restore from, and changes nothing
+   unless the edition is still `failed` with no URL:
+
+   ```bash
+   sudo docker exec -i celery_worker python -c "from cqc_lem.utilities.db import get_newsletter_edition as g, update_newsletter_edition as u; e=g(17); print(e['status'], e['published_url'], e['scheduled_for']); assert e['user_id']==1 and e['status']=='failed' and not e['published_url']; u(17, 1, status='approved'); print('now', g(17)['status'])"
+   ```
+
+4. **Stop before the task starts** (the next `:05`) if you change your mind. A run already under
+   way re-reads the row only at its start. This sets it back while it is still unpublished:
+
+   ```bash
+   sudo docker exec -i celery_worker python -c "from cqc_lem.utilities.db import get_newsletter_edition as g, update_newsletter_edition as u; e=g(17); assert e['status']=='approved' and not e['published_url']; u(17, 1, status='failed'); print('now', g(17)['status'])"
+   ```
+
+5. **Read the outcome** in `/opt/lem/logs/cqc_lem_YYYY_MM_DD.log` after `:05`:
+   - `Newsletter republish guard ...`: what the guard read;
+   - `Newsletter edition 17 is already live on LinkedIn; recorded it instead of publishing again`:
+     the guard found it live and recorded its URL, so nothing was published;
+   - `Publish screen not open after Next with a cover attached`: the second Next fired;
+   - `Published newsletter edition 17 for user 1`: done; the row now holds the URL;
+   - `Published newsletter edition 17 but could not record it` (ERROR): it is live, but the row is
+     still `approved`, and the next `:05` dispatches it again. Run step 4's stop now, then record
+     the URL with step 6;
+   - nothing at `:05`: the run was held, not failed. A 429 or pause skips it, and a rate-limit
+     skip logs only at DEBUG. The row stays `approved` and is retried the next hour;
+   - `Article publish screen at the miss` and `Newsletter edition publish flow did not complete`:
+     failed again. The row is `failed`, with no automatic retry. Fix the locator from the miss
+     line before resetting again.
+6. **Undo a duplicate**, if one ever goes out: delete the extra article on LinkedIn by hand, then
+   record the surviving one:
+
+   ```bash
+   sudo docker exec -i celery_worker python -c "from cqc_lem.utilities.db import mark_edition_published as m; print(m(17, '<surviving /pulse/ URL>'))"
+   ```
+
+**Code rollback:** redeploy the previous release with the owner deploy path in
+`docs/DEPLOYMENT.md` (`scripts/deploy.sh <previous tag>`). Do that only with edition 17 not
+`approved`; the old code has neither the second Next nor the guard.

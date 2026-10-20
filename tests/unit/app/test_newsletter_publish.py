@@ -1012,3 +1012,85 @@ class TestPendingCoverReminderBeat:
         assert entry["schedule"].minute == {30}
         drafts = app.conf.beat_schedule["generate-newsletter-drafts"]
         assert drafts["schedule"].hour == {10} and drafts["schedule"].minute == {0}
+
+
+class TestEditionAlreadyPublic:
+    """A republished edition must not put a second copy out (edition 17, 2026-10-20)."""
+
+    _OWN = "https://www.linkedin.com/pulse/30k-we-nearly-squandered-ai-content-christopher-queen-uztme/"
+    _PAGE = ('<a href="https://www.linkedin.com/pulse/30k-we-nearly-squandered-ai-content-christopher-queen-uztme?x">'
+             '<a href="https://www.linkedin.com/pulse/teardown-why-viral-ai-carousel-got-zero-leads-christopher-queen-huwmc">'
+             '<a href="https://www.linkedin.com/pulse/your-ai-content-still-wrong-someone-else-ab12c">')
+
+    def _guard(self, title, page=_PAGE, latest=_OWN, get_exc=None, status=200):
+        from cqc_lem.app.engagement.newsletter import _edition_already_public
+        resp = MagicMock(text=page, status_code=status)
+        logged = []
+        with patch(f"{_NL}.get_latest_published_newsletter_edition_url", return_value=latest), \
+             patch(f"{_NL}.log_info", side_effect=lambda msg, **kw: logged.append(msg)), \
+             patch("requests.get", side_effect=get_exc, return_value=resp) as get:
+            return _edition_already_public(1, title), get, logged
+
+    def test_a_live_article_with_the_same_title_is_found(self):
+        url, _, logged = self._guard("The $30K We Nearly Squandered on AI Content")
+        assert url == self._OWN.rstrip("/") + "/"
+        assert logged[0].startswith("Newsletter republish guard matched a live article")
+
+    def test_linkedins_dropped_words_still_match(self):
+        """LinkedIn drops "This" from the slug; the title keeps it."""
+        url, _, _ = self._guard("Teardown: Why This Viral AI Carousel Got Zero Leads")
+        assert url and "teardown-why-viral-ai-carousel" in url
+
+    def test_an_unpublished_title_is_not_found_and_says_so(self):
+        url, _, logged = self._guard("Your AI content still lies, even with web search")
+        assert url is None
+        assert logged == ["Newsletter republish guard read 3 article links, no match; publishing"]
+
+    def test_another_authors_article_never_matches(self):
+        """Same first four words, different author token: not ours, so not a duplicate."""
+        url, _, _ = self._guard("Your AI content still wrong")
+        assert url is None
+
+    def test_a_blocked_or_empty_page_is_unreadable_and_logged(self):
+        for kwargs in ({"status": 999}, {"page": "<html>sign in</html>"},
+                       {"get_exc": OSError("timeout")}):
+            url, _, logged = self._guard("The $30K We Nearly Squandered on AI Content", **kwargs)
+            assert url is None
+            assert len(logged) == 1 and logged[0].startswith(
+                "Newsletter republish guard could not read the article list")
+
+    def test_no_published_edition_short_titles_and_foreign_hosts_skip_the_fetch(self):
+        for title, latest in (("The $30K We Nearly Squandered on AI Content", None),
+                              ("Short title", self._OWN),
+                              ("The $30K We Nearly Squandered on AI Content", "https://evil.example/pulse/x-y-z/")):
+            url, get, _ = self._guard(title, latest=latest)
+            assert url is None and not get.called
+
+    def test_auto_publish_records_a_live_edition_instead_of_publishing_again(self):
+        from cqc_lem.app.engagement.newsletter import auto_publish_edition
+        edition = {"id": 17, "user_id": 1, "status": "approved", "title": "Your AI content still lies"}
+        live = "https://www.linkedin.com/pulse/your-ai-content-still-lies-christopher-queen-abc1/"
+        with patch(f"{_NL}.get_newsletter_edition", return_value=edition), \
+             patch(f"{_NL}._edition_already_public", return_value=live), \
+             patch(f"{_NL}.mark_edition_published") as mark, \
+             patch(f"{_NL}.get_current_profile") as gp:
+            result = auto_publish_edition.run(edition_id=17)
+        mark.assert_called_once_with(17, live)
+        gp.assert_not_called()                       # no browser, no second article
+        assert "already published" in result
+
+    def test_a_publish_that_cannot_be_recorded_is_never_marked_failed(self):
+        """Live on LinkedIn but the write failed: an error, and never `failed` (it IS published)."""
+        from cqc_lem.app.engagement.newsletter import auto_publish_edition
+        edition = {"id": 9, "user_id": 1, "status": "approved", "title": "T", "subtitle": None, "body": "B"}
+        with patch(f"{_NL}.get_newsletter_edition", return_value=edition), \
+             patch(f"{_NL}.get_current_profile", return_value=(MagicMock(), MagicMock(), "e", MagicMock())), \
+             patch(f"{_NL}._fill_and_publish_article", return_value=("https://x/pulse/t", None)), \
+             patch(f"{_NL}.mark_edition_published", return_value=False), \
+             patch(f"{_NL}.mark_edition_failed") as failed, \
+             patch(f"{_NL}.log_error") as err, \
+             patch(f"{_NL}.quit_gracefully"), \
+             pytest.raises(LaneTaskFailed):
+            auto_publish_edition.run(edition_id=9)
+        failed.assert_not_called()
+        assert err.call_args.args[0] == "Published newsletter edition 9 but could not record it"

@@ -1196,6 +1196,30 @@ class TestAttachArticleCover:
         assert ae.attach_article_cover(driver, MagicMock(), str(image)) is True
         assert apply_btn.clicked == 1
 
+    def test_a_dialog_scoped_next_advances_the_image_dialog(self, monkeypatch, tmp_path):
+        """An image dialog that advances with its own Next is confirmed through it (edition 17)."""
+        image = tmp_path / "cover.png"
+        image.write_bytes(b"png")
+        file_input = FakeElement(tag="input", attrs={"type": "file", "accept": "image/*"})
+        dialog_next = FakeElement(tag="button", text="Next")
+        driver = FakeDriver({
+            (By.CSS_SELECTOR, "input[type='file']"): [file_input],
+            (By.XPATH, "//*[@role='dialog']//button[normalize-space()='Next']"): [dialog_next],
+        })
+        monkeypatch.setattr(ae.time, "sleep", lambda s: None)
+        monkeypatch.setattr(ae, "find_first", self._find_first(driver))
+        assert ae.attach_article_cover(driver, MagicMock(), str(image)) is True
+        # Once by the first pass, once more by the dialog-only pass while the dialog stays open.
+        assert dialog_next.clicked == 2
+
+    def test_the_second_pass_never_presses_a_page_level_control(self, monkeypatch):
+        """A page-level Save/Done/Apply that outlives the dialog is pressed once, never twice."""
+        save = FakeElement(tag="button", text="Save")
+        driver = FakeDriver({(By.XPATH, "//button[normalize-space()='Save']"): [save]})
+        monkeypatch.setattr(ae, "find_first", self._find_first(driver))
+        assert ae._confirm_cover_dialog(driver, MagicMock(), dialog_only=True) is False
+        assert save.clicked == 0
+
 
 class TestFillArticleEditorCover:
     def _dom(self, extra=None):
@@ -1274,6 +1298,46 @@ class TestFillArticleEditorCover:
         assert failed is None and url == driver.current_url
         assert escapes == [driver]
         assert nxt.clicked == 1 and publish.clicked == 1
+
+    def test_next_that_leaves_the_editor_open_is_pressed_once_more(self, monkeypatch, tmp_path):
+        """Edition 17's shape: Next took the click, but the publish screen never opened.
+
+        The outcome decides, not the click: with a cover attached and no Publish on screen, the
+        flow presses Escape and the editor's Next once more, then publishes.
+        """
+        image = tmp_path / "cover.png"
+        image.write_bytes(b"png")
+        dom, _title, _body, nxt, publish = self._dom()
+        publish_routes = dom.pop((By.XPATH, "//button[normalize-space()='Publish']"))
+        driver = FakeDriver(dom)
+        self._wire(monkeypatch, driver)
+        monkeypatch.setattr(ae, "attach_article_cover", lambda *a, **k: True)
+        escapes = []
+        monkeypatch.setattr(ae, "_press_escape", lambda d: escapes.append(d))
+        logged = []
+        monkeypatch.setattr(ae, "log_info", lambda msg, **kw: logged.append(msg))
+        original_click = nxt.click
+
+        def click_next():
+            original_click()
+            if nxt.clicked == 2:  # only the second press opens the publish screen
+                driver.dom[(By.XPATH, "//button[normalize-space()='Publish']")] = publish_routes
+
+        nxt.click = click_next
+        url, failed = ae.fill_article_editor(driver, MagicMock(), "T", "B",
+                                             cover_image_path=str(image))
+        assert failed is None and url == driver.current_url
+        assert escapes == [driver] and nxt.clicked == 2 and publish.clicked == 1
+        assert any(m.startswith("Publish screen not open after Next") for m in logged)
+
+    def test_no_cover_never_presses_next_twice(self, monkeypatch):
+        """Without a cover the old path stands: a missing Publish is reported, not retried."""
+        dom, _title, _body, nxt, _publish = self._dom()
+        dom.pop((By.XPATH, "//button[normalize-space()='Publish']"))
+        driver = FakeDriver(dom)
+        self._wire(monkeypatch, driver)
+        url, failed = ae.fill_article_editor(driver, MagicMock(), "T", "B")
+        assert (url, failed) == (None, ae.STEP_PUBLISH) and nxt.clicked == 1
 
     def test_a_blocked_next_without_an_attached_cover_is_not_retried(self, monkeypatch, tmp_path):
         image = tmp_path / "cover.png"

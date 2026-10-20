@@ -592,20 +592,36 @@ def _click_safely(driver: WebDriver, element: WebElement) -> bool:
 
 
 def _confirm_cover_dialog(driver: WebDriver, wait: WebDriverWait,
-                          user_id: Optional[int] = None) -> bool:
+                          user_id: Optional[int] = None, dialog_only: bool = False) -> bool:
     """Best-effort: some editor variants open a crop/preview overlay after a cover is chosen, and
     the article cannot be published while it is up. Click its confirm button when one is there.
 
     A miss is DEBUG, not a warning: on the variants that attach the cover straight away there IS no
     dialog, and warning would file a defect for the working path.
+
+    The last two routes are scoped to an open dialog. An image dialog can advance with its own
+    "Next", and the editor's Next resolved after the upload may be that one rather than the
+    editor's (edition 17, 2026-10-20: the cover attached, Next "clicked", and the publish screen
+    never opened). A page-level "Next" is never matched here: that is the editor's own control.
+
+    ``dialog_only`` is the second pass after a click: only a control inside a still-open dialog
+    counts, so a page-level Save or Done that outlives the dialog is never pressed twice.
     """
-    confirm = find_first(driver, wait, [
+    dialog_routes = [
+        (By.XPATH, "//*[@role='dialog']//button[normalize-space()='Apply']"),
+        (By.XPATH, "//*[@role='dialog']//button[normalize-space()='Done']"),
+        (By.XPATH, "//*[@role='dialog']//button[normalize-space()='Next']"),
+        (By.XPATH, "//*[@role='dialog']//button[.//span[normalize-space()='Next']]"),
+    ]
+    page_routes = [
         (By.XPATH, "//button[normalize-space()='Apply']"),
         (By.XPATH, "//button[normalize-space()='Save']"),
         (By.XPATH, "//button[normalize-space()='Done']"),
         (By.XPATH, "//button[.//span[normalize-space()='Apply']]"),
-    ], "Article cover confirm", required=False, max_try=1, visible_only=True,
-        warn_on_miss=False, user_id=user_id)
+    ]
+    confirm = find_first(driver, wait, dialog_routes if dialog_only else page_routes + dialog_routes[2:],
+                         "Article cover confirm", required=False, max_try=1, visible_only=True,
+                         warn_on_miss=False, user_id=user_id)
     if confirm is None:
         return False
     return _click_safely(driver, confirm)
@@ -651,7 +667,11 @@ def attach_article_cover(driver: WebDriver, wait: WebDriverWait, image_path: str
             return False
         file_input.element.send_keys(os.path.abspath(image_path))
         time.sleep(3)
-        _confirm_cover_dialog(driver, wait, user_id=user_id)
+        # An image dialog can take two steps (adjust, then confirm); the second pass only presses a
+        # control inside a dialog that is still open.
+        if _confirm_cover_dialog(driver, wait, user_id=user_id):
+            time.sleep(1)
+            _confirm_cover_dialog(driver, wait, user_id=user_id, dialog_only=True)
         log_info("Article cover attached", user_id=user_id, action_type="article_editor",
                  route=file_input.route)
         return True
@@ -659,6 +679,17 @@ def attach_article_cover(driver: WebDriver, wait: WebDriverWait, image_path: str
         log_warning("Article cover attach failed", exc=e, user_id=user_id,
                     action_type="article_editor", step=STEP_COVER)
         return False
+
+
+def _publish_screen_open(driver: WebDriver, wait: WebDriverWait,
+                         user_id: Optional[int] = None) -> bool:
+    """Whether an enabled Publish control is on screen now.
+
+    A quiet read: a miss is DEBUG here, because the caller acts on it and the Publish step itself
+    warns if it is still missing.
+    """
+    return resolve_article_editor_step(driver, wait, STEP_PUBLISH, _PUBLISH_LOCATORS,
+                                       user_id=user_id, warn_on_miss=False).ok
 
 
 def _retry_next_after_cover(driver: WebDriver, wait: WebDriverWait,
@@ -736,6 +767,17 @@ def fill_article_editor(
             cover_attached and _retry_next_after_cover(driver, wait, user_id=user_id)):
         return None, STEP_NEXT
     time.sleep(3)
+    if cover_attached and not _publish_screen_open(driver, wait, user_id=user_id):
+        # Success is the publish screen opening, not Next taking a click. After a cover upload the
+        # click can land on an image overlay and leave the editor where it was, so close whatever is
+        # open and press the editor's Next once more before the Publish step is judged.
+        log_info("Publish screen not open after Next with a cover attached; pressing Escape and "
+                 "Next once more", user_id=user_id, action_type="article_editor")
+        _press_escape(driver)
+        time.sleep(1)
+        retry = resolve_article_editor_step(driver, wait, STEP_NEXT, _NEXT_LOCATORS, user_id=user_id)
+        if retry.ok and _click_safely(driver, retry.element):
+            time.sleep(3)
 
     if fill_description_fn is not None:
         try:
