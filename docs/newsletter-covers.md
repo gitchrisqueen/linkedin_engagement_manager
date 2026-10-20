@@ -533,13 +533,15 @@ words LinkedIn drops from slugs (`_SLUG_STOPWORDS`), and requires the same autho
 page's own slug. On a match, the edition is recorded as published with that URL and no browser
 opens. A page that is not a LinkedIn article, not a 200, or not listing its own link counts as
 unreadable, and the publish goes ahead. Every run that fetches the page logs one INFO line
-starting `Newsletter republish guard`. A title under four words, or no published edition yet,
-skips the fetch and logs nothing. The fetch lines are: `matched a live article`, `read N article links, no match; publishing`, or
+starting `Newsletter republish guard`. A title under four words, no published edition yet, or a
+newest-edition URL that is not `https://www.linkedin.com/pulse/...` skips the fetch and logs
+nothing. The fetch lines are: `matched a live article`, `read N article links, no match; publishing`, or
 `could not read the article list (http S); publishing`.
 
 Checked on 2026-10-20:
-- against this account's 11 published articles, all 11 match their slugs and edition 17's title
-  does not;
+- every published or failed edition's title against the 11 links on edition 16's live page: all
+  10 published editions (1-8, 15, 16) match their own article, the 11th link is an article LEM did
+  not publish, and none of the 7 failed editions (9-14, 17) matches (PR #2485 has the table);
 - live from the VPS, a logged-out fetch of edition 16's page read 11 article links and matched
   "Spot the Leak in Your LinkedIn AI Budget".
 

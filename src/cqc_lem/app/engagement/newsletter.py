@@ -243,8 +243,10 @@ def _edition_already_public(user_id: int, title: str) -> "str | None":
     own slug (the word before LinkedIn's 4-5 character id), so another author's article on the page
     never matches. Positive evidence only: a page that is not a LinkedIn article, not a 200, or not
     listing its own link is unreadable, and like no published edition yet or a title too short to
-    compare it returns None and the publish goes ahead. Every outcome is one INFO line starting
-    "Newsletter republish guard", so the log shows whether the guard actually read the list.
+    compare it returns None and the publish goes ahead. Every run that fetches the page logs one
+    INFO line starting "Newsletter republish guard", so the log shows whether the guard actually
+    read the list; a short title, no published edition or a non-/pulse/ URL skips the fetch and
+    logs nothing.
 
     This is the only automated check on the windows where a live article is not recorded as
     published: a Publish click that raised after it registered, an exception after the click (the
