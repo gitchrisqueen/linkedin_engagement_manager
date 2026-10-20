@@ -297,9 +297,9 @@ async def api_cache_control_middleware(request: Request, call_next):
     unnoticed, and the header is only meaningful in front of a cache nothing here can see.
 
     `/health` and `/health/deep` sit outside `/api` but get the same header. The edge cached
-    `/health/deep` too: during the 2026-10-20 outage it kept serving a `degraded` reading 43
-    minutes old (`age: 2576`) after the stack had recovered. A monitor reading a cached health
-    check reports the past.
+    `/health/deep` too: after the 2026-10-20 outage it kept serving the `degraded` reading taken
+    during the deploy (`cf-cache-status: HIT`, `age: 3267` at 12:57Z, while the origin read
+    `healthy`). A monitor reading a cached health check reports the past.
     """
     response = await call_next(request)
     path = request.url.path

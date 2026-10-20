@@ -109,8 +109,8 @@ def test_non_api_route_is_left_alone(api_client):
 def test_health_checks_are_no_store(api_client, path):
     """A monitor must read the stack as it is now, never an edge copy.
 
-    The edge served a cached `/health/deep` reading `degraded` 43 minutes after the stack had
-    recovered (2026-10-20). Only the header is asserted: the deep check's body depends on a broker
+    The edge kept serving a cached `degraded` `/health/deep` after the stack had recovered
+    (2026-10-20, `age: 3267` at 12:57Z). Only the header is asserted: the deep check's body depends on a broker
     this lane does not have.
     """
     with patch("cqc_lem.utilities.maintenance._inspect", side_effect=RuntimeError("no broker")):

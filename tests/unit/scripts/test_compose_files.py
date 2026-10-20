@@ -1,7 +1,7 @@
 """The prod compose file list resolves the same way everywhere (2026-10-20 grid-orphan outage).
 
 An `up -d cloudflared` run with base + prod only treated the Selenium grid as orphans and removed
-the hub, the nine chrome nodes and the debug node. scripts/lib/compose_files.sh gives rollback.sh
+the hub, every chrome node and the debug node. scripts/lib/compose_files.sh gives rollback.sh
 and scripts/compose.sh the list deploy.sh resolves inline; these tests hold the two together.
 """
 
@@ -64,3 +64,22 @@ def test_scripts_build_their_command_from_the_lib(script):
     assert 'scripts/lib/compose_files.sh"' in src
     assert "lem_compose_cmd" in src
     assert "docker compose -f" not in src
+
+
+@pytest.mark.parametrize("before", ["OTHER=1\nIMAGE_TAG=v9.9.9\n", "OTHER=1\n"])
+def test_persist_image_tag_rewrites_or_appends(tmp_path, before):
+    """A rollback must leave .env naming the rollback tag, or a later manual `up` revives the bad one."""
+    env_file = tmp_path / ".env"
+    env_file.write_text(before)
+    subprocess.run(["bash", "-c", f'. "{LIB}"\nlem_persist_image_tag "{env_file}" v1.2.2\n'],
+                   check=True, env={"PATH": "/usr/bin:/bin"})
+
+    lines = env_file.read_text().splitlines()
+    assert [ln for ln in lines if ln.startswith("IMAGE_TAG=")] == ["IMAGE_TAG=v1.2.2"]
+    assert "OTHER=1" in lines
+
+
+def test_rollback_persists_the_tag_after_the_up():
+    src = (REPO_ROOT / "scripts" / "rollback.sh").read_text()
+
+    assert src.index("up -d --remove-orphans") < src.index('lem_persist_image_tag "${ROOT_DIR}/.env" "${TAG}"')

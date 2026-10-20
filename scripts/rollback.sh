@@ -19,5 +19,6 @@ git checkout --quiet "${TAG}" 2>/dev/null || git checkout --quiet "tags/${TAG}"
 export IMAGE_TAG="${TAG}"
 ${COMPOSE} pull
 ${COMPOSE} up -d --remove-orphans
+lem_persist_image_tag "${ROOT_DIR}/.env" "${TAG}"
 echo "${TAG}" > "${ROOT_DIR}/.last_good_tag"
 echo "[rollback] now running ${TAG}"
