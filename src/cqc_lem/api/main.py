@@ -1470,6 +1470,14 @@ _health_queues_cache: dict = {"at": 0.0, "replies": None, "error": None}
 _health_queues_lock = threading.Lock()
 
 
+class _HealthReadCachedFailure(RuntimeError):
+    """A failed Celery read being reused within its window: a fresh exception per caller.
+
+    Re-raising the stored exception would grow its traceback by a frame pair on every request and
+    log it again each time; the request that made the failed broadcast has already logged it.
+    """
+
+
 def _read_active_queues() -> dict:
     from cqc_lem.utilities.maintenance import _inspect
     return _inspect(timeout=_HEALTH_INSPECT_TIMEOUT_SECONDS).active_queues() or {}
@@ -1483,13 +1491,13 @@ def _health_active_queues() -> dict:
         cached = _health_queues_cache
         if time.monotonic() - cached["at"] < _HEALTH_QUEUES_CACHE_SECONDS:
             if cached["error"] is not None:
-                raise cached["error"]
+                raise _HealthReadCachedFailure(cached["error"])
             if cached["replies"] is not None:
                 return cached["replies"]
         try:
             replies = _read_active_queues()
         except Exception as e:
-            cached.update(at=time.monotonic(), replies=None, error=e)
+            cached.update(at=time.monotonic(), replies=None, error=type(e).__name__)
             raise
         cached.update(at=time.monotonic(), replies=replies, error=None)
         return replies
@@ -1532,6 +1540,10 @@ def health_check_deep():
             # Covers BOTH "no workers answered" and "workers answered but consume nothing".
             # They are the same outage from a monitor's point of view: no task will run.
             status = "degraded"
+    except _HealthReadCachedFailure as e:
+        # The request that made the failed broadcast already warned; one WARNING per window.
+        log_debug(f"Deep health check reusing a failed Celery read ({e})")
+        status = "unknown"
     except Exception as e:
         log_warning("Deep health check could not reach the Celery control channel", exc=e)
         status = "unknown"             # unmeasured is never "healthy"

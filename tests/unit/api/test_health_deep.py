@@ -572,3 +572,31 @@ class TestCeleryReadIsShortAndReused:
             assert m._health_env_seconds("HEALTH_DEEP_INSPECT_TIMEOUT", 2.0, 0.5, 10.0) == 2.0
         warn.assert_called_once()
         assert "HEALTH_DEEP_INSPECT_TIMEOUT" in warn.call_args.args[0] and "abc" not in warn.call_args.args[0]
+
+    def test_a_cached_failure_is_a_fresh_exception_each_time(self):
+        """Re-raising one stored instance would grow its traceback on every request."""
+        import traceback
+
+        import cqc_lem.api.main as m
+        caught = []
+        with patch("cqc_lem.utilities.maintenance._inspect", side_effect=RuntimeError("down")):
+            for _ in range(3):
+                try:
+                    m._health_active_queues()
+                except RuntimeError as e:
+                    caught.append(e)
+        assert len(caught) == 3
+        assert caught[1] is not caught[2] and caught[0] is not caught[1]
+        assert len(traceback.extract_tb(caught[1].__traceback__)) == len(
+            traceback.extract_tb(caught[2].__traceback__))
+
+    def test_one_warning_per_failed_window(self):
+        """Every request in the window reads `unknown`; only the one that broadcast warns."""
+        import cqc_lem.api.main as m
+        with patch("cqc_lem.utilities.maintenance._inspect", side_effect=RuntimeError("down")), \
+             patch.object(m, "log_warning") as warn:
+            statuses = [m.health_check_deep()["status"] for _ in range(5)]
+        assert statuses == ["unknown"] * 5
+        celery_warnings = [c for c in warn.call_args_list
+                           if "Celery control channel" in c.args[0]]
+        assert len(celery_warnings) == 1

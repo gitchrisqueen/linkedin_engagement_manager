@@ -188,7 +188,9 @@ not in the reply. A broadcast always waits its whole timeout, which is why it is
 maintenance default of 10 s every request took about 10 s (measured 2026-10-20, #2488). Whatever
 the read returned is kept for the window: replies (an empty reply reads `degraded`) or a failure
 (re-raised, so it reads `unknown`). A reading can therefore lag the stack by up to the cache window
-per process. `HEALTH_DEEP_CACHE_SECONDS=0` turns the cache and its lock off.
+per process. A failure is logged once, at WARNING, by the request that made the failed broadcast;
+the rest of its window read `unknown` with a DEBUG line, one WARNING per window as the LinkedIn
+session reading does. `HEALTH_DEEP_CACHE_SECONDS=0` turns the cache and its lock off.
 
 ```json
 {"status": "healthy", "workers": 5, "consuming": 5, "maintenance": false,
