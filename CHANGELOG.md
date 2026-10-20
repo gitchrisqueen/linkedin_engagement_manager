@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.199.3](https://github.com/christopherqueenconsulting/linkedin_engagement_manager/compare/v0.199.2...v0.199.3) (2026-10-20)
+
+
+### Bug Fixes
+
+* **health:** /health/deep reads Celery with a 2 s broadcast, reused for 5 s ([#2488](https://github.com/christopherqueenconsulting/linkedin_engagement_manager/issues/2488)) ([64757f5](https://github.com/christopherqueenconsulting/linkedin_engagement_manager/commit/64757f5b9324104b9170708040e26e0904768e8c))
+* **sdui-probe:** grade group_feed_composer off the group half, not its home control (closes [#2462](https://github.com/christopherqueenconsulting/linkedin_engagement_manager/issues/2462)) ([#2468](https://github.com/christopherqueenconsulting/linkedin_engagement_manager/issues/2468)) ([41b105f](https://github.com/christopherqueenconsulting/linkedin_engagement_manager/commit/41b105ffcbe18a3c753eb09a68dc43283c9f0af9))
+
 ## [0.199.2](https://github.com/christopherqueenconsulting/linkedin_engagement_manager/compare/v0.199.1...v0.199.2) (2026-10-20)
 
 
