@@ -3455,6 +3455,27 @@ class TestGroupFeedComposerProbe:
         assert llv.group_feed_composer_state(reading) == llv.STATE_DRIFT
         assert "group surface is what differs" in llv.group_feed_composer_verdict(reading)
 
+    def test_a_failed_control_never_files_a_resolved_group_feed_as_drift(self):
+        """#2462: 2 of 3 group cards resolved, the home feed mounted nothing — graded drift.
+
+        The verdict already said the group reading stood on its own; the state must agree.
+        """
+        group = {"feed": "group", "page_text": "posts", "cards_found": 3, "composers_resolved": 2,
+                 "composers_from_widening": 2}
+        home = {"feed": "home", "page_text": "posts", "cards_found": 3, "composers_resolved": 0,
+                "page_textboxes_after_click": 0, "cards": [{"comment_action": {"text": "C"}}]}
+        reading = {"group_id": "65493", "group": group, "home": home}
+        assert llv.group_feed_composer_state(reading) == llv.STATE_OK
+        verdict = llv.group_feed_composer_verdict(reading)
+        assert "NO composer mounted anywhere" in verdict
+        assert "group reading stands on its own" in verdict
+
+    def test_an_unmeasured_group_feed_is_not_graded_off_the_control(self):
+        home = {"feed": "home", "page_text": "posts", "cards_found": 3, "composers_resolved": 0,
+                "page_textboxes_after_click": 0, "cards": [{"comment_action": {"text": "C"}}]}
+        reading = {"group_id": "42", "group": {"feed": "group", "page_text": ""}, "home": home}
+        assert llv.group_feed_composer_state(reading) == llv.STATE_UNKNOWN
+
     def test_a_control_that_failed_the_same_way_is_not_a_group_finding(self):
         drift = {"feed": "x", "page_text": "posts", "cards_found": 2, "composers_resolved": 0,
                  "page_textboxes_after_click": 1, "cards": [{"comment_action": {"text": "C"}}]}

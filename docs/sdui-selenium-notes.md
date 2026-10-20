@@ -1078,6 +1078,30 @@ The same reading found a second card on that post: a comment's text node (the sa
 the composer's own submit button. It keys to the same activity URN, so the at-most-once claim
 stops a second comment, but its "content" is a stranger's comment, not the post.
 
+**Issue #2462 — re-read 2026-10-19 (group 65493, user 1, `--group-feed-composer`).** The live
+group DOM is unchanged from the #2398 table above: one `button[aria-label='Comment']`
+(`type=submit`, text `Comment`) per card, `data-urn="urn:li:activity:<id>"` three ancestors above
+the card and `data-view-tracking-scope` five above, no post permalink href on the card, and the
+post's own box a `div[role=textbox]` labelled `Text editor for creating content`. No box was inside
+its card. Cards 0 and 1 resolved their box only through `_single_post_scope`. Card 2 resolved none,
+and its widened scope held no box either. The page-textbox count after each click was 1, then 2:
+the Escape does not close the box from the card before.
+
+The sweep still graded the surface `drift`, and the cause was the probe's grading, not the
+locators. The home-feed control clicked Comment on 3 cards and no box mounted anywhere on the
+page. `group_feed_composer_state` was worst-wins across the group half and that control, so the
+control's drift filed as group drift. The same report's verdict said "the group reading stands on
+its own". The state now comes from the group half alone, and the control only explains a group
+drift. Whether the home feed still has an inline composer belongs to the home feed surface, and
+is tracked as #2467. Until that lands, no sweep key grades the home-feed Comment → composer path
+(see "Gaps" in `docs/sdui-probe-coverage.md`).
+
+A second live run on 2026-10-20 (this branch's probe, group 65493) read group 3 of 3 cards
+resolved, all through `_single_post_scope`. The home control that time found one composer mounted
+on the page that `_post_composer_for_card` claimed for no card. That is the other zero-shape (a box
+that mounts but is not owned), not the 10-19 shape (no box mounts). #2467 should be grounded
+against both.
+
 A miss the page agrees with is an expected no-op, logged DEBUG *inside* the resolver like the reply one — the
 per-card `log_warning` it replaced escalated to ERROR and filed a defect for a post we skip by
 design. It polls `_COMPOSER_MOUNT_POLLS` times rather than burning
