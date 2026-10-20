@@ -512,6 +512,11 @@ Two changes follow, both judged by the outcome rather than by a click having lan
   on screen, it logs `Publish screen not open after Next with a cover attached; pressing Escape and
   Next once more`, presses Escape and the editor's Next once more, and only then judges Publish.
 
+`_PUBLISH_LOCATORS` also gains a `publish_dialog` route: Publish inside the publish dialog as a
+button, a span or a `role="button"` element, labelled exactly `Publish` or `Publish now`. Text
+labels stay exact on purpose. After the Publish click the page URL is taken as the article, so
+"Publishing settings" read as Publish would record a publish that never happened.
+
 If Publish is still missing, `Article publish screen at the miss (user N): {...}` (#2483) records
 the open dialogs with their own buttons, the disabled controls and the routes tried. Fix the
 locator from that line.

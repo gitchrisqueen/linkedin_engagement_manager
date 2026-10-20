@@ -180,7 +180,7 @@ class TestResolveArticleEditorStep:
         assert not result.ok
         assert result.route is None
         assert result.element is None
-        assert set(result.tried) == {ae.ROUTE_PUBLISH_TEXT, ae.ROUTE_PUBLISH_ARIA}
+        assert set(result.tried) == {ae.ROUTE_PUBLISH_TEXT, ae.ROUTE_PUBLISH_DIALOG, ae.ROUTE_PUBLISH_ARIA}
 
     def test_only_last_route_miss_carries_warn_on_miss(self, monkeypatch):
         """A single failed step must fire ONE `Selector miss:` warning, not one per route (#1925).
@@ -431,7 +431,8 @@ class TestArticleEditorVerdict:
         assert verdict["all_ok"] is False
         assert verdict["first_missing"] == ae.STEP_PUBLISH
         assert verdict["publish"]["verdict"] == ae.StepVerdict.MISSING
-        assert verdict["publish"]["tried"] == [ae.ROUTE_PUBLISH_TEXT, ae.ROUTE_PUBLISH_ARIA]
+        assert verdict["publish"]["tried"] == [ae.ROUTE_PUBLISH_TEXT, ae.ROUTE_PUBLISH_DIALOG,
+                                               ae.ROUTE_PUBLISH_ARIA]
 
 
 class TestFillArticleEditor:
@@ -1219,6 +1220,42 @@ class TestAttachArticleCover:
         monkeypatch.setattr(ae, "find_first", self._find_first(driver))
         assert ae._confirm_cover_dialog(driver, MagicMock(), dialog_only=True) is False
         assert save.clicked == 0
+
+
+class TestPublishLocators:
+    """Exact-label Publish routes (2026-10-20): never a looser text match that a click would misread."""
+
+    def _resolve(self, monkeypatch, dom):
+        driver = FakeDriver(dom)
+
+        def fake_find_first(d, w, locators, *args, **kwargs):
+            for by, value in locators:
+                matches = driver.find_elements(by, value)
+                if matches:
+                    return matches[0]
+            return None
+
+        monkeypatch.setattr(ae, "find_first", fake_find_first)
+        return ae.resolve_article_editor_step(driver, MagicMock(), ae.STEP_PUBLISH, ae._PUBLISH_LOCATORS)
+
+    def test_a_role_button_publish_inside_the_dialog_resolves(self, monkeypatch):
+        publish = FakeElement(tag="div", attrs={"role": "button"})
+        xpath = f"//*[@role='dialog']//*[@role='button'][{ae._PUBLISH_LABELS}]"
+        result = self._resolve(monkeypatch, {(By.XPATH, xpath): [publish]})
+        assert result.ok and result.route == ae.ROUTE_PUBLISH_DIALOG and result.element is publish
+
+    def test_publish_now_resolves_on_the_text_route(self, monkeypatch):
+        publish = FakeElement(tag="button")
+        result = self._resolve(monkeypatch, {(By.XPATH, "//button[normalize-space()='Publish now']"): [publish]})
+        assert result.ok and result.route == ae.ROUTE_PUBLISH_TEXT
+
+    def test_text_and_dialog_routes_match_exact_labels_only(self):
+        """No starts-with/contains on text: 'Publishing settings' must never read as Publish."""
+        for route, strategies in ae._PUBLISH_LOCATORS:
+            if route == ae.ROUTE_PUBLISH_ARIA:
+                continue
+            for _by, value in strategies:
+                assert "contains(" not in value and "starts-with(" not in value, value
 
 
 class TestFillArticleEditorCover:

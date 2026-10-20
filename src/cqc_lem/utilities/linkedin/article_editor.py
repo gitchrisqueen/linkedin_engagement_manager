@@ -67,6 +67,7 @@ ROUTE_NEXT_TEXT = "next_text"
 ROUTE_NEXT_ARIA = "next_aria"
 ROUTE_PUBLISH_TEXT = "publish_text"
 ROUTE_PUBLISH_ARIA = "publish_aria"
+ROUTE_PUBLISH_DIALOG = "publish_dialog"
 ROUTE_COVER_INPUT = "cover_input"
 ROUTE_COVER_TRIGGER = "cover_trigger"
 
@@ -132,10 +133,22 @@ _NEXT_LOCATORS: list[tuple[str, list[tuple[str, str]], str]] = [
     ]),
 ]
 
+# The text and dialog routes match exact labels only. After the Publish click the flow takes the page
+# URL as the published article, so a looser text match ("Publishing settings", "Publish later") would
+# record a publish that never happened. (The older aria route is a substring match on aria-label.)
+# The dialog route (2026-10-20, edition 17 missed Publish with no screen recorded) covers a Publish
+# rendered inside the publish dialog as a role="button" element or as "Publish now".
+_PUBLISH_LABELS = "normalize-space()='Publish' or normalize-space()='Publish now'"
 _PUBLISH_LOCATORS: list[tuple[str, list[tuple[str, str]], str]] = [
     (ROUTE_PUBLISH_TEXT, [
         (By.XPATH, "//button[normalize-space()='Publish']"),
         (By.XPATH, "//button[.//span[normalize-space()='Publish']]"),
+        (By.XPATH, "//button[normalize-space()='Publish now']"),
+    ]),
+    (ROUTE_PUBLISH_DIALOG, [
+        (By.XPATH, f"//*[@role='dialog']//button[{_PUBLISH_LABELS}]"),
+        (By.XPATH, f"//*[@role='dialog']//button[.//span[{_PUBLISH_LABELS}]]"),
+        (By.XPATH, f"//*[@role='dialog']//*[@role='button'][{_PUBLISH_LABELS}]"),
     ]),
     (ROUTE_PUBLISH_ARIA, [
         (By.CSS_SELECTOR, "button[aria-label*='Publish']"),
