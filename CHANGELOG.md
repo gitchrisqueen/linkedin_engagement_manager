@@ -1,5 +1,15 @@
 # Changelog
 
+## [0.199.1](https://github.com/christopherqueenconsulting/linkedin_engagement_manager/compare/v0.199.0...v0.199.1) (2026-10-20)
+
+
+### Bug Fixes
+
+* **maintenance:** log a timed-out deploy drain at INFO (closes [#2477](https://github.com/christopherqueenconsulting/linkedin_engagement_manager/issues/2477)) ([#2480](https://github.com/christopherqueenconsulting/linkedin_engagement_manager/issues/2480)) ([a92b9f4](https://github.com/christopherqueenconsulting/linkedin_engagement_manager/commit/a92b9f4b5739d0d93d2565df257e2a4a5bbf4206))
+* **maintenance:** log a timed-out deploy drain at INFO, not WARNING ([a92b9f4](https://github.com/christopherqueenconsulting/linkedin_engagement_manager/commit/a92b9f4b5739d0d93d2565df257e2a4a5bbf4206))
+* **selenium:** treat a Grid relay with a shut-down executor as a relay error ([2122967](https://github.com/christopherqueenconsulting/linkedin_engagement_manager/commit/212296765abdb74686e44801c571c12934c8f113))
+* **selenium:** treat a Grid relay with a shut-down executor as a relay error (closes [#2478](https://github.com/christopherqueenconsulting/linkedin_engagement_manager/issues/2478)) ([#2479](https://github.com/christopherqueenconsulting/linkedin_engagement_manager/issues/2479)) ([2122967](https://github.com/christopherqueenconsulting/linkedin_engagement_manager/commit/212296765abdb74686e44801c571c12934c8f113))
+
 ## [0.199.0](https://github.com/christopherqueenconsulting/linkedin_engagement_manager/compare/v0.198.2...v0.199.0) (2026-10-19)
 
 
