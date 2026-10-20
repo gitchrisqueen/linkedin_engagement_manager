@@ -1442,9 +1442,9 @@ def health_check():
 
 # The deep check's own Celery read. A broadcast `inspect()` waits its whole timeout for replies, so
 # the maintenance default (10 s) made every `/health/deep` take ~10 s once the edge stopped caching
-# it (2026-10-20, measured in the API container: inspect 10 s, everything else under 0.1 s). Workers
-# answer in milliseconds, and the status degrades only when NO worker consumes, so a shorter wait
-# drops a worker from the counts only if it cannot answer within it. Each API process keeps the last
+# it (2026-10-20, measured in the API container: inspect 10 s, everything else under 0.1 s). All five
+# workers answered a 1 s broadcast in the same measurement, and the status degrades only when NO
+# worker consumes, so a shorter wait drops a worker from the counts only if it cannot answer within it. Each API process keeps the last
 # read for `HEALTH_DEEP_CACHE_SECONDS`, whatever it was: replies (an empty reply reads `degraded`)
 # or a failure (re-raised, so it reads `unknown`). Requests that miss the cache together wait on one
 # lock for one broadcast, so a burst or a broker fault costs at most one attempt per window. With the
