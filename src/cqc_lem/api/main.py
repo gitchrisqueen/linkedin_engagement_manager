@@ -15,6 +15,7 @@ import io
 import json
 import os
 import re
+import threading
 import time
 import zipfile
 from contextvars import ContextVar
@@ -1442,23 +1443,35 @@ def health_check():
 # the maintenance default (10 s) made every `/health/deep` take ~10 s once the edge stopped caching
 # it (2026-10-20, measured in the API container: inspect 10 s, everything else under 0.1 s). Workers
 # answer in milliseconds, and the status degrades only when NO worker consumes, so a shorter wait
-# cannot flip it. A successful read is reused for a few seconds, so a burst of requests costs one
-# broadcast; a failed read is never cached.
-_HEALTH_INSPECT_TIMEOUT_SECONDS = float(os.getenv("HEALTH_DEEP_INSPECT_TIMEOUT", "2"))
-_HEALTH_QUEUES_CACHE_SECONDS = float(os.getenv("HEALTH_DEEP_CACHE_SECONDS", "5"))
+# drops a worker from the counts only if it cannot answer within it. A read (including an empty
+# reply, which reads `degraded`) is reused for a few seconds per API process; requests that miss the
+# cache at the same moment wait on one lock and share one broadcast. A failed read is never cached.
+def _health_env_seconds(name: str, default: float, low: float, high: float) -> float:
+    """A positive number of seconds from the env, clamped; a malformed value falls back."""
+    try:
+        value = float(os.getenv(name, str(default)))
+    except ValueError:
+        return default
+    return min(max(value, low), high)
+
+
+_HEALTH_INSPECT_TIMEOUT_SECONDS = _health_env_seconds("HEALTH_DEEP_INSPECT_TIMEOUT", 2.0, 0.5, 10.0)
+_HEALTH_QUEUES_CACHE_SECONDS = _health_env_seconds("HEALTH_DEEP_CACHE_SECONDS", 5.0, 0.0, 60.0)
 _health_queues_cache: dict = {"at": 0.0, "replies": None}
+_health_queues_lock = threading.Lock()
 
 
 def _health_active_queues() -> dict:
-    """`active_queues()` for the deep check: a short broadcast, reused for a few seconds."""
-    cached = _health_queues_cache
-    now = time.monotonic()
-    if cached["replies"] is not None and now - cached["at"] < _HEALTH_QUEUES_CACHE_SECONDS:
-        return cached["replies"]
-    from cqc_lem.utilities.maintenance import _inspect
-    replies = _inspect(timeout=_HEALTH_INSPECT_TIMEOUT_SECONDS).active_queues() or {}
-    cached["replies"], cached["at"] = replies, now
-    return replies
+    """`active_queues()` for the deep check: one short broadcast, reused for a few seconds."""
+    with _health_queues_lock:
+        cached = _health_queues_cache
+        now = time.monotonic()
+        if cached["replies"] is not None and now - cached["at"] < _HEALTH_QUEUES_CACHE_SECONDS:
+            return cached["replies"]
+        from cqc_lem.utilities.maintenance import _inspect
+        replies = _inspect(timeout=_HEALTH_INSPECT_TIMEOUT_SECONDS).active_queues() or {}
+        cached["replies"], cached["at"] = replies, time.monotonic()
+        return replies
 
 
 @app.get("/health/deep")

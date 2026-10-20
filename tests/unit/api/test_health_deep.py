@@ -452,7 +452,8 @@ class TestCeleryReadIsShortAndReused:
     def test_the_read_is_repeated_after_the_window(self, monkeypatch):
         import cqc_lem.api.main as m
         insp = self._insp()
-        clock = iter([100.0, 100.0 + m._HEALTH_QUEUES_CACHE_SECONDS + 1])
+        later = 100.0 + m._HEALTH_QUEUES_CACHE_SECONDS + 1
+        clock = iter([100.0, 100.0, later, later])  # each miss reads the clock twice
         monkeypatch.setattr(m.time, "monotonic", lambda: next(clock))
         with patch("cqc_lem.utilities.maintenance._inspect", return_value=insp) as inspect:
             m._health_active_queues()
@@ -466,3 +467,31 @@ class TestCeleryReadIsShortAndReused:
             with pytest.raises(RuntimeError):
                 m._health_active_queues()
             assert m._health_active_queues() == {"w1": [{"name": "celery"}]}
+
+    def test_concurrent_misses_share_one_broadcast(self):
+        """A burst against an expired cache waits on one lock and sends one broadcast."""
+        import threading
+        import time as _time
+
+        import cqc_lem.api.main as m
+        insp = self._insp()
+
+        def slow_queues():
+            _time.sleep(0.2)
+            return {"w1": [{"name": "celery"}]}
+
+        insp.active_queues.side_effect = slow_queues
+        with patch("cqc_lem.utilities.maintenance._inspect", return_value=insp) as inspect:
+            threads = [threading.Thread(target=m._health_active_queues) for _ in range(6)]
+            for t in threads:
+                t.start()
+            for t in threads:
+                t.join()
+        assert inspect.call_count == 1
+
+    @pytest.mark.parametrize("raw,expected", [("abc", 2.0), ("2s", 2.0), ("0", 0.5), ("-3", 0.5),
+                                              ("99", 10.0), ("1.5", 1.5)])
+    def test_a_bad_timeout_value_falls_back_or_clamps(self, monkeypatch, raw, expected):
+        import cqc_lem.api.main as m
+        monkeypatch.setenv("HEALTH_DEEP_INSPECT_TIMEOUT", raw)
+        assert m._health_env_seconds("HEALTH_DEEP_INSPECT_TIMEOUT", 2.0, 0.5, 10.0) == expected

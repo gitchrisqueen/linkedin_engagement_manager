@@ -181,8 +181,13 @@ moment, not from an incident the older script already handled. `events.jsonl` ca
 Celery being reachable. A test pins that.
 
 `/health/deep` answers what a monitor actually wants to know — it reaches every worker over the
-broker's control channel (`_inspect().active_queues()`), so a lane whose container was never started
-simply is not in the reply.
+broker's control channel (`_health_active_queues()`: one `active_queues()` broadcast with a
+`HEALTH_DEEP_INSPECT_TIMEOUT` wait, default 2 s, reused per API process for
+`HEALTH_DEEP_CACHE_SECONDS`, default 5 s), so a lane whose container was never started simply is
+not in the reply. A broadcast always waits its whole timeout, which is why it is short: with the
+maintenance default of 10 s every request took about 10 s (measured 2026-10-20, #2488). A read is
+cached even when no worker answered (that reads `degraded`); a failed read (`unknown`) never is.
+A healthy reading can therefore outlive a dead worker tier by up to the cache window per process.
 
 ```json
 {"status": "healthy", "workers": 5, "consuming": 5, "maintenance": false,
@@ -193,7 +198,7 @@ simply is not in the reply.
 | Field | Meaning |
 |---|---|
 | `status` | `healthy` / `degraded` / `unknown` — the only field a monitor should assert on |
-| `workers` | workers that answered the control channel — **presence, not usefulness** |
+| `workers` | workers that answered the control channel within `HEALTH_DEEP_INSPECT_TIMEOUT` — **presence, not usefulness** |
 | `consuming` | workers subscribed to ≥1 queue. **This is the one that decides `status`.** |
 | `maintenance` | `true`/`false`, or `null` when Redis couldn't be read. A declared window holds `status` at `healthy`. |
 | `egress` | Can the automation browser's egress proxy reach LinkedIn? `ok` / `unreachable` / `auth_failed` / `refused` / `unknown` / `direct` — see below |
@@ -339,7 +344,22 @@ is needed. The owner of the response is whoever receives the layer 3 monitor's a
 
 - **Load anyone can cause:** at most one probe round per `EGRESS_PROBE_CACHE_SECONDS` per API
   process, of at most 10 `CONNECT`s with a 5 s timeout each, in parallel. Concurrent requests during
-  a probe wait on the same lock rather than starting their own.
+  a probe wait on the same lock rather than starting their own. The Celery read is bounded the same
+  way: at most one `active_queues()` broadcast per `HEALTH_DEEP_CACHE_SECONDS` per API process, and
+  requests that miss the cache together wait on one lock for that one broadcast.
+- **Rollback of the Celery read timing (#2488):** `HEALTH_DEEP_INSPECT_TIMEOUT=10` and
+  `HEALTH_DEEP_CACHE_SECONDS=0` restore the old behaviour (a full 10 s broadcast on every request).
+  Use the same procedure as `HEALTH_DEEP_EGRESS_DEGRADES` in the next bullet, for each of the two
+  names: note the current lines with
+  `grep -E '^HEALTH_DEEP_(INSPECT_TIMEOUT|CACHE_SECONDS)=' /opt/lem/.env`, set each with the
+  `if grep ... sed ... else echo ... fi` command, re-deploy the running tag
+  (`cd /opt/lem && ./scripts/deploy.sh "$(cat .last_good_tag)"` or the Redeploy / Rollback VPS
+  workflow; saving `.env` alone does nothing, because both are read when the container is created),
+  then check with
+  `docker exec "web_api_$(cat /opt/lem/.active_color)" printenv HEALTH_DEEP_INSPECT_TIMEOUT HEALTH_DEEP_CACHE_SECONDS`.
+  To undo, put back the noted lines (or delete them with
+  `sed -i -E '/^HEALTH_DEEP_(INSPECT_TIMEOUT|CACHE_SECONDS)=/d' /opt/lem/.env`) and re-deploy the
+  same way. A malformed value cannot take the API down: it falls back to the default.
 - **Who acts on `degraded`:** only the external uptime monitor (layer 3), which alerts. Nothing
   restarts or rolls back on it: deploys gate on `/health`, never `/health/deep`, and the host
   watchdog (layer 1) reads `docker compose ps`, not this endpoint.
