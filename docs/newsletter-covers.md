@@ -567,6 +567,8 @@ Run as root on the box, in this order:
 
 5. **Read the outcome** in `/opt/lem/logs/cqc_lem_YYYY_MM_DD.log` after `:05`:
    - `Newsletter republish guard ...`: what the guard read;
+   - `Newsletter edition 17 is already live on LinkedIn; recorded it instead of publishing again`:
+     the guard found it live and recorded its URL, so nothing was published;
    - `Publish screen not open after Next with a cover attached`: the second Next fired;
    - `Published newsletter edition 17 for user 1`: done; the row now holds the URL;
    - `Article publish screen at the miss` and `Newsletter edition publish flow did not complete`:
