@@ -175,8 +175,10 @@ def note_tab_crash(exc: BaseException, *, task_name: str, crash_logged_upstream:
 # request. The session is very likely unusable for the rest of the walk either way, so it is
 # treated the same as a crashed tab — stop and report what shipped — rather than retried, but kept
 # a WARNING (not INFO) because a live Grid relay fault, unlike a routine deploy, is worth surfacing
-# if it recurs.
-_GRID_RELAY_ERROR_MARKERS = ("failed to execute request",)
+# if it recurs. The second marker is the same drop seen from the other end (issue #2478): the Grid's
+# `JdkHttpClient` executor for that hop is already shut down, so the command is refused with
+# `Task java.util.concurrent.FutureTask@… rejected from java.util.concurrent.ThreadPoolExecutor@…`.
+_GRID_RELAY_ERROR_MARKERS = ("failed to execute request", "rejected from java.util.concurrent")
 
 
 def is_grid_relay_error(exc: BaseException) -> bool:
