@@ -1012,3 +1012,53 @@ class TestPendingCoverReminderBeat:
         assert entry["schedule"].minute == {30}
         drafts = app.conf.beat_schedule["generate-newsletter-drafts"]
         assert drafts["schedule"].hour == {10} and drafts["schedule"].minute == {0}
+
+
+class TestEditionAlreadyPublic:
+    """A republished edition must not put a second copy out (edition 17, 2026-10-20)."""
+
+    _PAGE = ('<a href="https://www.linkedin.com/pulse/30k-we-nearly-squandered-ai-content-christopher-queen-uztme?x">'
+             '<a href="https://www.linkedin.com/pulse/teardown-why-viral-ai-carousel-got-zero-leads-christopher-queen-huwmc">')
+
+    def _guard(self, title, page=_PAGE, latest="https://www.linkedin.com/pulse/x/", get_exc=None):
+        from cqc_lem.app.engagement.newsletter import _edition_already_public
+        resp = MagicMock(text=page)
+        with patch(f"{_NL}.get_latest_published_newsletter_edition_url", return_value=latest), \
+             patch("requests.get", side_effect=get_exc, return_value=resp) as get:
+            return _edition_already_public(1, title), get
+
+    def test_a_live_article_with_the_same_title_is_found(self):
+        url, _ = self._guard("The $30K We Nearly Squandered on AI Content")
+        assert url == "https://www.linkedin.com/pulse/30k-we-nearly-squandered-ai-content-christopher-queen-uztme/"
+
+    def test_linkedins_dropped_words_still_match(self):
+        """LinkedIn drops "This" from the slug; the title keeps it."""
+        url, _ = self._guard("Teardown: Why This Viral AI Carousel Got Zero Leads")
+        assert url and "teardown-why-viral-ai-carousel" in url
+
+    def test_an_unpublished_title_is_not_found(self):
+        url, _ = self._guard("Your AI content still lies, even with web search")
+        assert url is None
+
+    def test_an_unreadable_page_grounds_nothing(self):
+        url, _ = self._guard("The $30K We Nearly Squandered on AI Content", get_exc=OSError("timeout"))
+        assert url is None
+
+    def test_no_published_edition_and_short_titles_skip_the_fetch(self):
+        url, get = self._guard("The $30K We Nearly Squandered on AI Content", latest=None)
+        assert url is None and not get.called
+        url, get = self._guard("Short title")
+        assert url is None and not get.called
+
+    def test_auto_publish_records_a_live_edition_instead_of_publishing_again(self):
+        from cqc_lem.app.engagement.newsletter import auto_publish_edition
+        edition = {"id": 17, "user_id": 1, "status": "approved", "title": "Your AI content still lies"}
+        live = "https://www.linkedin.com/pulse/your-ai-content-still-lies-christopher-queen-abc1/"
+        with patch(f"{_NL}.get_newsletter_edition", return_value=edition), \
+             patch(f"{_NL}._edition_already_public", return_value=live), \
+             patch(f"{_NL}.mark_edition_published") as mark, \
+             patch(f"{_NL}.get_current_profile") as gp:
+            result = auto_publish_edition.run(edition_id=17)
+        mark.assert_called_once_with(17, live)
+        gp.assert_not_called()                       # no browser, no second article
+        assert "already published" in result

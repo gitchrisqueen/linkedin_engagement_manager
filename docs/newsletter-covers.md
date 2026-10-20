@@ -494,3 +494,36 @@ which looks exactly like "LinkedIn changed the DOM again".
 `STEP_COVER` is deliberately **not** in `EDITOR_SCREEN_STEPS` / `ALL_STEPS`: the cover is optional,
 so grading it would report `MISSING` on every cover-less publish. A cover that will not attach is a
 warning and never a `failed_step` — an edition without its cover is still a published edition.
+
+### After the cover: the publish screen must actually open (edition 17, 2026-10-20)
+
+Edition 17 was the first live run of the cover fix. The cover attached (`Article cover attached`,
+13:07:46Z), Next took its click, and then neither the edition description nor Publish resolved
+(`Selector miss: Article editor article_publish`, 13:08:35Z). The edition was marked `failed`. The
+run saved no picture of the screen. The reading that fits every line: the click after the upload
+landed on the image dialog rather than moving the editor on, so the publish screen never opened.
+
+Two changes follow, both judged by the outcome rather than by a click having landed:
+
+- `_confirm_cover_dialog` also advances an image dialog through its own **Next**, matched only
+  inside `role='dialog'`. A page-level Next is the editor's own control and is never matched there.
+  A second pass, again inside a dialog only, covers a two-step dialog (adjust, then confirm).
+- With a cover attached, `fill_article_editor` checks for an enabled Publish after Next. If none is
+  on screen, it logs `Publish screen not open after Next with a cover attached; pressing Escape and
+  Next once more`, presses Escape and the editor's Next once more, and only then judges Publish.
+
+If Publish is still missing, `Article publish screen at the miss (user N): {...}` (#2483) records
+the open dialogs with their own buttons, the disabled controls and the routes tried. Fix the
+locator from that line.
+
+### A republished edition never goes out twice
+
+An edition reset to `approved` after a failed run goes through `auto_publish_edition` again. A
+failed run cannot have published: Publish is the last click, and every failure returns before it.
+As a second check, `_edition_already_public` reads the newest published edition's page logged out,
+with no browser, and compares each `/pulse/` slug in its "more articles" list with the edition's
+title. It takes the first four words on both sides, without the words LinkedIn drops from slugs
+(`_SLUG_STOPWORDS`). On a match, the edition is recorded as published with that URL and no browser
+opens. Only a match counts: an unreadable page, no published edition yet, or a title under four
+words returns None, and the publish goes ahead. Checked against this account's 11 published
+articles on 2026-10-20: all 11 match, and edition 17's title does not.

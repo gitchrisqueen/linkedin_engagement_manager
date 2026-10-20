@@ -219,6 +219,50 @@ def auto_publish_newsletter_edition(self, user_id: int):
     return lane_result(TaskOutcome.FAILED, "Newsletter publish flow did not complete", cause=failure)
 
 
+# Words LinkedIn leaves out of a /pulse/ slug (observed on this account's own articles: "The $30K We
+# Nearly Squandered on AI Content" -> 30k-we-nearly-squandered-ai-content, "Spot the Leak in Your
+# LinkedIn AI Budget" -> spot-leak-your-linkedin-ai-budget, "Teardown: Why This Viral AI Carousel" ->
+# teardown-why-viral-ai-carousel). Dropped from BOTH sides before comparing.
+_SLUG_STOPWORDS = frozenset({"a", "an", "the", "on", "in", "of", "to", "with", "and", "that", "for",
+                             "at", "by", "or", "this"})
+_SLUG_MATCH_WORDS = 4
+
+
+def _slug_words(text: str) -> list:
+    words = re.findall(r"[a-z0-9]+", text.lower().replace("'", ""))
+    return [w for w in words if w not in _SLUG_STOPWORDS]
+
+
+def _edition_already_public(user_id: int, title: str) -> "str | None":
+    """The /pulse/ URL of a live article of this account's whose slug matches this title, or None.
+
+    A republish (an edition reset to approved after a failed run) must not put a second copy out.
+    Every published LinkedIn article page lists the author's other articles, so the newest
+    published edition's page, read logged out with no browser, shows a recent one. This is
+    positive evidence only: an unreadable page, no published edition yet, or a title too short to
+    compare returns None and the publish goes ahead. A failed run cannot have published, because
+    Publish is the last click and the flow returns before it on every failure.
+    """
+    import requests
+
+    words = _slug_words(title or "")[:_SLUG_MATCH_WORDS]
+    if len(words) < _SLUG_MATCH_WORDS:
+        return None
+    page_url = get_latest_published_newsletter_edition_url(user_id)
+    if not page_url:
+        return None
+    try:
+        page = requests.get(page_url, timeout=15, headers={"User-Agent": "Mozilla/5.0"}).text
+    except Exception as e:  # noqa: BLE001 - a guard that cannot read grounds nothing
+        log_debug(f"Could not read the published article list: {type(e).__name__}", user_id=user_id,
+                  task_name="auto_publish_edition")
+        return None
+    for slug in set(re.findall(r"linkedin\.com/pulse/([a-z0-9-]+)", page)):
+        if _slug_words(slug.replace("-", " "))[:_SLUG_MATCH_WORDS] == words:
+            return f"https://www.linkedin.com/pulse/{slug}/"
+    return None
+
+
 @shared_task.task(name='cqc_lem.app.run_automation.auto_publish_edition',
                   bind=True, base=QueueOnce, once={'graceful': True, 'unlock_before_run': True, 'keys': ['edition_id']},
                   queue='se_content')
@@ -249,6 +293,13 @@ def auto_publish_edition(self, edition_id: int):
         log_debug(f"Newsletter edition {edition_id} is held for approval — ungrounded specifics",
                   user_id=user_id, task_name="auto_publish_edition", edition_id=edition_id)
         return lane_result(TaskOutcome.NO_OP, f"Edition {edition_id} held for approval")
+    live_url = _edition_already_public(user_id, edition.get("title"))
+    if live_url:
+        # Already out under this title: record it instead of publishing a second copy.
+        mark_edition_published(edition_id, live_url)
+        log_info(f"Newsletter edition {edition_id} is already live on LinkedIn; recorded it instead "
+                 f"of publishing again", user_id=user_id, task_name="auto_publish_edition")
+        return lane_result(TaskOutcome.NO_OP, f"Edition {edition_id} already published")
     try:
         # needs_images=True (#2094) — the same fastboot editor as `auto_publish_newsletter_edition`.
         driver, wait, user_email, my_profile = get_current_profile(
