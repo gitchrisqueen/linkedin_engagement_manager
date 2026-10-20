@@ -184,6 +184,11 @@ deliberately left, and why:
   container that resolved nothing against `share_composer.composer_open_signal` before deciding the
   group refuses member posts, because only that verdict may stamp the draft `FAILED` and rotate past
   the group.
+- **Home feed post card → Comment → inline composer** (the feed-commenting lane,
+  `_post_composer_for_card` on the home feed). Since #2462 no sweep key grades this path. The
+  `group_feed_composer` probe still clicks Comment on a few home-feed cards as its control, but that
+  control only explains a group verdict and never sets the grade. A green `group_feed_composer` says
+  nothing about home-feed comment posting. A dedicated key is tracked in #2467.
 - **Post media render** — a diagnostic, not a lane. Nothing in production reads it, so there is no
   zero to misread.
 - **Target resolution can still come back empty** (issue #1770) — a brand-new account with no
