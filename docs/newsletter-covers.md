@@ -518,12 +518,67 @@ locator from that line.
 
 ### A republished edition never goes out twice
 
-An edition reset to `approved` after a failed run goes through `auto_publish_edition` again. A
-failed run cannot have published: Publish is the last click, and every failure returns before it.
-As a second check, `_edition_already_public` reads the newest published edition's page logged out,
-with no browser, and compares each `/pulse/` slug in its "more articles" list with the edition's
-title. It takes the first four words on both sides, without the words LinkedIn drops from slugs
-(`_SLUG_STOPWORDS`). On a match, the edition is recorded as published with that URL and no browser
-opens. Only a match counts: an unreadable page, no published edition yet, or a title under four
-words returns None, and the publish goes ahead. Checked against this account's 11 published
-articles on 2026-10-20: all 11 match, and edition 17's title does not.
+An edition reset to `approved` after a failed run goes through `auto_publish_edition` again. Most
+failures return before the Publish click, so nothing went out. Three windows can leave a live
+article that the row does not record as published:
+- a Publish click that raised after it registered (the step reports `article_publish`);
+- an exception after the click (the edition is marked `failed`);
+- a publish whose `mark_edition_published` write failed. That one now logs `Published newsletter
+  edition N but could not record it` at ERROR, and the row stays `approved`.
+
+`_edition_already_public` is the automated check for all three. Before any browser opens, it reads
+the newest published edition's page logged out and compares each `/pulse/` slug in its "more
+articles" list with the edition's title. It uses the first four words on both sides, without the
+words LinkedIn drops from slugs (`_SLUG_STOPWORDS`), and requires the same author token as that
+page's own slug. On a match, the edition is recorded as published with that URL and no browser
+opens. A page that is not a LinkedIn article, not a 200, or not listing its own link counts as
+unreadable, and the publish goes ahead. Every run logs one INFO line starting `Newsletter
+republish guard`: `matched a live article`, `read N article links, no match; publishing`, or
+`could not read the article list (http S); publishing`.
+
+Checked on 2026-10-20:
+- against this account's 11 published articles, all 11 match their slugs and edition 17's title
+  does not;
+- live from the VPS, a logged-out fetch of edition 16's page read 11 article links and matched
+  "Spot the Leak in Your LinkedIn AI Budget".
+
+#### Republishing a failed edition (edition 17, ruling 139)
+
+Run as root on the box, in this order:
+
+1. **Gate.** The fix must be live first: the edition's slot is past, so the next hourly run (`:05`)
+   dispatches it as soon as it reads `approved`. `curl -s https://lem.christopherqueenconsulting.com/api/app-info`
+   must report a version that `git tag --contains <this PR's merge commit>` lists.
+2. **Check it is not already live.** Open your LinkedIn articles list and confirm the title is
+   not there. The guard repeats this check, but the reset is yours.
+3. **Reset.** This prints the row first, which is the record to restore from, and changes nothing
+   unless the edition is still `failed` with no URL:
+
+   ```bash
+   sudo docker exec -i celery_worker python -c "from cqc_lem.utilities.db import get_newsletter_edition as g, update_newsletter_edition as u; e=g(17); print(e['status'], e['published_url'], e['scheduled_for']); assert e['user_id']==1 and e['status']=='failed' and not e['published_url']; u(17, 1, status='approved'); print('now', g(17)['status'])"
+   ```
+
+4. **Stop before the next `:05`** if you change your mind. This sets it back while it is still
+   unpublished:
+
+   ```bash
+   sudo docker exec -i celery_worker python -c "from cqc_lem.utilities.db import get_newsletter_edition as g, update_newsletter_edition as u; e=g(17); assert e['status']=='approved' and not e['published_url']; u(17, 1, status='failed'); print('now', g(17)['status'])"
+   ```
+
+5. **Read the outcome** in `/opt/lem/logs/cqc_lem_YYYY_MM_DD.log` after `:05`:
+   - `Newsletter republish guard ...`: what the guard read;
+   - `Publish screen not open after Next with a cover attached`: the second Next fired;
+   - `Published newsletter edition 17 for user 1`: done; the row now holds the URL;
+   - `Article publish screen at the miss` and `Newsletter edition publish flow did not complete`:
+     failed again. The row is `failed`, with no automatic retry. Fix the locator from the miss
+     line before resetting again.
+6. **Undo a duplicate**, if one ever goes out: delete the extra article on LinkedIn by hand, then
+   record the surviving one:
+
+   ```bash
+   sudo docker exec -i celery_worker python -c "from cqc_lem.utilities.db import mark_edition_published as m; print(m(17, '<surviving /pulse/ URL>'))"
+   ```
+
+**Code rollback:** redeploy the previous release with the owner deploy path in
+`docs/DEPLOYMENT.md` (`scripts/deploy.sh <previous tag>`). Do that only with edition 17 not
+`approved`; the old code has neither the second Next nor the guard.

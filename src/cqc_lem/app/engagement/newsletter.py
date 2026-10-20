@@ -238,28 +238,47 @@ def _edition_already_public(user_id: int, title: str) -> "str | None":
 
     A republish (an edition reset to approved after a failed run) must not put a second copy out.
     Every published LinkedIn article page lists the author's other articles, so the newest
-    published edition's page, read logged out with no browser, shows a recent one. This is
-    positive evidence only: an unreadable page, no published edition yet, or a title too short to
-    compare returns None and the publish goes ahead. A failed run cannot have published, because
-    Publish is the last click and the flow returns before it on every failure.
+    published edition's page, read logged out with no browser, shows a recent one. A slug counts
+    only when its first words match the title AND it carries the same author token as that page's
+    own slug (the word before LinkedIn's 4-5 character id), so another author's article on the page
+    never matches. Positive evidence only: a page that is not a LinkedIn article, not a 200, or not
+    listing its own link is unreadable, and like no published edition yet or a title too short to
+    compare it returns None and the publish goes ahead. Every outcome is one INFO line starting
+    "Newsletter republish guard", so the log shows whether the guard actually read the list.
+
+    This is the only automated check on the windows where a live article is not recorded as
+    published: a Publish click that raised after it registered, an exception after the click (the
+    edition is marked failed), and a publish whose `mark_edition_published` write failed.
     """
     import requests
 
     words = _slug_words(title or "")[:_SLUG_MATCH_WORDS]
     if len(words) < _SLUG_MATCH_WORDS:
         return None
-    page_url = get_latest_published_newsletter_edition_url(user_id)
-    if not page_url:
+    page_url = get_latest_published_newsletter_edition_url(user_id) or ""
+    own = re.match(r"https://www\.linkedin\.com/pulse/([a-z0-9-]+)", page_url)
+    if not own:
         return None
+    own_slug = own.group(1)
+    author = own_slug.split("-")[-2] if own_slug.count("-") >= 2 else None
     try:
-        page = requests.get(page_url, timeout=15, headers={"User-Agent": "Mozilla/5.0"}).text
+        resp = requests.get(page_url, timeout=15, headers={"User-Agent": "Mozilla/5.0"})
+        status, page = resp.status_code, resp.text if resp.status_code == 200 else ""
     except Exception as e:  # noqa: BLE001 - a guard that cannot read grounds nothing
-        log_debug(f"Could not read the published article list: {type(e).__name__}", user_id=user_id,
-                  task_name="auto_publish_edition")
+        status, page = type(e).__name__, ""
+    slugs = set(re.findall(r"linkedin\.com/pulse/([a-z0-9-]+)", page))
+    if status != 200 or own_slug not in slugs or not author:
+        log_info(f"Newsletter republish guard could not read the article list (http {status}); "
+                 f"publishing", user_id=user_id, task_name="auto_publish_edition")
         return None
-    for slug in set(re.findall(r"linkedin\.com/pulse/([a-z0-9-]+)", page)):
-        if _slug_words(slug.replace("-", " "))[:_SLUG_MATCH_WORDS] == words:
+    for slug in slugs:
+        if (slug.split("-")[-2:-1] == [author]
+                and _slug_words(slug.replace("-", " "))[:_SLUG_MATCH_WORDS] == words):
+            log_info(f"Newsletter republish guard matched a live article ({len(slugs)} read)",
+                     user_id=user_id, task_name="auto_publish_edition")
             return f"https://www.linkedin.com/pulse/{slug}/"
+    log_info(f"Newsletter republish guard read {len(slugs)} article links, no match; publishing",
+             user_id=user_id, task_name="auto_publish_edition")
     return None
 
 
@@ -318,6 +337,7 @@ def auto_publish_edition(self, edition_id: int):
         log_error("Error getting profile for newsletter edition", exc=e, user_id=user_id, task_name="auto_publish_edition")
         return lane_result(TaskOutcome.FAILED, f"Failed to start newsletter edition: {e}", cause=e)
     failure = None
+    unrecorded = None
     try:
         driver.get("https://www.linkedin.com/article/new/")
         time.sleep(random.uniform(6, 9))
@@ -326,14 +346,22 @@ def auto_publish_edition(self, edition_id: int):
                                                       subtitle=edition.get("subtitle"),
                                                       user_id=user_id,
                                                       cover_image_path=_approved_cover_path(edition))
-        if url:
-            mark_edition_published(edition_id, url)
+        if url and mark_edition_published(edition_id, url):
             log_info(f"Published newsletter edition {edition_id} for user {user_id}: {edition['title']}")
             return lane_result(TaskOutcome.LANDED, f"Published newsletter edition: {edition['title']}")
-        failure = NewsletterPublishIncomplete(failed_step)
-        log_error("Newsletter edition publish flow did not complete", exc=failure,
-                  user_id=user_id, task_name="auto_publish_edition", edition_id=edition_id, failed_step=failed_step)
-        mark_edition_failed(edition_id)
+        if url:
+            # Live on LinkedIn but still 'approved' here, so the hourly beat would dispatch it again;
+            # `_edition_already_public` is then the only thing between it and a duplicate. Never
+            # marked failed: it IS published. Reported after the try, like the miss below.
+            log_error(f"Published newsletter edition {edition_id} but could not record it",
+                      user_id=user_id, task_name="auto_publish_edition")
+            unrecorded = url
+        else:
+            failure = NewsletterPublishIncomplete(failed_step)
+            log_error("Newsletter edition publish flow did not complete", exc=failure,
+                      user_id=user_id, task_name="auto_publish_edition", edition_id=edition_id,
+                      failed_step=failed_step)
+            mark_edition_failed(edition_id)
     except Exception as e:
         log_error("Newsletter edition publish error", exc=e, user_id=user_id, task_name="auto_publish_edition")
         mark_edition_failed(edition_id)
@@ -342,6 +370,8 @@ def auto_publish_edition(self, edition_id: int):
         quit_gracefully(driver)
     # Raised OUTSIDE the try: inside it, the `except Exception` above would catch the failure and
     # mark + log the edition a second time.
+    if unrecorded:
+        return lane_result(TaskOutcome.FAILED, f"Edition {edition_id} published but not recorded: {unrecorded}")
     return lane_result(TaskOutcome.FAILED, "Newsletter edition publish flow did not complete", cause=failure)
 
 
