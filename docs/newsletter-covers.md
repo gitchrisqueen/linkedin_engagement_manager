@@ -513,9 +513,24 @@ Two changes follow, both judged by the outcome rather than by a click having lan
   Next once more`, presses Escape and the editor's Next once more, and only then judges Publish.
 
 `_PUBLISH_LOCATORS` also gains a `publish_dialog` route: Publish inside the publish dialog as a
-button, a span or a `role="button"` element, labelled exactly `Publish` or `Publish now`. Text
-labels stay exact on purpose. After the Publish click the page URL is taken as the article, so
-"Publishing settings" read as Publish would record a publish that never happened.
+button, a span or a `role="button"` element, labelled exactly `Publish` or `Publish now`. A
+`role="button"` element gets the same disabled and `aria-disabled` check as a `<button>`. Text
+labels stay exact on purpose, so "Publishing settings" never reads as Publish.
+
+A click is not a publish. After the Publish click, the flow waits up to about 20 s for the page to
+reach `https://www.linkedin.com/pulse/...`. Every stored edition URL (editions 1-8, 15, 16) has
+that shape, ending `?published=t`. It always logs `Article publish resolved via <route> (tried
+[...]); after click: <url>`. If the URL is not an article page, it logs the miss evidence and
+returns `article_publish`. The edition is marked `failed`, not `published`.
+
+Reading the next publish run in `/opt/lem/logs/cqc_lem_YYYY_MM_DD.log`:
+
+| Line | Meaning | Action |
+|---|---|---|
+| `Article publish resolved via publish_text\|publish_dialog\|publish_aria ...; after click: https://www.linkedin.com/pulse/...` | Published; the route named did it | Keep |
+| `Article publish screen at the miss` with a Publish-labelled control in `dialogs` | The selector is still wrong | Add that label/shape to `_PUBLISH_LOCATORS` |
+| `Article publish screen at the miss` with `"enabled": false` | Publish was there but disabled | Not a selector problem; do not revert |
+| `Article publish resolved via ...; after click:` a URL that is not `/pulse/` | The click landed on something that did not publish | Revert the route named in that line |
 
 If Publish is still missing, `Article publish screen at the miss (user N): {...}` (#2483) records
 the open dialogs with their own buttons, the disabled controls and the routes tried. Fix the
@@ -578,6 +593,8 @@ Run as root on the box, in this order:
    - `Newsletter edition 17 is already live on LinkedIn; recorded it instead of publishing again`:
      the guard found it live and recorded its URL, so nothing was published;
    - `Publish screen not open after Next with a cover attached`: the second Next fired;
+   - `Article publish resolved via ...`: which route clicked Publish and where the page landed
+     (see the table above);
    - `Published newsletter edition 17 for user 1`: done; the row now holds the URL;
    - `Published newsletter edition 17 but could not record it` (ERROR): it is live, but the row is
      still `approved`, and the next `:05` dispatches it again. Run step 4's stop now, then record

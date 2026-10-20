@@ -68,6 +68,8 @@ ROUTE_NEXT_ARIA = "next_aria"
 ROUTE_PUBLISH_TEXT = "publish_text"
 ROUTE_PUBLISH_ARIA = "publish_aria"
 ROUTE_PUBLISH_DIALOG = "publish_dialog"
+# Where a real publish lands; see the outcome check at the end of `fill_article_editor`.
+_PULSE_URL = "linkedin.com/pulse/"
 ROUTE_COVER_INPUT = "cover_input"
 ROUTE_COVER_TRIGGER = "cover_trigger"
 
@@ -384,13 +386,22 @@ class ResolvedElement:
 
 
 def _is_enabled(element: WebElement) -> bool:
-    """Best-effort enabled check for buttons; fields are always considered enabled."""
+    """Best-effort enabled check for buttons; fields are always considered enabled.
+
+    A `role="button"` element counts as a button: the publish dialog route matches one, and a
+    disabled one must not read as a Publish that can be clicked.
+    """
     try:
         tag = (element.tag_name or "").lower()
     except (WebDriverException, StaleElementReferenceException):
         return True
     if tag != "button":
-        return True
+        try:
+            role = (element.get_attribute("role") or "").lower()
+        except (WebDriverException, StaleElementReferenceException):
+            role = ""
+        if role != "button":
+            return True
     try:
         disabled_attr = element.get_attribute("disabled")
     except (WebDriverException, StaleElementReferenceException):
@@ -809,5 +820,17 @@ def fill_article_editor(
     if not _click_safely(driver, publish_step.element):
         # The element was found and enabled, but the click itself failed (intercepted/stale).
         return None, STEP_PUBLISH
-    time.sleep(5)
-    return driver.current_url, None
+    # Success is the article page, never the click: every published edition so far landed on
+    # https://www.linkedin.com/pulse/<slug>/?published=t. Wait up to ~20 s for it.
+    url = ""
+    for wait_s in (5, 3, 3, 3, 3, 3):
+        time.sleep(wait_s)
+        url = driver.current_url or ""
+        if _PULSE_URL in url:
+            break
+    log_info(f"Article publish resolved via {publish_step.route} (tried {publish_step.tried}); "
+             f"after click: {url}", user_id=user_id, action_type="article_editor", step=STEP_PUBLISH)
+    if _PULSE_URL not in url:
+        _log_publish_miss_evidence(driver, publish_step, user_id=user_id)
+        return None, STEP_PUBLISH
+    return url, None
