@@ -82,7 +82,7 @@ def _fresh_health_deep_cache():
     import sys
     main = sys.modules.get("cqc_lem.api.main")
     if main is not None and hasattr(main, "_health_queues_cache"):
-        main._health_queues_cache.update(at=0.0, replies=None)
+        main._health_queues_cache.update(at=0.0, replies=None, error=None)
     yield
 
 

@@ -13,6 +13,7 @@ comment above `_API_ACCESS_TOKEN_SET`. Authorisation happens in the handler, whi
 
 import io
 import json
+import math
 import os
 import re
 import threading
@@ -1443,34 +1444,54 @@ def health_check():
 # the maintenance default (10 s) made every `/health/deep` take ~10 s once the edge stopped caching
 # it (2026-10-20, measured in the API container: inspect 10 s, everything else under 0.1 s). Workers
 # answer in milliseconds, and the status degrades only when NO worker consumes, so a shorter wait
-# drops a worker from the counts only if it cannot answer within it. A read (including an empty
-# reply, which reads `degraded`) is reused for a few seconds per API process; requests that miss the
-# cache at the same moment wait on one lock and share one broadcast. A failed read is never cached.
+# drops a worker from the counts only if it cannot answer within it. Each API process keeps the last
+# read for `HEALTH_DEEP_CACHE_SECONDS`, whatever it was: replies (an empty reply reads `degraded`)
+# or a failure (re-raised, so it reads `unknown`). Requests that miss the cache together wait on one
+# lock for one broadcast, so a burst or a broker fault costs at most one attempt per window. With the
+# cache at 0 there is no lock either: every request makes its own broadcast, in parallel, as before.
 def _health_env_seconds(name: str, default: float, low: float, high: float) -> float:
-    """A positive number of seconds from the env, clamped; a malformed value falls back."""
+    """A finite number of seconds from the env, clamped; a malformed value falls back to the default."""
+    raw = os.getenv(name)
+    if raw is None:
+        return default
     try:
-        value = float(os.getenv(name, str(default)))
+        value = float(raw)
     except ValueError:
+        value = float("nan")
+    if not math.isfinite(value):
+        log_warning(f"{name} is not a number of seconds; using the default", task_name="health_deep")
         return default
     return min(max(value, low), high)
 
 
 _HEALTH_INSPECT_TIMEOUT_SECONDS = _health_env_seconds("HEALTH_DEEP_INSPECT_TIMEOUT", 2.0, 0.5, 10.0)
 _HEALTH_QUEUES_CACHE_SECONDS = _health_env_seconds("HEALTH_DEEP_CACHE_SECONDS", 5.0, 0.0, 60.0)
-_health_queues_cache: dict = {"at": 0.0, "replies": None}
+_health_queues_cache: dict = {"at": 0.0, "replies": None, "error": None}
 _health_queues_lock = threading.Lock()
 
 
+def _read_active_queues() -> dict:
+    from cqc_lem.utilities.maintenance import _inspect
+    return _inspect(timeout=_HEALTH_INSPECT_TIMEOUT_SECONDS).active_queues() or {}
+
+
 def _health_active_queues() -> dict:
-    """`active_queues()` for the deep check: one short broadcast, reused for a few seconds."""
+    """`active_queues()` for the deep check: one short broadcast per window, failure included."""
+    if _HEALTH_QUEUES_CACHE_SECONDS <= 0:
+        return _read_active_queues()
     with _health_queues_lock:
         cached = _health_queues_cache
-        now = time.monotonic()
-        if cached["replies"] is not None and now - cached["at"] < _HEALTH_QUEUES_CACHE_SECONDS:
-            return cached["replies"]
-        from cqc_lem.utilities.maintenance import _inspect
-        replies = _inspect(timeout=_HEALTH_INSPECT_TIMEOUT_SECONDS).active_queues() or {}
-        cached["replies"], cached["at"] = replies, time.monotonic()
+        if time.monotonic() - cached["at"] < _HEALTH_QUEUES_CACHE_SECONDS:
+            if cached["error"] is not None:
+                raise cached["error"]
+            if cached["replies"] is not None:
+                return cached["replies"]
+        try:
+            replies = _read_active_queues()
+        except Exception as e:
+            cached.update(at=time.monotonic(), replies=None, error=e)
+            raise
+        cached.update(at=time.monotonic(), replies=replies, error=None)
         return replies
 
 
