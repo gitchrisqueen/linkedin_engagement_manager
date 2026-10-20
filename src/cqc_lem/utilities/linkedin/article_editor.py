@@ -242,44 +242,62 @@ def _press_escape(driver: WebDriver) -> None:
                   action_type="article_editor", step=STEP_COVER)
 
 
-# What the page shows when Publish cannot be found after Next: the visible buttons by their own
-# label, and any open dialog by its label or heading. Edition 17 (2026-10-20) attached its cover,
-# clicked Next, then missed Publish, and nothing recorded what was on screen instead (#2482 follow-up).
+# What the page shows when Publish cannot be resolved after Next: each open dialog by its label or
+# heading WITH its own buttons (Publish lives in the dialog Next opens), then the page's other
+# visible buttons. A disabled control is suffixed " [disabled]". Dialogs come first so neither the
+# page-button cap nor the message cap can drop them. Read-only: nothing is clicked or changed.
 _PUBLISH_MISS_SCAN_JS = r"""
 const vis = el => !!(el.offsetWidth || el.offsetHeight || (el.getClientRects && el.getClientRects().length));
-const label = el => ((el.getAttribute('aria-label') || '') + ' ' + (el.innerText || el.textContent || ''))
-  .trim().replace(/\s+/g, ' ').slice(0, 60);
-const buttons = [];
-for (const b of document.querySelectorAll('button, [role="button"]')) {
-  if (!vis(b)) continue;
-  const t = label(b);
-  if (t && !buttons.includes(t)) buttons.push(t);
-  if (buttons.length >= 25) break;
-}
+const label = el => {
+  const aria = (el.getAttribute('aria-label') || '').trim();
+  const text = (el.innerText || el.textContent || '').trim().replace(/\s+/g, ' ');
+  let t = (aria && text && aria !== text ? aria + ' / ' + text : (aria || text)).slice(0, 60);
+  if (el.disabled || el.getAttribute('aria-disabled') === 'true') t += ' [disabled]';
+  return t;
+};
+const btns = (root, cap) => {
+  const out = [];
+  for (const b of root.querySelectorAll('button, [role="button"]')) {
+    if (!vis(b)) continue;
+    const t = label(b);
+    if (t && !out.includes(t)) out.push(t);
+    if (out.length >= cap) break;
+  }
+  return out;
+};
 const dialogs = [];
 for (const d of document.querySelectorAll('[role="dialog"], [role="alertdialog"], dialog[open]')) {
   if (!vis(d)) continue;
   const h = d.querySelector('h1, h2, h3');
-  dialogs.push(((d.getAttribute('aria-label') || '') + ' ' + (h ? h.innerText : '')).trim().slice(0, 80));
+  const name = ((d.getAttribute('aria-label') || '') + ' ' + (h ? h.innerText : '')).trim().slice(0, 80);
+  dialogs.push({name: name, buttons: btns(d, 12)});
+  if (dialogs.length >= 4) break;
 }
-return {path: location.pathname.slice(0, 80), buttons: buttons, dialogs: dialogs.slice(0, 5)};
+return {dialogs: dialogs, path: location.pathname.slice(0, 80), buttons: btns(document, 20)};
 """
 
 
-def _log_publish_miss_evidence(driver: WebDriver, user_id: Optional[int] = None) -> None:
-    """Record what was on screen when Publish could not be found, best-effort.
+def _log_publish_miss_evidence(driver: WebDriver, publish_step: Optional["ResolvedElement"] = None,
+                               user_id: Optional[int] = None) -> None:
+    """Record what was on screen when Publish could not be resolved, best-effort; never raises.
 
-    INFO, not a warning: the miss itself already warned where it was detected
-    (`resolve_article_editor_step`). This line only says what the page offered instead, so the
-    next failure can be fixed from the log rather than by a live run. The evidence goes in the
-    message: the file log keeps only the fixed context keys, and prod forwards nothing below
-    WARNING to PostHog.
+    INFO, not a warning. When no route found Publish, the miss already warned where it was
+    detected (`resolve_article_editor_step`). When a route found it DISABLED there was no selector
+    miss, and this line is the only record, so it says which: `enabled` and the routes `tried` lead
+    the line. The evidence goes in the message text: the file log keeps no context keys, and prod
+    forwards nothing below WARNING to PostHog.
     """
+    evidence: dict = {}
+    if publish_step is not None:
+        evidence["enabled"] = publish_step.enabled
+        evidence["route"] = publish_step.route
+        evidence["tried"] = list(publish_step.tried or [])
     try:
-        evidence = driver.execute_script(_PUBLISH_MISS_SCAN_JS) or {}
-    except (WebDriverException, StaleElementReferenceException) as e:
-        evidence = {"scan_error": f"{type(e).__name__}"}
-    log_info(f"Article publish screen at the miss: {json.dumps(evidence, default=str)[:1500]}",
+        evidence.update(driver.execute_script(_PUBLISH_MISS_SCAN_JS) or {})
+    except Exception as e:  # noqa: BLE001 - a diagnostic must never turn a reported miss into a raise
+        evidence["scan_error"] = type(e).__name__
+    log_info(f"Article publish screen at the miss (user {user_id}): "
+             f"{json.dumps(evidence, default=str)[:2000]}",
              user_id=user_id, action_type="article_editor", step=STEP_PUBLISH)
 
 
@@ -728,7 +746,7 @@ def fill_article_editor(
     publish_step = resolve_article_editor_step(driver, wait, STEP_PUBLISH, _PUBLISH_LOCATORS,
                                              user_id=user_id)
     if not publish_step.ok:
-        _log_publish_miss_evidence(driver, user_id=user_id)
+        _log_publish_miss_evidence(driver, publish_step, user_id=user_id)
         return None, STEP_PUBLISH
 
     if not _click_safely(driver, publish_step.element):

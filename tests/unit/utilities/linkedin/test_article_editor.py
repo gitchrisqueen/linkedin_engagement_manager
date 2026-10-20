@@ -496,9 +496,15 @@ class TestFillArticleEditor:
             return None
 
         monkeypatch.setattr(ae, "find_first", fake_find_first)
+        logged = []
+        monkeypatch.setattr(ae, "log_info", lambda msg, **kw: logged.append(msg))
         url, failed = ae.fill_article_editor(driver, wait, "title", "body")
         assert url is None
         assert failed == ae.STEP_PUBLISH
+        # Found but disabled is not a selector miss; the evidence line must say which it was.
+        evidence = [m for m in logged if m.startswith("Article publish screen at the miss")]
+        assert len(evidence) == 1
+        assert '"enabled": false' in evidence[0] and ae.ROUTE_PUBLISH_TEXT in evidence[0]
 
     def test_returns_step_title_when_typing_fails_and_all_still_present(self, monkeypatch):
         title = FakeElement(tag="textarea", attrs={"placeholder": "Title"})
@@ -612,7 +618,7 @@ class TestFillArticleEditor:
         assert url is None
         assert failed == ae.STEP_PUBLISH
         # The miss records what the page offered instead, so the next failure is fixable from the log.
-        evidence = [(msg, kw) for msg, kw in logged if msg.startswith("Article publish screen at the miss: ")]
+        evidence = [(msg, kw) for msg, kw in logged if msg.startswith("Article publish screen at the miss")]
         assert len(evidence) == 1 and evidence[0][1]["step"] == ae.STEP_PUBLISH
 
     def test_publish_miss_evidence_survives_a_failing_script(self, monkeypatch):
@@ -624,20 +630,40 @@ class TestFillArticleEditor:
 
         ae._log_publish_miss_evidence(driver, user_id=1)
 
-        assert logged == [('Article publish screen at the miss: {"scan_error": "WebDriverException"}',
+        assert logged == [('Article publish screen at the miss (user 1): {"scan_error": "WebDriverException"}',
                            {"user_id": 1, "action_type": "article_editor", "step": ae.STEP_PUBLISH})]
+
+    def test_publish_miss_evidence_survives_a_transport_error(self, monkeypatch):
+        """A dropped Grid connection is not a WebDriverException; the diagnostic still never raises."""
+        driver = MagicMock()
+        driver.execute_script.side_effect = RuntimeError("cannot schedule new futures after shutdown")
+        logged = []
+        monkeypatch.setattr(ae, "log_info", lambda msg, **kw: logged.append(msg))
+
+        ae._log_publish_miss_evidence(driver, user_id=1)
+
+        assert logged == ['Article publish screen at the miss (user 1): {"scan_error": "RuntimeError"}']
 
     def test_publish_miss_evidence_names_the_visible_controls(self, monkeypatch):
         driver = MagicMock()
-        driver.execute_script.return_value = {"path": "/article/edit/1/", "buttons": ["Next", "Done"],
-                                              "dialogs": ["Edit image"]}
+        driver.execute_script.return_value = {
+            "dialogs": [{"name": "Edit image", "buttons": ["Done", "Cancel"]}],
+            "path": "/article/edit/1/", "buttons": ["Next"]}
         logged = []
         monkeypatch.setattr(ae, "log_info", lambda msg, **kw: logged.append(msg))
 
         ae._log_publish_miss_evidence(driver)
 
-        assert logged == ['Article publish screen at the miss: {"path": "/article/edit/1/", '
-                          '"buttons": ["Next", "Done"], "dialogs": ["Edit image"]}']
+        assert logged == ['Article publish screen at the miss (user None): '
+                          '{"dialogs": [{"name": "Edit image", "buttons": ["Done", "Cancel"]}], '
+                          '"path": "/article/edit/1/", "buttons": ["Next"]}']
+        # Dialogs lead, so the message cap can only ever cut page-level buttons.
+        assert logged[0].index('"dialogs"') < logged[0].index('"path"')
+
+    def test_scan_lists_dialog_buttons_first_and_marks_disabled(self):
+        js = ae._PUBLISH_MISS_SCAN_JS
+        assert "btns(d, 12)" in js and "[disabled]" in js and "aria-disabled" in js
+        assert js.index("return {dialogs: dialogs") >= 0
 
     def test_returns_publish_when_publish_click_fails(self, monkeypatch):
         title = FakeElement(tag="textarea", attrs={"placeholder": "Title"})
