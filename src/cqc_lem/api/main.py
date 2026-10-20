@@ -1438,6 +1438,29 @@ def health_check():
     return {"status": "healthy"}
 
 
+# The deep check's own Celery read. A broadcast `inspect()` waits its whole timeout for replies, so
+# the maintenance default (10 s) made every `/health/deep` take ~10 s once the edge stopped caching
+# it (2026-10-20, measured in the API container: inspect 10 s, everything else under 0.1 s). Workers
+# answer in milliseconds, and the status degrades only when NO worker consumes, so a shorter wait
+# cannot flip it. A successful read is reused for a few seconds, so a burst of requests costs one
+# broadcast; a failed read is never cached.
+_HEALTH_INSPECT_TIMEOUT_SECONDS = float(os.getenv("HEALTH_DEEP_INSPECT_TIMEOUT", "2"))
+_HEALTH_QUEUES_CACHE_SECONDS = float(os.getenv("HEALTH_DEEP_CACHE_SECONDS", "5"))
+_health_queues_cache: dict = {"at": 0.0, "replies": None}
+
+
+def _health_active_queues() -> dict:
+    """`active_queues()` for the deep check: a short broadcast, reused for a few seconds."""
+    cached = _health_queues_cache
+    now = time.monotonic()
+    if cached["replies"] is not None and now - cached["at"] < _HEALTH_QUEUES_CACHE_SECONDS:
+        return cached["replies"]
+    from cqc_lem.utilities.maintenance import _inspect
+    replies = _inspect(timeout=_HEALTH_INSPECT_TIMEOUT_SECONDS).active_queues() or {}
+    cached["replies"], cached["at"] = replies, now
+    return replies
+
+
 @app.get("/health/deep")
 def health_check_deep():
     """Readiness of the things `/health` deliberately ignores — for external monitors.
@@ -1465,10 +1488,9 @@ def health_check_deep():
     consuming = 0
     maintenance = None
     try:
-        from cqc_lem.utilities.maintenance import _inspect
         # active_queues() reaches every worker over the broker's control channel, so a lane whose
         # container was never started simply isn't in the reply — which is the signal we want.
-        replies = _inspect().active_queues() or {}
+        replies = _health_active_queues()
         for worker, queues in replies.items():
             lanes[worker] = sorted(q.get("name", "?") for q in (queues or []))
         consuming = sum(1 for names in lanes.values() if names)

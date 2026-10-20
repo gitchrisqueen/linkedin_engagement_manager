@@ -72,6 +72,21 @@ def _no_real_llm_calls():
 
 
 @pytest.fixture(autouse=True)
+def _fresh_health_deep_cache():
+    """Start every test with an empty `/health/deep` Celery cache.
+
+    The deep check reuses a successful `active_queues()` read for a few seconds, so without this a
+    test that patches `_inspect` would be answered by the previous test's cached reply. Only touched
+    when `api.main` is already imported, so it costs nothing elsewhere.
+    """
+    import sys
+    main = sys.modules.get("cqc_lem.api.main")
+    if main is not None and hasattr(main, "_health_queues_cache"):
+        main._health_queues_cache.update(at=0.0, replies=None)
+    yield
+
+
+@pytest.fixture(autouse=True)
 def _no_real_redis():
     """Keep un-mocked `_redis_client()` callers on the fails-open (None) path.
 

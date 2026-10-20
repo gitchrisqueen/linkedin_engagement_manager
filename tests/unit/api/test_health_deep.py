@@ -423,3 +423,46 @@ class TestHealthDeepLinkedInSession:
         body = json.dumps(out)
         assert "4242" not in body and "example.com" not in body and "2026-10-09" not in body
         assert out["session_checked"] == 1
+
+
+class TestCeleryReadIsShortAndReused:
+    """2026-10-20: once the edge stopped caching it, every request waited the full 10 s inspect."""
+
+    def _insp(self):
+        insp = MagicMock()
+        insp.active_queues.return_value = {"w1": [{"name": "celery"}]}
+        return insp
+
+    def test_the_deep_check_uses_its_own_short_inspect_timeout(self):
+        import cqc_lem.api.main as m
+        insp = self._insp()
+        with patch("cqc_lem.utilities.maintenance._inspect", return_value=insp) as inspect:
+            assert m._health_active_queues() == {"w1": [{"name": "celery"}]}
+        inspect.assert_called_once_with(timeout=m._HEALTH_INSPECT_TIMEOUT_SECONDS)
+        assert m._HEALTH_INSPECT_TIMEOUT_SECONDS < 10
+
+    def test_a_successful_read_is_reused_within_the_window(self):
+        import cqc_lem.api.main as m
+        insp = self._insp()
+        with patch("cqc_lem.utilities.maintenance._inspect", return_value=insp) as inspect:
+            m._health_active_queues()
+            m._health_active_queues()
+        assert inspect.call_count == 1
+
+    def test_the_read_is_repeated_after_the_window(self, monkeypatch):
+        import cqc_lem.api.main as m
+        insp = self._insp()
+        clock = iter([100.0, 100.0 + m._HEALTH_QUEUES_CACHE_SECONDS + 1])
+        monkeypatch.setattr(m.time, "monotonic", lambda: next(clock))
+        with patch("cqc_lem.utilities.maintenance._inspect", return_value=insp) as inspect:
+            m._health_active_queues()
+            m._health_active_queues()
+        assert inspect.call_count == 2
+
+    def test_a_failed_read_is_never_cached(self):
+        import cqc_lem.api.main as m
+        insp = self._insp()
+        with patch("cqc_lem.utilities.maintenance._inspect", side_effect=[RuntimeError("down"), insp]):
+            with pytest.raises(RuntimeError):
+                m._health_active_queues()
+            assert m._health_active_queues() == {"w1": [{"name": "celery"}]}
