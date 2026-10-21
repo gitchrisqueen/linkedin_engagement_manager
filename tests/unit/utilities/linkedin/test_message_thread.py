@@ -769,6 +769,16 @@ class TestReaders:
         assert mt.read_last_sender(d) == ""
         assert d.execute_script.call_count == mt._SENDER_READ_RETRIES
 
+    def test_a_crashed_tab_raises_instead_of_reading_as_no_sender(self):
+        # Issue #2490: '' sent `check_dm_replied` down its "no sender" path — a second warning and an
+        # unreadable read counted against a thread on a dead tab.
+        d = MagicMock()
+        d.execute_script.side_effect = WebDriverException("tab crashed\n  (Session info: chrome=155)")
+        with patch.object(mt, "log_warning") as warn, pytest.raises(WebDriverException):
+            mt.read_last_sender(d)
+        warn.assert_not_called()
+        assert d.execute_script.call_count == 1
+
 
 class TestResolveSelfName:
     """The name reply detection compares the last sender against (issue #731).

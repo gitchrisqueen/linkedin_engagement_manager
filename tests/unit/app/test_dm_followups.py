@@ -568,6 +568,23 @@ class TestCheckDmReplied:
             check_dm_replied(MagicMock(), MagicMock(), "https://x/in/b", my_name="Me")
         warn.assert_not_called()
 
+    def test_a_tab_crashed_on_the_sender_read_is_not_an_unknown_thread(self):
+        # Issue #2490: the thread opened, then the tab died on the sender read. Reading that as ''
+        # warned twice and counted an unreadable read against the row; it now ends the run.
+        from selenium.common.exceptions import WebDriverException
+
+        from cqc_lem.app.engagement.outreach import check_dm_replied
+        from cqc_lem.utilities.linkedin import message_thread as mt
+        driver = MagicMock()
+        driver.execute_script.side_effect = WebDriverException("tab crashed")
+        opened = MagicMock(opened=True, events=3, route="overlay")
+        with patch(f"{_OUT}.open_message_thread", return_value=opened), \
+             patch(f"{_OUT}.log_warning") as warn, patch.object(mt, "log_warning") as read_warn, \
+             pytest.raises(WebDriverException):
+            check_dm_replied(driver, MagicMock(), "https://x/in/b", my_name="Me")
+        warn.assert_not_called()
+        read_warn.assert_not_called()
+
 
 class _EmptyComposeDriver:
     """A driver that renders nothing but an empty full-page compose screen, on every route."""
