@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.199.4](https://github.com/christopherqueenconsulting/linkedin_engagement_manager/compare/v0.199.3...v0.199.4) (2026-10-21)
+
+
+### Bug Fixes
+
+* **outreach:** a crashed tab on the DM sender read ends the follow-up run ([1d440bf](https://github.com/christopherqueenconsulting/linkedin_engagement_manager/commit/1d440bfcb25928a816358bab5d0515b57fec478e))
+* **outreach:** a crashed tab on the DM sender read ends the follow-up run (closes [#2490](https://github.com/christopherqueenconsulting/linkedin_engagement_manager/issues/2490)) ([#2491](https://github.com/christopherqueenconsulting/linkedin_engagement_manager/issues/2491)) ([1d440bf](https://github.com/christopherqueenconsulting/linkedin_engagement_manager/commit/1d440bfcb25928a816358bab5d0515b57fec478e))
+
 ## [0.199.3](https://github.com/christopherqueenconsulting/linkedin_engagement_manager/compare/v0.199.2...v0.199.3) (2026-10-20)
 
 
