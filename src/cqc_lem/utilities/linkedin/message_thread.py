@@ -652,11 +652,16 @@ def read_last_sender(driver: WebDriver) -> str:
     (events present, sender empty) — the caller warns either way, so a transient race on every
     reply check was filing a `RecurringWarning` for working behaviour. A read that is STILL empty
     after the budget is spent is unchanged: '' , and the caller's warning stands.
+
+    A crashed tab re-raises (issue #2490), like `thread_reading`: reading it as '' warned here,
+    warned again in `check_dm_replied`, and counted an unreadable read against a thread nobody read.
     """
     for attempt in range(_SENDER_READ_RETRIES):
         try:
             sender = (driver.execute_script(_LAST_SENDER_JS) or "").strip()
         except Exception as e:
+            if is_tab_crashed(e):
+                raise
             log_warning("Could not read the last DM sender", exc=e, action_type="followup")
             return ""
         if sender or attempt == _SENDER_READ_RETRIES - 1:
