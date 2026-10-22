@@ -1,5 +1,15 @@
 # Changelog
 
+## [0.199.5](https://github.com/christopherqueenconsulting/linkedin_engagement_manager/compare/v0.199.4...v0.199.5) (2026-10-22)
+
+
+### Bug Fixes
+
+* **connections:** adjacent-author harvest opens with images, logs per-author counts ([#2456](https://github.com/christopherqueenconsulting/linkedin_engagement_manager/issues/2456)) ([583294a](https://github.com/christopherqueenconsulting/linkedin_engagement_manager/commit/583294afa87fc274be04ce5dce071e8ac83d1e43))
+* **connections:** adjacent-author harvest opens with images, logs per-author counts (closes [#2456](https://github.com/christopherqueenconsulting/linkedin_engagement_manager/issues/2456)) ([#2496](https://github.com/christopherqueenconsulting/linkedin_engagement_manager/issues/2496)) ([583294a](https://github.com/christopherqueenconsulting/linkedin_engagement_manager/commit/583294afa87fc274be04ce5dce071e8ac83d1e43))
+* **copy:** FAQ prices from plans.ts and suggest-mode Account wording (closes [#2493](https://github.com/christopherqueenconsulting/linkedin_engagement_manager/issues/2493)) ([#2499](https://github.com/christopherqueenconsulting/linkedin_engagement_manager/issues/2499)) ([2a0486c](https://github.com/christopherqueenconsulting/linkedin_engagement_manager/commit/2a0486c4d999ad5d76277496351595a43aaad43b))
+* **pricing:** name the catch-up cap as the one tier difference (closes [#2447](https://github.com/christopherqueenconsulting/linkedin_engagement_manager/issues/2447)) ([#2498](https://github.com/christopherqueenconsulting/linkedin_engagement_manager/issues/2498)) ([b5b4c3a](https://github.com/christopherqueenconsulting/linkedin_engagement_manager/commit/b5b4c3af7fcf0f2e5566464403bf7813f970c2f6))
+
 ## [0.199.4](https://github.com/christopherqueenconsulting/linkedin_engagement_manager/compare/v0.199.3...v0.199.4) (2026-10-21)
 
 
