@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import {
+  CATCHUP_TOUCHES_PER_DAY,
   INCLUDED_IN_EVERY_PLAN,
   PAID_PLANS,
   PLANS,
@@ -14,6 +15,7 @@ import {
   planFor,
   rememberPlanIntent,
   takePlanIntent,
+  tierDifferenceSentence,
 } from './plans'
 
 // Issue #1300: $29/$79/$199 lived in four places and none of them was the source of truth. These
@@ -74,12 +76,23 @@ describe('the plan constant is the SPA\'s one price source (issue #1300)', () =>
   })
 
   it('claims no capability that is gated behind a tier', () => {
-    // No tier gating exists in the codebase, so a per-tier feature list would be advertising
-    // something that does not ship. The capability list is deliberately shared.
+    // The catch-up cap is the one tier gate (issue #2447), so a per-tier feature list would be
+    // advertising something that does not ship. The capability list is deliberately shared.
     expect(INCLUDED_IN_EVERY_PLAN.length).toBeGreaterThan(3)
     for (const plan of PLANS) {
       expect(Object.keys(plan)).not.toContain('features')
     }
+  })
+})
+
+describe('the one tier gate is named, matching the backend (issue #2447)', () => {
+  it('pins the catch-up cap per tier: 10/day Professional and Enterprise, 5/day otherwise', () => {
+    // tests/unit/utilities/test_db_catchup_touches.py holds the backend half against this same map.
+    expect(CATCHUP_TOUCHES_PER_DAY).toEqual({ free_trial: 5, starter: 5, professional: 10, enterprise: 10 })
+  })
+
+  it('names the cap for the shown plans only', () => {
+    expect(tierDifferenceSentence()).toBe('Catch-up messages: 10/day on Professional, 5/day on Free Trial.')
   })
 })
 

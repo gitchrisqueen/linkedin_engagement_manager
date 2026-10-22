@@ -399,6 +399,24 @@ class TestPremiumCatchupAllowance:
             assert is_premium_subscriber(1) is False
             assert max_catchup_touches_allowed(1) == 5
 
+    def test_pricing_copy_names_the_same_cap_per_tier(self):
+        """The pricing copy's per-tier catch-up cap matches the backend gate (issue #2447).
+
+        The public pricing note reads `CATCHUP_TOUCHES_PER_DAY` in plans.ts, so each tier there must
+        get the cap this function enforces for an active subscription on it.
+        """
+        import re
+        from pathlib import Path
+        plans = Path(__file__).resolve().parents[3] / "src/cqc_lem/ui/src/constants/plans.ts"
+        block = re.search(r"CATCHUP_TOUCHES_PER_DAY[^=]*=\s*\{([^}]*)\}", plans.read_text()).group(1)
+        copy_caps = {tier: int(cap) for tier, cap in re.findall(r"(\w+):\s*(\d+)", block)}
+        assert set(copy_caps) == {"free_trial", "starter", "professional", "enterprise"}
+        for tier, cap in copy_caps.items():
+            info = {"subscription_tier": tier, "subscription_status": "active"}
+            with patch("cqc_lem.platform.db.repositories.users.get_user_subscription_info", return_value=info):
+                from cqc_lem.utilities.db import max_catchup_touches_allowed
+                assert max_catchup_touches_allowed(1) == cap, tier
+
 
 class TestCatchupDmTemplates:
     @pytest.mark.parametrize("event_type", ["job_change", "promotion", "work_anniversary",

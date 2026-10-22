@@ -1,5 +1,11 @@
 import { useAuth } from '../../contexts/useAuth'
-import { INCLUDED_IN_EVERY_PLAN, SHOWN_PLANS, TRIAL_DAYS, rememberPlanIntent } from '../../constants/plans'
+import {
+  INCLUDED_IN_EVERY_PLAN,
+  SHOWN_PLANS,
+  TRIAL_DAYS,
+  rememberPlanIntent,
+  tierDifferenceSentence,
+} from '../../constants/plans'
 import { EVENTS, capture } from '../../utils/analytics'
 import CtaButton from './CtaButton'
 import { IncludedMark } from './Icon'
@@ -9,10 +15,10 @@ import Section, { SectionHeading } from './Section'
 //
 // 1. The prices come from the shared `PLANS` constant, which the account checkout card and the FAQ
 //    fallback copy also read. They used to be typed out separately in each of those places.
-// 2. There is no per-tier feature table any more. No tier gating exists in the codebase — every
-//    account runs the same product — so the old Enterprise column ("Custom AI training",
-//    "White-label options", "API access", "Multi-team management") advertised four things that do
-//    not exist. The capability list is shared and the tiers differ by price, which is the truth.
+// 2. There is no per-tier feature table any more. Every account runs the same product, so the old
+//    Enterprise column ("Custom AI training", "White-label options", "API access", "Multi-team
+//    management") advertised four things that do not exist. The capability list is shared and the
+//    tiers differ by price plus ONE gate, the catch-up cap, which the note names (issue #2447).
 export default function PricingSection() {
   const { openLoginModal } = useAuth()
 
@@ -20,7 +26,7 @@ export default function PricingSection() {
     <Section id="pricing" analyticsName="pricing" tone="white">
       <SectionHeading
         eyebrow="Pricing"
-        title="Every plan is the whole product"
+        title="Every plan runs the whole loop"
         lede={`Start with a ${TRIAL_DAYS}-day free trial on any plan. No credit card required.`}
       />
 
@@ -83,9 +89,9 @@ export default function PricingSection() {
             </li>
           ))}
         </ul>
-        <p className="mt-5 max-w-measure text-sm text-fg-muted">
-          Plans differ by price today, not by feature — there is no capability locked behind a higher
-          tier. If that changes, this section changes with it.
+        <p data-testid="tier-difference" className="mt-5 max-w-measure text-sm text-fg-muted">
+          Plans differ by price and one cap. {tierDifferenceSentence()} Everything else is the same on
+          every plan.
         </p>
       </div>
     </Section>

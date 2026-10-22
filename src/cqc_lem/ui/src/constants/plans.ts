@@ -9,10 +9,11 @@
 // and cannot be verified from this repo. These strings are display copy that must be kept in step
 // with Stripe by hand.
 //
-// What is deliberately NOT here is a per-tier feature list. No tier gating exists in the codebase —
-// every account runs the same product today — so a table claiming Enterprise unlocks capabilities
-// Starter does not would be advertising something that does not exist. The shipped capability list
-// is shared (`INCLUDED_IN_EVERY_PLAN`) and the tiers differ by price alone until gating ships.
+// What is deliberately NOT here is a per-tier feature list. Every account runs the same product
+// with ONE exception, the catch-up message cap (`CATCHUP_TOUCHES_PER_DAY`, issue #2447), so a table
+// claiming Enterprise unlocks capabilities Starter does not would be advertising something that does
+// not exist. The shipped capability list is shared (`INCLUDED_IN_EVERY_PLAN`) and the tiers differ
+// by price and that one cap.
 
 export type PlanTier = 'free_trial' | 'starter' | 'professional' | 'enterprise'
 
@@ -68,9 +69,9 @@ export const PLANS: readonly Plan[] = [
 export const PAID_PLANS: readonly Plan[] = PLANS.filter((plan) => plan.tier !== 'free_trial')
 
 // Pricing test (issue #2370): while the free trial is being tested, every pricing surface offers the
-// trial plus the ONE recommended plan. The other tiers have no feature gate behind them yet, so
-// offering them asks a visitor to choose between prices for the same product. They stay defined
-// above — existing subscribers on them keep their label and their checkout — and setting this to
+// trial plus the ONE recommended plan. The other tiers differ from it by price and the catch-up cap
+// alone, so offering them asks a visitor to choose between prices for almost the same product. They
+// stay defined above — existing subscribers on them keep their label and their checkout — and setting this to
 // `false` is the whole un-hide.
 export const PRICING_TEST_ACTIVE = true
 
@@ -106,6 +107,38 @@ export const INCLUDED_IN_EVERY_PLAN: readonly string[] = [
   'Preview and approval before anything is published or sent',
   'Comment outcomes, post and audience stats, and a suppression tripwire',
 ] as const
+
+/**
+ * The one capability a tier gates (issue #2447): the highest catch-up cap a plan may set.
+ *
+ * Mirrors `max_catchup_touches_allowed()` in `platform/db/repositories/users.py` — 10/day on an
+ * active Professional or Enterprise plan, 5/day otherwise.
+ * `tests/unit/utilities/test_db_catchup_touches.py` reads this map and fails the build if the two
+ * disagree.
+ */
+export const CATCHUP_TOUCHES_PER_DAY: Readonly<Record<PlanTier, number>> = {
+  free_trial: 5,
+  starter: 5,
+  professional: 10,
+  enterprise: 10,
+}
+
+/**
+ * The tier difference as one sentence, naming only the shown plans, highest cap first.
+ *
+ * With every plan shown: "Catch-up messages: 10/day on Professional and Enterprise, 5/day on
+ * Free Trial and Starter."
+ */
+export function tierDifferenceSentence(): string {
+  const joinLabels = (labels: string[]) =>
+    labels.length <= 1 ? labels.join('') : `${labels.slice(0, -1).join(', ')} and ${labels[labels.length - 1]}`
+  const caps = [...new Set(SHOWN_PLANS.map((plan) => CATCHUP_TOUCHES_PER_DAY[plan.tier]))].sort((a, b) => b - a)
+  const groups = caps.map((cap) => {
+    const labels = SHOWN_PLANS.filter((plan) => CATCHUP_TOUCHES_PER_DAY[plan.tier] === cap).map((plan) => plan.label)
+    return `${cap}/day on ${joinLabels(labels)}`
+  })
+  return `Catch-up messages: ${groups.join(', ')}.`
+}
 
 // Which plan a visitor pressed on the marketing page, carried across signup (issue #1300).
 // Previously all seven landing CTAs opened the same login modal with no plan intent at all, so
