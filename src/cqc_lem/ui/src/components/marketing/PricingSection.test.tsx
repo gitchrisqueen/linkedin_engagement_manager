@@ -44,3 +44,13 @@ describe('landing pricing section during the pricing test (issue #2370)', () => 
     expect(screen.queryByTestId('plan-enterprise')).toBeNull()
   })
 })
+
+describe('landing pricing section names the one tier gate (issue #2447)', () => {
+  it('states the catch-up cap difference instead of claiming no capability is gated', () => {
+    const { container } = render(<PricingSection />)
+    expect(screen.getByTestId('tier-difference').textContent).toContain(
+      'Catch-up messages: 10/day on Professional, 5/day on Free Trial.',
+    )
+    expect(container.textContent).not.toMatch(/no capability locked|not by feature/)
+  })
+})
