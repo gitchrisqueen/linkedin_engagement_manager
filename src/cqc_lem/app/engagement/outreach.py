@@ -3187,15 +3187,22 @@ def _adjacent_author_signals(driver, user_id: int, authors: list, my_name: str,
             log_warning("Could not read adjacent author's recent activity", exc=e, user_id=user_id,
                         action_type="connection_targeting")
             continue
-        for post in activity[:_MAX_ADJACENT_POSTS_PER_AUTHOR]:
-            link = (post or {}).get("link")
-            if not link:
-                continue
+        posts = [p.get("link") for p in activity[:_MAX_ADJACENT_POSTS_PER_AUTHOR] if (p or {}).get("link")]
+        commenters = 0
+        for link in posts:
             try:
-                signals.extend(_harvest_post_commenters(driver, link, author_name, now))
+                harvested = _harvest_post_commenters(driver, link, author_name, now)
             except Exception as e:
                 log_warning("Could not harvest engagers from adjacent post", exc=e, user_id=user_id,
                             action_type="connection_targeting")
+                continue
+            commenters += len(harvested)
+            signals.extend(harvested)
+        # Issue #2456: the funnel's `adjacent=0` read the same whether the activity page parsed no
+        # posts or the posts carried no readable commenters. One INFO line per author tells them apart.
+        log_info(f"Adjacent author harvest: {author_url} activity={len(activity)} posts={len(posts)} "
+                 f"commenters={commenters}", user_id=user_id,
+                 task_name="scan_connection_candidates", action_type="connection_targeting")
     me = (my_name or "").strip().lower()
     return [s for s in signals if (s.person_name or "").strip().lower() != me]
 
@@ -3282,8 +3289,11 @@ def scan_connection_candidates(self, user_id: int, max_new: int = None):
     if authors:
         driver = None
         try:
+            # needs_images=True (#2456): this session reads an author's `/recent-activity/*` page
+            # (#1979) and each post permalink (#2020) — both fastboot, so images-blocked they render
+            # empty and every scan since the authors were configured read adjacent=0.
             driver, _wait, _user_email, my_profile = get_current_profile(
-                user_id=user_id, session_name="Connection Targeting")
+                user_id=user_id, session_name="Connection Targeting", needs_images=True)
             signals.extend(_adjacent_author_signals(driver, user_id, authors,
                                                     my_profile.full_name, now))
         except Exception as e:
