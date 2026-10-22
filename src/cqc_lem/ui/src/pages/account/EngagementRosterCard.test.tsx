@@ -80,6 +80,16 @@ describe('EngagementRosterCard — engagement-mode wording', () => {
     expect(card).not.toMatch(/LEM comments on/i)
   })
 
+  it('words the per-week tooltip as a ceiling, not a promise to comment', async () => {
+    mode.suggestOnly = true
+    routeGet(TARGETS)
+    harness(<EngagementRosterCard />)
+    await waitFor(() => expect(screen.getByLabelText('Max comments/wk')).toBeTruthy())
+    const hint = screen.getByLabelText('Max comments/wk').getAttribute('title') ?? ''
+    expect(hint).toMatch(/would comment .* under full automation/)
+    expect(hint).not.toMatch(/LEM will comment/)
+  })
+
   it('keeps the full-automation wording for an automate account', async () => {
     routeGet(TARGETS)
     harness(<EngagementRosterCard />)

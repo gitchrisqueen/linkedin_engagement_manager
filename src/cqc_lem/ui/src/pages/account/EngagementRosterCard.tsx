@@ -17,6 +17,9 @@ type RosterResponse = GetDetail<'/api/user/engagement-targets'>
 const PER_WEEK_LABEL = 'Max comments/wk'
 const PER_WEEK_HINT =
   "LEM will comment on this account's recent posts at most this many times per week (0 pauses the account)."
+// A suggest-mode account has no roster commenting (#2493), so its tooltip names the ceiling only.
+const PER_WEEK_HINT_SUGGEST =
+  "The most times per week LEM would comment on this account's recent posts under full automation (0 pauses the account)."
 
 // What LEM learned about a target it could not act on (issue #962). A blocked target is not an
 // error — the author simply restricts who may comment — so the badge says what to DO about it.
@@ -144,6 +147,7 @@ export default function EngagementRosterCard() {
   // sections' stale copies over the user's edits (see EngagementPrefsContext).
   const { eng, setEng, save: savePrefs } = useEngagementPrefs()
   const suggestOnly = useSuggestOnly()
+  const perWeekHint = suggestOnly ? PER_WEEK_HINT_SUGGEST : PER_WEEK_HINT
   // The edited roster, once the user touches it — null means "show what the API returned". Derived
   // rather than seeded in an effect, so a refetch can never discard rows being typed.
   const [draft, setDraft] = useState<EngagementTarget[] | null>(null)
@@ -271,7 +275,7 @@ export default function EngagementRosterCard() {
             <span className="sm:col-span-4">Profile URL</span>
             <span className="sm:col-span-3">Name</span>
             <span className="sm:col-span-2">Type</span>
-            <span className="sm:col-span-2" title={PER_WEEK_HINT}>{PER_WEEK_LABEL}</span>
+            <span className="sm:col-span-2" title={perWeekHint}>{PER_WEEK_LABEL}</span>
             <span className="sm:col-span-1 text-right">On</span>
           </div>
         )}
@@ -294,10 +298,10 @@ export default function EngagementRosterCard() {
               ))}
             </select>
             <label className="sm:col-span-2 flex items-center gap-1 text-xs text-fg-muted"
-                   title={PER_WEEK_HINT}>
+                   title={perWeekHint}>
               <input type="number" min={0} max={14} value={t.max_comments_per_week}
                 onChange={(e) => update(idx, { max_comments_per_week: Number(e.target.value) })}
-                aria-label={PER_WEEK_LABEL} title={PER_WEEK_HINT}
+                aria-label={PER_WEEK_LABEL} title={perWeekHint}
                 className="w-14 border border-field rounded-control px-1 py-1" />
               <span className="sm:hidden">{PER_WEEK_LABEL}</span>
               <span className="hidden sm:inline">/wk</span>
