@@ -180,6 +180,24 @@ class TestScanFiling:
         assert insert.call_args.kwargs["source"] == "adjacent_post"
         assert "adjacent authors" in insert.call_args.kwargs["reasons"]
 
+    def test_adjacent_session_requests_images(self):
+        """Issue #2456: the harvest's pages are fastboot, so images-blocked it read adjacent=0.
+
+        `/recent-activity/*` is #1979's surface and a post permalink is #2020's.
+        """
+        from cqc_lem.app.engagement import outreach as ra
+        with patch.multiple(_OUT, get_engagement_preferences=MagicMock(
+                                return_value=_prefs(connection_target_authors=["https://x/in/g"])),
+                            count_invites_sent_today=MagicMock(return_value=0),
+                            count_open_connection_requests=MagicMock(return_value=0),
+                            get_engager_candidates=MagicMock(return_value=[]),
+                            _adjacent_author_signals=MagicMock(return_value=[]),
+                            quit_gracefully=MagicMock()), \
+             patch(f"{_OUT}.get_current_profile") as profile:
+            profile.return_value = (MagicMock(), MagicMock(), "me@x.com", MagicMock(full_name="Me"))
+            ra.scan_connection_candidates.run(user_id=2)
+        assert profile.call_args.kwargs["needs_images"] is True
+
     def test_adjacent_sourcing_failure_still_files_own_post_engagers(self):
         from cqc_lem.app.engagement import outreach as ra
         with patch(f"{_OUT}.get_engagement_preferences",
@@ -293,6 +311,27 @@ class TestAdjacentAuthorHarvest:
              patch(f"{_OUT}._harvest_post_commenters", side_effect=Exception("post gone")):
             assert ra._adjacent_author_signals(MagicMock(), 1, ["https://x/in/a"], "Me",
                                                datetime(2026, 7, 25)) == []
+
+    def test_logs_one_count_line_per_author(self):
+        """Issue #2456: a zero must say WHICH stage emptied it — the page, or the posts' comments."""
+        from cqc_lem.app.engagement import outreach as ra
+        from cqc_lem.utilities.connection_targeting import SOURCE_ADJACENT_POST, CandidateSignal
+        fan = CandidateSignal(person_name="Fan", person_profile_url="https://x/in/fan",
+                              source=SOURCE_ADJACENT_POST)
+        activity = {"https://x/in/a": [{"link": "https://x/feed/update/1"}, {"link": None}],
+                    "https://x/in/b": []}
+        with patch("cqc_lem.utilities.linkedin.scrapper.get_profile_recent_activity",
+                   side_effect=lambda _d, url: activity[url]), \
+             patch(f"{_OUT}._harvest_post_commenters", return_value=[fan]), \
+             patch(f"{_OUT}.log_info") as info:
+            ra._adjacent_author_signals(MagicMock(), 1, ["https://x/in/a", "https://x/in/b"],
+                                        "Me", datetime(2026, 7, 25))
+        lines = [str(c.args[0]) for c in info.call_args_list
+                 if str(c.args[0]).startswith("Adjacent author harvest")]
+        assert lines == [
+            "Adjacent author harvest: https://x/in/a activity=2 posts=1 commenters=1",
+            "Adjacent author harvest: https://x/in/b activity=0 posts=0 commenters=0",
+        ]
 
     def test_author_display_name_from_slug(self):
         from cqc_lem.app.engagement import outreach as ra

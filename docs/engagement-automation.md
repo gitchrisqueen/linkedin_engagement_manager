@@ -1697,6 +1697,17 @@ Three separate books, and #1867 is what stopped them being one:
   Widening `_CONNECT_ENGAGER_LOOKBACK_DAYS` was rejected because the sweeps show no third-party
   commenters to widen into. Counting reactors would be a new source and needs its own issue. A
   re-check of the funnel line, due 2026-10-31, is #2456.
+- **Configured authors still read `adjacent=0`, because the session blocked images (issue #2456).**
+  Every scan from 2026-10-17 to 2026-10-22 read `adjacent=0` with no adjacent-author warning. For
+  example: `budget=5 own_post=1 adjacent=0 ranked=0 filed=0` on 2026-10-22. The `Connection
+  Targeting` session opened with the bandwidth saver on. The harvest reads two kinds of page: an
+  author's `/recent-activity/*` page and each post's permalink. Both are fastboot surfaces (#1979,
+  #2020), so with images blocked they render nothing. `get_profile_recent_activity` then returned
+  `[]`, which is not an exception, so the harvest was empty and nothing warned. The session now
+  opens with `needs_images=True`. The harvest also logs one INFO line per author:
+  `Adjacent author harvest: <url> activity= posts= commenters=`. A future zero shows where it
+  came from: `activity=0` means the page parsed no posts, which points at the legacy activity-page
+  selectors. `commenters=0` means the posts had no readable commenters.
 
 ## A lane run ends in the Celery state its outcome earned (`app/task_outcome.py`, issue #2097)
 
