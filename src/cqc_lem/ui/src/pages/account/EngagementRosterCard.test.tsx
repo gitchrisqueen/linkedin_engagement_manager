@@ -17,6 +17,8 @@ vi.mock('../../api/client', () => ({
   },
 }))
 vi.mock('../../contexts/useAuth', () => ({ useAuth: () => ({ sessionToken: 'tok' }) }))
+const mode = vi.hoisted(() => ({ suggestOnly: false }))
+vi.mock('../../hooks/useEngagementMode', () => ({ useSuggestOnly: () => mode.suggestOnly }))
 vi.mock('../../utils/analytics', () => ({
   maskProps: (className: string) => ({ className }),
   capture: vi.fn(),
@@ -61,7 +63,30 @@ beforeEach(() => {
   put.mockReset()
   del.mockReset()
 })
-afterEach(cleanup)
+afterEach(() => {
+  cleanup()
+  mode.suggestOnly = false
+})
+
+// Issue #2493: a suggest-mode account runs no roster commenting.
+describe('EngagementRosterCard — engagement-mode wording', () => {
+  it('says LEM does not comment on these accounts in suggestion mode', async () => {
+    mode.suggestOnly = true
+    routeGet(TARGETS)
+    harness(<EngagementRosterCard />)
+    await waitFor(() => expect(screen.getByTestId('engagement-roster')).toBeTruthy())
+    const card = screen.getByTestId('engagement-roster').textContent ?? ''
+    expect(card).toMatch(/suggestion mode, so LEM does not comment on these accounts' posts/i)
+    expect(card).not.toMatch(/LEM comments on/i)
+  })
+
+  it('keeps the full-automation wording for an automate account', async () => {
+    routeGet(TARGETS)
+    harness(<EngagementRosterCard />)
+    await waitFor(() => expect(screen.getByTestId('engagement-roster')).toBeTruthy())
+    expect(screen.getByTestId('engagement-roster').textContent).toMatch(/LEM comments on these accounts' recent posts/)
+  })
+})
 
 describe('EngagementRosterCard — the per-week field says what it controls (issue #956)', () => {
   it('heads the number column with a visible label, not just a "/wk" suffix', async () => {

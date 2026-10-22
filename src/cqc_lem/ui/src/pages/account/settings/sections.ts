@@ -14,13 +14,16 @@ export type Section = {
   key: SectionKey
   label: string
   blurb: string
+  /** Shown instead of `blurb` to a suggest-mode account, where `blurb` would claim a lane runs (#2493). */
+  suggestBlurb?: string
 }
 
 export const SECTIONS: Section[] = [
   { key: 'setup', label: 'Setup & Connection', blurb: "If this isn't right, nothing else runs." },
   { key: 'voice', label: 'My Voice', blurb: 'How LEM sounds — in posts, comments, DMs and your newsletter.' },
   { key: 'content', label: 'Content & Publishing', blurb: 'What gets written, and what has to clear review before it ships.' },
-  { key: 'targeting', label: 'Who I Engage', blurb: 'Which posts and people LEM engages with.' },
+  { key: 'targeting', label: 'Who I Engage', blurb: 'Which posts and people LEM engages with.',
+    suggestBlurb: 'Which posts and people LEM would engage with under full automation. Your account is in suggestion mode, so LEM does not comment in your feed, on these accounts or in your groups.' },
   { key: 'volume', label: 'How Much & How Often', blurb: 'Your daily activity budget, in one place.' },
   { key: 'outreach', label: 'Outreach & DMs', blurb: 'Everything that sends a person a message.' },
   { key: 'newsletter', label: 'Newsletter', blurb: 'Your recurring LinkedIn newsletter.' },

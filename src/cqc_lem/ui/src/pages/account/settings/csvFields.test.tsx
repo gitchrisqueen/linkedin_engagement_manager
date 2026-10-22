@@ -39,6 +39,8 @@ vi.mock('./userPrefsCtx', () => ({
   useUserPrefs: () => ({ prefs: null, setPrefs: () => {}, effectiveLanguage: null }),
 }))
 
+vi.mock('../../../hooks/useEngagementMode', () => ({ useSuggestOnly: () => false }))
+
 afterEach(() => { cleanup(); eng = {} })
 
 const box = (settingKey: string) =>

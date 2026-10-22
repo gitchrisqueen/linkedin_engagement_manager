@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import api from '../../api/client'
 import { useAuth } from '../../contexts/useAuth'
+import { useSuggestOnly } from '../../hooks/useEngagementMode'
 import { ROSTER_BLOCKED_BADGE_STREAK, TARGET_CATEGORIES } from './types'
 import type { GetDetail } from '../../api/types'
 import type { EngagementTarget, EngagementTargetCategory, EngagementTargetSuggestion } from './types'
@@ -142,6 +143,7 @@ export default function EngagementRosterCard() {
   // mutation every settings section writes through — a second writer here would save the other
   // sections' stale copies over the user's edits (see EngagementPrefsContext).
   const { eng, setEng, save: savePrefs } = useEngagementPrefs()
+  const suggestOnly = useSuggestOnly()
   // The edited roster, once the user touches it — null means "show what the API returned". Derived
   // rather than seeded in an effect, so a refetch can never discard rows being typed.
   const [draft, setDraft] = useState<EngagementTarget[] | null>(null)
@@ -237,8 +239,19 @@ export default function EngagementRosterCard() {
          data-testid="engagement-roster">
       <h2 className="text-base font-semibold text-fg">Engagement Roster</h2>
       <p className="text-xs text-fg-muted">
-        LEM comments on these accounts' recent posts <span className="font-semibold">before</span> it
-        looks at your home feed. The <span className="font-semibold">{PER_WEEK_LABEL}</span> number on
+        {suggestOnly ? (
+          <>
+            Your account is in suggestion mode, so LEM does not comment on these accounts' posts.
+            Under full automation it works through them <span className="font-semibold">before</span>{' '}
+            your home feed.
+          </>
+        ) : (
+          <>
+            LEM comments on these accounts' recent posts <span className="font-semibold">before</span> it
+            looks at your home feed.
+          </>
+        )}{' '}
+        The <span className="font-semibold">{PER_WEEK_LABEL}</span> number on
         each row is that account's weekly ceiling — set it to 0 to pause an account without removing
         it. Aim for 50–100 accounts, roughly 50% peers / 30% ICP / 20% large creators. Off-topic posts
         are always skipped, roster or not.

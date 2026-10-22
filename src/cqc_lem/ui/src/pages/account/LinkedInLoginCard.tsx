@@ -3,6 +3,7 @@ import { useMutation, useQuery } from '@tanstack/react-query'
 import api from '../../api/client'
 import { useAuth } from '../../contexts/useAuth'
 import { useAccountReadiness } from '../../hooks/useAccountReadiness'
+import { useSuggestOnly } from '../../hooks/useEngagementMode'
 import LinkedInSessionCard from '../../components/LinkedInSessionCard'
 import LinkedInSignInStatusCard from './LinkedInSignInStatusCard'
 import { useStepUp } from '../../hooks/useStepUp'
@@ -13,6 +14,7 @@ export default function LinkedInLoginCard() {
   const { sessionToken } = useAuth()
   const { guard, stepUpModal } = useStepUp()
   const { data: readiness } = useAccountReadiness()
+  const suggestOnly = useSuggestOnly()
   const sessionOk = readiness?.items.find((i) => i.key === 'linkedin_session')?.ok ?? false
   const cookieMigrationNeeded = readiness?.cookie_migration_needed ?? false
 
@@ -142,8 +144,10 @@ export default function LinkedInLoginCard() {
             </span>
           </div>
 
-          <p className="text-xs text-fg-muted">
-            Connecting allows LEM to post on your behalf, send DMs, reply to comments, and engage with your network automatically.
+          <p className="text-xs text-fg-muted" data-testid="linkedin-connect-purpose">
+            {suggestOnly
+              ? "Connecting lets LEM publish the posts you approve through LinkedIn's API. Your account is in suggestion mode, so LEM writes comments and messages for you to send yourself and does not comment, reply or message for you."
+              : 'Connecting allows LEM to post on your behalf, send DMs, reply to comments, and engage with your network automatically.'}
           </p>
 
           <a

@@ -15,6 +15,9 @@ vi.mock('../../api/client', () => ({
   },
 }))
 vi.mock('../../contexts/useAuth', () => ({ useAuth: () => ({ sessionToken: 'tok' }) }))
+// The mode has its own GET; mocked so it never consumes one of `routeGet`'s queued group payloads.
+const mode = vi.hoisted(() => ({ suggestOnly: false }))
+vi.mock('../../hooks/useEngagementMode', () => ({ useSuggestOnly: () => mode.suggestOnly }))
 vi.mock('../../utils/analytics', () => ({
   maskProps: (className: string) => ({ className }),
   capture: vi.fn(),
@@ -62,7 +65,32 @@ beforeEach(() => {
   get.mockReset()
   put.mockReset()
 })
-afterEach(cleanup)
+afterEach(() => {
+  cleanup()
+  mode.suggestOnly = false
+})
+
+// Issue #2493: a suggest-mode account never has LEM comment or post in its groups.
+describe('GroupsCard engagement-mode wording', () => {
+  const ON_YOUR_BEHALF = /LEM (leaves|publishes|comments|posts|will publish)\b/i
+
+  it('says nothing runs in suggestion mode and never claims LEM comments or posts', async () => {
+    mode.suggestOnly = true
+    routeGet([GROUPS], DRAFT)
+    const { container } = harness(<GroupsCard />)
+    await waitFor(() => expect(screen.getByText('Next group post — Sales Pros')).toBeTruthy())
+    expect(container.textContent).toMatch(/suggestion mode, so LEM does not comment or post in your groups/i)
+    expect(container.textContent).not.toMatch(ON_YOUR_BEHALF)
+  })
+
+  it('keeps the full-automation wording for an automate account', async () => {
+    routeGet([GROUPS])
+    const { container } = harness(<GroupsCard />)
+    await waitFor(() => expect(screen.getByText('LinkedIn Groups')).toBeTruthy())
+    expect(container.textContent).toMatch(/LEM leaves value-add comments/)
+    expect(container.textContent).toMatch(/LEM publishes/)
+  })
+})
 
 describe('GroupsCard (issue #769)', () => {
   it('says a group post is original, not a duplicate or reshare of a feed post', async () => {

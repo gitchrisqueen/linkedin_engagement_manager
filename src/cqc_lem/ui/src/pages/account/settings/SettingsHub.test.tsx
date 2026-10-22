@@ -37,6 +37,9 @@ vi.mock('./ConflictsContext', () => ({
 }))
 vi.mock('./conflictsCtx', () => ({ useConflicts: () => ({ alertCounts: {} }) }))
 
+const mode = vi.hoisted(() => ({ suggestOnly: true }))
+vi.mock('../../../hooks/useEngagementMode', () => ({ useSuggestOnly: () => mode.suggestOnly }))
+
 vi.mock('../SubscriptionCard', () => ({ default: () => <div data-testid="subscription-card" /> }))
 vi.mock('../VideoCreditsCard', () => ({ default: () => <div data-testid="video-credits-card" /> }))
 vi.mock('../TimezoneCard', () => ({ default: () => <div data-testid="timezone-card" /> }))
@@ -86,5 +89,28 @@ describe('SettingsHub card order', () => {
     harness('/account?section=content')
     expect(screen.getByTestId('content-section').parentElement?.getAttribute('aria-hidden')).toBe('false')
     expect(screen.getByTestId('voice-section').parentElement?.getAttribute('aria-hidden')).toBe('true')
+  })
+})
+
+// Issue #2493: a suggest-mode account runs no feed, roster or group commenting, so the Who I Engage
+// header must not say LEM engages for it.
+describe('SettingsHub section blurbs by engagement mode', () => {
+  const blurbOf = () =>
+    screen.getByTestId('targeting-section').parentElement?.querySelector('p')?.textContent ?? ''
+
+  it('words Who I Engage as suggestion mode for a suggest-mode account', () => {
+    mode.suggestOnly = true
+    const { unmount } = harness('/account?section=targeting')
+    expect(blurbOf()).toMatch(/suggestion mode, so LEM does not comment/i)
+    expect(blurbOf()).not.toMatch(/^Which posts and people LEM engages with\.$/)
+    unmount()
+  })
+
+  it('keeps the full-automation wording for an automate account', () => {
+    mode.suggestOnly = false
+    const { unmount } = harness('/account?section=targeting')
+    expect(blurbOf()).toBe('Which posts and people LEM engages with.')
+    unmount()
+    mode.suggestOnly = true
   })
 })

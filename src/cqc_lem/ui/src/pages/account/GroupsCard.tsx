@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react'
 import { useMutation, useQuery } from '@tanstack/react-query'
 import api from '../../api/client'
 import { useAuth } from '../../contexts/useAuth'
+import { useSuggestOnly } from '../../hooks/useEngagementMode'
 import Toggle from '../../components/Toggle'
 import { maskProps } from '../../utils/analytics'
 import type { GroupPostDraft, UserGroup } from './types'
@@ -21,6 +22,7 @@ const postSig = (rows: UserGroup[]) =>
 
 export default function GroupsCard() {
   const { sessionToken } = useAuth()
+  const suggestOnly = useSuggestOnly()
   // Edits in progress, once there are any — null means "show what the API returned". Both are
   // derived at render rather than seeded in an effect, so a background refetch can never discard a
   // toggle the user just moved or a post they are part-way through rewriting.
@@ -145,13 +147,22 @@ export default function GroupsCard() {
     <div className="bg-raised rounded-panel shadow-panel border border-hairline p-6 space-y-4">
       <h2 className="text-base font-semibold text-fg">LinkedIn Groups</h2>
       <div className="text-xs text-fg-muted space-y-1">
-        <p>Two separate things happen in your joined groups, and each has its own switch per group. Both are on by default.</p>
+        {suggestOnly ? (
+          <p>
+            Your account is in suggestion mode, so LEM does not comment or post in your groups. Under
+            full automation two separate things happen in them, each with its own switch per group.
+          </p>
+        ) : (
+          <p>Two separate things happen in your joined groups, and each has its own switch per group. Both are on by default.</p>
+        )}
         <p>
-          <span className="font-semibold text-fg">Comment</span> — LEM leaves value-add comments on
+          <span className="font-semibold text-fg">Comment</span> —{' '}
+          {suggestOnly ? 'value-add comments' : 'LEM leaves value-add comments'} on
           other members' posts in that group, daily, out of your normal daily comment budget.
         </p>
         <p>
-          <span className="font-semibold text-fg">Post</span> — about once a week LEM publishes{' '}
+          <span className="font-semibold text-fg">Post</span> —{' '}
+          {suggestOnly ? 'about once a week,' : 'about once a week LEM publishes'}{' '}
           <span className="font-semibold text-fg">one original post into one group</span>, written fresh
           for that group's members. Your scheduled feed posts are never duplicated, reshared or cross-posted
           into groups, and the same post never goes to more than one group.
@@ -180,8 +191,11 @@ export default function GroupsCard() {
                   : "Skipped — this week's slot has passed, so the skip is final and a new post is "
                     + 'drafted Sunday. ')
                 + 'Images and video for a group post live in the Content Studio.'
-              : 'This exact text is what LEM will publish at the next weekly group slot. Edit it, '
-                + 'or skip it and no group post goes out this week.'}
+              : suggestOnly
+                ? 'LEM drafted this for the next weekly group slot. In suggestion mode it is not '
+                  + 'published for you: copy it into the group yourself if you want it there.'
+                : 'This exact text is what LEM will publish at the next weekly group slot. Edit it, '
+                  + 'or skip it and no group post goes out this week.'}
           </p>
           <textarea
             aria-label="Group post text"
