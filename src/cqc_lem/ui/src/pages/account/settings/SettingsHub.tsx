@@ -32,6 +32,7 @@ import TargetingSection from './TargetingSection'
 import VolumeSection from './VolumeSection'
 import OutreachSection from './OutreachSection'
 import SafetyCard from './SafetyCard'
+import { useSuggestOnly } from '../../../hooks/useEngagementMode'
 
 function SectionBody({ section }: { section: SectionKey }) {
   switch (section) {
@@ -123,6 +124,7 @@ function SharedSaveStatus() {
 export default function SettingsHub() {
   const [searchParams, setSearchParams] = useSearchParams()
   const active = resolveSection(searchParams.get('section'), searchParams.get('tab'))
+  const suggestOnly = useSuggestOnly()
 
   const selectSection = (key: SectionKey) => {
     setSearchParams((prev) => {
@@ -149,7 +151,7 @@ export default function SettingsHub() {
                   >
                     <div>
                       <h2 className="text-xl font-semibold text-fg">{s.label}</h2>
-                      <p className="text-sm text-fg-muted">{s.blurb}</p>
+                      <p className="text-sm text-fg-muted">{(suggestOnly && s.suggestBlurb) || s.blurb}</p>
                     </div>
                     <SectionBody section={s.key} />
                   </div>

@@ -3,9 +3,12 @@ import api from '../api/client'
 import { TRIAL_DAYS, paidPricingSentence } from '../constants/plans'
 
 // Front-page FAQ (issue #506). Entries come from `faq_entries` via the public GET /api/faq, which
-// the auto-FAQ pass keeps current from the questions users actually ask. The seeded copy below is
-// the fallback ONLY — if the API is unreachable the landing page still answers the basics rather
-// than showing an empty section.
+// the auto-FAQ pass keeps current from the questions users actually ask.
+//
+// The answers below are the SPA's own and always lead the section (issue #2493). The six rows the
+// 2026-07 migration seeded still sit in `faq_entries` describing automated engagement and the old
+// four-plan pricing, so a served row is shown only when it answers something these do not — and
+// never when it quotes a price, because plan names and prices come from constants/plans.ts alone.
 interface FaqEntry {
   id: number
   question: string
@@ -13,7 +16,7 @@ interface FaqEntry {
   updated_at?: string | null
 }
 
-const FALLBACK_ENTRIES: FaqEntry[] = [
+const SPA_ENTRIES: FaqEntry[] = [
   {
     id: -1,
     question: 'What does LEM actually do?',
@@ -56,6 +59,33 @@ const FALLBACK_ENTRIES: FaqEntry[] = [
   },
 ]
 
+// The questions V20260725155210__add_faq_entries.sql seeded, each answered above in its current form.
+const SEEDED_QUESTIONS = [
+  'What does the automation actually do?',
+  'How much does it cost, and is there a free trial?',
+  "Is this against LinkedIn's Terms of Service?",
+  'What happens to my data and my LinkedIn credentials?',
+  'How does the AI match my voice?',
+  'Can I cancel anytime?',
+]
+
+const normalizeQuestion = (q: string) => q.trim().toLowerCase().replace(/[’']/g, "'")
+
+const ANSWERED_HERE = new Set(
+  [...SEEDED_QUESTIONS, ...SPA_ENTRIES.map((e) => e.question)].map(normalizeQuestion),
+)
+
+const QUOTES_A_PRICE = /[$€£]\s?\d/
+
+/** A served entry worth showing after the SPA's own: a new question, with no price of its own. */
+function isExtraEntry(entry: FaqEntry): boolean {
+  return (
+    !ANSWERED_HERE.has(normalizeQuestion(entry.question)) &&
+    !QUOTES_A_PRICE.test(entry.question) &&
+    !QUOTES_A_PRICE.test(entry.answer)
+  )
+}
+
 function FaqItem({ question, answer }: { question: string; answer: string }) {
   const [open, setOpen] = useState(false)
   // The answer needs a stable id so the disclosure button can point `aria-controls` at it —
@@ -86,7 +116,7 @@ function FaqItem({ question, answer }: { question: string; answer: string }) {
 }
 
 export default function FAQ() {
-  const [entries, setEntries] = useState<FaqEntry[]>(FALLBACK_ENTRIES)
+  const [extra, setExtra] = useState<FaqEntry[]>([])
 
   useEffect(() => {
     let cancelled = false
@@ -94,10 +124,10 @@ export default function FAQ() {
       .get('/faq')
       .then((r) => {
         const published: FaqEntry[] = r.data?.detail?.entries ?? []
-        const usable = published.filter((e) => e?.question && e?.answer)
-        if (!cancelled && usable.length > 0) setEntries(usable)
+        const usable = published.filter((e) => e?.question && e?.answer && isExtraEntry(e))
+        if (!cancelled) setExtra(usable)
       })
-      // Unreachable API on a public page is not worth an error state — keep the seeded copy.
+      // Unreachable API on a public page is not worth an error state — the SPA's answers stand.
       .catch(() => undefined)
     return () => {
       cancelled = true
@@ -111,7 +141,7 @@ export default function FAQ() {
           Frequently asked questions
         </h2>
         <div className="space-y-3">
-          {entries.map((entry) => (
+          {[...SPA_ENTRIES, ...extra].map((entry) => (
             <FaqItem key={entry.id} question={entry.question} answer={entry.answer} />
           ))}
         </div>

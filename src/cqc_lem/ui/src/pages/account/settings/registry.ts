@@ -183,7 +183,7 @@ export const SETTINGS: SettingDescriptor[] = [
     why: 'Filters out dead posts, but applies BEFORE scoring — set it high and the pool empties.',
     recommended: '0. Raise it only if you are commenting on posts nobody sees.' }),
   D({ key: 'max_post_age_hours', section: 'targeting', label: 'Max post age (hours)',
-    what: 'How old a post may be when LEM comments on it.',
+    what: 'How old a post may be for LEM to comment on it.',
     why: 'Early comments earn far more reach, but a tiny window leaves almost nothing to pick from.',
     recommended: '24 hours.' }),
   D({ key: 'feed_fallback_when_empty', section: 'targeting', label: 'Comment anyway if my filters match nothing',

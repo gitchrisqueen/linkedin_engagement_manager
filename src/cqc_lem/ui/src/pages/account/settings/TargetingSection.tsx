@@ -1,5 +1,6 @@
 import Toggle from '../../../components/Toggle'
 import { maskProps } from '../../../utils/analytics'
+import { useSuggestOnly } from '../../../hooks/useEngagementMode'
 import type { EngPrefs } from '../types'
 import CsvInput from './CsvInput'
 import { useEngagementPrefs } from './engagementPrefsCtx'
@@ -27,10 +28,12 @@ const FILTERS: ListField[] = [
 
 // The live funnel from the last real feed scan — so a targeting warning cites the user's own data
 // instead of a hypothetical.
-function FeedReachFunnel() {
+// A suggest-mode account runs no feed scan (#2367), so any funnel it has is left over from full
+// automation and would say LEM commented for it.
+function FeedReachFunnel({ suggestOnly }: { suggestOnly: boolean }) {
   const { eng } = useEngagementPrefs()
   const reach = eng?.feed_reach
-  if (!reach) return null
+  if (!reach || suggestOnly) return null
   return (
     <div className="rounded-panel bg-page border border-hairline p-3 text-xs text-fg-muted" data-testid="feed-reach">
       <p className="font-medium text-fg mb-1">Your last feed scan</p>
@@ -76,6 +79,7 @@ function FeedReachFunnel() {
 // sections that own them (F7).
 export default function TargetingSection() {
   const { eng, setEng } = useEngagementPrefs()
+  const suggestOnly = useSuggestOnly()
   if (!eng) return null
 
   const listField = ({ field, masked }: ListField) => (
@@ -89,10 +93,10 @@ export default function TargetingSection() {
 
   return (
     <SectionCard
-      title="Which posts LEM comments on"
+      title={suggestOnly ? 'Which posts LEM would comment on under full automation' : 'Which posts LEM comments on'}
       blurb="Comma-separated. Exclusions always win; if any include filter is set, a post must match one of them (keywords and authors literally, topics via AI relevance)."
     >
-      <FeedReachFunnel />
+      <FeedReachFunnel suggestOnly={suggestOnly} />
       {FILTERS.filter((f) => !f.advanced).map(listField)}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <Field settingKey="min_reactions">

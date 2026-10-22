@@ -9,7 +9,13 @@ vi.mock('./engagementPrefsCtx', () => ({
   useEngagementPrefs: () => state,
 }))
 
-afterEach(cleanup)
+const mode = vi.hoisted(() => ({ suggestOnly: false }))
+vi.mock('../../../hooks/useEngagementMode', () => ({ useSuggestOnly: () => mode.suggestOnly }))
+
+afterEach(() => {
+  cleanup()
+  mode.suggestOnly = false
+})
 
 function show(feed_sort: FeedReach['feed_sort']) {
   state.eng = {
@@ -51,5 +57,22 @@ describe('feed reach funnel sort caveat', () => {
   it('stays quiet for a funnel written before the sort was recorded', () => {
     show(undefined)
     expect(screen.queryByTestId('feed-reach-unsorted')).toBeNull()
+  })
+})
+
+// Issue #2493: a suggest-mode account runs no feed scan, so the card must not say LEM comments for it.
+describe('engagement-mode wording', () => {
+  it('words the card as full-automation-only and hides a leftover funnel in suggestion mode', () => {
+    mode.suggestOnly = true
+    show('recent')
+    expect(screen.getByText('Which posts LEM would comment on under full automation')).toBeTruthy()
+    expect(screen.queryByTestId('feed-reach')).toBeNull()
+    expect(screen.queryByText('Which posts LEM comments on')).toBeNull()
+  })
+
+  it('keeps the full-automation wording and funnel for an automate account', () => {
+    show('recent')
+    expect(screen.getByText('Which posts LEM comments on')).toBeTruthy()
+    expect(screen.getByTestId('feed-reach').textContent).toMatch(/commented on/)
   })
 })
